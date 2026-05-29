@@ -74,6 +74,38 @@ def get_db_cursor() -> Generator[DictCursor, None, None]:
             conn.close()
 
 
+@contextmanager
+def get_db_transaction():
+    """
+    显式事务上下文管理器。
+
+    调用方获取连接后手动控制 commit / rollback。
+    适合需要在一个事务内执行多条 SQL（含日志写入）的场景。
+
+    用法示例：
+        with get_db_transaction() as conn:
+            cursor = conn.cursor(DictCursor)
+            cursor.execute("INSERT ...", (...))
+            cursor.execute("INSERT INTO operation_logs ...", (...))
+            conn.commit()
+        # 或异常时自动 rollback
+
+    Yields:
+        pymysql.connections.Connection
+    """
+    conn = None
+    try:
+        conn = get_connection()
+        yield conn
+    except Exception:
+        if conn is not None:
+            conn.rollback()
+        raise
+    finally:
+        if conn is not None:
+            conn.close()
+
+
 def test_connection() -> Dict[str, Any]:
     """
     轻量级数据库健康检查。

@@ -2,31 +2,30 @@
 项目 Service 层。
 
 处理项目与项目成员相关业务逻辑。
-复用 auth_service.get_current_user() 和 user_repo 中的工具。
+所有写操作使用 get_db_transaction() 保证与 operation_logs 同一事务。
 """
 
 from typing import Any, Dict, List, Optional
 
+from app.database import get_db_transaction
 from app.repositories import project_repo, user_repo
 from app.utils.exceptions import (
-    AppException,
     ForbiddenException,
     NotFoundException,
+    UnauthorizedException,
     ValidationException,
 )
 
-# 允许的项目成员角色
 VALID_PROJECT_ROLES = {"member", "leader", "reviewer", "teacher"}
-# 允许的项目状态
 VALID_PROJECT_STATUS = {"active", "archived", "suspended"}
 
 
 def _require_auth(token: str) -> Dict[str, Any]:
-    """解析 Token，获取当前用户，失败抛出 Unauthorized。"""
+    """解析 Token，获取当前用户。"""
     from app.services.auth_service import get_current_user
     user = get_current_user(token)
     if user is None:
-        raise ForbiddenException(message="未登录或登录已过期")
+        raise UnauthorizedException(message="未登录或登录已过期，请重新登录")
     return user
 
 
@@ -35,7 +34,6 @@ def _is_admin(user: Dict[str, Any]) -> bool:
 
 
 def _is_project_manager(project_id: int, user_id: int) -> bool:
-    """判断用户是否有权管理指定项目（admin 或 owner 或 leader）。"""
     if user_repo.is_admin(user_id):
         return True
     return (
@@ -45,11 +43,9 @@ def _is_project_manager(project_id: int, user_id: int) -> bool:
 
 
 def _can_access_project(project_id: int, user: Dict[str, Any]) -> bool:
-    """判断用户是否有权访问指定项目。"""
-    user_id = user["user_id"]
     if _is_admin(user):
         return True
-    return project_repo.is_user_in_project(project_id, user_id)
+    return project_repo.is_user_in_project(project_id, user["user_id"])
 
 
 # =============================================================================
@@ -63,25 +59,12 @@ def list_projects(
     keyword: Optional[str] = None,
     status: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """
-    分页查询项目列表（按权限过滤）。
-
-    Args:
-        token: JWT token
-        page: 页码
-        page_size: 每页条数
-        keyword: 搜索关键字
-        status: 项目状态过滤
-
-    Returns:
-        {"items": [...], "total": N, "page": ..., "page_size": ...}
-    """
+    """分页查询项目列表（按权限过滤）。"""
     user = _require_auth(token)
     user_id = user["user_id"]
     is_admin = _is_admin(user)
     is_teacher = "teacher" in user.get("roles", [])
 
-    # 校验 status 参数
     if status is not None and status not in VALID_PROJECT_STATUS:
         raise ValidationException(
             message=f"无效的项目状态: {status}，允许值: {', '.join(VALID_PROJECT_STATUS)}"
@@ -97,9 +80,8 @@ def list_projects(
         status=status,
     )
 
-    items = [_project_row_to_dict(r) for r in rows]
     return {
-        "items": items,
+        "items": [_project_row_to_dict(r) for r in rows],
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -107,7 +89,7 @@ def list_projects(
 
 
 # =============================================================================
-# 项目创建
+# 项目创建（事务：INSERT projects + INSERT project_members + INSERT operation_logs）
 # =============================================================================
 
 def create_project(
@@ -118,39 +100,40 @@ def create_project(
     ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """
-    创建项目。
-
-    自动将创建人写入 project_members（角色为 leader）。
-    写入 operation_logs。
-
-    Returns:
-        新项目详情 dict
-    """
+    """创建项目，创建人自动成为 owner 和 leader。"""
     user = _require_auth(token)
     user_id = user["user_id"]
 
     if not project_name or not project_name.strip():
         raise ValidationException(message="项目名称不能为空")
 
-    project_id = project_repo.create_project(
-        project_name=project_name.strip(),
-        project_type=project_type,
-        description=(description.strip() if description else None),
-        owner_id=user_id,
-        created_by=user_id,
-    )
+    project_id: int = 0
 
-    user_repo.insert_operation_log(
-        user_id=user_id,
-        action_type="project:create",
-        action_desc=f"创建项目: {project_name.strip()}",
-        target_type="project",
-        target_id=project_id,
-        project_id=project_id,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
+    with get_db_transaction() as conn:
+        # 1. 创建项目 + 写入 leader 成员
+        project_id = project_repo.create_project(
+            project_name=project_name.strip(),
+            project_type=project_type,
+            description=(description.strip() if description else None),
+            owner_id=user_id,
+            created_by=user_id,
+            conn=conn,
+        )
+
+        # 2. 写入操作日志（同一事务）
+        user_repo.insert_operation_log_with_conn(
+            user_id=user_id,
+            action_type="project:create",
+            action_desc=f"创建项目: {project_name.strip()}",
+            target_type="project",
+            target_id=project_id,
+            project_id=project_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            conn=conn,
+        )
+
+        conn.commit()
 
     project = project_repo.get_project_by_id(project_id)
     return _project_row_to_dict(project)
@@ -160,10 +143,7 @@ def create_project(
 # 项目详情
 # =============================================================================
 
-def get_project_detail(
-    token: str,
-    project_id: int,
-) -> Dict[str, Any]:
+def get_project_detail(token: str, project_id: int) -> Dict[str, Any]:
     """获取项目详情（需有权限）。"""
     user = _require_auth(token)
 
@@ -178,7 +158,7 @@ def get_project_detail(
 
 
 # =============================================================================
-# 项目更新
+# 项目更新（事务：UPDATE projects + INSERT operation_logs）
 # =============================================================================
 
 def update_project(
@@ -210,32 +190,38 @@ def update_project(
             message=f"无效的项目状态: {status}，允许值: {', '.join(VALID_PROJECT_STATUS)}"
         )
 
-    project_repo.update_project(
-        project_id=project_id,
-        project_name=(project_name.strip() if project_name else None),
-        project_type=project_type,
-        description=description,
-        status=status,
-        updated_by=user_id,
-    )
+    with get_db_transaction() as conn:
+        affected = project_repo.update_project(
+            project_id=project_id,
+            project_name=(project_name.strip() if project_name else None),
+            project_type=project_type,
+            description=description,
+            status=status,
+            updated_by=user_id,
+            conn=conn,
+        )
+        if affected == 0:
+            raise NotFoundException(message="项目不存在或无权更新")
 
-    user_repo.insert_operation_log(
-        user_id=user_id,
-        action_type="project:update",
-        action_desc=f"更新项目: {project_id}",
-        target_type="project",
-        target_id=project_id,
-        project_id=project_id,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
+        user_repo.insert_operation_log_with_conn(
+            user_id=user_id,
+            action_type="project:update",
+            action_desc=f"更新项目: {project_id}",
+            target_type="project",
+            target_id=project_id,
+            project_id=project_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            conn=conn,
+        )
+        conn.commit()
 
     updated = project_repo.get_project_by_id(project_id)
     return _project_row_to_dict(updated)
 
 
 # =============================================================================
-# 项目软删除
+# 项目软删除（事务：UPDATE projects + INSERT operation_logs）
 # =============================================================================
 
 def delete_project(
@@ -255,22 +241,31 @@ def delete_project(
     if not _is_project_manager(project_id, user_id):
         raise ForbiddenException(message="无权删除此项目")
 
-    project_repo.soft_delete_project(project_id=project_id, deleted_by=user_id)
+    with get_db_transaction() as conn:
+        affected = project_repo.soft_delete_project(
+            project_id=project_id,
+            deleted_by=user_id,
+            conn=conn,
+        )
+        if affected == 0:
+            raise NotFoundException(message="项目不存在或无权删除")
 
-    user_repo.insert_operation_log(
-        user_id=user_id,
-        action_type="project:delete",
-        action_desc=f"删除项目: {project_id}",
-        target_type="project",
-        target_id=project_id,
-        project_id=project_id,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
+        user_repo.insert_operation_log_with_conn(
+            user_id=user_id,
+            action_type="project:delete",
+            action_desc=f"删除项目: {project_id}",
+            target_type="project",
+            target_id=project_id,
+            project_id=project_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            conn=conn,
+        )
+        conn.commit()
 
 
 # =============================================================================
-# 项目归档
+# 项目归档（优先调用 sp_archive_project 存储过程）
 # =============================================================================
 
 def archive_project(
@@ -293,31 +288,31 @@ def archive_project(
     if project["status"] == "archived":
         raise ValidationException(message="项目已归档")
 
-    project_repo.archive_project(project_id=project_id, updated_by=user_id)
+    with get_db_transaction() as conn:
+        result_code, result_message = project_repo.archive_project_with_procedure(
+            project_id=project_id,
+            operator_id=user_id,
+            conn=conn,
+        )
 
-    user_repo.insert_operation_log(
-        user_id=user_id,
-        action_type="project:archive",
-        action_desc=f"归档项目: {project_id}",
-        target_type="project",
-        target_id=project_id,
-        project_id=project_id,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
+        if result_code == 404:
+            conn.rollback()
+            raise NotFoundException(message="项目不存在")
+        elif result_code != 0:
+            conn.rollback()
+            raise ValidationException(message=f"归档失败: {result_message}")
+
+        conn.commit()
 
     updated = project_repo.get_project_by_id(project_id)
     return _project_row_to_dict(updated)
 
 
 # =============================================================================
-# 项目成员管理
+# 项目成员查询
 # =============================================================================
 
-def list_project_members(
-    token: str,
-    project_id: int,
-) -> List[Dict[str, Any]]:
+def list_project_members(token: str, project_id: int) -> List[Dict[str, Any]]:
     """查询项目成员列表（需有权限）。"""
     user = _require_auth(token)
 
@@ -331,6 +326,10 @@ def list_project_members(
     members = project_repo.list_project_members(project_id)
     return [_member_row_to_dict(m) for m in members]
 
+
+# =============================================================================
+# 添加项目成员（事务：INSERT project_members + INSERT operation_logs）
+# =============================================================================
 
 def add_project_member(
     token: str,
@@ -356,37 +355,45 @@ def add_project_member(
             message=f"无效的角色: {project_role}，允许值: {', '.join(VALID_PROJECT_ROLES)}"
         )
 
-    # 检查目标用户是否存在
     target_user = user_repo.get_user_by_id(user_id)
     if target_user is None:
         raise NotFoundException(message="要添加的用户不存在")
 
-    # 检查是否已存在未删除成员
     existing = project_repo.get_project_member_by_user(project_id, user_id)
     if existing is not None:
         raise ValidationException(message="该用户已是项目成员")
 
-    member_id = project_repo.add_project_member(
-        project_id=project_id,
-        user_id=user_id,
-        project_role=project_role,
-        created_by=current_user_id,
-    )
+    member_id: int = 0
 
-    user_repo.insert_operation_log(
-        user_id=current_user_id,
-        action_type="project:add_member",
-        action_desc=f"添加项目成员: user_id={user_id}, role={project_role}",
-        target_type="project_member",
-        target_id=member_id,
-        project_id=project_id,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
+    with get_db_transaction() as conn:
+        member_id = project_repo.add_project_member(
+            project_id=project_id,
+            user_id=user_id,
+            project_role=project_role,
+            created_by=current_user_id,
+            conn=conn,
+        )
+
+        user_repo.insert_operation_log_with_conn(
+            user_id=current_user_id,
+            action_type="project:add_member",
+            action_desc=f"添加项目成员: user_id={user_id}, role={project_role}",
+            target_type="project_member",
+            target_id=member_id,
+            project_id=project_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            conn=conn,
+        )
+        conn.commit()
 
     member = project_repo.get_project_member(project_id, member_id)
     return _member_row_to_dict(member)
 
+
+# =============================================================================
+# 修改项目成员角色（事务：UPDATE project_members + INSERT operation_logs）
+# =============================================================================
 
 def update_project_member_role(
     token: str,
@@ -416,30 +423,39 @@ def update_project_member_role(
     if member is None:
         raise NotFoundException(message="项目成员不存在")
 
-    # 禁止将 owner 对应的成员角色降级为 member
     if member["user_id"] == project["owner_id"] and project_role != "leader":
         raise ForbiddenException(message="不能修改项目所有者的成员角色")
 
-    project_repo.update_project_member_role(
-        member_id=member_id,
-        project_role=project_role,
-        updated_by=current_user_id,
-    )
+    with get_db_transaction() as conn:
+        affected = project_repo.update_project_member_role(
+            member_id=member_id,
+            project_role=project_role,
+            updated_by=current_user_id,
+            conn=conn,
+        )
+        if affected == 0:
+            raise NotFoundException(message="成员不存在或无权修改")
 
-    user_repo.insert_operation_log(
-        user_id=current_user_id,
-        action_type="project:update_member",
-        action_desc=f"修改项目成员角色: member_id={member_id}, role={project_role}",
-        target_type="project_member",
-        target_id=member_id,
-        project_id=project_id,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
+        user_repo.insert_operation_log_with_conn(
+            user_id=current_user_id,
+            action_type="project:update_member",
+            action_desc=f"修改项目成员角色: member_id={member_id}, role={project_role}",
+            target_type="project_member",
+            target_id=member_id,
+            project_id=project_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            conn=conn,
+        )
+        conn.commit()
 
     updated = project_repo.get_project_member(project_id, member_id)
     return _member_row_to_dict(updated)
 
+
+# =============================================================================
+# 移除项目成员（事务：UPDATE project_members + INSERT operation_logs）
+# =============================================================================
 
 def remove_project_member(
     token: str,
@@ -463,25 +479,30 @@ def remove_project_member(
     if member is None:
         raise NotFoundException(message="项目成员不存在")
 
-    # 禁止移除 owner
     if member["user_id"] == project["owner_id"]:
         raise ForbiddenException(message="不能移除项目所有者")
 
-    project_repo.soft_delete_project_member(
-        member_id=member_id,
-        deleted_by=current_user_id,
-    )
+    with get_db_transaction() as conn:
+        affected = project_repo.soft_delete_project_member(
+            member_id=member_id,
+            deleted_by=current_user_id,
+            conn=conn,
+        )
+        if affected == 0:
+            raise NotFoundException(message="成员不存在或无权移除")
 
-    user_repo.insert_operation_log(
-        user_id=current_user_id,
-        action_type="project:remove_member",
-        action_desc=f"移除项目成员: member_id={member_id}",
-        target_type="project_member",
-        target_id=member_id,
-        project_id=project_id,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
+        user_repo.insert_operation_log_with_conn(
+            user_id=current_user_id,
+            action_type="project:remove_member",
+            action_desc=f"移除项目成员: member_id={member_id}",
+            target_type="project_member",
+            target_id=member_id,
+            project_id=project_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            conn=conn,
+        )
+        conn.commit()
 
 
 # =============================================================================
@@ -489,7 +510,6 @@ def remove_project_member(
 # =============================================================================
 
 def _project_row_to_dict(row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    """将项目数据库行转为 API 响应 dict。"""
     if row is None:
         return {}
     return {
@@ -509,7 +529,6 @@ def _project_row_to_dict(row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def _member_row_to_dict(row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    """将项目成员数据库行转为 API 响应 dict。"""
     if row is None:
         return {}
     return {

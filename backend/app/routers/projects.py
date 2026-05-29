@@ -1,8 +1,6 @@
 """
 项目空间管理路由。
 
-提供项目 CRUD 和项目成员管理接口。
-
 GET    /api/projects
 POST   /api/projects
 GET    /api/projects/{project_id}
@@ -15,28 +13,25 @@ PUT    /api/projects/{project_id}/members/{member_id}
 DELETE /api/projects/{project_id}/members/{member_id}
 """
 
-from typing import Any, List, Optional
+from typing import Optional
 
-from fastapi import APIRouter, Header, Path, Query, Request
+from fastapi import APIRouter, Body, Header, Path, Query, Request
 from pydantic import BaseModel, Field
 
 from app.services import project_service
+from app.utils.exceptions import UnauthorizedException
 from app.utils.response import error_response, success_response
 
 router = APIRouter(prefix="/api/projects", tags=["项目管理"])
 
 
-# =============================================================================
-# 辅助函数
-# =============================================================================
-
 def _extract_token(authorization: Optional[str]) -> str:
     """从 Authorization 头解析 Bearer token。"""
     if not authorization:
-        raise ValueError("未提供认证信息")
+        raise UnauthorizedException(message="未登录")
     parts = authorization.split()
     if len(parts) != 2 or parts[0].lower() != "bearer":
-        raise ValueError("认证信息格式错误")
+        raise UnauthorizedException(message="认证信息格式错误")
     return parts[1]
 
 
@@ -45,21 +40,6 @@ def _get_client_ip(request: Request) -> str:
     if forwarded:
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
-
-
-def _handle_service(func, *args, request: Optional[Request] = None, **kwargs):
-    """
-    统一处理 service 层调用。
-
-    从 service 层抛出 AppException 的子类（NotFound/Forbidden/Validation）
-    会被转换为统一错误响应；其他异常返回 code=5000。
-    """
-    try:
-        return func(*args, **kwargs)
-    except ValueError as e:
-        return error_response(message=str(e), code=4002)
-    except Exception as e:
-        return error_response(message=str(e), code=5000)
 
 
 # =============================================================================
@@ -101,16 +81,8 @@ async def list_projects(
     keyword: Optional[str] = Query(None, max_length=100),
     status: Optional[str] = Query(None),
 ) -> dict:
-    """
-    获取项目列表（分页 + 搜索 + 状态过滤）。
-
-    权限过滤：admin 查看全部；teacher 查看参与项目；
-    project_leader / student_member 只能查看参与项目。
-    """
-    try:
-        token = _extract_token(authorization)
-    except ValueError as e:
-        return error_response(message=str(e), code=4002)
+    """获取项目列表（分页 + 搜索 + 状态过滤）。"""
+    token = _extract_token(authorization)
 
     result = project_service.list_projects(
         token=token,
@@ -130,14 +102,10 @@ async def list_projects(
 async def create_project(
     request: Request,
     authorization: Optional[str] = Header(None, alias="Authorization"),
-    body: CreateProjectRequest = None,
+    body: CreateProjectRequest = Body(...),
 ) -> dict:
-    """创建新项目。创建人自动成为 owner 和 leader 并写入 project_members。"""
-    try:
-        token = _extract_token(authorization)
-    except ValueError as e:
-        return error_response(message=str(e), code=4002)
-
+    """创建新项目。创建人自动成为 owner 和 leader。"""
+    token = _extract_token(authorization)
     ip = _get_client_ip(request)
     ua = request.headers.get("User-Agent", "")
 
@@ -163,10 +131,7 @@ async def get_project(
     authorization: Optional[str] = Header(None, alias="Authorization"),
 ) -> dict:
     """获取项目详情（需有权限）。"""
-    try:
-        token = _extract_token(authorization)
-    except ValueError as e:
-        return error_response(message=str(e), code=4002)
+    token = _extract_token(authorization)
 
     result = project_service.get_project_detail(
         token=token,
@@ -184,14 +149,10 @@ async def update_project(
     request: Request,
     project_id: int = Path(..., gt=0),
     authorization: Optional[str] = Header(None, alias="Authorization"),
-    body: UpdateProjectRequest = None,
+    body: UpdateProjectRequest = Body(...),
 ) -> dict:
     """更新项目信息（仅 admin / owner / leader 可操作）。"""
-    try:
-        token = _extract_token(authorization)
-    except ValueError as e:
-        return error_response(message=str(e), code=4002)
-
+    token = _extract_token(authorization)
     ip = _get_client_ip(request)
     ua = request.headers.get("User-Agent", "")
 
@@ -219,11 +180,7 @@ async def delete_project(
     authorization: Optional[str] = Header(None, alias="Authorization"),
 ) -> dict:
     """软删除项目（仅 admin / owner / leader 可操作）。"""
-    try:
-        token = _extract_token(authorization)
-    except ValueError as e:
-        return error_response(message=str(e), code=4002)
-
+    token = _extract_token(authorization)
     ip = _get_client_ip(request)
     ua = request.headers.get("User-Agent", "")
 
@@ -247,11 +204,7 @@ async def archive_project(
     authorization: Optional[str] = Header(None, alias="Authorization"),
 ) -> dict:
     """归档项目（仅 admin / owner / leader 可操作）。"""
-    try:
-        token = _extract_token(authorization)
-    except ValueError as e:
-        return error_response(message=str(e), code=4002)
-
+    token = _extract_token(authorization)
     ip = _get_client_ip(request)
     ua = request.headers.get("User-Agent", "")
 
@@ -275,10 +228,7 @@ async def list_project_members(
     authorization: Optional[str] = Header(None, alias="Authorization"),
 ) -> dict:
     """获取项目成员列表（需有权限）。"""
-    try:
-        token = _extract_token(authorization)
-    except ValueError as e:
-        return error_response(message=str(e), code=4002)
+    token = _extract_token(authorization)
 
     result = project_service.list_project_members(
         token=token,
@@ -296,14 +246,10 @@ async def add_project_member(
     request: Request,
     project_id: int = Path(..., gt=0),
     authorization: Optional[str] = Header(None, alias="Authorization"),
-    body: AddMemberRequest = None,
+    body: AddMemberRequest = Body(...),
 ) -> dict:
     """添加项目成员（仅 admin / owner / leader 可操作）。"""
-    try:
-        token = _extract_token(authorization)
-    except ValueError as e:
-        return error_response(message=str(e), code=4002)
-
+    token = _extract_token(authorization)
     ip = _get_client_ip(request)
     ua = request.headers.get("User-Agent", "")
 
@@ -328,14 +274,10 @@ async def update_project_member_role(
     project_id: int = Path(..., gt=0),
     member_id: int = Path(..., gt=0),
     authorization: Optional[str] = Header(None, alias="Authorization"),
-    body: UpdateMemberRoleRequest = None,
+    body: UpdateMemberRoleRequest = Body(...),
 ) -> dict:
     """修改项目成员角色（仅 admin / owner / leader 可操作）。"""
-    try:
-        token = _extract_token(authorization)
-    except ValueError as e:
-        return error_response(message=str(e), code=4002)
-
+    token = _extract_token(authorization)
     ip = _get_client_ip(request)
     ua = request.headers.get("User-Agent", "")
 
@@ -362,11 +304,7 @@ async def remove_project_member(
     authorization: Optional[str] = Header(None, alias="Authorization"),
 ) -> dict:
     """移除项目成员（仅 admin / owner / leader 可操作，软删除）。"""
-    try:
-        token = _extract_token(authorization)
-    except ValueError as e:
-        return error_response(message=str(e), code=4002)
-
+    token = _extract_token(authorization)
     ip = _get_client_ip(request)
     ua = request.headers.get("User-Agent", "")
 

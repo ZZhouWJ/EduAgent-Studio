@@ -168,7 +168,7 @@ def insert_operation_log(
     user_agent: Optional[str] = None,
 ) -> None:
     """
-    写入操作日志。
+    写入操作日志（独立事务）。
 
     Args:
         user_id: 操作人
@@ -201,6 +201,58 @@ def insert_operation_log(
             user_agent,
             datetime.now(),
         ))
+
+
+def insert_operation_log_with_conn(
+    user_id: int,
+    action_type: str,
+    action_desc: str,
+    target_type: Optional[str] = None,
+    target_id: Optional[int] = None,
+    project_id: Optional[int] = None,
+    task_id: Optional[int] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
+    conn=None,
+) -> None:
+    """
+    写入操作日志（支持外部传入事务连接）。
+
+    用于与业务操作在同一事务内写入日志。
+
+    Args:
+        conn: 外部传入的数据库连接（pymysql Connection）
+              若为 None，则内部创建独立事务
+    """
+    sql = """
+        INSERT INTO operation_logs
+            (user_id, project_id, task_id, target_type, target_id,
+             action_type, action_desc, ip_address, user_agent, created_at)
+        VALUES
+            (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    params = (
+        user_id,
+        project_id,
+        task_id,
+        target_type,
+        target_id,
+        action_type,
+        action_desc,
+        ip_address,
+        user_agent,
+        datetime.now(),
+    )
+
+    if conn is not None:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql, params)
+        finally:
+            cursor.close()
+    else:
+        with get_db_cursor() as cursor:
+            cursor.execute(sql, params)
 
 
 def list_users(
