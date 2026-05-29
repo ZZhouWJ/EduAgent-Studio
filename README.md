@@ -7,7 +7,7 @@ AI-Collab Audit System: A Git-inspired AI task management and quality audit plat
 ![Vue3](https://img.shields.io/badge/Frontend-Vue3-4FC08D?style=flat&logo=vue.js)
 ![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat&logo=fastapi)
 ![MySQL](https://img.shields.io/badge/Database-MySQL_8.0-4479A1?style=flat&logo=mysql)
-![License](https://img.shields.io/badge/License-MIT-blue.svg)
+![License](https://img.shields.io/badge/License-Apache-2.0-blue.svg)
 
 ## 📖 项目简介
 
