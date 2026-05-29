@@ -1,0 +1,28 @@
+# ============================================================
+# AI-Collab-Audit-System - Backend Requirements
+# Python 3.10+
+# ============================================================
+
+# Web 框架
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+
+# 数据库驱动
+pymysql>=1.1.0
+
+# 配置管理
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# 环境变量
+python-dotenv>=1.0.0
+
+# HTTP 客户端（供后续 API 调用使用）
+httpx>=0.26.0
+
+# JSON Web Token（供后续认证使用）
+PyJWT>=2.8.0
+
+# 密码哈希（供后续认证使用）
+bcrypt>=4.1.0
+passlib[bcrypt]>=1.7.4

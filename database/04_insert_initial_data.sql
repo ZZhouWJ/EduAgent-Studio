@@ -146,7 +146,7 @@ INSERT INTO `users` (
     `email`, `phone`, `status`, `last_login_at`, `created_by`
 ) VALUES (
     'admin',
-    '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYIq7b8F4Ly',
+    '$2b$12$ShxG2SvnL1QcViFPuMRqHO.T8jCQgOpdWBJdYAwhVn9QgnVRCJB4O',
     '系统管理员',
     NULL,
     'admin@example.com',
