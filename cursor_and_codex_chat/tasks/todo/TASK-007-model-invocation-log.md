@@ -1,5 +1,9 @@
 # TASK-007 模型管理、Mock 模型调用、调用日志和成本记录模块
 
+## 任务状态
+
+已完成。
+
 ## 任务目标
 
 完成模型管理、Mock 模型调用、调用日志和成本记录模块，使系统能够通过 Mock ModelAdapter 执行一次任务生成流程，并写入 `ai_invocations`、`task_outputs`、`cost_records` 和 `operation_logs`。

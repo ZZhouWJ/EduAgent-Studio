@@ -26,3 +26,6 @@ PyJWT>=2.8.0
 # 密码哈希（供后续认证使用）
 bcrypt>=4.1.0
 passlib[bcrypt]>=1.7.4
+
+# AES-GCM 加密（供 API Key 加密使用）
+cryptography>=42.0.0
