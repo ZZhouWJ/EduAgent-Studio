@@ -598,3 +598,289 @@ def create_manual_output(
                 now, created_by,
             ))
             return cursor.lastrowid
+
+
+# =============================================================================
+# 输出版本更新（乐观锁）
+# =============================================================================
+
+def update_output_with_lock(
+    output_id: int,
+    content: str,
+    edit_summary: Optional[str],
+    lock_version: int,
+    last_modified_by: int,
+    updated_by: int,
+    conn: Optional[Connection] = None,
+) -> int:
+    """
+    使用乐观锁更新输出版本。
+
+    WHERE 条件包含 output_id、lock_version、is_deleted=0。
+    更新成功后 lock_version + 1。
+
+    Returns:
+        affected_rows（0 表示乐观锁冲突）
+    """
+    now = datetime.now()
+    sql = """
+        UPDATE task_outputs
+        SET content = %s,
+            edit_summary = %s,
+            lock_version = lock_version + 1,
+            last_modified_at = %s,
+            last_modified_by = %s,
+            updated_at = %s,
+            updated_by = %s
+        WHERE output_id = %s
+          AND lock_version = %s
+          AND is_deleted = 0
+    """
+    if conn is not None:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql, (
+                content, edit_summary,
+                now, last_modified_by,
+                now, updated_by,
+                output_id, lock_version,
+            ))
+            return cursor.rowcount
+        finally:
+            cursor.close()
+    else:
+        with get_db_cursor() as cursor:
+            cursor.execute(sql, (
+                content, edit_summary,
+                now, last_modified_by,
+                now, updated_by,
+                output_id, lock_version,
+            ))
+            return cursor.rowcount
+
+
+def get_output_project_id(output_id: int) -> Optional[int]:
+    """
+    通过 output_id 查询所属 project_id。
+
+    Returns:
+        project_id 或 None
+    """
+    sql = """
+        SELECT t.project_id
+        FROM task_outputs o
+        INNER JOIN project_tasks t ON o.task_id = t.task_id AND t.is_deleted = 0
+        WHERE o.output_id = %s AND o.is_deleted = 0
+    """
+    with get_db_cursor() as cursor:
+        cursor.execute(sql, (output_id,))
+        row = cursor.fetchone()
+        return row["project_id"] if row else None
+
+
+# =============================================================================
+# 输出版本另存为新版本
+# =============================================================================
+
+def save_output_as_new_version(
+    source_output_id: int,
+    task_id: int,
+    branch_id: Optional[int],
+    version_no: int,
+    output_title: str,
+    content: str,
+    edit_summary: Optional[str],
+    source_type: str,
+    created_by: int,
+    conn: Optional[Connection] = None,
+) -> int:
+    """
+    基于已有输出创建新版本（另存为）。
+
+    Returns:
+        新输出 ID
+    """
+    now = datetime.now()
+    sql = """
+        INSERT INTO task_outputs
+            (task_id, branch_id, version_no, output_title, content,
+             source_type, parent_output_id,
+             lock_version, last_modified_at, last_modified_by,
+             edit_summary, is_final_candidate, status,
+             is_deleted, created_at, created_by)
+        VALUES
+            (%s, %s, %s, %s, %s, %s, %s,
+             0, %s, %s,
+             %s, 0, 'draft',
+             0, %s, %s)
+    """
+    if conn is not None:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql, (
+                task_id, branch_id, version_no,
+                output_title, content,
+                source_type, source_output_id,
+                now, created_by,
+                edit_summary,
+                now, created_by,
+            ))
+            return cursor.lastrowid
+        finally:
+            cursor.close()
+    else:
+        with get_db_cursor() as cursor:
+            cursor.execute(sql, (
+                task_id, branch_id, version_no,
+                output_title, content,
+                source_type, source_output_id,
+                now, created_by,
+                edit_summary,
+                now, created_by,
+            ))
+            return cursor.lastrowid
+
+
+# =============================================================================
+# 输出批注查询
+# =============================================================================
+
+VALID_COMMENT_STATUS = {"open", "resolved", "closed"}
+
+
+def get_comment_output_id(comment_id: int) -> Optional[int]:
+    """
+    通过 comment_id 查询所属 output_id。
+    Returns:
+        output_id 或 None
+    """
+    sql = "SELECT output_id FROM output_comments WHERE comment_id = %s AND is_deleted = 0"
+    with get_db_cursor() as cursor:
+        cursor.execute(sql, (comment_id,))
+        row = cursor.fetchone()
+        return row["output_id"] if row else None
+
+
+def list_output_comments(
+    output_id: int,
+    status: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    查询输出的批注列表。
+
+    Returns:
+        批注列表（不返回 password_hash）
+    """
+    if status:
+        sql = """
+            SELECT c.comment_id, c.output_id, c.commenter_id, c.comment_type,
+                   c.comment_text, c.status,
+                   c.created_at, c.updated_at,
+                   u.username AS commenter_username, u.real_name AS commenter_real_name
+            FROM output_comments c
+            LEFT JOIN users u ON c.commenter_id = u.user_id AND u.is_deleted = 0
+            WHERE c.output_id = %s AND c.is_deleted = 0 AND c.status = %s
+            ORDER BY c.created_at ASC
+        """
+        with get_db_cursor() as cursor:
+            cursor.execute(sql, (output_id, status))
+            return cursor.fetchall()
+    else:
+        sql = """
+            SELECT c.comment_id, c.output_id, c.commenter_id, c.comment_type,
+                   c.comment_text, c.status,
+                   c.created_at, c.updated_at,
+                   u.username AS commenter_username, u.real_name AS commenter_real_name
+            FROM output_comments c
+            LEFT JOIN users u ON c.commenter_id = u.user_id AND u.is_deleted = 0
+            WHERE c.output_id = %s AND c.is_deleted = 0
+            ORDER BY c.created_at ASC
+        """
+        with get_db_cursor() as cursor:
+            cursor.execute(sql, (output_id,))
+            return cursor.fetchall()
+
+
+def get_comment_by_id(comment_id: int) -> Optional[Dict[str, Any]]:
+    """按 ID 查询批注详情。"""
+    sql = """
+        SELECT c.comment_id, c.output_id, c.commenter_id, c.comment_type,
+               c.comment_text, c.status,
+               c.created_at, c.updated_at,
+               u.username AS commenter_username, u.real_name AS commenter_real_name
+        FROM output_comments c
+        LEFT JOIN users u ON c.commenter_id = u.user_id AND u.is_deleted = 0
+        WHERE c.comment_id = %s AND c.is_deleted = 0
+    """
+    with get_db_cursor() as cursor:
+        cursor.execute(sql, (comment_id,))
+        return cursor.fetchone()
+
+
+# =============================================================================
+# 输出批注写操作
+# =============================================================================
+
+def create_output_comment(
+    output_id: int,
+    commenter_id: int,
+    comment_type: str,
+    comment_text: str,
+    conn: Optional[Connection] = None,
+) -> int:
+    """
+    创建输出批注。
+
+    Returns:
+        新批注 ID
+    """
+    now = datetime.now()
+    sql = """
+        INSERT INTO output_comments
+            (output_id, commenter_id, comment_type, comment_text,
+             status, is_deleted, created_at)
+        VALUES
+            (%s, %s, %s, %s, 'open', 0, %s)
+    """
+    if conn is not None:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql, (output_id, commenter_id, comment_type, comment_text, now))
+            return cursor.lastrowid
+        finally:
+            cursor.close()
+    else:
+        with get_db_cursor() as cursor:
+            cursor.execute(sql, (output_id, commenter_id, comment_type, comment_text, now))
+            return cursor.lastrowid
+
+
+def update_comment_status(
+    comment_id: int,
+    status: str,
+    conn: Optional[Connection] = None,
+) -> int:
+    """
+    更新批注状态。
+
+    Returns:
+        affected_rows（0 表示批注不存在或无权更新）
+    """
+    now = datetime.now()
+    sql = """
+        UPDATE output_comments
+        SET status = %s,
+            updated_at = %s
+        WHERE comment_id = %s AND is_deleted = 0
+    """
+    if conn is not None:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql, (status, now, comment_id))
+            return cursor.rowcount
+        finally:
+            cursor.close()
+    else:
+        with get_db_cursor() as cursor:
+            cursor.execute(sql, (status, now, comment_id))
+            return cursor.rowcount

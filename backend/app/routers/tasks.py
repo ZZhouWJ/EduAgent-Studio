@@ -17,8 +17,15 @@ POST   /api/tasks/{task_id}/branches
 输出版本相关：
 GET    /api/tasks/{task_id}/outputs
 GET    /api/outputs/{output_id}
+PUT    /api/outputs/{output_id}
+POST   /api/outputs/{output_id}/save-as
 GET    /api/outputs/{output_id}/timeline
 POST   /api/tasks/{task_id}/outputs/manual
+
+输出批注相关：
+GET    /api/outputs/{output_id}/comments
+POST   /api/outputs/{output_id}/comments
+PUT    /api/comments/{comment_id}/status
 """
 
 from typing import Optional
@@ -83,6 +90,28 @@ class CreateManualOutputRequest(BaseModel):
     output_title: str = Field(..., min_length=1, max_length=200)
     content: str = Field(...)
     edit_summary: Optional[str] = Field(None, max_length=500)
+
+
+class UpdateOutputRequest(BaseModel):
+    content: str = Field(..., min_length=1)
+    lock_version: int = Field(..., ge=0)
+    edit_summary: Optional[str] = Field(None, max_length=500)
+
+
+class SaveAsNewVersionRequest(BaseModel):
+    output_title: str = Field(..., min_length=1, max_length=200)
+    content: str = Field(...)
+    edit_summary: Optional[str] = Field(None, max_length=500)
+    branch_id: Optional[int] = Field(None, gt=0)
+
+
+class CreateCommentRequest(BaseModel):
+    comment_type: str = Field(..., min_length=1, max_length=50)
+    comment_text: str = Field(..., min_length=1, max_length=1000)
+
+
+class UpdateCommentStatusRequest(BaseModel):
+    status: str = Field(..., max_length=20)
 
 
 # =============================================================================
@@ -350,6 +379,138 @@ async def create_manual_output(
         edit_summary=body.edit_summary,
         branch_id=body.branch_id,
         parent_output_id=body.parent_output_id,
+        ip_address=ip,
+        user_agent=ua,
+    )
+    return success_response(data=result)
+
+
+# =============================================================================
+# 编辑输出版本（乐观锁）
+# =============================================================================
+
+@router.put("/api/outputs/{output_id}")
+async def update_output(
+    request: Request,
+    output_id: int = Path(..., gt=0),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    body: UpdateOutputRequest = Body(...),
+) -> dict:
+    """使用乐观锁更新输出版本（需有权限）。affected_rows==0 时返回 code=4004 冲突错误。"""
+    token = _extract_token(authorization)
+    ip = _get_client_ip(request)
+    ua = request.headers.get("User-Agent", "")
+
+    result = task_service.update_output(
+        token=token,
+        output_id=output_id,
+        content=body.content,
+        lock_version=body.lock_version,
+        edit_summary=body.edit_summary,
+        ip_address=ip,
+        user_agent=ua,
+    )
+    return success_response(data=result)
+
+
+# =============================================================================
+# 另存为新版本
+# =============================================================================
+
+@router.post("/api/outputs/{output_id}/save-as")
+async def save_output_as_new_version(
+    request: Request,
+    output_id: int = Path(..., gt=0),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    body: SaveAsNewVersionRequest = Body(...),
+) -> dict:
+    """基于已有输出另存为新版本（需有权限）。"""
+    token = _extract_token(authorization)
+    ip = _get_client_ip(request)
+    ua = request.headers.get("User-Agent", "")
+
+    result = task_service.save_output_as_new_version(
+        token=token,
+        output_id=output_id,
+        output_title=body.output_title,
+        content=body.content,
+        edit_summary=body.edit_summary,
+        branch_id=body.branch_id,
+        ip_address=ip,
+        user_agent=ua,
+    )
+    return success_response(data=result)
+
+
+# =============================================================================
+# 输出批注列表
+# =============================================================================
+
+@router.get("/api/outputs/{output_id}/comments")
+async def list_output_comments(
+    request: Request,
+    output_id: int = Path(..., gt=0),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    status: Optional[str] = Query(None, max_length=20),
+) -> dict:
+    """查询输出的批注列表（需有权限）。"""
+    token = _extract_token(authorization)
+
+    result = task_service.list_output_comments(
+        token=token,
+        output_id=output_id,
+        status=status,
+    )
+    return success_response(data=result)
+
+
+# =============================================================================
+# 新增批注
+# =============================================================================
+
+@router.post("/api/outputs/{output_id}/comments")
+async def create_output_comment(
+    request: Request,
+    output_id: int = Path(..., gt=0),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    body: CreateCommentRequest = Body(...),
+) -> dict:
+    """为输出新增批注（需有权限）。"""
+    token = _extract_token(authorization)
+    ip = _get_client_ip(request)
+    ua = request.headers.get("User-Agent", "")
+
+    result = task_service.create_output_comment(
+        token=token,
+        output_id=output_id,
+        comment_type=body.comment_type,
+        comment_text=body.comment_text,
+        ip_address=ip,
+        user_agent=ua,
+    )
+    return success_response(data=result)
+
+
+# =============================================================================
+# 批注状态更新
+# =============================================================================
+
+@router.put("/api/comments/{comment_id}/status")
+async def update_comment_status(
+    request: Request,
+    comment_id: int = Path(..., gt=0),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    body: UpdateCommentStatusRequest = Body(...),
+) -> dict:
+    """更新批注状态（仅 admin / teacher / project_leader / 批注创建人可操作）。"""
+    token = _extract_token(authorization)
+    ip = _get_client_ip(request)
+    ua = request.headers.get("User-Agent", "")
+
+    result = task_service.update_comment_status(
+        token=token,
+        comment_id=comment_id,
+        status=body.status,
         ip_address=ip,
         user_agent=ua,
     )

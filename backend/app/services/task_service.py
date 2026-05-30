@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 from app.database import get_db_transaction
 from app.repositories import project_repo, task_repo, user_repo
 from app.utils.exceptions import (
+    ConflictException,
     ForbiddenException,
     NotFoundException,
     UnauthorizedException,
@@ -678,4 +679,373 @@ def _timeline_item_to_dict(row: Dict[str, Any]) -> Dict[str, Any]:
         "created_at": row.get("created_at"),
         "created_by": row.get("created_by"),
         "depth": row.get("depth", 0),
+    }
+
+
+# =============================================================================
+# 辅助：检查输出所属项目访问权限（复用 project_repo）
+# =============================================================================
+
+def _get_output_project_id(output_id: int) -> Optional[int]:
+    """通过 output_id 获取 project_id。"""
+    return task_repo.get_output_project_id(output_id)
+
+
+# =============================================================================
+# 编辑输出版本（乐观锁）
+# PUT /api/outputs/{output_id}
+# =============================================================================
+
+def update_output(
+    token: str,
+    output_id: int,
+    content: str,
+    lock_version: int,
+    edit_summary: Optional[str] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    使用乐观锁更新输出版本。
+
+    - 仅项目成员可编辑
+    - WHERE 包含 output_id + lock_version + is_deleted=0
+    - affected_rows == 0 时抛出 ConflictException（code=4004）
+    - 编辑和日志在同一事务内
+    """
+    user = _require_auth(token)
+    user_id = user["user_id"]
+
+    output = task_repo.get_output_by_id(output_id)
+    if output is None:
+        raise NotFoundException(message="输出版本不存在")
+
+    project_id = _get_output_project_id(output_id)
+    if project_id is None:
+        raise NotFoundException(message="输出版本关联项目不存在")
+
+    if not _can_access_project(project_id, user_id):
+        raise ForbiddenException(message="无权编辑此输出版本")
+
+    if content is None or (isinstance(content, str) and not content.strip()):
+        raise ValidationException(message="正文内容不能为空")
+
+    with get_db_transaction() as conn:
+        affected = task_repo.update_output_with_lock(
+            output_id=output_id,
+            content=content,
+            edit_summary=edit_summary,
+            lock_version=lock_version,
+            last_modified_by=user_id,
+            updated_by=user_id,
+            conn=conn,
+        )
+        if affected == 0:
+            conn.rollback()
+            raise ConflictException(
+                message="当前内容已被其他成员修改，请刷新后重新编辑，或另存为新版本。"
+            )
+
+        user_repo.insert_operation_log_with_conn(
+            user_id=user_id,
+            action_type="output:update",
+            action_desc=f"编辑输出版本: output={output_id}",
+            target_type="output",
+            target_id=output_id,
+            project_id=project_id,
+            task_id=output["task_id"],
+            ip_address=ip_address,
+            user_agent=user_agent,
+            conn=conn,
+        )
+        conn.commit()
+
+    updated = task_repo.get_output_by_id(output_id)
+    return _output_detail_to_dict(updated)
+
+
+# =============================================================================
+# 另存为新版本
+# POST /api/outputs/{output_id}/save-as
+# =============================================================================
+
+def save_output_as_new_version(
+    token: str,
+    output_id: int,
+    output_title: str,
+    content: str,
+    edit_summary: Optional[str] = None,
+    branch_id: Optional[int] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    基于已有输出另存为新版本。
+
+    - 仅项目成员可操作
+    - 新版本 parent_output_id = 原 output_id
+    - version_no 在事务内通过 FOR UPDATE 生成
+    - 事务：version_no + INSERT output + INSERT operation_logs
+    """
+    user = _require_auth(token)
+    user_id = user["user_id"]
+
+    source_output = task_repo.get_output_by_id(output_id)
+    if source_output is None:
+        raise NotFoundException(message="源输出版本不存在")
+
+    project_id = _get_output_project_id(output_id)
+    if project_id is None:
+        raise NotFoundException(message="源输出版本关联项目不存在")
+
+    if not _can_access_project(project_id, user_id):
+        raise ForbiddenException(message="无权为此输出版本创建新版本")
+
+    if not output_title or not output_title.strip():
+        raise ValidationException(message="版本标题不能为空")
+
+    task_id = source_output["task_id"]
+
+    if branch_id is not None:
+        branch = task_repo.get_branch_by_id_and_task(branch_id, task_id)
+        if branch is None:
+            raise ValidationException(message="分支不属于当前任务")
+
+    with get_db_transaction() as conn:
+        next_version = task_repo.get_next_version_no_for_update(
+            task_id=task_id,
+            conn=conn,
+        )
+
+        new_output_id = task_repo.save_output_as_new_version(
+            source_output_id=output_id,
+            task_id=task_id,
+            branch_id=(branch_id if branch_id is not None else source_output.get("branch_id")),
+            version_no=next_version,
+            output_title=output_title.strip(),
+            content=content,
+            edit_summary=edit_summary,
+            source_type="hybrid",
+            created_by=user_id,
+            conn=conn,
+        )
+
+        user_repo.insert_operation_log_with_conn(
+            user_id=user_id,
+            action_type="output:save_as",
+            action_desc=f"另存为新版本: output={output_id} -> new_output={new_output_id}",
+            target_type="output",
+            target_id=new_output_id,
+            project_id=project_id,
+            task_id=task_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            conn=conn,
+        )
+        conn.commit()
+
+    output = task_repo.get_output_by_id(new_output_id)
+    return _output_detail_to_dict(output)
+
+
+# =============================================================================
+# 输出批注列表
+# GET /api/outputs/{output_id}/comments
+# =============================================================================
+
+def list_output_comments(
+    token: str,
+    output_id: int,
+    status: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """查询输出的批注列表（需有权限）。"""
+    user = _require_auth(token)
+
+    output = task_repo.get_output_by_id(output_id)
+    if output is None:
+        raise NotFoundException(message="输出版本不存在")
+
+    project_id = _get_output_project_id(output_id)
+    if project_id is None:
+        raise NotFoundException(message="输出版本关联项目不存在")
+
+    if not _can_access_project(project_id, user["user_id"]):
+        raise ForbiddenException(message="无权查看此批注")
+
+    if status is not None and status not in task_repo.VALID_COMMENT_STATUS:
+        raise ValidationException(
+            message=f"无效的批注状态: {status}"
+        )
+
+    rows = task_repo.list_output_comments(output_id=output_id, status=status)
+    return [_comment_row_to_dict(r) for r in rows]
+
+
+# =============================================================================
+# 新增批注
+# POST /api/outputs/{output_id}/comments
+# =============================================================================
+
+def create_output_comment(
+    token: str,
+    output_id: int,
+    comment_type: str,
+    comment_text: str,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    为输出新增批注。
+
+    - 仅项目成员可添加批注
+    - 批注创建人和日志在同一事务内
+    """
+    user = _require_auth(token)
+    user_id = user["user_id"]
+
+    output = task_repo.get_output_by_id(output_id)
+    if output is None:
+        raise NotFoundException(message="输出版本不存在")
+
+    project_id = _get_output_project_id(output_id)
+    if project_id is None:
+        raise NotFoundException(message="输出版本关联项目不存在")
+
+    if not _can_access_project(project_id, user_id):
+        raise ForbiddenException(message="无权为此输出版本添加批注")
+
+    if not comment_type or not comment_type.strip():
+        raise ValidationException(message="批注类型不能为空")
+
+    if not comment_text or not comment_text.strip():
+        raise ValidationException(message="批注内容不能为空")
+
+    with get_db_transaction() as conn:
+        comment_id = task_repo.create_output_comment(
+            output_id=output_id,
+            commenter_id=user_id,
+            comment_type=comment_type.strip(),
+            comment_text=comment_text.strip(),
+            conn=conn,
+        )
+
+        user_repo.insert_operation_log_with_conn(
+            user_id=user_id,
+            action_type="output:comment",
+            action_desc=f"新增批注: output={output_id}",
+            target_type="output",
+            target_id=output_id,
+            project_id=project_id,
+            task_id=output["task_id"],
+            ip_address=ip_address,
+            user_agent=user_agent,
+            conn=conn,
+        )
+        conn.commit()
+
+    comment = task_repo.get_comment_by_id(comment_id)
+    return _comment_row_to_dict(comment)
+
+
+# =============================================================================
+# 批注状态更新
+# PUT /api/comments/{comment_id}/status
+# =============================================================================
+
+def update_comment_status(
+    token: str,
+    comment_id: int,
+    status: str,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    更新批注状态。
+
+    - 仅 admin / teacher / project_leader / 批注创建人可更新
+    - status 仅允许 open / resolved / closed
+    - affected_rows == 0 时返回错误
+    """
+    user = _require_auth(token)
+    user_id = user["user_id"]
+
+    if status not in task_repo.VALID_COMMENT_STATUS:
+        raise ValidationException(
+            message=f"无效的批注状态: {status}，允许值: {', '.join(task_repo.VALID_COMMENT_STATUS)}"
+        )
+
+    comment = task_repo.get_comment_by_id(comment_id)
+    if comment is None:
+        raise NotFoundException(message="批注不存在")
+
+    output_id = comment["output_id"]
+
+    output = task_repo.get_output_by_id(output_id)
+    if output is None:
+        raise NotFoundException(message="批注关联输出不存在")
+
+    project_id = _get_output_project_id(output_id)
+    if project_id is None:
+        raise NotFoundException(message="批注关联项目不存在")
+
+    if not _can_access_project(project_id, user_id):
+        raise ForbiddenException(message="无权更新此批注")
+
+    if _is_admin(user):
+        pass
+    elif "teacher" in user.get("roles", []):
+        pass
+    elif "project_leader" in user.get("roles", []):
+        pass
+    elif comment["commenter_id"] == user_id:
+        pass
+    else:
+        raise ForbiddenException(message="无权更新此批注状态")
+
+    with get_db_transaction() as conn:
+        affected = task_repo.update_comment_status(
+            comment_id=comment_id,
+            status=status,
+            conn=conn,
+        )
+        if affected == 0:
+            conn.rollback()
+            raise NotFoundException(message="批注不存在或无权更新")
+
+        user_repo.insert_operation_log_with_conn(
+            user_id=user_id,
+            action_type="output:comment_status",
+            action_desc=f"更新批注状态: comment={comment_id}, status={status}",
+            target_type="output",
+            target_id=output_id,
+            project_id=project_id,
+            task_id=output["task_id"],
+            ip_address=ip_address,
+            user_agent=user_agent,
+            conn=conn,
+        )
+        conn.commit()
+
+    updated = task_repo.get_comment_by_id(comment_id)
+    return _comment_row_to_dict(updated)
+
+
+# =============================================================================
+# 数据转换：批注
+# =============================================================================
+
+def _comment_row_to_dict(row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    if row is None:
+        return {}
+    return {
+        "comment_id": row["comment_id"],
+        "output_id": row["output_id"],
+        "commenter_id": row["commenter_id"],
+        "commenter_username": row.get("commenter_username"),
+        "commenter_real_name": row.get("commenter_real_name"),
+        "comment_type": row["comment_type"],
+        "comment_text": row["comment_text"],
+        "status": row["status"],
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("updated_at"),
     }
