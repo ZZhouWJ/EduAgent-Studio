@@ -347,6 +347,7 @@ async def create_manual_output(
         task_id=task_id,
         output_title=body.output_title,
         content=body.content,
+        edit_summary=body.edit_summary,
         branch_id=body.branch_id,
         parent_output_id=body.parent_output_id,
         ip_address=ip,

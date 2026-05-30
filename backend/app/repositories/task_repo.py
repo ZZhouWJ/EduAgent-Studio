@@ -142,12 +142,7 @@ def create_task(
     due_date: Optional[str],
     conn: Optional[Connection] = None,
 ) -> int:
-    """
-    创建任务。
-
-    Returns:
-        新任务 ID
-    """
+    """创建任务。Returns: 新任务 ID"""
     now = datetime.now()
     sql = """
         INSERT INTO project_tasks
@@ -187,12 +182,7 @@ def update_task(
     updated_by: Optional[int] = None,
     conn: Optional[Connection] = None,
 ) -> int:
-    """
-    更新任务字段（仅更新非 None 的字段）。
-
-    Returns:
-        affected_rows
-    """
+    """更新任务字段（仅更新非 None 的字段）。Returns: affected_rows"""
     fields = []
     params: list = []
 
@@ -250,12 +240,7 @@ def soft_delete_task(
     deleted_by: int,
     conn: Optional[Connection] = None,
 ) -> int:
-    """
-    软删除任务。
-
-    Returns:
-        affected_rows
-    """
+    """软删除任务。Returns: affected_rows"""
     sql = """
         UPDATE project_tasks
         SET is_deleted = 1,
@@ -336,12 +321,7 @@ def create_task_branch(
     created_by: int,
     conn: Optional[Connection] = None,
 ) -> int:
-    """
-    创建任务分支。
-
-    Returns:
-        新分支 ID
-    """
+    """创建任务分支。Returns: 新分支 ID"""
     now = datetime.now()
     sql = """
         INSERT INTO task_branches
@@ -368,12 +348,7 @@ def create_task_branch(
 # =============================================================================
 
 def list_task_outputs(task_id: int) -> List[Dict[str, Any]]:
-    """
-    查询任务输出版本列表（不含软删除，不返回完整 content）。
-
-    Returns:
-        版本列表
-    """
+    """查询任务输出版本列表（不含软删除，不返回完整 content）。"""
     sql = """
         SELECT o.output_id, o.task_id, o.branch_id, o.invocation_id,
                o.version_no, o.output_title, o.source_type,
@@ -406,7 +381,7 @@ def get_output_by_id(output_id: int) -> Optional[Dict[str, Any]]:
                o.last_modified_at, o.last_modified_by,
                o.edit_summary, o.is_final_candidate, o.status,
                o.created_at, o.created_by,
-               t.task_title,
+               t.title AS task_title,
                c.username AS creator_username, c.real_name AS creator_real_name
         FROM task_outputs o
         INNER JOIN project_tasks t ON o.task_id = t.task_id AND t.is_deleted = 0
@@ -425,23 +400,6 @@ def get_output_task_id(output_id: int) -> Optional[int]:
         cursor.execute(sql, (output_id,))
         row = cursor.fetchone()
         return row["task_id"] if row else None
-
-
-def get_next_version_no(task_id: int, branch_id: Optional[int]) -> int:
-    """
-    生成下一个版本号。
-
-    策略：取当前最大 version_no + 1（整数递增）
-    """
-    sql = """
-        SELECT MAX(version_no) AS max_ver FROM task_outputs
-        WHERE task_id = %s AND is_deleted = 0
-    """
-    with get_db_cursor() as cursor:
-        cursor.execute(sql, (task_id,))
-        row = cursor.fetchone()
-        max_ver = row["max_ver"] if row["max_ver"] is not None else 0
-        return max_ver + 1
 
 
 def get_output_by_id_and_task(output_id: int, task_id: int) -> Optional[Dict[str, Any]]:
@@ -467,6 +425,118 @@ def get_branch_by_id_and_task(branch_id: int, task_id: int) -> Optional[Dict[str
 
 
 # =============================================================================
+# 版本时间线查询（修复：从 output_id 向上追溯父版本链）
+# =============================================================================
+
+def get_output_parent_chain(output_id: int) -> List[Dict[str, Any]]:
+    """
+    查询指定 output_id 的父版本链（从最早父版本到当前版本）。
+
+    使用 WITH RECURSIVE，从目标 output_id 开始，递归向上找 parent_output_id。
+    结果按 depth 升序排列（0=当前版本，越大=越早的父版本）。
+
+    最终 service 层反转顺序返回：最早版本 -> ... -> 当前版本。
+
+    Args:
+        output_id: 目标输出 ID
+
+    Returns:
+        父版本链列表（含 output_id, parent_output_id, version_no, ...）
+    """
+    timeline_sql = """
+        WITH RECURSIVE parent_chain AS (
+            -- 锚点：当前 output
+            SELECT
+                o.output_id,
+                o.parent_output_id,
+                o.task_id,
+                o.version_no,
+                o.output_title,
+                o.source_type,
+                o.created_by,
+                o.created_at,
+                0 AS depth
+            FROM task_outputs o
+            WHERE o.output_id = %s AND o.is_deleted = 0
+
+            UNION ALL
+
+            -- 递归：找父版本
+            SELECT
+                p.output_id,
+                p.parent_output_id,
+                p.task_id,
+                p.version_no,
+                p.output_title,
+                p.source_type,
+                p.created_by,
+                p.created_at,
+                pc.depth + 1 AS depth
+            FROM task_outputs p
+            INNER JOIN parent_chain pc ON p.output_id = pc.parent_output_id
+            WHERE p.is_deleted = 0
+        )
+        SELECT
+            pc.output_id,
+            pc.parent_output_id,
+            pc.version_no,
+            pc.output_title,
+            pc.source_type,
+            pc.created_by,
+            pc.created_at,
+            pc.depth,
+            u.username AS creator_username,
+            u.real_name AS creator_real_name
+        FROM parent_chain pc
+        LEFT JOIN users u ON pc.created_by = u.user_id AND u.is_deleted = 0
+        ORDER BY pc.depth DESC
+    """
+    with get_db_cursor() as cursor:
+        cursor.execute(timeline_sql, (output_id,))
+        return cursor.fetchall()
+
+
+# =============================================================================
+# 版本号生成（事务内，带 FOR UPDATE 锁）
+# =============================================================================
+
+def get_next_version_no_for_update(
+    task_id: int,
+    conn: Connection,
+) -> int:
+    """
+    在事务内生成下一个版本号（带 FOR UPDATE 锁）。
+
+    通过对 task_outputs 表加读锁（SELECT ... FOR UPDATE）确保并发安全。
+    返回当前 task 下最大 version_no + 1。
+
+    此函数必须在 service 层已开启事务（conn 已传入）后调用。
+
+    Args:
+        task_id: 任务 ID
+        conn: 已开启事务的数据库连接
+
+    Returns:
+        下一个版本号
+    """
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT MAX(version_no) AS max_ver FROM task_outputs
+            WHERE task_id = %s AND is_deleted = 0
+            FOR UPDATE
+            """,
+            (task_id,),
+        )
+        row = cursor.fetchone()
+        max_ver = row["max_ver"] if row and row["max_ver"] is not None else 0
+        return max_ver + 1
+    finally:
+        cursor.close()
+
+
+# =============================================================================
 # 输出版本写操作
 # =============================================================================
 
@@ -478,11 +548,15 @@ def create_manual_output(
     content: str,
     source_type: str,
     parent_output_id: Optional[int],
+    edit_summary: Optional[str],
     created_by: int,
     conn: Optional[Connection] = None,
 ) -> int:
     """
     创建人工输出版本。
+
+    Args:
+        edit_summary: 编辑说明（可为 None 或空字符串）
 
     Returns:
         新输出 ID
@@ -498,7 +572,7 @@ def create_manual_output(
         VALUES
             (%s, %s, %s, %s, %s, %s, %s,
              0, %s, %s,
-             NULL, 0, 'draft',
+             %s, 0, 'draft',
              0, %s, %s)
     """
     if conn is not None:
@@ -508,6 +582,7 @@ def create_manual_output(
                 task_id, branch_id, version_no, output_title, content,
                 source_type, parent_output_id,
                 now, created_by,
+                edit_summary,
                 now, created_by,
             ))
             return cursor.lastrowid
@@ -519,6 +594,7 @@ def create_manual_output(
                 task_id, branch_id, version_no, output_title, content,
                 source_type, parent_output_id,
                 now, created_by,
+                edit_summary,
                 now, created_by,
             ))
             return cursor.lastrowid

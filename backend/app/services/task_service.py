@@ -2,7 +2,8 @@
 任务 Service 层。
 
 处理任务、任务分支、输出版本相关业务逻辑。
-复用 project_service / project_repo 中的项目权限判断。
+复用 project_repo / project_service 中的项目权限判断。
+所有写操作使用 get_db_transaction() 保证与 operation_logs 同一事务。
 """
 
 from typing import Any, Dict, List, Optional
@@ -20,7 +21,6 @@ VALID_TASK_STATUS = {"draft", "running", "generated", "submitted",
                      "approved", "rejected", "revision_required",
                      "adopted", "archived", "conflict_pending"}
 VALID_PRIORITY = {"low", "normal", "high", "urgent"}
-VALID_SOURCE_TYPE = {"ai_generated", "manual_edit", "hybrid", "manual_merge"}
 
 
 # =============================================================================
@@ -41,31 +41,18 @@ def _is_admin(user: Dict[str, Any]) -> bool:
 
 
 def _can_access_project(project_id: int, user_id: int) -> bool:
-    """判断用户是否有权访问指定项目。"""
     if user_repo.is_admin(user_id):
         return True
     return project_repo.is_user_in_project(project_id, user_id)
 
 
-def _can_manage_project(project_id: int, user_id: int) -> bool:
-    """判断用户是否有权管理项目（admin 或 owner 或 leader）。"""
-    if user_repo.is_admin(user_id):
-        return True
-    return (
-        project_repo.is_user_project_owner(project_id, user_id) or
-        project_repo.is_user_project_leader(project_id, user_id)
-    )
-
-
 def _can_create_task(project_id: int, user: Dict[str, Any]) -> bool:
-    """只有项目成员才能创建任务。"""
     if _is_admin(user):
         return True
     return project_repo.is_user_in_project(project_id, user["user_id"])
 
 
 def _can_update_task(task: Dict[str, Any], user: Dict[str, Any]) -> bool:
-    """更新任务：admin / 项目 owner / leader / 任务创建人 / 任务负责人。"""
     if _is_admin(user):
         return True
     user_id = user["user_id"]
@@ -82,7 +69,6 @@ def _can_update_task(task: Dict[str, Any], user: Dict[str, Any]) -> bool:
 
 
 def _can_delete_task(task: Dict[str, Any], user: Dict[str, Any]) -> bool:
-    """删除任务：admin / 项目 owner / leader / 任务创建人。"""
     if _is_admin(user):
         return True
     user_id = user["user_id"]
@@ -180,7 +166,6 @@ def create_task(
     branch_id: Optional[int] = None
 
     with get_db_transaction() as conn:
-        # 1. 创建任务
         task_id = task_repo.create_task(
             project_id=project_id,
             task_type_id=task_type_id,
@@ -193,7 +178,6 @@ def create_task(
             conn=conn,
         )
 
-        # 2. 创建默认主分支（主分支名固定为 main）
         if create_default_branch:
             branch_id = task_repo.create_task_branch(
                 task_id=task_id,
@@ -204,7 +188,6 @@ def create_task(
                 conn=conn,
             )
 
-        # 3. 写入操作日志
         user_repo.insert_operation_log_with_conn(
             user_id=user_id,
             action_type="task:create",
@@ -490,15 +473,11 @@ def get_output_detail(token: str, output_id: int) -> Dict[str, Any]:
 
 
 # =============================================================================
-# 输出版本时间线
+# 输出版本时间线（使用 repo 方法，不在 service 层写 SQL）
 # =============================================================================
 
 def get_output_timeline(token: str, output_id: int) -> List[Dict[str, Any]]:
-    """
-    获取输出版本时间线（基于 parent_output_id）。
-
-    优先使用 MySQL WITH RECURSIVE CTE 实现递归查询。
-    """
+    """获取输出版本时间线（基于 parent_output_id）。"""
     user = _require_auth(token)
 
     output = task_repo.get_output_by_id(output_id)
@@ -512,48 +491,13 @@ def get_output_timeline(token: str, output_id: int) -> List[Dict[str, Any]]:
     if not _can_access_project(task["project_id"], user["user_id"]):
         raise ForbiddenException(message="无权访问此输出版本")
 
-    from app.database import get_db_cursor
-
-    timeline_sql = """
-        WITH RECURSIVE output_tree AS (
-            -- 基础版本：从最早的没有父版本的版本开始（parent_output_id IS NULL）
-            SELECT o.output_id, o.parent_output_id, o.version_no,
-                   o.output_title, o.source_type, o.created_by,
-                   o.created_at, 0 AS depth
-            FROM task_outputs o
-            WHERE o.task_id = %s
-              AND o.is_deleted = 0
-              AND o.parent_output_id IS NULL
-
-            UNION ALL
-
-            -- 递归：找到子版本
-            SELECT o.output_id, o.parent_output_id, o.version_no,
-                   o.output_title, o.source_type, o.created_by,
-                   o.created_at, ot.depth + 1
-            FROM task_outputs o
-            INNER JOIN output_tree ot ON o.parent_output_id = ot.output_id
-            WHERE o.task_id = %s
-              AND o.is_deleted = 0
-        )
-        SELECT ot.output_id, ot.parent_output_id, ot.version_no,
-               ot.output_title, ot.source_type,
-               ot.created_by, ot.created_at, ot.depth,
-               u.username AS creator_username, u.real_name AS creator_real_name
-        FROM output_tree ot
-        LEFT JOIN users u ON ot.created_by = u.user_id AND u.is_deleted = 0
-        ORDER BY ot.depth ASC, ot.created_at ASC
-    """
-
-    with get_db_cursor() as cursor:
-        cursor.execute(timeline_sql, (output["task_id"], output["task_id"]))
-        rows = cursor.fetchall()
-
-    return [_timeline_item_to_dict(r) for r in rows]
+    rows = task_repo.get_output_parent_chain(output_id)
+    timeline = [_timeline_item_to_dict(r) for r in rows]
+    return timeline
 
 
 # =============================================================================
-# 创建人工输出版本（事务：INSERT output + INSERT operation_logs）
+# 创建人工输出版本（事务：version_no + INSERT output + INSERT operation_logs）
 # =============================================================================
 
 def create_manual_output(
@@ -561,12 +505,18 @@ def create_manual_output(
     task_id: int,
     output_title: str,
     content: str,
+    edit_summary: Optional[str] = None,
     branch_id: Optional[int] = None,
     parent_output_id: Optional[int] = None,
     ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """创建人工输出版本。"""
+    """
+    创建人工输出版本。
+
+    version_no 在事务内通过 FOR UPDATE 锁生成，保证并发不重复。
+    edit_summary 写入 task_outputs.edit_summary 字段。
+    """
     user = _require_auth(token)
     user_id = user["user_id"]
 
@@ -580,13 +530,11 @@ def create_manual_output(
     if not output_title or not output_title.strip():
         raise ValidationException(message="版本标题不能为空")
 
-    # 校验分支
     if branch_id is not None:
         branch = task_repo.get_branch_by_id_and_task(branch_id, task_id)
         if branch is None:
             raise ValidationException(message="分支不属于当前任务")
 
-    # 校验父版本
     if parent_output_id is not None:
         parent = task_repo.get_output_by_id_and_task(parent_output_id, task_id)
         if parent is None:
@@ -595,10 +543,12 @@ def create_manual_output(
     else:
         source_type = "manual_edit"
 
-    # 生成版本号
-    next_version = task_repo.get_next_version_no(task_id, branch_id)
-
     with get_db_transaction() as conn:
+        next_version = task_repo.get_next_version_no_for_update(
+            task_id=task_id,
+            conn=conn,
+        )
+
         output_id = task_repo.create_manual_output(
             task_id=task_id,
             branch_id=branch_id,
@@ -607,6 +557,7 @@ def create_manual_output(
             content=content,
             source_type=source_type,
             parent_output_id=parent_output_id,
+            edit_summary=edit_summary,
             created_by=user_id,
             conn=conn,
         )

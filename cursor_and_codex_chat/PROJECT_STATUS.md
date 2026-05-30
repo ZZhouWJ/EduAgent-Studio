@@ -2,20 +2,20 @@
 
 ## 当前阶段
 
-Stage-05 任务与版本管理模块：已发布任务，等待 Cursor 开发。
+Stage-06 提示词模板管理模块：已发布任务，等待 Cursor 开发。
 
-Stage-04 项目空间管理模块已通过 Fix R2 复审。
+Stage-05 任务与版本管理模块已通过 Fix 复审。
 
 ## 审查结果摘要
 
-- Stage-04 项目空间管理模块 10 个项目与成员接口已实现；
-- 创建项目返回 `project_id` 已修复；
-- 关键写操作与 `operation_logs` 同事务已修复；
-- teacher 项目列表权限过滤已修复；
-- UPDATE affected_rows 检查已修复；
-- 项目归档已使用 MySQL 会话变量可靠读取 `sp_archive_project` OUT 参数；
+- `task_repo.get_output_by_id()` 已修复为 `t.title AS task_title`；
+- 版本时间线已改为从指定 `output_id` 向上追溯父版本链；
+- 版本时间线 SQL 已移入 `task_repo.py`；
+- 人工输出版本创建已保存 `edit_summary`；
+- `version_no` 已在创建输出版本的同一事务内计算，并使用 `SELECT ... FOR UPDATE`；
+- 创建输出版本、写 `operation_logs` 与版本号计算处于同一事务；
 - 未发现本轮越界修改 `database/`、`frontend/` 或 `docs/01_数据库Schema冻结说明.md`；
-- 未发现 Stage-05 内容提前实现；
+- 未发现 AI 调用、提示词模板、审核中心、成果库或前端页面越界实现；
 - Python 语法编译检查通过。
 
 ## 当前技术栈
@@ -28,13 +28,12 @@ Stage-04 项目空间管理模块已通过 Fix R2 复审。
 
 ## 当前任务
 
-- `TASK-005-task-version-management.md`：任务与版本管理模块
+- `TASK-006-prompt-template.md`：提示词模板管理模块
 
 ## 未完成内容
 
 - Windows MySQL 环境下补做 Stage-01 SQL 顺序导入验证
-- Stage-02/Stage-03/Stage-04 后端服务运行级验证和接口 curl 验证
-- Stage-05 任务与版本管理
+- Stage-02/Stage-03/Stage-04/Stage-05 后端服务运行级验证和接口 curl 验证
 - Stage-06 提示词模板
 - Stage-07 模型调用
 - Stage-08 人工编辑与乐观锁
