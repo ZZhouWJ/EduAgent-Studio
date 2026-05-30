@@ -14,5 +14,7 @@
 | TASK-006 | Stage-06 | 提示词模板管理 | 已通过 Codex 审查 | Cursor | Codex |
 | TASK-007 | Stage-07 | 模型管理、Mock 模型调用、调用日志和成本记录 | 已通过 Fix R2 复审 | Cursor | Codex |
 | TASK-007-FIX | Stage-07 | 修复模型调用审查阻塞问题 | 已通过 Fix R2 复审 | Cursor | Codex |
-| TASK-008 | Stage-08 | 人工编辑、批注与乐观锁 | 已完成，等待 Codex 审查 | Cursor | Codex |
+| TASK-008 | Stage-08 | 人工编辑、批注与乐观锁 | 已通过 Fix 复审 | Cursor | Codex |
+| TASK-008-FIX | Stage-08 | 修复人工编辑、批注与乐观锁审查问题 | 已通过 Codex 复审 | Cursor | Codex |
+| TASK-009 | Stage-09 | 审核中心模块 | 已发布，等待 Cursor 开发 | Cursor | Codex |
 

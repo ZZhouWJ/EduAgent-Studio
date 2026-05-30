@@ -562,6 +562,32 @@ def is_user_project_leader(project_id: int, user_id: int) -> bool:
         return cursor.fetchone() is not None
 
 
+def is_user_project_teacher(project_id: int, user_id: int) -> bool:
+    """判断用户是否为项目内 teacher。"""
+    sql = """
+        SELECT 1 FROM project_members
+        WHERE project_id = %s AND user_id = %s
+          AND project_role = 'teacher'
+          AND is_deleted = 0
+    """
+    with get_db_cursor() as cursor:
+        cursor.execute(sql, (project_id, user_id))
+        return cursor.fetchone() is not None
+
+
+def is_user_project_reviewer(project_id: int, user_id: int) -> bool:
+    """判断用户是否为项目内 reviewer。"""
+    sql = """
+        SELECT 1 FROM project_members
+        WHERE project_id = %s AND user_id = %s
+          AND project_role = 'reviewer'
+          AND is_deleted = 0
+    """
+    with get_db_cursor() as cursor:
+        cursor.execute(sql, (project_id, user_id))
+        return cursor.fetchone() is not None
+
+
 def is_user_in_project(project_id: int, user_id: int) -> bool:
     """判断用户是否为项目成员。"""
     sql = """

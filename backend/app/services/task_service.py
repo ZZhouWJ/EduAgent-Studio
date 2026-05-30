@@ -916,6 +916,10 @@ def create_output_comment(
 
     if not comment_type or not comment_type.strip():
         raise ValidationException(message="批注类型不能为空")
+    if comment_type.strip() not in task_repo.VALID_COMMENT_TYPE:
+        raise ValidationException(
+            message=f"无效的批注类型: {comment_type}，允许值: {', '.join(task_repo.VALID_COMMENT_TYPE)}"
+        )
 
     if not comment_text or not comment_text.strip():
         raise ValidationException(message="批注内容不能为空")
@@ -962,7 +966,7 @@ def update_comment_status(
     """
     更新批注状态。
 
-    - 仅 admin / teacher / project_leader / 批注创建人可更新
+    - 仅 admin / 项目内 leader / 项目内 teacher / 项目内 reviewer / 批注创建人可更新
     - status 仅允许 open / resolved / closed
     - affected_rows == 0 时返回错误
     """
@@ -974,30 +978,27 @@ def update_comment_status(
             message=f"无效的批注状态: {status}，允许值: {', '.join(task_repo.VALID_COMMENT_STATUS)}"
         )
 
-    comment = task_repo.get_comment_by_id(comment_id)
-    if comment is None:
+    ctx = task_repo.get_comment_project_context(comment_id)
+    if ctx is None:
         raise NotFoundException(message="批注不存在")
 
-    output_id = comment["output_id"]
-
-    output = task_repo.get_output_by_id(output_id)
-    if output is None:
-        raise NotFoundException(message="批注关联输出不存在")
-
-    project_id = _get_output_project_id(output_id)
-    if project_id is None:
-        raise NotFoundException(message="批注关联项目不存在")
+    commenter_id = ctx["commenter_id"]
+    output_id = ctx["output_id"]
+    task_id = ctx["task_id"]
+    project_id = ctx["project_id"]
 
     if not _can_access_project(project_id, user_id):
         raise ForbiddenException(message="无权更新此批注")
 
     if _is_admin(user):
         pass
-    elif "teacher" in user.get("roles", []):
+    elif commenter_id == user_id:
         pass
-    elif "project_leader" in user.get("roles", []):
+    elif project_repo.is_user_project_leader(project_id, user_id):
         pass
-    elif comment["commenter_id"] == user_id:
+    elif project_repo.is_user_project_teacher(project_id, user_id):
+        pass
+    elif project_repo.is_user_project_reviewer(project_id, user_id):
         pass
     else:
         raise ForbiddenException(message="无权更新此批注状态")
@@ -1006,6 +1007,7 @@ def update_comment_status(
         affected = task_repo.update_comment_status(
             comment_id=comment_id,
             status=status,
+            updated_by=user_id,
             conn=conn,
         )
         if affected == 0:
@@ -1019,7 +1021,7 @@ def update_comment_status(
             target_type="output",
             target_id=output_id,
             project_id=project_id,
-            task_id=output["task_id"],
+            task_id=task_id,
             ip_address=ip_address,
             user_agent=user_agent,
             conn=conn,

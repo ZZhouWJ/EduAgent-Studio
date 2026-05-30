@@ -414,10 +414,25 @@ async def update_output(
 
 
 # =============================================================================
-# 另存为新版本
+# 另存为新版本（/save-as 兼容路径）
 # =============================================================================
 
 @router.post("/api/outputs/{output_id}/save-as")
+async def save_output_as(
+    request: Request,
+    output_id: int = Path(..., gt=0),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    body: SaveAsNewVersionRequest = Body(...),
+) -> dict:
+    """基于已有输出另存为新版本（兼容路径，需有权限）。"""
+    return _save_as_impl(request, output_id, authorization, body)
+
+
+# =============================================================================
+# 另存为新版本（/save-as-new-version 验收指定路径）
+# =============================================================================
+
+@router.post("/api/outputs/{output_id}/save-as-new-version")
 async def save_output_as_new_version(
     request: Request,
     output_id: int = Path(..., gt=0),
@@ -425,6 +440,16 @@ async def save_output_as_new_version(
     body: SaveAsNewVersionRequest = Body(...),
 ) -> dict:
     """基于已有输出另存为新版本（需有权限）。"""
+    return _save_as_impl(request, output_id, authorization, body)
+
+
+def _save_as_impl(
+    request: Request,
+    output_id: int,
+    authorization: Optional[str],
+    body: SaveAsNewVersionRequest,
+) -> dict:
+    """统一的另存为新版本实现，供两个路由共用。"""
     token = _extract_token(authorization)
     ip = _get_client_ip(request)
     ua = request.headers.get("User-Agent", "")

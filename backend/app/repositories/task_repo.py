@@ -23,6 +23,8 @@ VALID_TASK_STATUS = {"draft", "running", "generated", "submitted",
                      "adopted", "archived", "conflict_pending"}
 VALID_BRANCH_STATUS = {"active", "merged", "closed", "conflict_pending"}
 VALID_SOURCE_TYPE = {"ai_generated", "manual_edit", "hybrid", "manual_merge"}
+VALID_COMMENT_TYPE = {"comment", "suggestion", "approval"}
+VALID_COMMENT_STATUS = {"open", "resolved", "closed"}
 
 
 # =============================================================================
@@ -745,9 +747,6 @@ def save_output_as_new_version(
 # 输出批注查询
 # =============================================================================
 
-VALID_COMMENT_STATUS = {"open", "resolved", "closed"}
-
-
 def get_comment_output_id(comment_id: int) -> Optional[int]:
     """
     通过 comment_id 查询所属 output_id。
@@ -858,29 +857,58 @@ def create_output_comment(
 def update_comment_status(
     comment_id: int,
     status: str,
+    updated_by: int,
     conn: Optional[Connection] = None,
 ) -> int:
     """
     更新批注状态。
 
     Returns:
-        affected_rows（0 表示批注不存在或无权更新）
+        affected_rows（0 表示批注不存在）
     """
     now = datetime.now()
     sql = """
         UPDATE output_comments
         SET status = %s,
-            updated_at = %s
+            updated_at = %s,
+            updated_by = %s
         WHERE comment_id = %s AND is_deleted = 0
     """
     if conn is not None:
         cursor = conn.cursor()
         try:
-            cursor.execute(sql, (status, now, comment_id))
+            cursor.execute(sql, (status, now, updated_by, comment_id))
             return cursor.rowcount
         finally:
             cursor.close()
     else:
         with get_db_cursor() as cursor:
-            cursor.execute(sql, (status, now, comment_id))
+            cursor.execute(sql, (status, now, updated_by, comment_id))
             return cursor.rowcount
+
+
+def get_comment_project_context(comment_id: int) -> Optional[Dict[str, Any]]:
+    """
+    通过 comment_id 查询批注关联的项目上下文。
+
+    用于权限判断：找到批注所属 project_id。
+
+    Returns:
+        dict（含 comment_id, output_id, commenter_id, task_id, project_id）
+        或 None
+    """
+    sql = """
+        SELECT
+            c.comment_id,
+            c.output_id,
+            c.commenter_id,
+            t.task_id,
+            t.project_id
+        FROM output_comments c
+        INNER JOIN task_outputs o ON c.output_id = o.output_id AND o.is_deleted = 0
+        INNER JOIN project_tasks t ON o.task_id = t.task_id AND t.is_deleted = 0
+        WHERE c.comment_id = %s AND c.is_deleted = 0
+    """
+    with get_db_cursor() as cursor:
+        cursor.execute(sql, (comment_id,))
+        return cursor.fetchone()
