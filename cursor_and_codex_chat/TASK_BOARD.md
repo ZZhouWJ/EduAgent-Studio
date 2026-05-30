@@ -9,4 +9,4 @@
 | TASK-004 | Stage-04 | 项目空间管理 | 已通过 Fix R2 复审 | Cursor | Codex |
 | TASK-004-FIX | Stage-04 | 修复项目空间管理审查问题 | 已完成 | Cursor | Codex |
 | TASK-004-FIX-R2 | Stage-04 | 修复项目归档存储过程 OUT 参数读取 | 已通过 Codex 复审 | Cursor | Codex |
-| TASK-005 | Stage-05 | 任务与版本管理 | 已发布，等待 Cursor 开发 | Cursor | Codex |
+| TASK-005 | Stage-05 | 任务与版本管理 | 已完成，等待 Codex 审查 | Cursor | Codex |
