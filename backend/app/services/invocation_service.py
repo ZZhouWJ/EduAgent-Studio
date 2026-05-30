@@ -1,7 +1,7 @@
 """
 调用日志 Service 层。
 
-处理 AI 模型调用、输出版本写入、成本记录相关业务逻辑。
+处理 AI 模型调用、输出版本写入，成本记录相关业务逻辑。
 """
 
 from typing import Any, Dict, List, Optional
@@ -56,13 +56,14 @@ def generate_task_outputs(
     """
     任务模型生成（调用 Mock 模型，批量）。
 
-    为每个模型单独调用 Mock Adapter：
-    1. 记录 ai_invocations（成功或失败）
-    2. 成功时写入 task_outputs（ai_generated）
-    3. 成功时写入 cost_records
-    4. 统一写入 operation_logs
+    每个模型的调用流程（同一事务内）：
+    1. 校验模型
+    2. 调用 Mock Adapter
+    3. 先插入 ai_invocations，获取 invocation_id
+    4. 成功后插入 task_outputs（关联 invocation_id）
+    5. 成功后插入 cost_records
+    6. 失败时也插入 cost_records（成本为 0）
 
-    整个接口在一个事务中执行所有数据库写入。
     单个模型失败不影响其他模型结果。
 
     Returns:
@@ -96,7 +97,7 @@ def generate_task_outputs(
         from app.repositories import prompt_repo
         version = prompt_repo.get_version_by_id(prompt_version_id)
         if version is None:
-            raise ValidationException(message="提示词版本不存在")
+            raise NotFoundException(message="提示词版本不存在")
         prompt_content = version.get("prompt_content")
 
     results: List[Dict[str, Any]] = []
@@ -119,6 +120,21 @@ def generate_task_outputs(
                     latency_ms=0,
                     status="failed",
                     created_by=user_id,
+                    conn=conn,
+                )
+                invocation_repo.create_cost_record(
+                    invocation_id=invocation_id,
+                    project_id=project_id,
+                    task_id=task_id,
+                    model_id=model_id,
+                    user_id=user_id,
+                    input_tokens=0,
+                    output_tokens=0,
+                    total_tokens=0,
+                    input_cost=0.0,
+                    output_cost=0.0,
+                    total_cost=0.0,
+                    currency="CNY",
                     conn=conn,
                 )
                 results.append({
@@ -150,6 +166,21 @@ def generate_task_outputs(
                     created_by=user_id,
                     conn=conn,
                 )
+                invocation_repo.create_cost_record(
+                    invocation_id=invocation_id,
+                    project_id=project_id,
+                    task_id=task_id,
+                    model_id=model_id,
+                    user_id=user_id,
+                    input_tokens=0,
+                    output_tokens=0,
+                    total_tokens=0,
+                    input_cost=0.0,
+                    output_cost=0.0,
+                    total_cost=0.0,
+                    currency="CNY",
+                    conn=conn,
+                )
                 results.append({
                     "model_id": model_id,
                     "model_name": model_name,
@@ -171,27 +202,7 @@ def generate_task_outputs(
                     conn=conn,
                 )
 
-                output_id = invocation_repo.create_task_output(
-                    task_id=task_id,
-                    branch_id=branch_id,
-                    invocation_id=None,
-                    version_no=next_version,
-                    output_title=output_title,
-                    content=model_result.output_text,
-                    source_type="ai_generated",
-                    parent_output_id=None,
-                    created_by=user_id,
-                    conn=conn,
-                )
-
-                input_cost = (
-                    model_result.input_tokens / 1000.0 * float(model.get("input_price", 0))
-                )
-                output_cost = (
-                    model_result.output_tokens / 1000.0 * float(model.get("output_price", 0))
-                )
-                total_cost = input_cost + output_cost
-
+                # 先插入 ai_invocations，获取 invocation_id
                 invocation_id = invocation_repo.create_invocation(
                     project_id=project_id,
                     task_id=task_id,
@@ -208,6 +219,28 @@ def generate_task_outputs(
                     created_by=user_id,
                     conn=conn,
                 )
+
+                # 再插入 task_outputs，关联 invocation_id
+                output_id = invocation_repo.create_task_output(
+                    task_id=task_id,
+                    branch_id=branch_id,
+                    invocation_id=invocation_id,
+                    version_no=next_version,
+                    output_title=output_title,
+                    content=model_result.output_text,
+                    source_type="ai_generated",
+                    parent_output_id=None,
+                    created_by=user_id,
+                    conn=conn,
+                )
+
+                input_cost = (
+                    model_result.input_tokens / 1000.0 * float(model.get("input_price", 0))
+                )
+                output_cost = (
+                    model_result.output_tokens / 1000.0 * float(model.get("output_price", 0))
+                )
+                total_cost = input_cost + output_cost
 
                 invocation_repo.create_cost_record(
                     invocation_id=invocation_id,
@@ -252,6 +285,21 @@ def generate_task_outputs(
                     latency_ms=model_result.latency_ms,
                     status="failed",
                     created_by=user_id,
+                    conn=conn,
+                )
+                invocation_repo.create_cost_record(
+                    invocation_id=invocation_id,
+                    project_id=project_id,
+                    task_id=task_id,
+                    model_id=model_id,
+                    user_id=user_id,
+                    input_tokens=0,
+                    output_tokens=0,
+                    total_tokens=0,
+                    input_cost=0.0,
+                    output_cost=0.0,
+                    total_cost=0.0,
+                    currency="CNY",
                     conn=conn,
                 )
                 results.append({
@@ -330,8 +378,7 @@ def get_invocation_detail(
         raise NotFoundException(message="调用记录不存在")
 
     if invocation.get("task_id"):
-        project_id = invocation["task_id"]
-        task = task_repo.get_task_by_id(project_id)
+        task = task_repo.get_task_by_id(invocation["task_id"])
         if task:
             if not _can_access_project(task["project_id"], user["user_id"]):
                 raise ForbiddenException(message="无权查看此调用记录")

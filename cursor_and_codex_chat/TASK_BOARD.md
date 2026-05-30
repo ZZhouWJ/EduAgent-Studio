@@ -12,4 +12,7 @@
 | TASK-005 | Stage-05 | 任务与版本管理 | 已通过 Fix 复审 | Cursor | Codex |
 | TASK-005-FIX | Stage-05 | 修复任务与版本管理审查问题 | 已通过 Codex 复审 | Cursor | Codex |
 | TASK-006 | Stage-06 | 提示词模板管理 | 已通过 Codex 审查 | Cursor | Codex |
-| TASK-007 | Stage-07 | 模型管理、Mock 模型调用、调用日志和成本记录 | 已完成，等待 Codex 审查 | Cursor | Codex |
+| TASK-007 | Stage-07 | 模型管理、Mock 模型调用、调用日志和成本记录 | 已通过 Fix R2 复审 | Cursor | Codex |
+| TASK-007-FIX | Stage-07 | 修复模型调用审查阻塞问题 | 已通过 Fix R2 复审 | Cursor | Codex |
+| TASK-008 | Stage-08 | 人工编辑、批注与乐观锁 | 已发布，等待 Cursor 开发 | Cursor | Codex |
+

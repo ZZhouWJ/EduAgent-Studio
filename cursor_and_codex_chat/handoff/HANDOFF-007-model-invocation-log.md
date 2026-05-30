@@ -43,11 +43,11 @@
 
 ```python
 # 加密
-encrypted_data, iv, tag, key_version = encrypt_api_key("sk-test-123456")
+encrypted_data, iv, tag, key_version = encrypt_api_key("<YOUR_API_KEY>")
 # 解密
 plaintext = decrypt_api_key(encrypted_data, iv, tag)
 # 掩码
-mask_api_key("sk-test-123456")  # "sk-te****3456"
+mask_api_key("<YOUR_API_KEY>")  # "<YOU****KEY>"
 ```
 
 ### 2.2 Mock Adapter
@@ -316,7 +316,7 @@ curl "http://127.0.0.1:8000/api/api-configs" \
 curl -X POST "http://127.0.0.1:8000/api/api-configs" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
-  -d '{"provider_id":1,"config_name":"测试配置","api_key":"sk-test-abcdefgh1234","quota_limit":100000}'
+  -d '{"provider_id":1,"config_name":"测试配置","api_key":"<TEST_API_KEY>","quota_limit":100000}'
 # 期望：返回 api_config_id 和 key_mask
 ```
 

@@ -179,7 +179,8 @@ def list_models(
         filters.append("(m.model_name LIKE %s OR m.display_name LIKE %s)")
         params.extend([like, like])
 
-    where_clause = " AND ".join(filters) if filters else base_where
+    where_parts = [base_where] + filters
+    where_clause = " AND ".join(where_parts)
 
     count_sql = f"SELECT COUNT(*) AS total FROM ai_models m WHERE {where_clause}"
 
@@ -326,9 +327,9 @@ def list_api_configs(
 def create_api_config(
     provider_id: int,
     config_name: str,
-    encrypted_api_key: bytes,
-    key_iv: bytes,
-    key_tag: bytes,
+    encrypted_api_key: str,
+    key_iv: str,
+    key_tag: str,
     key_version: int,
     key_mask: str,
     quota_limit: int,
@@ -336,7 +337,7 @@ def create_api_config(
     conn: Optional[Connection] = None,
 ) -> int:
     """
-    创建 API 配置（加密字段）。
+    创建 API 配置（加密字段，值为 Base64 字符串）。
 
     Returns:
         新配置 ID

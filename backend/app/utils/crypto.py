@@ -4,14 +4,14 @@
 提供 API Key 的 AES-256-GCM 加密解密功能。
 加密主密钥从环境变量 API_KEY_SECRET 读取，不硬编码。
 
-AES-GCM 为带认证的加密模式，同时保证机密性和完整性。
+所有加密结果均以 Base64 字符串形式返回/入库，与数据库 TEXT/VARCHAR 字段兼容。
 """
 
+import base64
 import os
 import secrets
 from typing import Tuple
 
-from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 _SECRET_ENV_VAR = "API_KEY_SECRET"
@@ -34,7 +34,7 @@ def _get_master_key() -> bytes:
     if not secret:
         raise RuntimeError(
             f"环境变量 {_SECRET_ENV_VAR} 未设置。"
-            f"请在 .env 文件中设置 API_KEY_SECRET=<32字节十六进制字符串或随机密钥>"
+            f"请在 .env 文件中设置 API_KEY_SECRET=<随机密钥>"
         )
     secret_bytes = secret.encode("utf-8")
     if len(secret_bytes) < 16:
@@ -42,48 +42,54 @@ def _get_master_key() -> bytes:
             f"环境变量 {_SECRET_ENV_VAR} 太短（至少需要 32 字符）。"
             f"请使用随机密钥，例如：openssl rand -hex 32"
         )
-    key = secret_bytes[:32] if len(secret_bytes) >= 32 else secret_bytes.ljust(32, b'\0')
+    key = secret_bytes[:32] if len(secret_bytes) >= 32 else secret_bytes.ljust(32, b"\0")
     return key
 
 
-def encrypt_api_key(plaintext: str) -> Tuple[bytes, bytes, bytes, int]:
+def encrypt_api_key(plaintext: str) -> Tuple[str, str, str, int]:
     """
-    使用 AES-256-GCM 加密 API Key。
+    使用 AES-256-GCM 加密 API Key，结果以 Base64 字符串形式返回。
 
     Args:
         plaintext: 明文 API Key
 
     Returns:
-        (encrypted_data, iv, tag, key_version)
-        - encrypted_data: 密文（bytes）
-        - iv: 初始化向量（12 字节随机值）
-        - tag: 认证标签（16 字节）
+        (encrypted_base64, iv_base64, tag_base64, key_version)
+        - encrypted_base64: 密文（Base64 字符串）
+        - iv_base64: 初始化向量（Base64 字符串）
+        - tag_base64: 认证标签（Base64 字符串）
         - key_version: 密钥版本号（当前固定为 1）
     """
     key = _get_master_key()
     aesgcm = AESGCM(key)
     iv = secrets.token_bytes(12)
     ciphertext_with_tag = aesgcm.encrypt(iv, plaintext.encode("utf-8"), None)
-    encrypted_data = ciphertext_with_tag[:-16]
+    ciphertext = ciphertext_with_tag[:-16]
     tag = ciphertext_with_tag[-16:]
-    return encrypted_data, iv, tag, _KEY_VERSION
+    encrypted_b64 = base64.b64encode(ciphertext).decode("utf-8")
+    iv_b64 = base64.b64encode(iv).decode("utf-8")
+    tag_b64 = base64.b64encode(tag).decode("utf-8")
+    return encrypted_b64, iv_b64, tag_b64, _KEY_VERSION
 
 
-def decrypt_api_key(encrypted_data: bytes, iv: bytes, tag: bytes) -> str:
+def decrypt_api_key(encrypted_base64: str, iv_base64: str, tag_base64: str) -> str:
     """
-    解密 API Key。
+    解密 API Key（接受 Base64 字符串）。
 
     Args:
-        encrypted_data: 密文
-        iv: 初始化向量
-        tag: 认证标签
+        encrypted_base64: 密文（Base64 字符串）
+        iv_base64: 初始化向量（Base64 字符串）
+        tag_base64: 认证标签（Base64 字符串）
 
     Returns:
         明文 API Key
     """
     key = _get_master_key()
     aesgcm = AESGCM(key)
-    ciphertext_with_tag = encrypted_data + tag
+    ciphertext = base64.b64decode(encrypted_base64)
+    iv = base64.b64decode(iv_base64)
+    tag = base64.b64decode(tag_base64)
+    ciphertext_with_tag = ciphertext + tag
     plaintext_bytes = aesgcm.decrypt(iv, ciphertext_with_tag, None)
     return plaintext_bytes.decode("utf-8")
 
