@@ -154,7 +154,8 @@ def list_project_stats(
     """
     项目维度统计列表。
 
-    优先使用 v_project_task_statistics 视图。
+    优先使用 v_project_task_statistics 视图，通过 LEFT JOIN 子查询补齐
+    approved_output_count、invocation_count、total_cost。
     """
     params: List = []
     admin_filter = ""
@@ -172,13 +173,38 @@ def list_project_stats(
         SELECT
             v.project_id,
             v.project_name,
-            v.total_tasks,
-            v.total_members,
-            v.total_outputs,
-            v.total_review_requests,
-            v.pending_reviews,
-            v.total_adopted AS artifact_count
+            v.total_members AS member_count,
+            v.total_tasks AS task_count,
+            v.total_outputs AS output_count,
+
+            COALESCE(approved.cnt, 0) AS approved_output_count,
+            v.total_adopted AS artifact_count,
+
+            COALESCE(invocations_cnt.cnt, 0) AS invocation_count,
+            COALESCE(costs.total, 0) AS total_cost
+
         FROM v_project_task_statistics v
+
+        LEFT JOIN (
+            SELECT t.project_id, COUNT(DISTINCT o.output_id) AS cnt
+            FROM task_outputs o
+            INNER JOIN project_tasks t ON o.task_id = t.task_id AND t.is_deleted = 0
+            WHERE o.is_deleted = 0 AND o.status = 'approved'
+            GROUP BY t.project_id
+        ) approved ON v.project_id = approved.project_id
+
+        LEFT JOIN (
+            SELECT project_id, COUNT(*) AS cnt
+            FROM ai_invocations
+            GROUP BY project_id
+        ) invocations_cnt ON v.project_id = invocations_cnt.project_id
+
+        LEFT JOIN (
+            SELECT project_id, COALESCE(SUM(total_cost), 0) AS total
+            FROM cost_records
+            GROUP BY project_id
+        ) costs ON v.project_id = costs.project_id
+
         WHERE 1=1
         {admin_filter}
         {project_filter}
@@ -194,33 +220,80 @@ def get_project_stats_by_id(
 ) -> Optional[Dict[str, Any]]:
     """
     单个项目详细统计。
+
+    字段与 list_project_stats() 完全对齐：
+    project_id, project_name, member_count, task_count, output_count,
+    approved_output_count, artifact_count, invocation_count, total_cost
     """
+    params = [project_id]
     sql = """
         SELECT
-            v.project_id,
-            v.project_name,
-            v.project_type,
-            v.owner_name,
-            v.project_status,
-            v.total_tasks,
-            v.task_draft,
-            v.task_running,
-            v.task_generated,
-            v.task_submitted,
-            v.task_approved,
-            v.task_rejected,
-            v.task_revision_required,
-            v.task_adopted,
-            v.total_members,
-            v.total_outputs,
-            v.total_review_requests,
-            v.pending_reviews,
-            v.total_adopted AS artifact_count
-        FROM v_project_task_statistics v
-        WHERE v.project_id = %s
+            p.project_id,
+            p.project_name,
+
+            COALESCE(members.cnt, 0) AS member_count,
+            COALESCE(tasks.cnt, 0) AS task_count,
+            COALESCE(outputs.cnt, 0) AS output_count,
+            COALESCE(approved.cnt, 0) AS approved_output_count,
+            COALESCE(artifacts.cnt, 0) AS artifact_count,
+            COALESCE(invocations.cnt, 0) AS invocation_count,
+            COALESCE(costs.total, 0) AS total_cost
+
+        FROM projects p
+
+        LEFT JOIN (
+            SELECT project_id, COUNT(*) AS cnt
+            FROM project_members
+            WHERE is_deleted = 0
+            GROUP BY project_id
+        ) members ON p.project_id = members.project_id
+
+        LEFT JOIN (
+            SELECT project_id, COUNT(*) AS cnt
+            FROM project_tasks
+            WHERE is_deleted = 0
+            GROUP BY project_id
+        ) tasks ON p.project_id = tasks.project_id
+
+        LEFT JOIN (
+            SELECT t.project_id, COUNT(DISTINCT o.output_id) AS cnt
+            FROM task_outputs o
+            INNER JOIN project_tasks t ON o.task_id = t.task_id AND t.is_deleted = 0
+            WHERE o.is_deleted = 0
+            GROUP BY t.project_id
+        ) outputs ON p.project_id = outputs.project_id
+
+        LEFT JOIN (
+            SELECT t.project_id, COUNT(DISTINCT o.output_id) AS cnt
+            FROM task_outputs o
+            INNER JOIN project_tasks t ON o.task_id = t.task_id AND t.is_deleted = 0
+            WHERE o.is_deleted = 0 AND o.status = 'approved'
+            GROUP BY t.project_id
+        ) approved ON p.project_id = approved.project_id
+
+        LEFT JOIN (
+            SELECT project_id, COUNT(*) AS cnt
+            FROM adopted_outputs
+            WHERE is_deleted = 0
+            GROUP BY project_id
+        ) artifacts ON p.project_id = artifacts.project_id
+
+        LEFT JOIN (
+            SELECT project_id, COUNT(*) AS cnt
+            FROM ai_invocations
+            GROUP BY project_id
+        ) invocations ON p.project_id = invocations.project_id
+
+        LEFT JOIN (
+            SELECT project_id, COALESCE(SUM(total_cost), 0) AS total
+            FROM cost_records
+            GROUP BY project_id
+        ) costs ON p.project_id = costs.project_id
+
+        WHERE p.project_id = %s AND p.is_deleted = 0
     """
     with get_db_cursor() as cursor:
-        cursor.execute(sql, (project_id,))
+        cursor.execute(sql, params)
         row = cursor.fetchone()
         return _normalize_row(row) if row else None
 
@@ -239,94 +312,85 @@ def get_model_call_stats(
     """
     模型调用统计。
 
-    优先使用 v_model_invocation_statistics 视图。
-    支持 project_id 和日期范围过滤。
+    权限过滤由 service 层根据 project_id 决定 project_ids 范围后传入。
+    SQL 从 ai_invocations 出发，JOIN ai_models 获取模型信息，
+    JOIN projects 过滤已删除项目，确保不跨项目统计。
+
+    参数顺序（与 SQL 占位符严格对应）：
+      [1] ai.project_id = %s  或  ai.project_id IN (...%)
+      [2] ai.created_at >= %s
+      [3] ai.created_at <= %s
     """
     params: List = []
-    project_join = ""
-    date_filter = ""
 
+    # 1. project 过滤
+    project_filter = ""
     if project_id is not None:
-        project_join = " INNER JOIN ai_invocations ai2 ON v.model_id = ai2.model_id AND ai2.project_id = %s"
+        # 有明确 project_id：严格限制 ai.project_id = %s
+        project_filter = "ai.project_id = %s"
         params.append(project_id)
-        # 去重
-        project_join += """
-            AND EXISTS (
-                SELECT 1 FROM projects p
-                WHERE p.project_id = ai2.project_id
-                  AND p.is_deleted = 0
-            )"""
-
-    if date_from:
-        date_filter += " AND ai.created_at >= %s"
-        params.append(date_from)
-
-    if date_to:
-        date_filter += " AND ai.created_at <= %s"
-        params.append(date_to + " 23:59:59")
-
-    # 非 admin 按项目成员过滤
-    member_filter = ""
-    if not is_admin:
-        member_filter = " INNER JOIN project_members pm ON ai.project_id = pm.project_id AND pm.user_id = %s AND pm.is_deleted = 0"
-        params.append(user_id)
-
-    # 构建子查询获取过滤后的 ai.model_id
-    sub_params = list(params)
-    if project_id is not None and not date_filter and not member_filter:
-        # 简单场景：直接用视图
-        view_sql = f"SELECT DISTINCT model_id FROM ai_invocations WHERE project_id = %s AND is_deleted = 0"
-        with get_db_cursor() as cursor:
-            cursor.execute(view_sql, [project_id])
-            model_ids = [r["model_id"] for r in cursor.fetchall()]
-
-        if not model_ids:
-            return []
-
-        placeholders = ",".join(["%s"] * len(model_ids))
-        final_sql = f"""
-            SELECT * FROM v_model_invocation_statistics
-            WHERE model_id IN ({placeholders})
-            ORDER BY total_invocations DESC
+    elif not is_admin:
+        # 非 admin 无 project_id：限制在参与项目范围内
+        member_sql = """
+            SELECT DISTINCT project_id FROM project_members
+            WHERE user_id = %s AND is_deleted = 0
         """
         with get_db_cursor() as cursor:
-            cursor.execute(final_sql, model_ids)
-            return [_normalize_row(r) for r in cursor.fetchall()]
+            cursor.execute(member_sql, (user_id,))
+            rows = cursor.fetchall()
+        project_ids = [r["project_id"] for r in rows]
+        if not project_ids:
+            return []
+        ids_ph = ",".join(["%s"] * len(project_ids))
+        project_filter = f"ai.project_id IN ({ids_ph})"
+        params.extend(project_ids)
+    # admin 无 project_id：无 project 过滤条件
 
-    # 复杂场景：直接 JOIN ai_invocations 过滤
+    # 2. date 过滤（列表累积，避免 date_from 被 date_to 覆盖）
+    date_conditions = []
+    if date_from:
+        date_conditions.append("ai.created_at >= %s")
+        params.append(date_from)
+    if date_to:
+        date_conditions.append("ai.created_at <= %s")
+        params.append(date_to + " 23:59:59")
+
+    # 构建 WHERE 子句
+    conditions = ["m.is_deleted = 0", project_filter]
+    conditions.extend(date_conditions)
+    where_clause = " AND ".join(c for c in conditions if c)
+
     sql = f"""
         SELECT
-            v.model_id,
-            v.model_name,
-            v.display_name,
-            v.provider_name,
-            v.model_status,
-            COUNT(DISTINCT ai.invocation_id) AS total_invocations,
+            m.model_id,
+            m.model_name,
+            m.display_name,
+            mp.provider_name,
+            COUNT(ai.invocation_id) AS call_count,
+            COUNT(ai.invocation_id) AS total_invocations,
             SUM(CASE WHEN ai.status = 'success' THEN 1 ELSE 0 END) AS success_count,
             SUM(CASE WHEN ai.status = 'failed' THEN 1 ELSE 0 END) AS failed_count,
             SUM(CASE WHEN ai.status = 'timeout' THEN 1 ELSE 0 END) AS timeout_count,
             SUM(CASE WHEN ai.status = 'blocked' THEN 1 ELSE 0 END) AS blocked_count,
-            COALESCE(SUM(ai.input_tokens), 0) AS total_input_tokens,
+            COALESCE(SUM(ai.input_tokens),  0) AS total_input_tokens,
             COALESCE(SUM(ai.output_tokens), 0) AS total_output_tokens,
             COALESCE(SUM(ai.input_tokens) + SUM(ai.output_tokens), 0) AS total_tokens,
             COALESCE(AVG(ai.latency_ms), 0) AS avg_latency_ms,
             CASE
-                WHEN COUNT(DISTINCT ai.invocation_id) > 0
+                WHEN COUNT(ai.invocation_id) > 0
                 THEN ROUND(
                     SUM(CASE WHEN ai.status = 'success' THEN 1 ELSE 0 END) * 100.0
-                    / COUNT(DISTINCT ai.invocation_id), 2)
+                    / COUNT(ai.invocation_id), 2)
                 ELSE 0.00
             END AS success_rate
-        FROM v_model_invocation_statistics v
-        INNER JOIN ai_invocations ai
-            ON v.model_id = ai.model_id AND ai.is_deleted = 0
-            {member_filter}
-        WHERE v.model_status = 'active'
-          {date_filter}
-        GROUP BY
-            v.model_id, v.model_name, v.display_name,
-            v.provider_name, v.model_status
-        ORDER BY total_invocations DESC
+        FROM ai_invocations ai
+        INNER JOIN ai_models m
+            ON ai.model_id = m.model_id
+        LEFT JOIN model_providers mp
+            ON m.provider_id = mp.provider_id AND mp.is_deleted = 0
+        WHERE {where_clause}
+        GROUP BY m.model_id, m.model_name, m.display_name, mp.provider_name
+        ORDER BY call_count DESC
     """
     with get_db_cursor() as cursor:
         cursor.execute(sql, params)
@@ -579,17 +643,22 @@ def get_member_contribution_stats(
 ) -> List[Dict[str, Any]]:
     """
     成员贡献统计。
+
+    权限规则：
+    - admin: 全局（不限 project_id）
+    - 非 admin + project_id 指定：当前用户参与该项目 -> 返回该项目所有成员贡献
+    - 非 admin + project_id 未指定：返回当前用户参与的所有项目中的所有成员贡献
     """
     params: List = []
-    project_filter = ""
-    member_filter = ""
+    project_scope_filter = ""
 
     if project_id is not None:
-        project_filter = " AND pm.project_id = %s"
+        # 指定了 project_id：只统计该项目
+        project_scope_filter = " AND pm.project_id = %s"
         params.append(project_id)
-
-    if not is_admin:
-        member_filter = " AND pm.user_id = %s"
+    elif not is_admin:
+        # 非 admin 未指定 project_id：限制在参与项目的范围内
+        project_scope_filter = " AND pm.project_id IN (SELECT project_id FROM project_members WHERE user_id = %s AND is_deleted = 0)"
         params.append(user_id)
 
     sql = f"""
@@ -611,7 +680,8 @@ def get_member_contribution_stats(
             ), 0) AS task_assigned_count,
             COALESCE(SUM(
                 (SELECT COUNT(*) FROM task_outputs o
-                 WHERE o.project_id = pm.project_id
+                 INNER JOIN project_tasks pt ON o.task_id = pt.task_id AND pt.is_deleted = 0
+                 WHERE pt.project_id = pm.project_id
                    AND o.created_by = pm.user_id
                    AND o.is_deleted = 0)
             ), 0) AS output_created_count,
@@ -630,14 +700,12 @@ def get_member_contribution_stats(
             COALESCE(SUM(
                 (SELECT COUNT(*) FROM ai_invocations ai
                  WHERE ai.project_id = pm.project_id
-                   AND ai.created_by = pm.user_id
-                   AND ai.is_deleted = 0)
+                   AND ai.created_by = pm.user_id)
             ), 0) AS invocation_count
         FROM project_members pm
         INNER JOIN users u ON pm.user_id = u.user_id AND u.is_deleted = 0
         WHERE pm.is_deleted = 0
-        {project_filter}
-        {member_filter}
+        {project_scope_filter}
         GROUP BY pm.user_id, u.real_name
         ORDER BY project_count DESC, task_created_count DESC
     """
