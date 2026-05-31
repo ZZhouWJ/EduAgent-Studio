@@ -24,4 +24,6 @@
 | TASK-011-FIX | Stage-11 | 修复统计看板审查问题 | Codex 第一次修复审查不通过，需再次修复 | Cursor | Codex |
 | TASK-011-FIX-R2 | Stage-11 | 修复统计看板第二次审查问题 | Codex 第二次修复审查不通过，需再次修复 | Cursor | Codex |
 | TASK-011-FIX-R3 | Stage-11 | 修复统计看板第三次审查问题（date_filter 覆盖） | 已完成，等待 Codex 复审 | Cursor | Codex |
-| TASK-012 | Stage-12 | 后端整体联调、运行验证与课程报告素材整理 | 已完成，等待 Codex 复审 | Cursor | Codex |
+| TASK-012 | Stage-12 | 后端整体联调、运行验证与课程报告素材整理 | Codex 审查不通过，需修复文档问题 | Cursor | Codex |
+| TASK-012-FIX | Stage-12 Fix | 修复 Stage-12 文档与测试材料问题 | Codex 复审不通过，需修复 task_name/task_type 字段 | Cursor | Codex |
+| TASK-012-FIX-R2 | Stage-12 Fix R2 | 修复创建任务字段 task_name->title, task_type->task_type_id | 已完成，等待 Codex 复审 | Cursor | Codex |

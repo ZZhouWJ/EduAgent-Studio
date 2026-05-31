@@ -64,9 +64,11 @@ copy .env.example .env   # Windows
 ```env
 APP_NAME=AI-Collab-Audit-System
 APP_ENV=development
-APP_HOST=0.0.0.0
-APP_PORT=8000
 API_PREFIX=/api
+
+# 服务器配置（启动端口）
+SERVER_HOST=0.0.0.0
+SERVER_PORT=8000
 
 DB_HOST=127.0.0.1
 DB_PORT=3306
@@ -86,12 +88,32 @@ API_KEY_SECRET=<YOUR_32_BYTE_SECRET_BASE64_OR_HEX>
 
 ### 5. 初始化数据库
 
-在 MySQL 中执行建库建表脚本：
+在 MySQL 中按以下顺序执行建库建表脚本：
 
-```sql
-SOURCE <项目根目录>/database/01_create_database.sql;
-SOURCE <项目根目录>/database/04_insert_initial_data.sql;
+```bash
+# Step 1: 创建数据库
+mysql -u root -p < ../database/01_create_database.sql
+
+# Step 2: 创建数据表
+mysql -u root -p ai_collab_audit_system < ../database/02_create_tables.sql
+
+# Step 3: 创建索引
+mysql -u root -p ai_collab_audit_system < ../database/03_create_indexes.sql
+
+# Step 4: 导入初始数据
+mysql -u root -p ai_collab_audit_system < ../database/04_insert_initial_data.sql
+
+# Step 5: 创建视图
+mysql -u root -p ai_collab_audit_system < ../database/05_create_views.sql
+
+# Step 6: 创建存储过程
+mysql -u root -p ai_collab_audit_system < ../database/06_create_stored_procedures.sql
+
+# Step 7: 执行测试查询（可选）
+mysql -u root -p ai_collab_audit_system < ../database/07_test_queries.sql
 ```
+
+> **说明**：Step 1 只在首次建库时执行一次；Step 2-7 均在 `ai_collab_audit_system` 数据库中执行。必须按顺序执行，否则后续步骤可能因依赖缺失而失败。
 
 ### 6. 启动后端
 
@@ -110,6 +132,42 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 - API 文档（Swagger UI）：http://127.0.0.1:8000/docs
 - ReDoc 文档：http://127.0.0.1:8000/redoc
 - 健康检查：http://127.0.0.1:8000/api/health
+
+**统一响应格式**：所有接口均使用以下 JSON 格式：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": { ... }
+}
+```
+
+健康检查响应示例：
+
+```json
+// GET /api/health
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "status": "ok",
+    "service": "AI-Collab-Audit-System",
+    "env": "development"
+  }
+}
+
+// GET /api/health/db
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "status": "ok",
+    "database": "connected",
+    "server_version": "8.0.x"
+  }
+}
+```
 
 ## 数据库连接说明
 
@@ -159,8 +217,9 @@ curl http://127.0.0.1:8000/api/health
 curl http://127.0.0.1:8000/api/health/db
 ```
 
-- `/api/health` 返回 `{"status":"ok"}` — 服务正常
-- `/api/health/db` 返回 `{"database":"connected"}` — 数据库连接正常
+- `/api/health` 返回 `{"code":0,"message":"success","data":{"status":"ok"}}` — 服务正常
+- `/api/health/db` 返回 `{"code":0,"message":"success","data":{"database":"connected"}}` — 数据库连接正常
+  - 当前环境无 MySQL 时返回 `{"code":5002,"message":"...","data":{"database":"disconnected"}}`
 
 ## 后端整体语法检查
 

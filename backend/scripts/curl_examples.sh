@@ -46,10 +46,9 @@ curl -s -X POST "$BASE_URL/api/projects" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "project_name": "My Project",
-    "description": "Project description",
+    "project_name": "数据库课程设计项目",
     "project_type": "course_project",
-    "course_name": "Software Engineering"
+    "description": "数据库管理实务结课设计"
   }'
 
 # ============================================================
@@ -61,8 +60,16 @@ curl -s -X GET "$BASE_URL/api/projects/$PROJECT_ID/tasks" \
   -H "Authorization: Bearer $TOKEN"
 
 # Generate task outputs (AI generation)
+# Requires: model_ids (list of int), input_text (str), optional: branch_id (int), prompt_version_id (int)
 curl -s -X POST "$BASE_URL/api/tasks/$TASK_ID/generate" \
-  -H "Authorization: Bearer $TOKEN"
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model_ids": [1],
+    "input_text": "请生成数据库课程报告需求分析部分",
+    "branch_id": 1,
+    "prompt_version_id": 1
+  }'
 
 # ============================================================
 # 5. Outputs (Reviews)
@@ -79,18 +86,20 @@ curl -s -X POST "$BASE_URL/api/outputs/$OUTPUT_ID/submit-review" \
 # ============================================================
 
 # Complete review
+# Scores must be in range 0-10 (not 0-100)
 curl -s -X POST "$BASE_URL/api/reviews/$REQUEST_ID/complete" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "review_status": "approved",
-    "accuracy_score": 90,
-    "completeness_score": 90,
-    "logic_score": 90,
-    "format_score": 90,
-    "usability_score": 90,
-    "risk_score": 5,
-    "review_comment": "Good"
+    "accuracy_score": 9,
+    "completeness_score": 8.5,
+    "logic_score": 9,
+    "format_score": 8,
+    "usability_score": 9,
+    "risk_score": 1,
+    "review_comment": "整体可用，建议补充非功能需求。",
+    "issue_tag_ids": [1]
   }'
 
 # ============================================================
