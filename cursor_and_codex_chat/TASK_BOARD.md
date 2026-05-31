@@ -27,3 +27,4 @@
 | TASK-012 | Stage-12 | 后端整体联调、运行验证与课程报告素材整理 | Codex 审查不通过，需修复文档问题 | Cursor | Codex |
 | TASK-012-FIX | Stage-12 Fix | 修复 Stage-12 文档与测试材料问题 | Codex 复审不通过，需修复 task_name/task_type 字段 | Cursor | Codex |
 | TASK-012-FIX-R2 | Stage-12 Fix R2 | 修复创建任务字段 task_name->title, task_type->task_type_id | 已完成，等待 Codex 复审 | Cursor | Codex |
+| TASK-013 | Stage-13 | Vue3 前端基础框架、登录页和整体布局 | 已完成，等待 Codex 复审 | Cursor | Codex |
