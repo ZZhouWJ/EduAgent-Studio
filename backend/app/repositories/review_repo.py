@@ -24,6 +24,8 @@ from app.database import get_connection, get_db_cursor
 
 VALID_REVIEW_STATUS = {"pending", "approved", "rejected", "revision_required"}
 VALID_TASK_STATUS_FROM_REVIEW = {"submitted", "approved", "rejected", "revision_required"}
+# 完成审核时只允许这三种结论状态，不得使用 pending
+VALID_COMPLETE_REVIEW_STATUS = {"approved", "rejected", "revision_required"}
 
 
 # =============================================================================
@@ -103,6 +105,10 @@ def list_pending_reviews(
     """
     分页查询待审核列表（request_status = pending）。
 
+    权限规则：
+    - admin：查看全部
+    - 非 admin：可查看（项目内 leader/teacher/reviewer 的项目 OR reviewer_id = 当前用户）的 pending 请求
+
     Args:
         is_admin: 是否为管理员（可查看全部）
         user_id: 当前用户 ID
@@ -121,14 +127,20 @@ def list_pending_reviews(
         params.append(project_id)
 
     if not is_admin:
+        # 非 admin：查看本项目内 leader/teacher/reviewer 的 pending，
+        # 或者 reviewer_id = 当前用户（允许普通 member 查看分配给自己的请求）
         member_filter = """
-            AND r.project_id IN (
-                SELECT pm.project_id FROM project_members pm
-                WHERE pm.user_id = %s AND pm.is_deleted = 0
-                  AND pm.project_role IN ('leader', 'teacher', 'reviewer')
+            AND (
+                r.project_id IN (
+                    SELECT pm.project_id FROM project_members pm
+                    WHERE pm.user_id = %s AND pm.is_deleted = 0
+                      AND pm.project_role IN ('leader', 'teacher', 'reviewer')
+                )
+                OR r.reviewer_id = %s
             )
         """
         base_where += member_filter
+        params.append(user_id)
         params.append(user_id)
 
     count_sql = f"""
@@ -204,6 +216,44 @@ def get_output_by_id(output_id: int) -> Optional[Dict[str, Any]]:
     with get_db_cursor() as cursor:
         cursor.execute(sql, (output_id,))
         return cursor.fetchone()
+
+
+# =============================================================================
+# 用户查询
+# =============================================================================
+
+def get_user_basic_by_id(user_id: int) -> Optional[Dict[str, Any]]:
+    """
+    按 user_id 查询用户基本信息（不含 password_hash）。
+
+    Returns:
+        dict（含 user_id, username, roles）或 None
+    """
+    sql = """
+        SELECT user_id, username, email, real_name, roles
+        FROM users
+        WHERE user_id = %s AND is_deleted = 0
+    """
+    with get_db_cursor() as cursor:
+        cursor.execute(sql, (user_id,))
+        return cursor.fetchone()
+
+
+def get_project_member_role(project_id: int, user_id: int) -> Optional[str]:
+    """
+    查询用户在指定项目中的角色。
+
+    Returns:
+        project_role 字符串（'leader' / 'teacher' / 'reviewer' / 'member'）或 None（不在项目中）
+    """
+    sql = """
+        SELECT project_role FROM project_members
+        WHERE project_id = %s AND user_id = %s AND is_deleted = 0
+    """
+    with get_db_cursor() as cursor:
+        cursor.execute(sql, (project_id, user_id))
+        row = cursor.fetchone()
+        return row["project_role"] if row else None
 
 
 # =============================================================================

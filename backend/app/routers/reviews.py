@@ -182,7 +182,10 @@ async def complete_review(
 # =============================================================================
 
 @router.get("/api/issue-tags")
-async def list_issue_tags() -> dict:
-    """查询所有可用的问题标签（无需认证，供审核表单选择）。"""
-    result = review_service.list_issue_tags()
+async def list_issue_tags(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+) -> dict:
+    """查询所有可用的问题标签（需已登录）。"""
+    token = _extract_token(authorization)
+    result = review_service.list_issue_tags(token=token)
     return success_response(data=result)

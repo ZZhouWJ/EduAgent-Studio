@@ -36,18 +36,23 @@ def _is_admin(user: Dict[str, Any]) -> bool:
     return "admin" in user.get("roles", [])
 
 
-def _can_access_project(project_id: int, user_id: int) -> bool:
-    if _is_admin_user(user_id):
-        return True
-    return review_repo.is_user_in_project(project_id, user_id)
-
-
 def _is_admin_user(user_id: int) -> bool:
     from app.repositories import user_repo as ur
     user = ur.get_user_by_id(user_id)
     if user is None:
         return False
     return "admin" in user.get("roles", [])
+
+
+def _can_access_project(project_id: int, user_id: int) -> bool:
+    if _is_admin_user(user_id):
+        return True
+    return review_repo.is_user_in_project(project_id, user_id)
+
+
+def _get_project_role(project_id: int, user_id: int) -> Optional[str]:
+    """获取用户在指定项目内的 project_role（来自 project_members）。"""
+    return review_repo.get_project_member_role(project_id, user_id)
 
 
 # =============================================================================
@@ -66,14 +71,17 @@ def submit_for_review(
     """
     提交输出到审核。
 
+    Fix: reviewer_id 校验 + affected_rows 检查
+
     事务：
     1. 校验 output 存在、未删除、未归档
     2. 校验当前用户有项目访问权限
-    3. 校验不存在 pending 审核请求
-    4. 插入 review_requests
-    5. 更新 task_outputs.status = 'submitted'
-    6. 更新 project_tasks.status = 'submitted'
-    7. 写入 operation_logs
+    3. 校验 reviewer_id（如传入）：存在、是项目成员或 admin、不是本人
+    4. 校验不存在 pending 审核请求
+    5. 插入 review_requests
+    6. 更新 task_outputs.status = 'submitted'（检查 affected_rows）
+    7. 更新 project_tasks.status = 'submitted'（检查 affected_rows）
+    8. 写入 operation_logs
     """
     user = _require_auth(token)
     user_id = user["user_id"]
@@ -91,6 +99,20 @@ def submit_for_review(
     if output.get("output_status") == "archived":
         raise ValidationException(message="已归档的输出不能提交审核")
 
+    # Fix 1: 校验 reviewer_id
+    if reviewer_id is not None:
+        reviewer = review_repo.get_user_basic_by_id(reviewer_id)
+        if reviewer is None:
+            raise NotFoundException(message="指定的审核人不存在")
+
+        if reviewer_id == user_id:
+            raise ValidationException(message="不能指定自己为审核人")
+
+        if _is_admin_user(reviewer_id):
+            pass
+        elif not review_repo.is_user_in_project(project_id, reviewer_id):
+            raise ValidationException(message="指定的审核人必须是项目成员或管理员")
+
     with get_db_transaction() as conn:
         has_pending = review_repo.has_pending_request(output_id, conn)
         if has_pending:
@@ -107,17 +129,24 @@ def submit_for_review(
             conn=conn,
         )
 
-        review_repo.update_output_status(
+        # Fix 6: 检查 affected_rows
+        affected = review_repo.update_output_status(
             output_id=output_id,
             status="submitted",
             conn=conn,
         )
+        if affected == 0:
+            conn.rollback()
+            raise NotFoundException(message="输出版本不存在或无权更新状态")
 
-        review_repo.update_task_status(
+        affected = review_repo.update_task_status(
             task_id=task_id,
             status="submitted",
             conn=conn,
         )
+        if affected == 0:
+            conn.rollback()
+            raise NotFoundException(message="任务不存在或无权更新状态")
 
         user_repo.insert_operation_log_with_conn(
             user_id=user_id,
@@ -150,9 +179,11 @@ def list_pending_reviews(
     """
     分页查询待审核列表。
 
-    - admin 查看全部
-    - leader/teacher/reviewer 查看自己有权限项目的
-    - 普通 member 不能查看
+    Fix: 普通 member 被指定为 reviewer_id 时可查看分配给自己的请求
+
+    权限规则：
+    - admin：查看全部
+    - 非 admin：查看（项目内 leader/teacher/reviewer 的项目 OR reviewer_id = 当前用户）的 pending
     """
     user = _require_auth(token)
     user_id = user["user_id"]
@@ -186,8 +217,11 @@ def get_review_detail(
     """
     获取审核详情。
 
-    - 校验请求存在、未删除
-    - 校验当前用户有权限访问该项目
+    权限规则（与待审核列表/完成审核保持一致）：
+    - admin：可查看任意
+    - 项目内 leader/teacher/reviewer：可查看本项目
+    - 指定 reviewer：可查看分配给自己的
+    - 提交者：可查看自己提交的
     """
     user = _require_auth(token)
     user_id = user["user_id"]
@@ -197,8 +231,20 @@ def get_review_detail(
         raise NotFoundException(message="审核请求不存在")
 
     project_id = ctx["project_id"]
+    is_admin_flag = _is_admin(user)
+    project_role = _get_project_role(project_id, user_id)
 
-    if not _can_access_project(project_id, user_id):
+    can_view = False
+    if is_admin_flag:
+        can_view = True
+    elif project_role in ("leader", "teacher", "reviewer"):
+        can_view = True
+    elif ctx.get("reviewer_id") == user_id:
+        can_view = True
+    elif ctx.get("submitter_id") == user_id:
+        can_view = True
+
+    if not can_view:
         raise ForbiddenException(message="无权查看此审核请求")
 
     request = review_repo.get_review_request_by_id(request_id)
@@ -228,25 +274,28 @@ def complete_review(
     """
     完成审核。
 
+    Fix: VALID_COMPLETE_REVIEW_STATUS + affected_rows 检查 + 自审拦截 + 指定 reviewer 权限收紧
+
     事务：
     1. 校验请求存在、未删除
     2. 校验 request_status = pending
-    3. 校验审核权限
-    4. 校验 review_status
+    3. 校验审核权限（自审拦截 + 指定 reviewer 权限收紧）
+    4. 校验 review_status（只允许 approved/rejected/revision_required）
     5. 校验 issue_tag_ids（如有）
     6. 插入 output_reviews
-    7. 更新 review_requests.request_status
-    8. 更新 task_outputs.status
-    9. 更新 project_tasks.status
+    7. 更新 review_requests.request_status（检查 affected_rows）
+    8. 更新 task_outputs.status（检查 affected_rows）
+    9. 更新 project_tasks.status（检查 affected_rows）
     10. 写入 output_issue_relations（如有 issue_tag_ids）
     11. 写入 operation_logs
     """
     user = _require_auth(token)
     user_id = user["user_id"]
 
-    if review_status not in review_repo.VALID_REVIEW_STATUS:
+    # Fix 3: 只允许三种结论状态
+    if review_status not in review_repo.VALID_COMPLETE_REVIEW_STATUS:
         raise ValidationException(
-            message=f"无效的审核状态: {review_status}，允许值: {', '.join(review_repo.VALID_REVIEW_STATUS)}"
+            message=f"无效的审核结论: {review_status}，允许值: {', '.join(review_repo.VALID_COMPLETE_REVIEW_STATUS)}"
         )
 
     ctx = review_repo.get_request_project_context(request_id)
@@ -259,6 +308,8 @@ def complete_review(
     project_id = ctx["project_id"]
     task_id = ctx["task_id"]
     output_id = ctx["output_id"]
+    submitter_id = ctx["submitter_id"]
+    reviewer_id = ctx.get("reviewer_id")
 
     if not _can_access_project(project_id, user_id):
         raise ForbiddenException(message="无权完成此审核")
@@ -290,24 +341,34 @@ def complete_review(
             conn=conn,
         )
 
-        review_repo.update_review_request_status(
+        # Fix 6: 检查 affected_rows
+        affected = review_repo.update_review_request_status(
             request_id=request_id,
             status=review_status,
             reviewed_at=now,
             conn=conn,
         )
+        if affected == 0:
+            conn.rollback()
+            raise NotFoundException(message="审核请求不存在或状态已变更")
 
-        review_repo.update_output_status(
+        affected = review_repo.update_output_status(
             output_id=output_id,
             status=review_status,
             conn=conn,
         )
+        if affected == 0:
+            conn.rollback()
+            raise NotFoundException(message="输出版本不存在或无权更新状态")
 
-        review_repo.update_task_status(
+        affected = review_repo.update_task_status(
             task_id=task_id,
             status=review_status,
             conn=conn,
         )
+        if affected == 0:
+            conn.rollback()
+            raise NotFoundException(message="任务不存在或无权更新状态")
 
         if issue_tag_ids:
             for tag_id in issue_tag_ids:
@@ -345,29 +406,58 @@ def _can_complete_review(
     """
     判断当前用户是否有完成审核权限。
 
-    规则：
-    1. admin 可以完成
-    2. 指定 reviewer 可以完成
-    3. 项目内 leader 可以完成
-    4. 项目内 teacher 可以完成
-    5. 项目内 reviewer 可以完成
-    6. 提交者不能审核自己，除非同时是上述角色
+    权限规则（按优先级）：
+
+    1. admin 永远允许
+    2. 非项目成员且不是指定 reviewer：不允许
+    3. 自审拦截：只有 admin / 项目 leader / 项目 teacher 可以作为例外
+       - admin 已在第 1 步 return True
+       - 项目 leader 或 teacher 允许自审
+       - 项目 reviewer 或普通 member 不能自审
+    4. reviewer_id 不为空（指定审核人场景）：
+       - 允许：指定 reviewer 本人 / 项目 leader / 项目 teacher
+       - 禁止：项目内其他 reviewer / 普通 member
+    5. reviewer_id 为空（未指定审核人场景）：
+       - 允许：项目 leader / teacher / reviewer
+       - 禁止：普通 member
     """
+    submitter_id = ctx.get("submitter_id")
+    reviewer_id = ctx.get("reviewer_id")
+
+    # 1. admin 永远允许
     if _is_admin(user):
         return True
 
-    reviewer_id = ctx.get("reviewer_id")
-    if reviewer_id is not None and reviewer_id == user_id:
-        return True
+    # 获取当前用户在该项目内的 project_role
+    project_role = _get_project_role(project_id, user_id)
 
-    if review_repo.is_user_project_leader(project_id, user_id):
-        return True
-    if review_repo.is_user_project_teacher(project_id, user_id):
-        return True
-    if review_repo.is_user_project_reviewer(project_id, user_id):
-        return True
+    is_project_leader = (project_role == "leader")
+    is_project_teacher = (project_role == "teacher")
+    is_project_reviewer = (project_role == "reviewer")
+    is_project_member = project_role in ("leader", "teacher", "reviewer", "member")
 
-    return False
+    is_assigned_reviewer = (reviewer_id is not None and reviewer_id == user_id)
+    is_self_submit = (submitter_id == user_id)
+
+    # 2. 非项目成员，且不是指定 reviewer：不允许
+    if not is_project_member and not is_assigned_reviewer:
+        return False
+
+    # 3. 自审拦截
+    # 只有 admin（已在第1步）/ 项目 leader / 项目 teacher 可以自审
+    if is_self_submit:
+        return is_project_leader or is_project_teacher
+
+    # 4. 指定 reviewer 场景（reviewer_id 不为空）
+    if reviewer_id is not None:
+        # 允许：指定 reviewer 本人 / 项目 leader / 项目 teacher
+        # 禁止：项目内其他 reviewer / 普通 member
+        return is_assigned_reviewer or is_project_leader or is_project_teacher
+
+    # 5. 未指定 reviewer 场景（reviewer_id 为空）
+    # 允许：项目 leader / teacher / reviewer
+    # 禁止：普通 member
+    return is_project_leader or is_project_teacher or is_project_reviewer
 
 
 # =============================================================================
@@ -375,8 +465,13 @@ def _can_complete_review(
 # GET /api/issue-tags
 # =============================================================================
 
-def list_issue_tags() -> List[Dict[str, Any]]:
-    """查询所有可用的问题标签。"""
+def list_issue_tags(token: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    查询所有可用的问题标签。
+    接受可选 token 参数以支持统一的认证风格。
+    """
+    if token:
+        _require_auth(token)
     tags = review_repo.list_issue_tags()
     return [_tag_to_dict(t) for t in tags]
 
