@@ -81,12 +81,14 @@ export interface GenerateRequestData {
 export interface GenerateResultItem {
   model_id: number
   model_name: string
-  display_name: string
   invocation_id: number
   output_id?: number
+  version_no?: string | number
   status: string
-  content?: string
-  error?: string
+  input_tokens?: number
+  output_tokens?: number
+  latency_ms?: number
+  error_message?: string
 }
 
 /** 输出编辑请求体：PUT /api/outputs/{output_id} */

@@ -4,6 +4,19 @@ import axios from "axios"
 import { get, merge } from "lodash-es"
 import { useUserStore } from "@/pinia/stores/user"
 
+/** 业务错误对象，保留 code/message/data */
+interface BusinessError {
+  code: number
+  message: string
+  data: unknown
+  isBusinessError: true
+}
+
+/** 判断是否为业务错误对象 */
+function isBusinessError(val: unknown): val is BusinessError {
+  return typeof val === "object" && val !== null && (val as BusinessError).isBusinessError === true
+}
+
 /** 退出登录并强制刷新页面（会重定向到登录页） */
 function logout() {
   useUserStore().logout()
@@ -43,16 +56,22 @@ function createInstance() {
         case 401:
           // Token 过期时
           return logout()
-        default:
-          // 不是正确的 code
+        default: {
+          // 业务错误：保留 code、message、data 到抛出对象中
           ElMessage.error(apiData.message || "Error")
-          return Promise.reject(new Error("Error"))
+          const err = new Error(apiData.message || "Error") as Error & BusinessError
+          err.code = code
+          err.data = apiData.data
+          err.isBusinessError = true
+          return Promise.reject(err)
+        }
       }
     },
     (error) => {
       // status 是 HTTP 状态码
       const status = get(error, "response.status")
       const message = get(error, "response.data.message")
+      const apiCode = get(error, "response.data.code")
       switch (status) {
         case 400:
           error.message = "请求错误"
@@ -89,6 +108,11 @@ function createInstance() {
         case 505:
           error.message = "HTTP 版本不受支持"
           break
+      }
+      // 如果后端返回了业务 code，也要附加到 error 对象上
+      if (apiCode !== undefined) {
+        ;(error as Error & BusinessError).code = apiCode
+        ;(error as Error & BusinessError).isBusinessError = true
       }
       ElMessage.error(error.message)
       return Promise.reject(error)
