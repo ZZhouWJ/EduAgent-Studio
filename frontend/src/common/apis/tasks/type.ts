@@ -46,12 +46,73 @@ export interface TaskOutput {
   source_type: "ai_generated" | "manual"
   content: string
   status: string
+  lock_version: number
   created_by: number
   creator_username?: string
   creator_real_name?: string
   created_at: string
   updated_at: string
   is_deleted?: number
+}
+
+export interface OutputComment {
+  comment_id: number
+  output_id: number
+  commenter_id: number
+  commenter_username?: string
+  commenter_real_name?: string
+  comment_type: "comment" | "suggestion" | "approval"
+  comment_text: string
+  status: "open" | "resolved" | "closed"
+  created_at: string
+  updated_at: string
+  is_deleted?: number
+}
+
+/** AI 生成请求体：POST /api/tasks/{task_id}/generate */
+export interface GenerateRequestData {
+  model_ids: number[]
+  branch_id?: number
+  prompt_version_id?: number
+  input_text: string
+}
+
+/** AI 生成响应项（单个模型的生成结果） */
+export interface GenerateResultItem {
+  model_id: number
+  model_name: string
+  display_name: string
+  invocation_id: number
+  output_id?: number
+  status: string
+  content?: string
+  error?: string
+}
+
+/** 输出编辑请求体：PUT /api/outputs/{output_id} */
+export interface UpdateOutputRequestData {
+  content: string
+  lock_version: number
+  edit_summary?: string
+}
+
+/** 另存为新版本请求体：POST /api/outputs/{output_id}/save-as-new-version */
+export interface SaveAsNewVersionRequestData {
+  output_title: string
+  content: string
+  edit_summary?: string
+  branch_id?: number
+}
+
+/** 新增批注请求体：POST /api/outputs/{output_id}/comments */
+export interface CreateCommentRequestData {
+  comment_type: "comment" | "suggestion" | "approval"
+  comment_text: string
+}
+
+/** 更新批注状态请求体：PUT /api/comments/{comment_id}/status */
+export interface UpdateCommentStatusRequestData {
+  status: "open" | "resolved" | "closed"
 }
 
 export interface OutputTimeline {

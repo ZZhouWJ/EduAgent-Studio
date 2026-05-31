@@ -94,3 +94,56 @@ export function createManualOutputApi(taskId: number | string, data: { content: 
     data
   })
 }
+
+/** AI 生成：POST /api/tasks/{task_id}/generate */
+export function generateTaskOutputApi(taskId: number | string, data: Tasks.GenerateRequestData) {
+  return request<ApiResponseData<Tasks.GenerateResultItem[]>>({
+    url: `api/tasks/${taskId}/generate`,
+    method: "post",
+    data
+  })
+}
+
+/** 更新输出版本（乐观锁）：PUT /api/outputs/{output_id} */
+export function updateOutputApi(outputId: number | string, data: Tasks.UpdateOutputRequestData) {
+  return request<ApiResponseData<Tasks.TaskOutput>>({
+    url: `api/outputs/${outputId}`,
+    method: "put",
+    data
+  })
+}
+
+/** 另存为新版本：POST /api/outputs/{output_id}/save-as-new-version */
+export function saveOutputAsNewVersionApi(outputId: number | string, data: Tasks.SaveAsNewVersionRequestData) {
+  return request<ApiResponseData<Tasks.TaskOutput>>({
+    url: `api/outputs/${outputId}/save-as-new-version`,
+    method: "post",
+    data
+  })
+}
+
+/** 获取输出版本批注列表：GET /api/outputs/{output_id}/comments */
+export function getOutputCommentsApi(outputId: number | string) {
+  return request<ApiResponseData<Tasks.OutputComment[]>>({
+    url: `api/outputs/${outputId}/comments`,
+    method: "get"
+  })
+}
+
+/** 新增批注：POST /api/outputs/{output_id}/comments */
+export function createOutputCommentApi(outputId: number | string, data: Tasks.CreateCommentRequestData) {
+  return request<ApiResponseData<Tasks.OutputComment>>({
+    url: `api/outputs/${outputId}/comments`,
+    method: "post",
+    data
+  })
+}
+
+/** 更新批注状态：PUT /api/comments/{comment_id}/status */
+export function updateCommentStatusApi(commentId: number | string, data: Tasks.UpdateCommentStatusRequestData) {
+  return request<ApiResponseData<Tasks.OutputComment>>({
+    url: `api/comments/${commentId}/status`,
+    method: "put",
+    data
+  })
+}
