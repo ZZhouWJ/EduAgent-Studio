@@ -366,95 +366,82 @@ AI Gateway 与 LLM 可观测性平台。
 
 ## 2.5 借鉴边界与合规说明
 
-本项目可以参考上述开源项目的产品思路、页面布局、数据库对象设计和功能组织方式，但应遵守以下边界：
+本项目在产品设计层面参考了 LiteLLM、One API、New API、Dify、Langfuse、Helicone、Open WebUI、LobeChat 等成熟开源项目的功能思想、交互结构、页面组织方式和数据管理思路；在前端工程实现层面，基于 V3 Admin Vite 这一成熟 Vue3 开源后台模板进行二次开发。
 
-1. 只借鉴思想和交互结构，不直接复制核心源码；
-2. 不使用他人商标、Logo、品牌名称和专有素材；
-3. 不将系统包装成已有项目的二次发布版本；
-4. 课程报告中应说明参考项目来源和差异化设计；
-5. 如使用开源代码片段，应查看其许可证并保留必要声明；
-6. 本课程设计建议优先自主实现前端页面和后端接口，避免许可证争议。
+需要明确的是，本项目并不是对上述 AI 平台的简单复制，也不是对 LobeChat 或 Open WebUI 源码的迁移。本项目的核心业务仍然围绕高校项目协作、AI 任务生成、版本管理、质量审核、成果采用和数据库管理展开。参考项目主要用于帮助确定产品形态、交互结构、后台布局和可观测性设计。
 
-## 2.6 Vue3 复刻 LobeChat 与 Open WebUI 前端的可行性判断
+前端模板使用遵守以下原则：
+
+1. 保留 V3 Admin Vite 的 LICENSE、NOTICE 与来源说明；
+2. 在 frontend/README.md 或 NOTICE.md 中标明原项目名称、GitHub 链接和许可证；
+3. 不使用原模板 Logo、品牌名和无关业务页面；
+4. 不将模板包装成完全原创项目；
+5. 删除或禁用模板自带 Mock API、Mock 数据和演示页面；
+6. 将系统名称、菜单、路由、登录接口和页面内容替换为本项目内容；
+7. 不复制 LobeChat / Open WebUI 的 React、Next.js、SvelteKit 源码；
+8. 前端模板只作为后台基础工程和 UI 底座，核心业务、数据库设计、接口逻辑和页面内容由本项目自主设计实现。
+
+因此，本项目的合规边界可以概括为：
+
+- 对 LobeChat / Open WebUI：只参考界面审美和交互方式，不迁移源码；
+- 对 V3 Admin Vite：在遵守 MIT License 的前提下，基于其开源模板代码进行二次开发；
+- 对本项目业务：系统品牌、菜单、接口、权限、数据库和业务页面均围绕"智研协作 AI 项目质量审计系统"重新设计。
+
+
+## 2.6 基于 Vue3 开源后台模板的前端实现方案
 
 ### 2.6.1 基本结论
 
-使用 Vue3 + Element Plus / Naive UI + Pinia + Vue Router + ECharts，可以实现与 LobeChat、Open WebUI 类似的页面结构和交互体验，但不能称为“源码级完美迁移”。
+LobeChat 和 Open WebUI 在 AI 产品体验方面具有较高参考价值，尤其是现代化布局、模型选择、任务列表、内容展示和权限管理等交互方式。但二者的技术栈分别偏向 React / Next.js 和 SvelteKit，并不适合直接迁移到本项目的 Vue3 技术路线中。
 
-准确表述应为：
+因此，本项目采用更稳妥的实现方式：以 V3 Admin Vite 作为 Vue3 前端模板底座，在其成熟的后台管理工程结构基础上进行裁剪和二次开发。系统保留模板的基础布局、路由、状态管理、菜单结构和样式体系，同时替换为本项目的系统品牌、登录接口、业务菜单和占位页面。
 
-> 本系统前端采用 Vue3 技术栈，不直接复用 LobeChat 或 Open WebUI 源码，而是借鉴其成熟的界面布局、模型选择交互、消息 / 任务展示方式和管理后台风格，结合本系统的项目任务、质量审核和成果归档业务进行重新设计。
+### 2.6.2 前端模板方案
 
-### 2.6.2 可以用 Vue3 完整实现的部分
+| 内容 | 实际方案 |
+|---|---|
+| 前端基础模板 | V3 Admin Vite |
+| 原项目链接 | https://github.com/un-pany/v3-admin-vite |
+| 许可证 | MIT License |
+| 技术栈 | Vue3 + Vite + TypeScript + Element Plus + Pinia + Vue Router |
+| 使用方式 | 保留基础布局、路由、菜单、状态管理和样式体系，删除无关示例页面 |
+| 品牌替换 | 替换为"智研协作 AI 项目质量审计系统" |
+| 接口替换 | 模板 Mock API 替换为本项目 FastAPI 后端接口 |
+| 合规方式 | 保留 LICENSE / NOTICE / 来源说明 |
+| 不使用内容 | 不使用原模板 Logo、Mock 数据、无关业务页面；不复制 LobeChat / Open WebUI 源码 |
 
-| 参考项目能力        | Vue3 实现方式                         | 可行性 |
-| ------------- | --------------------------------- | --- |
-| 左侧导航栏         | Element Plus Menu / Naive UI Menu | 高   |
-| 会话 / 任务列表     | Vue 组件 + 分页 / 虚拟列表                | 高   |
-| 模型选择器         | Select + 模型卡片 + 能力标签              | 高   |
-| Markdown 输出展示 | markdown-it / md-editor-v3        | 高   |
-| 代码块高亮         | highlight.js / shiki              | 高   |
-| 流式输出          | Fetch Stream / SSE / WebSocket    | 高   |
-| 参数设置抽屉        | Drawer 组件                         | 高   |
-| 用户登录与权限菜单     | Pinia + 路由守卫                      | 高   |
-| 数据看板          | ECharts                           | 高   |
-| 响应式布局         | CSS Grid / Flex / Tailwind 可选     | 高   |
-| 主题色切换         | CSS Variables + Pinia             | 中高  |
-| 版本时间线         | Timeline 组件                       | 高   |
-| 审核评分面板        | Form + Rate + Tag 组件              | 高   |
+### 2.6.3 选择 V3 Admin Vite 的原因
 
-### 2.6.3 不适合直接迁移的部分
+选择 V3 Admin Vite 作为前端基础模板，主要基于以下考虑：
 
-| 来源                            | 不适合直接迁移的原因                               | 我们的处理方式                       |
-| ----------------------------- | ---------------------------------------- | ----------------------------- |
-| LobeChat React / Next.js 组件   | Vue 与 React 组件模型不同，Next.js 还涉及服务端渲染和路由机制 | 用 Vue3 重新实现相似页面               |
-| LobeChat Zustand 状态管理         | Zustand 是 React 生态状态库                    | 使用 Pinia 替代                   |
-| LobeChat Ant Design / Lobe UI | Ant Design React 组件不能直接用于 Vue            | 使用 Element Plus 或 Naive UI 替代 |
-| Open WebUI SvelteKit 组件       | Svelte 组件语法与 Vue 不兼容                     | 只借鉴布局和交互                      |
-| Open WebUI 内置聊天架构             | 其业务中心是聊天，本系统业务中心是项目任务                    | 改造成任务详情页和审核中心                 |
-| 品牌素材与默认主题                     | 涉及品牌与许可证风险                               | 自定义项目名称、Logo 和主题色             |
+1. 技术栈与本项目一致，均基于 Vue3、Vite、Element Plus、Pinia 和 Vue Router；
+2. 后台管理布局成熟，适合项目管理、任务管理、审核中心、成果库和统计看板等页面；
+3. 工程结构完整，便于后续继续扩展业务页面；
+4. 相比直接迁移 LobeChat / Open WebUI 源码，技术风险更低；
+5. 保留开源许可证和来源说明后，能够满足课程项目的合规要求；
+6. 页面视觉效果更成熟，有利于课程答辩截图和系统展示。
 
-### 2.6.4 Vue3 前端实现建议
+### 2.6.4 与 LobeChat / Open WebUI 的关系
 
-建议采用以下前端组合：
+LobeChat 和 Open WebUI 仍然作为本系统的 AI 产品体验参考对象，但本项目不直接复用其源码。具体来说：
 
-1. Vue3：前端框架；
-2. Vite：构建工具；
-3. Element Plus：后台管理组件库；
-4. Pinia：全局状态管理；
-5. Vue Router：路由管理；
-6. ECharts：统计图表；
-7. Axios：接口请求；
-8. markdown-it 或 md-editor-v3：AI 输出渲染；
-9. highlight.js 或 shiki：代码高亮；
-10. @vueuse/core：常用组合式工具；
-11. SSE / WebSocket：可选实现流式输出。
+1. 参考 LobeChat 的现代化 AI 产品审美、圆角卡片、任务内容展示和模型标签风格；
+2. 参考 Open WebUI 的简洁登录体验、多用户管理和模型访问控制思想；
+3. 不迁移 LobeChat 的 React / Next.js 组件；
+4. 不迁移 Open WebUI 的 SvelteKit 前端源码；
+5. 不使用二者 Logo、品牌素材或默认视觉资产；
+6. 结合本项目业务，将相关设计思想改造为项目任务、输出版本、审核中心和成果库页面。
 
-### 2.6.5 推荐页面复刻策略
+### 2.6.5 最终判断
 
-| 页面       | 主要参考                        | Vue3 复刻方式           |
-| -------- | --------------------------- | ------------------- |
-| 登录页      | Open WebUI                  | 简洁登录卡片 + 项目说明       |
-| 首页仪表盘    | New API / Helicone          | 统计卡片 + ECharts 图表   |
-| 项目详情页    | GitHub / GitLab 项目页         | 项目信息 + 成员 + 任务 + 成果 |
-| AI 任务生成页 | LobeChat                    | 左侧任务信息，中间输出区，右侧模型参数 |
-| 审核中心页    | Langfuse / GitHub PR Review | 输出内容 + 评分面板 + 问题标签  |
-| 成果库页     | Git Release / 文档库           | 成果列表 + 版本号 + 来源追踪   |
-| 模型管理页    | One API / New API           | 模型表格 + 状态标签 + 调用统计  |
-| 调用日志页    | Helicone / Langfuse         | 日志表格 + 筛选条件 + 详情抽屉  |
+基于 V3 Admin Vite 进行前端二次开发，比完全从零手写前端页面更适合本课程项目。该方式既能获得成熟后台系统的界面质感和工程结构，又能通过菜单、接口、权限、页面内容和业务流程改造，体现本项目自身的数据库设计和业务创新。
 
-### 2.6.6 最终判断
+因此，前端实现策略不是"复刻 LobeChat / Open WebUI 源码"，也不是完全手写普通后台页面，而是：
 
-使用 Vue3 完全可以做出接近 LobeChat 和 Open WebUI 观感的现代化前端，而且更适合课程设计，因为 Vue3 + Element Plus 做后台管理系统速度快、表格和表单能力强、学习成本低、截图效果好。
-
-但需要明确：
-
-1. Vue3 可以实现相似视觉和交互；
-2. Vue3 不能直接运行 React / Svelte 源码；
-3. 我们不追求复刻完整聊天平台，而是借鉴其 UI 优点服务于“项目任务管理 + AI 输出审核”；
-4. 对课程设计而言，自主实现 Vue3 页面比改造 LobeChat / Open WebUI 源码更稳、更容易解释、更符合数据库课程目标。
+> 基于 V3 Admin Vite 开源 Vue3 后台模板二次开发，参考成熟 AI 平台的视觉与交互风格，服务于本项目的 AI 项目协作质量审计业务。
 
 ---
+
 
 ## 2.7 人机协同内容生产机制
 
@@ -693,13 +680,16 @@ Git 是软件开发中非常成熟的版本控制方案，具有分支、提交�
 
 功能包括：
 
-1. 用户注册；
-2. 用户登录；
-3. 密码加密存储；
-4. 角色分配；
-5. 权限控制；
-6. 登录日志记录；
-7. 用户状态管理。
+1. 用户登录（POST /api/auth/login）；
+2. 用户信息查询（GET /api/auth/me）；
+3. 退出登录（POST /api/auth/logout）；
+4. 密码哈希存储（bcrypt）；
+5. 角色分配；
+6. 权限控制；
+7. 登录日志记录；
+8. 用户状态管理。
+
+> 注：本系统不开放用户自主注册功能，由系统管理员分配账号。
 
 角色权限示例：
 
@@ -1661,19 +1651,25 @@ AI 输入输出通常包含 Markdown、代码、报告段落、论文摘要、�
 3. 修改任务状态为 submitted；
 4. 写入操作日志。
 
-## 7.4 审核通过并采用事务
+## 7.4 审核完成事务
 
 审核员审核通过后，系统应当：
 
-1. 插入审核记录；
-2. 修改审核请求状态；
-3. 修改输出状态为 approved；
-4. 将输出写入 `adopted_outputs` 成果表；
-5. 修改任务状态为 adopted；
-6. 修改任务分支状态为 merged；
-7. 写入操作日志。
+1. 插入审核记录（reviews 表）；
+2. 修改审核请求状态为 approved（review_requests.request_status）；
+3. 修改输出状态为 approved（task_outputs.status）；
+4. 写入操作日志。
 
-## 7.5 审核退回事务
+## 7.5 成果采用事务
+
+项目负责人或指导教师确认采用该输出后，系统应当：
+
+1. 将输出写入 `adopted_outputs` 成果表；
+2. 修改任务状态为 adopted；
+3. 修改任务分支状态为 merged；
+4. 写入操作日志。
+
+## 7.6 审核退回事务
 
 审核员退回输出时，系统应当：
 
@@ -1683,7 +1679,7 @@ AI 输入输出通常包含 Markdown、代码、报告段落、论文摘要、�
 4. 修改任务状态；
 5. 写入操作日志。
 
-## 7.6 分支冲突处理机制
+## 7.7 分支冲突处理机制
 
 由于系统采用 Git 式版本管理思想，同一任务下可能出现多名成员同时基于同一个 AI 初稿进行修改的情况。例如，成员 A 和成员 B 同时基于版本 v1.0 创建了不同的修改版本，并分别提交审核。此时系统不能简单覆盖任何一方的结果，而应保留多个版本并交由项目负责人处理。
 
@@ -1724,7 +1720,7 @@ AI 输入输出通常包含 Markdown、代码、报告段落、论文摘要、�
 
 > 当系统检测到多个输出版本基于同一父版本并同时提交审核时，不直接覆盖任何版本，而是将其标记为分支冲突。项目负责人可通过版本对比页面查看不同版本差异，并选择采用其中一个版本、退回版本、分别采用，或手动合并生成新的输出版本。所有冲突处理行为均写入合并记录表和操作日志，以保证项目成果演进过程可追溯。
 
-## 7.7 项目一键归档事务
+## 7.8 项目一键归档事务
 
 项目完成后，项目负责人或管理员可以执行项目归档操作。归档过程涉及项目、任务、分支等多张表状态更新，应通过事务保证一致性。归档成功后，系统应写入操作日志；若任一步骤失败，应回滚全部更新。
 
@@ -1734,7 +1730,7 @@ AI 输入输出通常包含 Markdown、代码、报告段落、论文摘要、�
 
 为了兼顾开发效率、界面美观度和数据库课程要求，推荐采用 Web 系统架构：
 
-1. 前端：Vue 3 + Vite + Element Plus / Naive UI；
+1. 前端：基于 V3 Admin Vite 开源模板二次开发，底层采用 Vue3 + Vite + TypeScript + Element Plus + Pinia + Vue Router；
 2. 后端：Python FastAPI；
 3. 数据库：MySQL 或 SQL Server；
 4. 数据库访问：使用参数化 SQL 或轻量封装，避免完全依赖 ORM；
@@ -1744,26 +1740,34 @@ AI 输入输出通常包含 Markdown、代码、报告段落、论文摘要、�
 
 本项目最终确认采用 Web 技术路线，不再优先考虑桌面 GUI 方案。选择 Web 方案的原因如下：
 
-1. Vue3 适合快速实现后台管理系统；
-2. Element Plus / Naive UI 对表格、表单、弹窗、抽屉、标签、时间线等管理系统组件支持较好；
+1. V3 Admin Vite 模板提供成熟的后台布局、路由守卫、状态管理和样式体系，开发效率高；
+2. Element Plus 对表格、表单、弹窗、抽屉、标签、时间线等管理系统组件支持较好；
 3. FastAPI 适合构建清晰的 REST API，便于前后端分离；
 4. MySQL / SQL Server 能充分体现关系型数据库设计、约束、事务和 SQL 查询能力；
 5. ECharts 适合完成课程报告中需要展示的可视化统计图；
 6. 前后端分离结构更便于截图展示、功能测试和后期维护。
 
-关于 LobeChat 和 Open WebUI 的借鉴方式，技术上应坚持“设计复刻，不做源码迁移”：LobeChat 主要基于 Next.js + React，Open WebUI 前端主要基于 SvelteKit，二者都不能直接无损迁移到 Vue3。但它们的页面结构、模型选择器、任务 / 会话布局、Markdown 输出区、参数设置区、权限控制思想和现代化视觉风格，都可以用 Vue3 重新实现。因此，本项目应使用 Vue3 自主开发前端页面，而不是改造上述项目源码。
+本项目不改造 LobeChat / Open WebUI 源码，但前端基础工程采用 V3 Admin Vite 开源 Vue3 后台模板进行二次开发。该模板采用 MIT 许可证，合规风险低。
 
-综合界面展示效果、课程解释难度和开发可控性，建议最终技术栈确定为：
+最终技术栈确定为：
 
 ```text
-Vue3 + Vite + Element Plus + Pinia + Vue Router + ECharts
-Python FastAPI
-MySQL 或 SQL Server
-参数化 SQL / 轻量 Repository 层
-Mock ModelAdapter + 可选真实模型 API
+前端（基于 V3 Admin Vite）：
+  Vue3 + Vite + TypeScript + Element Plus + Pinia + Vue Router + UnoCSS + Sass
+后端：
+  Python FastAPI
+数据库：
+  MySQL 或 SQL Server
+数据库访问：
+  参数化 SQL / 轻量 Repository 层
+大模型接口：
+  Mock ModelAdapter + 可选真实模型 API
+图表：
+  ECharts
 ```
 
 该路线既能保证界面美观，也能突出数据库课程设计要求。
+
 
 ## 8.2 系统分层架构
 
@@ -1825,43 +1829,44 @@ backend/
 
 ## 8.4 前端目录结构建议
 
+前端项目基于 V3 Admin Vite 模板裁剪和改造，具体目录以实际模板结构为准。课程报告中重点说明本项目在模板基础上完成了系统品牌替换、认证接口适配、菜单重构、Mock API 清理和业务占位页设计。
+
+建议目录结构如下：
+
 ```text
 frontend/
+  package.json
+  vite.config.ts
+  index.html
+  .env.example
+  .env.production
+  .env.staging
+  LICENSE
+  NOTICE.md
+  README.md
   src/
-    api/
-      auth.js
-      project.js
-      task.js
-      prompt.js
-      model.js
-      review.js
-      statistics.js
-    views/
-      Login.vue
-      Dashboard.vue
-      ProjectList.vue
-      ProjectDetail.vue
-      TaskCreate.vue
-      TaskDetail.vue
-      PromptManage.vue
-      ModelManage.vue
-      ReviewCenter.vue
-      ArtifactLibrary.vue
-      UserManage.vue
-    components/
-      Sidebar.vue
-      Topbar.vue
-      StatCard.vue
-      DataTable.vue
-      ModelSelect.vue
-      ScorePanel.vue
-      VersionTimeline.vue
+    main.ts
+    App.vue
     router/
-      index.js
     store/
-      user.js
-    main.js
+    api/
+    layout/
+    views/
+    components/
+    styles/
+    utils/
 ```
+
+其中：
+
+1. `router/` 保存前端路由与路由守卫；
+2. `store/` 保存 Pinia 用户状态和权限信息；
+3. `api/` 封装 Axios 请求和后端接口；
+4. `layout/` 保存后台基础布局；
+5. `views/` 保存登录页、首页和各业务占位页；
+6. `components/` 保存通用组件；
+7. `.env.production` 和 `.env.staging` 已清理原模板 Mock API，接口地址改为本项目后端地址或占位符。
+
 
 ## 8.5 数据库脚本结构
 
@@ -1882,16 +1887,19 @@ database/
 
 ## 9.1 整体界面风格
 
-界面建议采用“现代后台管理系统”风格：
+系统界面基于 V3 Admin Vite 的成熟后台管理风格进行二次设计，整体采用现代化后台平台布局，包括左侧导航栏、顶部用户信息栏、卡片式内容区、状态标签、表格容器和统一主题色。
 
-1. 左侧深色导航栏；
-2. 顶部用户信息栏；
-3. 首页卡片式统计；
-4. 表格管理页面；
-5. 弹窗式新增 / 编辑；
-6. 标签显示任务状态；
-7. 时间轴展示版本历史；
-8. 图表展示模型调用和评分。
+视觉上，系统参考 New API、LobeChat、Open WebUI 等 AI 平台的产品质感，但不复用其源码和品牌素材。页面目标不是做成普通学生管理系统，而是呈现为一个成熟的 AI 项目协作与质量审计平台。
+
+界面设计重点包括：
+
+1. 登录页突出系统名称和 AI 项目协作定位；
+2. 后台采用左侧导航 + 顶部用户信息栏 + 内容区布局；
+3. 首页使用流程卡片展示项目空间、AI 生成、人工编辑、审核中心、成果库和统计看板；
+4. 业务页面在当前阶段先做占位，后续逐步对接真实接口；
+5. 原 V3 Admin Vite 模板的 Mock API、Mock 数据和无关演示页面已移除或禁用；
+6. 页面风格应适合课程答辩截图和系统展示。
+
 
 ## 9.2 页面清单
 
@@ -2006,13 +2014,15 @@ ORDER BY rr.created_at ASC;
 ```sql
 SELECT
     m.display_name,
-    COUNT(*) AS call_count,
+    COUNT(i.invocation_id) AS call_count,
     SUM(CASE WHEN i.status = 'success' THEN 1 ELSE 0 END) AS success_count,
+    SUM(CASE WHEN i.status <> 'success' THEN 1 ELSE 0 END) AS failed_count,
     AVG(i.latency_ms) AS avg_latency,
-    SUM(i.input_tokens + i.output_tokens) AS total_tokens
+    SUM(COALESCE(i.input_tokens, 0) + COALESCE(i.output_tokens, 0)) AS total_tokens
 FROM ai_invocations i
 JOIN ai_models m ON i.model_id = m.model_id
-WHERE i.is_deleted = 0
+JOIN project_tasks t ON i.task_id = t.task_id AND t.is_deleted = 0
+JOIN projects p ON t.project_id = p.project_id AND p.is_deleted = 0
 GROUP BY m.display_name
 ORDER BY call_count DESC;
 ```
@@ -2440,24 +2450,28 @@ END;
 
 ## 11.4 第四阶段：前端开发
 
+本阶段前端开发不再从零搭建普通后台页面，而是基于 V3 Admin Vite 开源 Vue3 后台模板进行裁剪和二次开发。
+
 任务：
 
-1. 搭建前端项目；
-2. 实现登录页；
-3. 实现首页仪表盘；
-4. 实现项目管理页面；
-5. 实现任务管理页面；
-6. 实现多模型生成页面；
-7. 实现审核中心页面；
-8. 实现成果库页面；
-9. 实现模型管理页面；
-10. 实现调用日志页面。
+1. 引入并裁剪 V3 Admin Vite 模板；
+2. 保留 LICENSE / NOTICE 与来源说明；
+3. 替换系统品牌和菜单；
+4. 移除模板 Mock API、Mock 数据和无关演示页面；
+5. 适配后端登录接口；
+6. 实现路由守卫与用户状态；
+7. 实现后台整体布局；
+8. 实现项目、任务、模型、审核、成果库、统计等占位页面；
+9. 后续逐步接入真实业务接口。
 
 输出物：
 
-1. 前端源代码；
-2. 系统运行截图；
-3. 关键页面截图。
+1. 基于 V3 Admin Vite 二次开发的前端源代码；
+2. 前端模板来源与许可证说明；
+3. 登录页和后台布局截图；
+4. 关键占位页面截图；
+5. 后续业务页面开发计划。
+
 
 ## 11.5 第五阶段：系统测试与报告撰写
 
