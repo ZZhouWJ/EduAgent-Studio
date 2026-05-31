@@ -331,24 +331,47 @@ def merge_branches(
     with get_db_transaction() as conn:
         merged_output_id: Optional[int] = None
 
+        # adopt_source: source_output_id 必须提供
         if merge_strategy == "adopt_source":
-            if source_output_id_resolved is not None:
-                affected = artifact_repo.update_output_status(
-                    source_output_id_resolved, "adopted", conn
+            if source_output_id_resolved is None:
+                conn.rollback()
+                raise ValidationException(
+                    message="adopt_source 策略必须提供 source_output_id"
                 )
-                if affected == 0:
-                    conn.rollback()
-                    raise NotFoundException(message="源输出不存在或无权更新状态")
+            affected = artifact_repo.update_output_status(
+                source_output_id_resolved, "adopted", conn
+            )
+            if affected == 0:
+                conn.rollback()
+                raise NotFoundException(message="源输出不存在或无权更新状态")
+            affected = artifact_repo.update_branch_status(
+                source_branch_id, "merged", conn
+            )
+            if affected == 0:
+                conn.rollback()
+                raise NotFoundException(message="源分支不存在或无权更新状态")
 
+        # adopt_target: target_output_id 必须提供
         elif merge_strategy == "adopt_target":
-            if target_output_id_resolved is not None:
-                affected = artifact_repo.update_output_status(
-                    target_output_id_resolved, "adopted", conn
+            if target_output_id_resolved is None:
+                conn.rollback()
+                raise ValidationException(
+                    message="adopt_target 策略必须提供 target_output_id"
                 )
-                if affected == 0:
-                    conn.rollback()
-                    raise NotFoundException(message="目标输出不存在或无权更新状态")
+            affected = artifact_repo.update_output_status(
+                target_output_id_resolved, "adopted", conn
+            )
+            if affected == 0:
+                conn.rollback()
+                raise NotFoundException(message="目标输出不存在或无权更新状态")
+            affected = artifact_repo.update_branch_status(
+                target_branch_id, "merged", conn
+            )
+            if affected == 0:
+                conn.rollback()
+                raise NotFoundException(message="目标分支不存在或无权更新状态")
 
+        # manual_merge: 创建新 output
         elif merge_strategy == "manual_merge":
             merged_output_id = artifact_repo.create_task_output(
                 task_id=task_id,
@@ -356,14 +379,35 @@ def merge_branches(
                 content=merged_content,
                 source_type="manual_merge",
                 parent_output_id=target_output_id_resolved,
+                branch_id=target_branch_id,
                 created_by=user_id,
+                edit_summary=merge_note or "分支手动合并生成",
                 conn=conn,
             )
-            artifact_repo.update_branch_status(source_branch_id, "merged", conn)
-            artifact_repo.update_branch_status(target_branch_id, "active", conn)
+            affected = artifact_repo.update_branch_status(
+                source_branch_id, "merged", conn
+            )
+            if affected == 0:
+                conn.rollback()
+                raise NotFoundException(message="源分支不存在或无权更新状态")
+            affected = artifact_repo.update_branch_status(target_branch_id, "active", conn)
+            if affected == 0:
+                conn.rollback()
+                raise NotFoundException(message="目标分支不存在或无权更新状态")
 
+        # adopt_separately: 标记源分支已合并
         elif merge_strategy == "adopt_separately":
-            artifact_repo.update_branch_status(source_branch_id, "merged", conn)
+            if source_output_id_resolved is None and target_output_id_resolved is None:
+                conn.rollback()
+                raise ValidationException(
+                    message="adopt_separately 至少需要提供 source_output_id 或 target_output_id 之一"
+                )
+            affected = artifact_repo.update_branch_status(
+                source_branch_id, "merged", conn
+            )
+            if affected == 0:
+                conn.rollback()
+                raise NotFoundException(message="源分支不存在或无权更新状态")
 
         merge_id = artifact_repo.create_merge_record(
             project_id=project_id,

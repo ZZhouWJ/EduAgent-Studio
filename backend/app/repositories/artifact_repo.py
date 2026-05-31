@@ -349,11 +349,22 @@ def create_task_output(
     content: str,
     source_type: str,
     parent_output_id: Optional[int],
+    branch_id: int,
     created_by: int,
+    edit_summary: Optional[str],
     conn: Connection,
 ) -> int:
     """
     创建新的输出版本（用于 manual_merge）。
+
+    写入字段：
+    - task_id, output_title, content, source_type
+    - parent_output_id, branch_id
+    - status='generated', version_no（事务内生成）
+    - lock_version=0, is_deleted=0
+    - created_at, created_by
+    - updated_at, updated_by, last_modified_at, last_modified_by
+    - edit_summary
 
     Returns:
         新 output_id
@@ -363,24 +374,35 @@ def create_task_output(
     sql = """
         INSERT INTO task_outputs
             (task_id, output_title, content,
-             source_type, parent_output_id,
+             source_type, parent_output_id, branch_id,
              status, version_no,
              lock_version,
-             is_deleted, created_at, created_by, updated_at, updated_by)
+             is_deleted,
+             created_at, created_by,
+             updated_at, updated_by,
+             last_modified_at, last_modified_by,
+             edit_summary)
         VALUES
             (%s, %s, %s,
-             %s, %s,
+             %s, %s, %s,
              'generated', %s,
              0,
-             0, %s, %s, %s, %s)
+             0,
+             %s, %s,
+             %s, %s,
+             %s, %s,
+             %s)
     """
     cursor = conn.cursor()
     try:
         cursor.execute(sql, (
             task_id, output_title, content,
-            source_type, parent_output_id,
+            source_type, parent_output_id, branch_id,
             version_no,
-            now, created_by, now, created_by,
+            now, created_by,
+            now, created_by,
+            now, created_by,
+            edit_summary or "分支手动合并生成",
         ))
         return cursor.lastrowid
     finally:
@@ -533,13 +555,25 @@ def is_user_in_project(project_id: int, user_id: int) -> bool:
 
 
 def is_user_admin(user_id: int) -> bool:
+    """
+    判断用户是否为管理员。
+
+    基于冻结 Schema 通过 user_roles + roles 关联查询：
+    - users.user_id = user_roles.user_id
+    - user_roles.role_id = roles.role_id
+    - roles.role_code = 'admin'
+    """
     sql = """
-        SELECT 1 FROM users
-        WHERE user_id = %s AND is_deleted = 0
-          AND roles LIKE %s
+        SELECT 1 FROM users u
+        JOIN user_roles ur ON u.user_id = ur.user_id AND ur.is_deleted = 0
+        JOIN roles r ON ur.role_id = r.role_id AND r.is_deleted = 0
+        WHERE u.user_id = %s
+          AND u.is_deleted = 0
+          AND r.role_code = 'admin'
     """
     with get_db_cursor() as cursor:
-        cursor.execute(sql, (user_id, "%admin%"))
+        cursor.execute(sql, (user_id,))
+        return cursor.fetchone() is not None
         return cursor.fetchone() is not None
 
 
