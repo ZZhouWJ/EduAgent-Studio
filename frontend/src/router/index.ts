@@ -63,12 +63,32 @@ export const constantRoutes: RouteRecordRaw[] = [
         }
       },
       {
+        path: "projects/:projectId",
+        component: () => import("@/pages/projects/ProjectDetail.vue"),
+        name: "ProjectDetail",
+        meta: {
+          title: "项目详情",
+          svgIcon: "dashboard",
+          hidden: true
+        }
+      },
+      {
         path: "tasks",
         component: () => import("@/pages/tasks/index.vue"),
         name: "Tasks",
         meta: {
           title: "任务与版本",
           svgIcon: "dashboard"
+        }
+      },
+      {
+        path: "tasks/:taskId",
+        component: () => import("@/pages/tasks/TaskDetail.vue"),
+        name: "TaskDetail",
+        meta: {
+          title: "任务详情",
+          svgIcon: "dashboard",
+          hidden: true
         }
       },
       {
