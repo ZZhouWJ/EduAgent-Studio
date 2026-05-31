@@ -3,8 +3,10 @@
 export interface Task {
   task_id: number
   project_id: number
+  project_name?: string
   task_type_id: number
-  task_type_name?: string
+  type_name?: string
+  type_code?: string
   title: string
   description?: string
   status: string
@@ -25,10 +27,12 @@ export interface TaskBranch {
   branch_id: number
   task_id: number
   branch_name: string
-  branch_type: string
   status: string
   base_output_id?: number
+  base_output_title?: string
   created_by: number
+  creator_username?: string
+  creator_real_name?: string
   created_at: string
   is_deleted?: number
 }
@@ -85,7 +89,6 @@ export interface CreateTaskRequestData {
 
 export interface CreateBranchRequestData {
   branch_name: string
-  branch_type?: string
   base_output_id?: number
 }
 
@@ -94,7 +97,8 @@ export interface OutputListParams {
   page_size?: number
 }
 
-export interface OutputListResponse {
+/** 后端 GET /api/tasks/{id}/outputs 当前返回数组，兼容分页对象 */
+export type OutputListResponse = TaskOutput[] | {
   items: TaskOutput[]
   total: number
   page: number

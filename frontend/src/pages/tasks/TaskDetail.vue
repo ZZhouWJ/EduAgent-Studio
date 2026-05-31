@@ -18,7 +18,6 @@ const loading = ref(false)
 const task = ref<Partial<Task>>({})
 const branches = ref<TaskBranch[]>([])
 const outputs = ref<TaskOutput[]>([])
-const outputTotal = ref(0)
 
 const outputDetailVisible = ref(false)
 const outputDetail = ref<Partial<TaskOutput>>({})
@@ -27,8 +26,11 @@ const outputDetailLoading = ref(false)
 
 function getStatusType(status: string) {
   const map: Record<string, string> = {
+    draft: "info",
     pending: "info",
+    running: "primary",
     in_progress: "primary",
+    generated: "success",
     submitted: "warning",
     approved: "success",
     rejected: "danger",
@@ -41,8 +43,11 @@ function getStatusType(status: string) {
 
 function getStatusLabel(status: string) {
   const map: Record<string, string> = {
+    draft: "草稿",
     pending: "待处理",
+    running: "进行中",
     in_progress: "进行中",
+    generated: "已生成",
     submitted: "已提交",
     approved: "已通过",
     rejected: "已拒绝",
@@ -74,6 +79,13 @@ function getSourceTypeLabel(type: string) {
   return map[type] || type
 }
 
+function getOutputList(data: unknown) {
+  if (Array.isArray(data)) return data
+  const obj = data as Record<string, unknown>
+  if (obj && Array.isArray(obj.items)) return obj.items as TaskOutput[]
+  return []
+}
+
 async function fetchTask() {
   loading.value = true
   try {
@@ -84,8 +96,7 @@ async function fetchTask() {
     ])
     task.value = taskRes.data
     branches.value = branchesRes.data || []
-    outputs.value = outputsRes.data.items || []
-    outputTotal.value = outputsRes.data.total || 0
+    outputs.value = getOutputList(outputsRes.data)
   } catch {
     // error shown by axios interceptor
   } finally {
@@ -129,8 +140,14 @@ onMounted(fetchTask)
       <el-tabs>
         <el-tab-pane label="基本信息">
           <el-descriptions :column="2" border>
+            <el-descriptions-item label="所属项目" :span="2">
+              <el-link v-if="task.project_id" type="primary" :underline="false" @click="router.push(`/projects/${task.project_id}`)">
+                {{ task.project_name || `项目 #${task.project_id}` }}
+              </el-link>
+              <span v-else>-</span>
+            </el-descriptions-item>
             <el-descriptions-item label="任务标题" :span="2">{{ task.title || "-" }}</el-descriptions-item>
-            <el-descriptions-item label="任务类型">{{ task.task_type_name || "-" }}</el-descriptions-item>
+            <el-descriptions-item label="任务类型">{{ task.type_name || "-" }}</el-descriptions-item>
             <el-descriptions-item label="优先级">
               <el-tag size="small" :type="getPriorityTagType(task.priority || '')">
                 {{ getPriorityLabel(task.priority || '') }}
@@ -163,11 +180,9 @@ onMounted(fetchTask)
           <el-table :data="branches" stripe style="width: 100%">
             <el-table-column type="index" label="序号" width="60" align="center" />
             <el-table-column prop="branch_name" label="分支名称" min-width="180" />
-            <el-table-column prop="branch_type" label="分支类型" width="120" align="center">
+            <el-table-column prop="base_output_title" label="基准版本" width="180" show-overflow-tooltip>
               <template #default="{ row }">
-                <el-tag size="small" type="info">
-                  {{ row.branch_type === "main" ? "主分支" : row.branch_type === "feature" ? "功能分支" : row.branch_type }}
-                </el-tag>
+                {{ row.base_output_title || "-" }}
               </template>
             </el-table-column>
             <el-table-column prop="status" label="状态" width="100" align="center">
@@ -175,6 +190,11 @@ onMounted(fetchTask)
                 <el-tag size="small" :type="getStatusType(row.status)">
                   {{ getStatusLabel(row.status) }}
                 </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="creator_real_name" label="创建人" width="120" align="center">
+              <template #default="{ row }">
+                {{ row.creator_real_name || row.creator_username || "-" }}
               </template>
             </el-table-column>
             <el-table-column prop="created_at" label="创建时间" width="170" align="center">
@@ -234,9 +254,6 @@ onMounted(fetchTask)
               <el-empty description="暂无输出版本" />
             </template>
           </el-table>
-          <div v-if="outputTotal > 50" style="margin-top: 12px; text-align: right;">
-            <span style="color: #909399; font-size: 13px">共 {{ outputTotal }} 个版本</span>
-          </div>
         </el-tab-pane>
       </el-tabs>
     </el-card>
@@ -272,7 +289,7 @@ onMounted(fetchTask)
         <div v-if="outputDetail.content" class="content-preview">
           <div class="content-label">版本内容</div>
           <el-input
-            v-model="outputDetail.content"
+            :model-value="outputDetail.content"
             type="textarea"
             :rows="12"
             readonly

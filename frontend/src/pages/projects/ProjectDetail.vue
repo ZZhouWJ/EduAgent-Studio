@@ -31,6 +31,11 @@ const createTaskForm = ref<CreateTaskRequestData>({
   due_date: ""
 })
 
+const createTaskRules = {
+  title: [{ required: true, message: "请输入任务标题", trigger: "blur" }],
+  task_type_id: [{ required: true, message: "请选择任务类型", trigger: "change" }]
+}
+
 const taskTypeOptions = [
   { label: "需求分析", value: 1 },
   { label: "概要设计", value: 2 },
@@ -73,8 +78,11 @@ async function handleCreateTask() {
 
 function getStatusType(status: string) {
   const map: Record<string, string> = {
+    draft: "info",
     pending: "info",
+    running: "primary",
     in_progress: "primary",
+    generated: "success",
     submitted: "warning",
     approved: "success",
     rejected: "danger",
@@ -87,8 +95,11 @@ function getStatusType(status: string) {
 
 function getStatusLabel(status: string) {
   const map: Record<string, string> = {
+    draft: "草稿",
     pending: "待处理",
+    running: "进行中",
     in_progress: "进行中",
+    generated: "已生成",
     submitted: "已提交",
     approved: "已通过",
     rejected: "已拒绝",
@@ -221,7 +232,11 @@ onMounted(fetchAll)
                 </el-link>
               </template>
             </el-table-column>
-            <el-table-column prop="task_type_name" label="任务类型" width="120" align="center" />
+            <el-table-column prop="type_name" label="任务类型" width="120" align="center">
+              <template #default="{ row }">
+                {{ row.type_name || "-" }}
+              </template>
+            </el-table-column>
             <el-table-column prop="status" label="状态" width="100" align="center">
               <template #default="{ row }">
                 <el-tag size="small" :type="getStatusType(row.status)">
@@ -272,6 +287,7 @@ onMounted(fetchAll)
       <el-form
         ref="createTaskFormRef"
         :model="createTaskForm"
+        :rules="createTaskRules"
         label-width="90px"
       >
         <el-form-item label="任务标题" prop="title">
