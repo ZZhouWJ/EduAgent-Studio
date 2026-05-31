@@ -101,6 +101,16 @@ export const constantRoutes: RouteRecordRaw[] = [
         }
       },
       {
+        path: "reviews/:requestId",
+        component: () => import("@/pages/reviews/ReviewDetail.vue"),
+        name: "ReviewDetail",
+        meta: {
+          title: "审核详情",
+          svgIcon: "dashboard",
+          hidden: true
+        }
+      },
+      {
         path: "artifacts",
         component: () => import("@/pages/artifacts/index.vue"),
         name: "Artifacts",
@@ -110,8 +120,18 @@ export const constantRoutes: RouteRecordRaw[] = [
         }
       },
       {
+        path: "artifacts/:adoptedId",
+        component: () => import("@/pages/artifacts/ArtifactDetail.vue"),
+        name: "ArtifactDetail",
+        meta: {
+          title: "成果详情",
+          svgIcon: "dashboard",
+          hidden: true
+        }
+      },
+      {
         path: "statistics",
-        component: () => import("@/pages/statistics/index.vue"),
+        component: () => import("@/pages/statistics/StatisticsDashboard.vue"),
         name: "Statistics",
         meta: {
           title: "统计看板",

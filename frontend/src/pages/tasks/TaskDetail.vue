@@ -14,6 +14,8 @@ import {
   createOutputCommentApi,
   updateCommentStatusApi
 } from "@/common/apis/tasks"
+import { adoptOutputApi } from "@/common/apis/artifacts"
+import { mergeTaskBranchesApi } from "@/common/apis/artifacts"
 import { getModelListApi } from "@/common/apis/models"
 import { getTemplateListApi, getTemplateVersionsApi } from "@/common/apis/prompts"
 import type {
@@ -26,6 +28,7 @@ import type {
 } from "@/common/apis/tasks/type"
 import type { AIModel } from "@/common/apis/models/type"
 import type { PromptTemplate, PromptVersion } from "@/common/apis/prompts/type"
+import type { MergeBranchesRequestData } from "@/common/apis/artifacts/type"
 
 const route = useRoute()
 const router = useRouter()
@@ -328,6 +331,122 @@ async function handleSaveAs() {
   finally { saveAsLoading.value = false }
 }
 
+// ─── Adopt Output Dialog ──────────────────────────────────────────────────────
+
+const adoptDialogVisible = ref(false)
+const adoptFormRef = ref()
+const adoptLoading = ref(false)
+const adoptForm = ref({
+  artifact_title: "",
+  artifact_type: "",
+  release_version: "v1.0",
+  adopt_note: ""
+})
+const adoptRules = {
+  artifact_title: [{ required: true, message: "请输入成果标题", trigger: "blur" }],
+  artifact_type: [{ required: true, message: "请选择成果类型", trigger: "change" }]
+}
+
+function openAdoptDialog() {
+  adoptFormRef.value?.resetFields()
+  adoptForm.value = {
+    artifact_title: outputDetail.value.output_title || "",
+    artifact_type: "",
+    release_version: "v1.0",
+    adopt_note: ""
+  }
+  adoptDialogVisible.value = true
+}
+
+async function handleAdopt() {
+  if (!adoptFormRef.value || !outputDetail.value.output_id) return
+  try {
+    const valid = await adoptFormRef.value.validate()
+    if (!valid) return
+    adoptLoading.value = true
+    await adoptOutputApi(outputDetail.value.output_id, adoptForm.value)
+    ElMessage.success("成果采用成功")
+    adoptDialogVisible.value = false
+    await fetchTask()
+  } catch { /* shown by interceptor */ }
+  finally { adoptLoading.value = false }
+}
+
+// ─── Branch Merge Dialog ──────────────────────────────────────────────────────
+
+const mergeDialogVisible = ref(false)
+const mergeFormRef = ref()
+const mergeLoading = ref(false)
+const mergeForm = ref<MergeBranchesRequestData>({
+  source_branch_id: 0,
+  target_branch_id: 0,
+  source_output_id: undefined,
+  target_output_id: undefined,
+  merge_strategy: "manual_merge",
+  merged_output_title: "",
+  merged_content: "",
+  merge_note: ""
+})
+const mergeRules = {
+  merge_strategy: [{ required: true, message: "请选择合并策略", trigger: "change" }],
+  source_branch_id: [{ required: true, message: "请选择源分支", trigger: "change" }],
+  target_branch_id: [{ required: true, message: "请选择目标分支", trigger: "change" }],
+  merged_output_title: [{ required: true, message: "请输入新版本标题", trigger: "blur" }],
+  merged_content: [{ required: true, message: "请输入合并内容", trigger: "blur" }]
+}
+
+function openMergeDialog() {
+  mergeFormRef.value?.resetFields()
+  const activeBranches = branches.value.filter(b => b.status === "active")
+  mergeForm.value = {
+    source_branch_id: activeBranches.length > 0 ? activeBranches[0].branch_id : (branches.value[0]?.branch_id || 0),
+    target_branch_id: activeBranches.length > 1 ? activeBranches[1].branch_id : (branches.value[1]?.branch_id || 0),
+    source_output_id: undefined,
+    target_output_id: undefined,
+    merge_strategy: "manual_merge",
+    merged_output_title: "",
+    merged_content: "",
+    merge_note: ""
+  }
+  mergeDialogVisible.value = true
+}
+
+async function handleMerge() {
+  if (!mergeFormRef.value) return
+  if (mergeForm.value.source_branch_id === mergeForm.value.target_branch_id) {
+    ElMessage.warning("源分支和目标分支不能相同")
+    return
+  }
+  if (mergeForm.value.merge_strategy === "adopt_source" && !mergeForm.value.source_output_id) {
+    ElMessage.warning("采用源分支策略必须选择源输出")
+    return
+  }
+  if (mergeForm.value.merge_strategy === "adopt_target" && !mergeForm.value.target_output_id) {
+    ElMessage.warning("采用目标分支策略必须选择目标输出")
+    return
+  }
+  if (mergeForm.value.merge_strategy === "manual_merge") {
+    if (!mergeForm.value.merged_output_title?.trim()) {
+      ElMessage.warning("手动合并策略必须填写新版本标题")
+      return
+    }
+    if (!mergeForm.value.merged_content?.trim()) {
+      ElMessage.warning("手动合并策略必须填写合并内容")
+      return
+    }
+  }
+  try {
+    const valid = await mergeFormRef.value.validate()
+    if (!valid) return
+    mergeLoading.value = true
+    await mergeTaskBranchesApi(taskId, mergeForm.value)
+    ElMessage.success("分支合并成功")
+    mergeDialogVisible.value = false
+    await fetchTask()
+  } catch { /* shown by interceptor */ }
+  finally { mergeLoading.value = false }
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
 async function refreshDetail() {
@@ -473,6 +592,14 @@ onMounted(fetchTask)
 
         <!-- 分支 -->
         <el-tab-pane label="分支">
+          <div style="margin-bottom: 12px; text-align: right">
+            <el-button
+              v-if="branches.length >= 2"
+              type="warning"
+              size="small"
+              @click="openMergeDialog"
+            >分支合并</el-button>
+          </div>
           <el-table :data="branches" stripe style="width: 100%">
             <el-table-column type="index" label="序号" width="60" align="center" />
             <el-table-column prop="branch_name" label="分支名称" min-width="180" />
@@ -680,6 +807,12 @@ onMounted(fetchTask)
         <div style="margin-bottom: 12px">
           <el-button type="primary" size="small" @click="openEditDialog">编辑输出</el-button>
           <el-button size="small" @click="openSaveAsDialog">另存为新版本</el-button>
+          <el-button
+            v-if="outputDetail.status === 'approved'"
+            type="success"
+            size="small"
+            @click="openAdoptDialog"
+          >采用为成果</el-button>
         </div>
 
         <div v-if="outputDetail.content" class="content-preview">
@@ -823,6 +956,105 @@ onMounted(fetchTask)
       <template #footer>
         <el-button @click="saveAsDialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="saveAsLoading" @click="handleSaveAs">创建新版本</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- ─── Adopt Output Dialog ─────────────────────────────────────────────── -->
+    <el-dialog v-model="adoptDialogVisible" title="采用为成果" width="520px" :close-on-click-modal="false">
+      <el-form ref="adoptFormRef" :model="adoptForm" :rules="adoptRules" label-width="100px">
+        <el-form-item label="成果标题" prop="artifact_title">
+          <el-input v-model="adoptForm.artifact_title" placeholder="请输入成果标题" maxlength="200" show-word-limit />
+        </el-form-item>
+        <el-form-item label="成果类型" prop="artifact_type">
+          <el-select v-model="adoptForm.artifact_type" placeholder="请选择成果类型" style="width: 100%">
+            <el-option label="报告章节" value="report_section" />
+            <el-option label="需求分析" value="requirements" />
+            <el-option label="设计文档" value="design" />
+            <el-option label="代码" value="code" />
+            <el-option label="测试文档" value="test" />
+            <el-option label="使用手册" value="manual" />
+            <el-option label="其他" value="other" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="发布版本">
+          <el-input v-model="adoptForm.release_version" placeholder="如 v1.0" maxlength="50" />
+        </el-form-item>
+        <el-form-item label="采用说明">
+          <el-input v-model="adoptForm.adopt_note" type="textarea" :rows="3" placeholder="描述此成果的用途（选填）" maxlength="500" show-word-limit />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="adoptDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="adoptLoading" @click="handleAdopt">确认采用</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- ─── Branch Merge Dialog ─────────────────────────────────────────────── -->
+    <el-dialog v-model="mergeDialogVisible" title="分支合并" width="600px" :close-on-click-modal="false">
+      <el-form ref="mergeFormRef" :model="mergeForm" :rules="mergeRules" label-width="100px">
+        <el-form-item label="合并策略" prop="merge_strategy">
+          <el-select v-model="mergeForm.merge_strategy" placeholder="请选择合并策略" style="width: 100%">
+            <el-option label="采用源分支 (adopt_source)" value="adopt_source" />
+            <el-option label="采用目标分支 (adopt_target)" value="adopt_target" />
+            <el-option label="手动合并 (manual_merge)" value="manual_merge" />
+            <el-option label="分别采用 (adopt_separately)" value="adopt_separately" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="源分支" prop="source_branch_id">
+          <el-select v-model="mergeForm.source_branch_id" placeholder="选择源分支" style="width: 100%">
+            <el-option v-for="b in branches" :key="b.branch_id" :label="b.branch_name" :value="b.branch_id" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="目标分支" prop="target_branch_id">
+          <el-select v-model="mergeForm.target_branch_id" placeholder="选择目标分支" style="width: 100%">
+            <el-option v-for="b in branches" :key="b.branch_id" :label="b.branch_name" :value="b.branch_id" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item v-if="mergeForm.merge_strategy === 'adopt_source' || mergeForm.merge_strategy === 'adopt_target'" label="选择输出">
+          <el-select
+            v-if="mergeForm.merge_strategy === 'adopt_source'"
+            v-model="mergeForm.source_output_id"
+            placeholder="选择源分支输出"
+            style="width: 100%"
+          >
+            <el-option v-for="o in outputs" :key="o.output_id" :label="`v${o.version_no} - ${o.output_title || '无标题'}`" :value="o.output_id" />
+          </el-select>
+          <el-select
+            v-if="mergeForm.merge_strategy === 'adopt_target'"
+            v-model="mergeForm.target_output_id"
+            placeholder="选择目标分支输出"
+            style="width: 100%"
+          >
+            <el-option v-for="o in outputs" :key="o.output_id" :label="`v${o.version_no} - ${o.output_title || '无标题'}`" :value="o.output_id" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item
+          v-if="mergeForm.merge_strategy === 'manual_merge'"
+          label="新版本标题"
+          prop="merged_output_title"
+        >
+          <el-input v-model="mergeForm.merged_output_title" placeholder="请输入合并后的版本标题" maxlength="200" />
+        </el-form-item>
+
+        <el-form-item
+          v-if="mergeForm.merge_strategy === 'manual_merge'"
+          label="合并内容"
+          prop="merged_content"
+        >
+          <el-input v-model="mergeForm.merged_content" type="textarea" :rows="6" placeholder="请输入合并后的正文内容" />
+        </el-form-item>
+
+        <el-form-item label="合并说明">
+          <el-input v-model="mergeForm.merge_note" type="textarea" :rows="2" placeholder="描述本次合并（选填）" maxlength="500" show-word-limit />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="mergeDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="mergeLoading" @click="handleMerge">执行合并</el-button>
       </template>
     </el-dialog>
   </div>
