@@ -18,4 +18,4 @@
 | TASK-008-FIX | Stage-08 | 修复人工编辑、批注与乐观锁审查问题 | 已通过 Codex 复审 | Cursor | Codex |
 | TASK-009 | Stage-09 | 审核中心模块 | 已通过 Fix R3 复审 | Cursor | Codex |
 | TASK-009-FIX-R2 | Stage-09 | 修复 _can_complete_review 权限逻辑 | 已通过 Codex 复审 | Cursor | Codex |
-| TASK-010 | Stage-10 | 成果库与分支合并模块 | 已发布，等待 Cursor 开发 | Cursor | Codex |
+| TASK-010 | Stage-10 | 成果库与分支合并模块 | 已完成，等待 Codex 审查 | Cursor | Codex |
