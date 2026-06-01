@@ -145,12 +145,12 @@ onMounted(async () => {
         <el-table-column prop="output_title" label="原始输出" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ row.output_title || "-" }}</template>
         </el-table-column>
-        <el-table-column prop="adopted_by_real_name" label="采用人" width="120" align="center">
-          <template #default="{ row }">{{ row.adopted_by_real_name || row.adopted_by_username || "-" }}</template>
+        <el-table-column prop="adopted_by_name" label="采用人" width="120" align="center">
+          <template #default="{ row }">{{ row.adopted_by_name || "-" }}</template>
         </el-table-column>
-        <el-table-column prop="created_at" label="采用时间" width="170" align="center">
+        <el-table-column label="采用时间" width="170" align="center">
           <template #default="{ row }">
-            {{ row.created_at ? new Date(row.created_at).toLocaleString("zh-CN") : "-" }}
+            {{ row.adopted_at ? new Date(row.adopted_at).toLocaleString("zh-CN") : "-" }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="80" align="center" fixed="right">

@@ -435,6 +435,12 @@ async function handleMerge() {
       return
     }
   }
+  if (mergeForm.value.merge_strategy === "adopt_separately") {
+    if (!mergeForm.value.source_output_id && !mergeForm.value.target_output_id) {
+      ElMessage.warning("分别保留时至少需要选择一个输出版本")
+      return
+    }
+  }
   try {
     const valid = await mergeFormRef.value.validate()
     if (!valid) return
@@ -1027,6 +1033,28 @@ onMounted(fetchTask)
             v-model="mergeForm.target_output_id"
             placeholder="选择目标分支输出"
             style="width: 100%"
+          >
+            <el-option v-for="o in outputs" :key="o.output_id" :label="`v${o.version_no} - ${o.output_title || '无标题'}`" :value="o.output_id" />
+          </el-select>
+        </el-form-item>
+
+        <!-- adopt_separately: both source and target outputs required -->
+        <el-form-item v-if="mergeForm.merge_strategy === 'adopt_separately'" label="源分支输出">
+          <el-select
+            v-model="mergeForm.source_output_id"
+            placeholder="选择源分支输出"
+            style="width: 100%"
+            clearable
+          >
+            <el-option v-for="o in outputs" :key="o.output_id" :label="`v${o.version_no} - ${o.output_title || '无标题'}`" :value="o.output_id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="mergeForm.merge_strategy === 'adopt_separately'" label="目标分支输出">
+          <el-select
+            v-model="mergeForm.target_output_id"
+            placeholder="选择目标分支输出"
+            style="width: 100%"
+            clearable
           >
             <el-option v-for="o in outputs" :key="o.output_id" :label="`v${o.version_no} - ${o.output_title || '无标题'}`" :value="o.output_id" />
           </el-select>

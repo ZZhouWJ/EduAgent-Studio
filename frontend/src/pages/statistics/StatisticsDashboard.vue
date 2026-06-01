@@ -19,12 +19,18 @@ import type {
   RecentActivity
 } from "@/common/apis/statistics/type"
 
+/** 兼容后端数组返回 */
+function asArray<T>(data: unknown): T[] {
+  if (Array.isArray(data)) return data as T[]
+  if (Array.isArray((data as Record<string, unknown>)?.items)) return ((data as Record<string, unknown>).items) as T[]
+  return []
+}
+
 const overviewLoading = ref(false)
 const overview = ref<Partial<StatisticsOverview>>({})
 
 const projectStatsLoading = ref(false)
 const projectStats = ref<ProjectStats[]>([])
-const projectStatsTotal = ref(0)
 
 const modelStatsLoading = ref(false)
 const modelStats = ref<ModelCallStats[]>([])
@@ -53,9 +59,8 @@ async function fetchOverview() {
 async function fetchProjectStats() {
   projectStatsLoading.value = true
   try {
-    const res = await getProjectStatisticsApi({ page: 1, page_size: 20 })
-    projectStats.value = res.data.items || []
-    projectStatsTotal.value = res.data.total || 0
+    const res = await getProjectStatisticsApi()
+    projectStats.value = asArray<ProjectStats>(res.data)
   } catch { /* shown by interceptor */ }
   finally { projectStatsLoading.value = false }
 }
@@ -63,8 +68,8 @@ async function fetchProjectStats() {
 async function fetchModelStats() {
   modelStatsLoading.value = true
   try {
-    const res = await getModelCallStatisticsApi({ page: 1, page_size: 20 })
-    modelStats.value = res.data.items || []
+    const res = await getModelCallStatisticsApi()
+    modelStats.value = asArray<ModelCallStats>(res.data)
   } catch { /* shown by interceptor */ }
   finally { modelStatsLoading.value = false }
 }
@@ -90,8 +95,8 @@ async function fetchReviewStats() {
 async function fetchMemberStats() {
   memberLoading.value = true
   try {
-    const res = await getMemberContributionsApi({ page: 1, page_size: 20 })
-    memberStats.value = res.data.items || []
+    const res = await getMemberContributionsApi()
+    memberStats.value = asArray<MemberContribution>(res.data)
   } catch { /* shown by interceptor */ }
   finally { memberLoading.value = false }
 }
@@ -99,8 +104,8 @@ async function fetchMemberStats() {
 async function fetchActivities() {
   activityLoading.value = true
   try {
-    const res = await getRecentActivitiesApi({ limit: 20 })
-    activities.value = res.data.items || []
+    const res = await getRecentActivitiesApi()
+    activities.value = asArray<RecentActivity>(res.data)
   } catch { /* shown by interceptor */ }
   finally { activityLoading.value = false }
 }
@@ -116,7 +121,9 @@ function getActionTypeLabel(type: string) {
     "output:adopt": "采用成果",
     "merge:execute": "分支合并",
     "project:create": "创建项目",
-    "project:archive": "归档项目"
+    "project:archive": "归档项目",
+    "login": "登录",
+    "logout": "退出登录"
   }
   return m[type] || type
 }
@@ -142,31 +149,31 @@ onMounted(() => {
     <div v-loading="overviewLoading" class="overview-grid">
       <el-card shadow="hover" class="stat-card">
         <div class="stat-label">项目总数</div>
-        <div class="stat-value">{{ overview.total_projects ?? 0 }}</div>
+        <div class="stat-value">{{ overview.project_count ?? 0 }}</div>
       </el-card>
       <el-card shadow="hover" class="stat-card">
         <div class="stat-label">进行中项目</div>
-        <div class="stat-value">{{ overview.active_projects ?? 0 }}</div>
+        <div class="stat-value">{{ overview.active_project_count ?? 0 }}</div>
       </el-card>
       <el-card shadow="hover" class="stat-card">
         <div class="stat-label">任务总数</div>
-        <div class="stat-value">{{ overview.total_tasks ?? 0 }}</div>
+        <div class="stat-value">{{ overview.task_count ?? 0 }}</div>
       </el-card>
       <el-card shadow="hover" class="stat-card">
-        <div class="stat-label">已完成任务</div>
-        <div class="stat-value">{{ overview.completed_tasks ?? 0 }}</div>
-      </el-card>
-      <el-card shadow="hover" class="stat-card">
-        <div class="stat-label">输出总数</div>
-        <div class="stat-value">{{ overview.total_outputs ?? 0 }}</div>
-      </el-card>
-      <el-card shadow="hover" class="stat-card">
-        <div class="stat-label">已通过输出</div>
-        <div class="stat-value">{{ overview.approved_outputs ?? 0 }}</div>
+        <div class="stat-label">待审核数</div>
+        <div class="stat-value">{{ overview.pending_review_count ?? 0 }}</div>
       </el-card>
       <el-card shadow="hover" class="stat-card">
         <div class="stat-label">模型调用次数</div>
-        <div class="stat-value">{{ overview.total_invocations ?? 0 }}</div>
+        <div class="stat-value">{{ overview.invocation_count ?? 0 }}</div>
+      </el-card>
+      <el-card shadow="hover" class="stat-card">
+        <div class="stat-label">成功调用次数</div>
+        <div class="stat-value">{{ overview.success_invocation_count ?? 0 }}</div>
+      </el-card>
+      <el-card shadow="hover" class="stat-card">
+        <div class="stat-label">成果总数</div>
+        <div class="stat-value">{{ overview.artifact_count ?? 0 }}</div>
       </el-card>
       <el-card shadow="hover" class="stat-card">
         <div class="stat-label">累计成本 (CNY)</div>
@@ -203,10 +210,11 @@ onMounted(() => {
             <div style="font-weight: 600">模型调用统计</div>
           </template>
           <el-table :data="modelStats" stripe size="small" style="width: 100%">
-            <el-table-column prop="model_name" label="模型" min-width="120" show-overflow-tooltip>
+            <el-table-column label="模型" min-width="120" show-overflow-tooltip>
               <template #default="{ row }">{{ row.display_name || row.model_name }}</template>
             </el-table-column>
             <el-table-column prop="call_count" label="调用次数" width="90" align="center" />
+            <el-table-column prop="success_count" label="成功数" width="80" align="center" />
             <el-table-column prop="total_input_tokens" label="输入 Tokens" width="110" align="right">
               <template #default="{ row }">{{ (row.total_input_tokens || 0).toLocaleString() }}</template>
             </el-table-column>
@@ -233,21 +241,30 @@ onMounted(() => {
           </template>
           <div class="cost-grid">
             <div class="cost-item">
-              <div class="cost-label">本次统计总成本</div>
+              <div class="cost-label">总成本 (CNY)</div>
               <div class="cost-value">¥{{ (costStats.total_cost ?? 0).toFixed(4) }}</div>
             </div>
             <div class="cost-item">
               <div class="cost-label">输入成本</div>
-              <div class="cost-value">¥{{ (costStats.total_input_cost ?? 0).toFixed(4) }}</div>
+              <div class="cost-value">¥{{ (costStats.input_cost ?? 0).toFixed(4) }}</div>
             </div>
             <div class="cost-item">
               <div class="cost-label">输出成本</div>
-              <div class="cost-value">¥{{ (costStats.total_output_cost ?? 0).toFixed(4) }}</div>
+              <div class="cost-value">¥{{ (costStats.output_cost ?? 0).toFixed(4) }}</div>
             </div>
             <div class="cost-item">
-              <div class="cost-label">币种</div>
-              <div class="cost-value">{{ costStats.currency || "CNY" }}</div>
+              <div class="cost-label">总 Tokens</div>
+              <div class="cost-value">{{ (costStats.total_tokens ?? 0).toLocaleString() }}</div>
             </div>
+          </div>
+          <div v-if="costStats.cost_by_model && costStats.cost_by_model.length > 0" style="margin-top: 12px">
+            <div class="sub-title">按模型成本明细</div>
+            <el-table :data="costStats.cost_by_model" size="small" style="width: 100%">
+              <el-table-column prop="model_name" label="模型" />
+              <el-table-column prop="total_cost" label="成本" align="right">
+                <template #default="{ row }">¥{{ (row.total_cost || 0).toFixed(4) }}</template>
+              </el-table-column>
+            </el-table>
           </div>
         </el-card>
       </el-col>
@@ -260,7 +277,7 @@ onMounted(() => {
           <div class="review-stats-grid">
             <div class="review-item">
               <div class="review-label">审核总数</div>
-              <div class="review-value">{{ reviewStats.total_reviews ?? 0 }}</div>
+              <div class="review-value">{{ reviewStats.review_count ?? 0 }}</div>
             </div>
             <div class="review-item">
               <div class="review-label">通过数</div>
@@ -291,6 +308,14 @@ onMounted(() => {
               <div class="review-value">{{ (reviewStats.avg_usability_score ?? 0).toFixed(1) }}</div>
             </div>
           </div>
+          <div v-if="reviewStats.top_issue_tags && reviewStats.top_issue_tags.length > 0" style="margin-top: 12px">
+            <div class="sub-title">高频问题标签</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px">
+              <el-tag v-for="tag in reviewStats.top_issue_tags" :key="tag.tag_name" size="small" type="info">
+                {{ tag.tag_name }} ({{ tag.tag_count }})
+              </el-tag>
+            </div>
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -305,16 +330,12 @@ onMounted(() => {
           <el-table :data="memberStats" stripe size="small" style="width: 100%">
             <el-table-column type="index" label="排名" width="60" align="center" />
             <el-table-column label="成员" min-width="100">
-              <template #default="{ row }">
-                {{ row.real_name || row.username }}
-              </template>
+              <template #default="{ row }">{{ row.real_name || `用户 #${row.user_id}` }}</template>
             </el-table-column>
-            <el-table-column prop="output_count" label="输出数" width="70" align="center" />
-            <el-table-column prop="approved_output_count" label="已通过" width="80" align="center" />
-            <el-table-column prop="invocation_count" label="调用次数" width="90" align="center" />
-            <el-table-column prop="total_cost" label="成本" width="90" align="right">
-              <template #default="{ row }">¥{{ (row.total_cost || 0).toFixed(4) }}</template>
-            </el-table-column>
+            <el-table-column prop="task_created_count" label="创建任务" width="90" align="center" />
+            <el-table-column prop="output_created_count" label="创建输出" width="90" align="center" />
+            <el-table-column prop="review_count" label="审核数" width="80" align="center" />
+            <el-table-column prop="artifact_adopted_count" label="采用成果" width="90" align="center" />
             <template #empty>
               <el-empty description="暂无成员贡献数据" />
             </template>
@@ -338,8 +359,7 @@ onMounted(() => {
               <div class="activity-content">
                 <div class="activity-desc">{{ item.action_desc || "-" }}</div>
                 <div class="activity-meta">
-                  <span>{{ item.real_name || item.username }}</span>
-                  <span v-if="item.project_name">&nbsp;· {{ item.project_name }}</span>
+                  {{ item.real_name || `用户 #${item.user_id}` }}
                 </div>
               </div>
               <div class="activity-time">
@@ -359,9 +379,7 @@ onMounted(() => {
   max-width: 1600px;
   margin: 0 auto;
 }
-.page-header {
-  margin-bottom: 16px;
-}
+.page-header { margin-bottom: 16px; }
 .page-title {
   font-size: 20px;
   font-weight: 700;
@@ -376,36 +394,20 @@ onMounted(() => {
 }
 .stat-card {
   text-align: center;
-  .stat-label {
-    font-size: 13px;
-    color: #909399;
-    margin-bottom: 8px;
-  }
-  .stat-value {
-    font-size: 24px;
-    font-weight: 700;
-    color: #1e3a5f;
-  }
+  .stat-label { font-size: 13px; color: #909399; margin-bottom: 8px; }
+  .stat-value { font-size: 24px; font-weight: 700; color: #1e3a5f; }
 }
 .cost-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
   gap: 12px;
 }
 .cost-item {
   background: #f5f7fa;
   border-radius: 4px;
   padding: 12px;
-  .cost-label {
-    font-size: 12px;
-    color: #909399;
-    margin-bottom: 4px;
-  }
-  .cost-value {
-    font-size: 16px;
-    font-weight: 600;
-    color: #303133;
-  }
+  .cost-label { font-size: 12px; color: #909399; margin-bottom: 4px; }
+  .cost-value { font-size: 16px; font-weight: 600; color: #303133; }
 }
 .review-stats-grid {
   display: grid;
@@ -417,16 +419,14 @@ onMounted(() => {
   border-radius: 4px;
   padding: 10px;
   text-align: center;
-  .review-label {
-    font-size: 12px;
-    color: #909399;
-    margin-bottom: 4px;
-  }
-  .review-value {
-    font-size: 18px;
-    font-weight: 700;
-    color: #303133;
-  }
+  .review-label { font-size: 12px; color: #909399; margin-bottom: 4px; }
+  .review-value { font-size: 18px; font-weight: 700; color: #303133; }
+}
+.sub-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #606266;
+  margin-bottom: 8px;
 }
 .activity-list {
   max-height: 400px;
@@ -440,25 +440,12 @@ onMounted(() => {
   border-bottom: 1px solid #f0f0f0;
   &:last-child { border-bottom: none; }
 }
-.activity-icon {
-  flex-shrink: 0;
-  padding-top: 2px;
-}
+.activity-icon { flex-shrink: 0; padding-top: 2px; }
 .activity-content {
   flex: 1;
   min-width: 0;
-  .activity-desc {
-    font-size: 13px;
-    color: #303133;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .activity-meta {
-    font-size: 12px;
-    color: #909399;
-    margin-top: 2px;
-  }
+  .activity-desc { font-size: 13px; color: #303133; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .activity-meta { font-size: 12px; color: #909399; margin-top: 2px; }
 }
 .activity-time {
   flex-shrink: 0;

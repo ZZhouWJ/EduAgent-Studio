@@ -10,28 +10,20 @@ export function getStatisticsOverviewApi(params?: { project_id?: number }) {
   })
 }
 
-/** 项目维度统计：GET /api/statistics/projects */
-export function getProjectStatisticsApi(params?: { project_id?: number; page?: number; page_size?: number }) {
-  return request<Statistics.ApiResponseData<{
-    items: Statistics.ProjectStats[]
-    total: number
-    page: number
-    page_size: number
-  }>>({
+/** 项目维度统计：GET /api/statistics/projects
+ * 后端返回数组，不是分页对象 */
+export function getProjectStatisticsApi(params?: { project_id?: number }) {
+  return request<Statistics.ApiResponseData<Statistics.ProjectStats[]>>({
     url: "api/statistics/projects",
     method: "get",
     params
   })
 }
 
-/** 模型调用统计：GET /api/statistics/model-calls */
-export function getModelCallStatisticsApi(params?: { project_id?: number; date_from?: string; date_to?: string; page?: number; page_size?: number }) {
-  return request<Statistics.ApiResponseData<{
-    items: Statistics.ModelCallStats[]
-    total: number
-    page: number
-    page_size: number
-  }>>({
+/** 模型调用统计：GET /api/statistics/model-calls
+ * 后端返回数组，不是分页对象 */
+export function getModelCallStatisticsApi(params?: { project_id?: number; date_from?: string; date_to?: string }) {
+  return request<Statistics.ApiResponseData<Statistics.ModelCallStats[]>>({
     url: "api/statistics/model-calls",
     method: "get",
     params
@@ -56,28 +48,20 @@ export function getReviewStatisticsApi(params?: { project_id?: number }) {
   })
 }
 
-/** 成员贡献统计：GET /api/statistics/member-contributions */
-export function getMemberContributionsApi(params?: { project_id?: number; page?: number; page_size?: number }) {
-  return request<Statistics.ApiResponseData<{
-    items: Statistics.MemberContribution[]
-    total: number
-    page: number
-    page_size: number
-  }>>({
+/** 成员贡献统计：GET /api/statistics/member-contributions
+ * 后端返回数组，不是分页对象 */
+export function getMemberContributionsApi(params?: { project_id?: number }) {
+  return request<Statistics.ApiResponseData<Statistics.MemberContribution[]>>({
     url: "api/statistics/member-contributions",
     method: "get",
     params
   })
 }
 
-/** 最近操作动态：GET /api/statistics/recent-activities */
-export function getRecentActivitiesApi(params?: { limit?: number; page?: number; page_size?: number }) {
-  return request<Statistics.ApiResponseData<{
-    items: Statistics.RecentActivity[]
-    total: number
-    page: number
-    page_size: number
-  }>>({
+/** 最近操作动态：GET /api/statistics/recent-activities
+ * 后端返回数组，不是分页对象 */
+export function getRecentActivitiesApi(params?: { project_id?: number; limit?: number }) {
+  return request<Statistics.ApiResponseData<Statistics.RecentActivity[]>>({
     url: "api/statistics/recent-activities",
     method: "get",
     params

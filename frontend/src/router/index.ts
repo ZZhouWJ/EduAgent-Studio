@@ -112,7 +112,7 @@ export const constantRoutes: RouteRecordRaw[] = [
       },
       {
         path: "artifacts",
-        component: () => import("@/pages/artifacts/index.vue"),
+        component: () => import("@/pages/artifacts/ArtifactList.vue"),
         name: "Artifacts",
         meta: {
           title: "成果库",

@@ -68,10 +68,10 @@ onMounted(fetchDetail)
             {{ detail.adopted_by_real_name || detail.adopted_by_username || "-" }}
           </el-descriptions-item>
           <el-descriptions-item label="采用时间">
-            {{ detail.created_at ? new Date(detail.created_at).toLocaleString("zh-CN") : "-" }}
+            {{ detail.adopted_at ? new Date(detail.adopted_at).toLocaleString("zh-CN") : "-" }}
           </el-descriptions-item>
-          <el-descriptions-item label="采用说明" :span="2">
-            {{ detail.adopt_note || "-" }}
+          <el-descriptions-item label="原始状态">
+            <el-tag size="small">{{ detail.output_status || "-" }}</el-tag>
           </el-descriptions-item>
         </el-descriptions>
       </el-card>
@@ -80,7 +80,7 @@ onMounted(fetchDetail)
         <template #header>
           <div style="font-weight: 600">成果正文</div>
         </template>
-        <div v-if="detail.content" class="content-box">{{ detail.content }}</div>
+        <div v-if="detail.output_content" class="content-box">{{ detail.output_content }}</div>
         <el-empty v-else description="暂无正文内容" />
       </el-card>
     </div>
