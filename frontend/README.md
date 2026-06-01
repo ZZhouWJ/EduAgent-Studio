@@ -130,7 +130,7 @@ pnpm build
 
 ## 当前阶段实现范围
 
-Stage-13 仅完成前端基础框架和登录功能，包括：
+Stage-17 已完成前端全部核心业务模块，包括：
 
 - [x] 基于 V3 Admin Vite 模板二次开发
 - [x] Vue3 + Vite + TypeScript + Element Plus 项目基础结构
@@ -138,18 +138,56 @@ Stage-13 仅完成前端基础框架和登录功能，包括：
 - [x] Vue Router 路由基础（含守卫）
 - [x] 登录页（对接 `/api/auth/login`、`/api/auth/me`）
 - [x] 后台管理整体布局（左侧导航 + 顶部栏 + 标签栏）
-- [x] 首页占位（Dashboard）
+- [x] 首页（Dashboard，含流程卡片与数据卡片）
+- [x] 项目空间（项目列表、详情、创建、成员管理）
+- [x] 任务与版本（任务列表、详情、分支管理、版本管理）
+- [x] AI 生成（多模型批量调用、Mock 机制）
+- [x] 人工编辑与批注（输出编辑、另存版本、批注列表）
+- [x] 审核中心（待审核列表、审核详情、评分与提交）
+- [x] 成果库（成果列表、成果详情）
+- [x] 统计看板（概览、模型调用、成本、审核质量、成员贡献）
+- [x] 模型管理（供应商列表、模型列表）
 
-以下模块在本阶段仅为占位页面，**不实现完整业务功能**：
+### 页面模块说明
 
-| 页面 | 路由 | 说明 |
-|------|------|------|
-| 项目空间 | `/projects` | 占位 |
-| 任务与版本 | `/tasks` | 占位 |
-| 审核中心 | `/reviews` | 占位 |
-| 成果库 | `/artifacts` | 占位 |
-| 统计看板 | `/statistics` | 占位 |
-| 模型管理 | `/models` | 占位 |
+| 页面 | 路由 | 文件 | 对接后端 |
+|------|------|------|---------|
+| 登录页 | `/login` | `pages/login/index.vue` | `/api/auth/login`、`/api/auth/me` |
+| 首页 | `/dashboard` | `pages/dashboard/index.vue` | `/api/statistics/overview` |
+| 项目空间 | `/projects` | `pages/projects/index.vue` | `/api/projects` |
+| 项目详情 | `/projects/:projectId` | `pages/projects/ProjectDetail.vue` | `/api/projects/{id}` |
+| 任务与版本 | `/tasks` | `pages/tasks/index.vue` | `/api/tasks` |
+| 任务详情 | `/tasks/:taskId` | `pages/tasks/TaskDetail.vue` | `/api/tasks/{id}` |
+| 审核中心 | `/reviews` | `pages/reviews/index.vue` | `/api/reviews/pending` |
+| 审核详情 | `/reviews/:requestId` | `pages/reviews/ReviewDetail.vue` | `/api/reviews/{id}` |
+| 成果库 | `/artifacts` | `pages/artifacts/ArtifactList.vue` | `/api/artifacts` |
+| 成果详情 | `/artifacts/:adoptedId` | `pages/artifacts/ArtifactDetail.vue` | `/api/artifacts/{id}` |
+| 统计看板 | `/statistics` | `pages/statistics/StatisticsDashboard.vue` | `/api/statistics/*` |
+| 模型管理 | `/models` | `pages/models/index.vue` | `/api/ai-models` |
+| 错误页 | `/404`、`/403` | `pages/error/*.vue` | — |
+
+> **注**：当前所有 AI 模型调用使用 Mock 机制，返回模拟数据。扩展真实模型 API 时仅需实现 `ModelAdapter` 接口，无需修改前端或后端业务代码。
+
+### Apifox Mock API 清理状态
+
+- [x] 已移除 `.env.production` 中的 Apifox Mock 地址
+- [x] 已移除 `.env.staging` 中的 Apifox Mock 地址
+- [x] 已移除 `vite.config.ts` 中的 mock 反向代理配置
+- [x] 所有环境变量中的 API 地址均指向本项目 FastAPI 后端
+
+### 本阶段未包含的内容
+
+以下内容不在本阶段范围内：
+
+- 真实 AI 模型 API 接入（当前使用 Mock）
+- 前端 E2E 测试
+- CI/CD 自动化测试流水线
+- Docker 容器化部署
+
+### 本地 Node 环境说明
+
+- 前端构建验证需要本地 Node 18+ 环境
+- 当前开发环境如无 Node，部分前端功能截图需在本地 Windows 环境补做
 
 ## 目录结构
 

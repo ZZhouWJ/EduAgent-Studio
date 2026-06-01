@@ -83,7 +83,7 @@ const flowSteps = [
       </template>
       <el-alert type="info" :closable="false" show-icon>
         <template #title>
-          统计数据将在后续阶段接入。当前统计看板将展示项目总数、任务总数、AI 调用次数、审核通过率等维度数据。
+          统计看板数据由后端接口实时提供，涵盖项目、任务、审核、调用成本、成员贡献等多个维度。首次登录时数据为空属正常现象，随着系统使用，数据将逐渐丰富。
         </template>
       </el-alert>
     </el-card>
