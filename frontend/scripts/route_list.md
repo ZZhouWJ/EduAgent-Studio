@@ -14,12 +14,12 @@
 | 2 | `/dashboard` | 首页 | `pages/dashboard/index.vue` | 统计概览、流程卡片 | `GET /api/statistics/overview` |
 | 3 | `/projects` | 项目空间列表 | `pages/projects/index.vue` | 项目列表、创建项目弹窗 | `GET /api/projects`<br>`POST /api/projects`<br>`DELETE /api/projects/{id}` |
 | 4 | `/projects/:projectId` | 项目详情 | `pages/projects/ProjectDetail.vue` | 成员列表、任务列表、成果列表 | `GET /api/projects/{id}`<br>`GET /api/projects/{id}/members`<br>`GET /api/projects/{id}/tasks` |
-| 5 | `/tasks` | 任务列表 | `pages/tasks/index.vue` | 全局任务列表、搜索过滤 | `GET /api/tasks` |
+| 5 | `/tasks` | 任务列表入口 | `pages/tasks/index.vue` | 全局任务列表入口，引导至项目空间查看详情 | 从项目详情进入；任务详情：`GET /api/tasks/{id}` |
 | 6 | `/tasks/:taskId` | 任务详情 | `pages/tasks/TaskDetail.vue` | 分支、版本、AI生成面板、编辑、批注 | `GET /api/tasks/{id}`<br>`GET /api/tasks/{id}/branches`<br>`GET /api/tasks/{id}/outputs`<br>`POST /api/tasks/{id}/generate`<br>`GET /api/outputs/{id}/comments` |
 | 7 | `/reviews` | 审核中心列表 | `pages/reviews/index.vue` | 待审核列表、审核统计 | `GET /api/reviews/pending` |
 | 8 | `/reviews/:requestId` | 审核详情 | `pages/reviews/ReviewDetail.vue` | 输出内容查看、评分弹窗、提交审核 | `GET /api/reviews/{id}`<br>`POST /api/reviews/{id}/complete`<br>`GET /api/issue-tags` |
-| 9 | `/artifacts` | 成果库列表 | `pages/artifacts/ArtifactList.vue` | 所有已采用成果列表 | `GET /api/artifacts` |
-| 10 | `/artifacts/:adoptedId` | 成果详情 | `pages/artifacts/ArtifactDetail.vue` | 成果完整内容展示 | `GET /api/artifacts/{id}` |
+| 9 | `/artifacts` | 成果库列表 | `pages/artifacts/ArtifactList.vue` | 所有已采用成果列表（按项目查询） | `GET /api/projects/{project_id}/artifacts` |
+| 10 | `/artifacts/:adoptedId` | 成果详情 | `pages/artifacts/ArtifactDetail.vue` | 成果完整内容展示 | `GET /api/artifacts/{adopted_id}` |
 | 11 | `/statistics` | 统计看板 | `pages/statistics/StatisticsDashboard.vue` | 多维度统计图表 | `GET /api/statistics/overview`<br>`GET /api/statistics/projects`<br>`GET /api/statistics/model-calls`<br>`GET /api/statistics/costs`<br>`GET /api/statistics/reviews`<br>`GET /api/statistics/member-contributions`<br>`GET /api/statistics/recent-activities` |
 | 12 | `/models` | 模型管理 | `pages/models/index.vue` | 供应商、模型、API配置管理 | `GET /api/model-providers`<br>`GET /api/ai-models`<br>`GET /api/api-configs` |
 | 13 | `/404` | 404 错误页 | `pages/error/404.vue` | 路由未匹配 | — |

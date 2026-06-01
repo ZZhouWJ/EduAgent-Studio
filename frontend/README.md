@@ -156,12 +156,12 @@ Stage-17 已完成前端全部核心业务模块，包括：
 | 首页 | `/dashboard` | `pages/dashboard/index.vue` | `/api/statistics/overview` |
 | 项目空间 | `/projects` | `pages/projects/index.vue` | `/api/projects` |
 | 项目详情 | `/projects/:projectId` | `pages/projects/ProjectDetail.vue` | `/api/projects/{id}` |
-| 任务与版本 | `/tasks` | `pages/tasks/index.vue` | `/api/tasks` |
-| 任务详情 | `/tasks/:taskId` | `pages/tasks/TaskDetail.vue` | `/api/tasks/{id}` |
+| 任务与版本 | `/tasks` | `pages/tasks/index.vue` | 任务列表入口（从项目详情进入）；任务详情：`GET /api/tasks/{id}` |
+| 任务详情 | `/tasks/:taskId` | `pages/tasks/TaskDetail.vue` | 分支/版本/生成/批注相关接口 |
 | 审核中心 | `/reviews` | `pages/reviews/index.vue` | `/api/reviews/pending` |
 | 审核详情 | `/reviews/:requestId` | `pages/reviews/ReviewDetail.vue` | `/api/reviews/{id}` |
-| 成果库 | `/artifacts` | `pages/artifacts/ArtifactList.vue` | `/api/artifacts` |
-| 成果详情 | `/artifacts/:adoptedId` | `pages/artifacts/ArtifactDetail.vue` | `/api/artifacts/{id}` |
+| 成果库 | `/artifacts` | `pages/artifacts/ArtifactList.vue` | `/api/projects/{project_id}/artifacts` |
+| 成果详情 | `/artifacts/:adoptedId` | `pages/artifacts/ArtifactDetail.vue` | `/api/artifacts/{adopted_id}` |
 | 统计看板 | `/statistics` | `pages/statistics/StatisticsDashboard.vue` | `/api/statistics/*` |
 | 模型管理 | `/models` | `pages/models/index.vue` | `/api/ai-models` |
 | 错误页 | `/404`、`/403` | `pages/error/*.vue` | — |
@@ -217,14 +217,14 @@ frontend/
     │   ├── modes/          # 布局模式
     │   └── config.ts
     ├── pages/              # 页面组件
-    │   ├── dashboard/      # 首页（已替换为业务内容）
-    │   ├── projects/       # 项目空间（占位）
-    │   ├── tasks/          # 任务管理（占位）
-    │   ├── reviews/         # 审核中心（占位）
-    │   ├── artifacts/       # 成果库（占位）
-    │   ├── statistics/      # 统计看板（占位）
-    │   ├── models/          # 模型管理（占位）
-    │   ├── login/           # 登录页（已适配后端接口）
+    │   ├── dashboard/      # 首页
+    │   ├── projects/       # 项目空间
+    │   ├── tasks/          # 任务与版本
+    │   ├── reviews/        # 审核中心
+    │   ├── artifacts/       # 成果库
+    │   ├── statistics/     # 统计看板
+    │   ├── models/         # 模型管理
+    │   ├── login/          # 登录页
     │   ├── error/           # 错误页
     │   └── redirect/        # 重定向页
     ├── pinia/               # 状态管理（来自模板）

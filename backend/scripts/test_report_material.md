@@ -72,8 +72,8 @@
 | TC-023 | 审核中心 | 完成审核 | `curl -X POST /api/reviews/1/complete -H "Authorization: Bearer $TOKEN" -d '{"review_status":"approved","accuracy_score":9,"completeness_score":8,"logic_score":9,"format_score":8,"usability_score":9,"risk_score":1,"review_comment":"可用","issue_tag_ids":[]}'` | 返回 `{"code":0,"message":"success","data":{request_id,...}}` |
 | TC-024 | 成果库 | 项目成果列表 | `curl http://localhost:8000/api/projects/1/artifacts -H "Authorization: Bearer $TOKEN"` | 返回 `{"code":0,"message":"success","data":[{adopted_id,title,...}]}` |
 | TC-025 | 成果库 | 采用输出为成果 | `curl -X POST /api/outputs/1/adopt -H "Authorization: Bearer $TOKEN" -d '{"artifact_title":"最终报告","artifact_type":"document","release_version":"v1.0","adopt_note":"采用"}'` | 返回 `{"code":0,"message":"success","data":{adopted_id,...}}` |
-| TC-026 | 统计看板 | 统计概览 | `curl http://localhost:8000/api/statistics/overview -H "Authorization: Bearer $TOKEN"` | 返回 `{"code":0,"message":"success","data":{total_projects,...}}` |
-| TC-027 | 统计看板 | 成员贡献统计 | `curl http://localhost:8000/api/statistics/member-contributions -H "Authorization: Bearer $TOKEN"` | 返回 `{"code":0,"message":"success","data":[{user_id,contribution_count,...}]}` |
+| TC-026 | 统计看板 | 统计概览 | `curl http://localhost:8000/api/statistics/overview -H "Authorization: Bearer $TOKEN"` | 返回 `{"code":0,"message":"success","data":{"project_count":...,"active_project_count":...,"task_count":...,"pending_review_count":...,"invocation_count":...,"success_invocation_count":...,"artifact_count":...,"total_tokens":...,"total_cost":...}}` |
+| TC-027 | 统计看板 | 成员贡献统计 | `curl http://localhost:8000/api/statistics/member-contributions -H "Authorization: Bearer $TOKEN"` | 返回 `{"code":0,"message":"success","data":[{user_id,real_name,project_count,task_created_count,task_assigned_count,output_created_count,review_count,artifact_adopted_count,invocation_count}]}` |
 
 > **注**：所有接口测试均需先通过 `/api/auth/login` 获取有效 Token，并在后续请求的 `Authorization` Header 中携带 `Bearer $TOKEN`。密码使用占位符 `<PLACEHOLDER_PASSWORD>`，实际执行时请替换为真实密码。**当前环境无法连接 MySQL，TC-011 及 TC-012 之后所有涉及数据库读写的用例均需在 Windows MySQL 可连接环境中执行，待补充截图。**
 
@@ -532,6 +532,6 @@ curl http://localhost:8000/api/statistics/overview \
 
 ---
 
-*本文档版本：v1.2 | 生成日期：2026-06-01 | 适用于 AI 协作审核系统课程报告*
+*本文档版本：v1.3 | 生成日期：2026-06-01 | 适用于 AI 协作审核系统课程报告*
 
-> **Stage-17 更新说明（v1.2）**：本文档测试用例与步骤说明已与 Stage-17 最终交付物保持一致。所有测试用例使用 `title`（非 `task_name`）和 `task_type_id`（非 `task_type`）作为创建任务字段。系统无 `/api/auth/register` 接口。统一返回格式为 `code:0`。前端所有业务模块（审核中心、成果库、统计看板、模型管理）均已完整实现，前端截图可在本地 Node 环境下补做。
+> **Stage-17 FIX 说明（v1.3）**：修正了 TC-026 统计概览预期字段（`total_projects` → `project_count`/`active_project_count`/`task_count`/`invocation_count`/`success_invocation_count`/`artifact_count`/`total_tokens`/`total_cost`）和 TC-027 成员贡献预期字段（`contribution_count` → `project_count`/`task_created_count`/`task_assigned_count`/`output_created_count`/`review_count`/`artifact_adopted_count`/`invocation_count`）。所有测试用例使用 `title`（非 `task_name`）和 `task_type_id`（非 `task_type`）作为创建任务字段。系统无 `/api/auth/register` 接口。统一返回格式为 `code:0`。
