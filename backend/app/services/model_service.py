@@ -49,7 +49,8 @@ def list_providers(
 ) -> List[Dict[str, Any]]:
     """查询模型供应商列表（已登录用户均可查看）。"""
     _require_auth(token)
-    return model_repo.list_providers(status=status)
+    rows = model_repo.list_providers(status=status)
+    return [_provider_row_to_dict(r) for r in rows]
 
 
 def create_provider(
@@ -307,6 +308,13 @@ def _model_row_to_dict(row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         "provider_name": row.get("provider_name"),
         "provider_code": row.get("provider_code"),
     }
+
+
+def _provider_row_to_dict(row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """对供应商行数据做浅拷贝，直接返回（数据已是正确编码）。"""
+    if row is None:
+        return {}
+    return dict(row)
 
 
 def _api_config_row_to_dict(row: Optional[Dict[str, Any]]) -> Dict[str, Any]:

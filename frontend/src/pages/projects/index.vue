@@ -1,165 +1,167 @@
-<script lang="ts" setup>
-import { ref, reactive } from "vue"
+<script setup lang="ts">
+import { ref, onMounted } from "vue"
 import { useRouter } from "vue-router"
-import { getProjectListApi, createProjectApi } from "@/common/apis/projects"
-import type { Project, CreateProjectRequestData, ProjectListParams } from "@/common/apis/projects/type"
+import { ElMessage } from "element-plus"
+import { projectsApi } from "@/api/projects"
 
 const router = useRouter()
+
 const loading = ref(false)
-const projectList = ref<Project[]>([])
+const projects = ref<any[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
 const keyword = ref("")
-const selectedStatus = ref("")
+const statusFilter = ref("")
 
 const createDialogVisible = ref(false)
 const createLoading = ref(false)
-const createFormRef = ref()
-
-const createForm = reactive<CreateProjectRequestData>({
+const createForm = ref({
   project_name: "",
   project_type: "course_project",
   description: ""
 })
 
-const projectTypeOptions = [
+const projectTypes = [
   { label: "课程项目", value: "course_project" },
   { label: "科研项目", value: "research_project" },
   { label: "竞赛项目", value: "competition_project" },
-  { label: "企业实习", value: "internship_project" },
-  { label: "毕业设计", value: "graduation_project" },
-  { label: "其他", value: "other" }
+  { label: "企业项目", value: "enterprise_project" }
 ]
 
 const statusOptions = [
-  { label: "进行中", value: "active", type: "success" },
-  { label: "已归档", value: "archived", type: "info" },
-  { label: "已暂停", value: "suspended", type: "warning" }
+  { label: "全部状态", value: "" },
+  { label: "活跃", value: "active" },
+  { label: "已完成", value: "completed" },
+  { label: "已归档", value: "archived" }
 ]
 
-const createFormRules = {
-  project_name: [{ required: true, message: "请输入项目名称", trigger: "blur" }],
-  project_type: [{ required: true, message: "请选择项目类型", trigger: "change" }]
-}
+onMounted(() => {
+  loadProjects()
+})
 
-function getStatusType(status: string) {
-  const map: Record<string, string> = {
-    active: "success",
-    archived: "info",
-    suspended: "warning",
-    deleted: "danger"
-  }
-  return map[status] || "info"
-}
-
-function getStatusLabel(status: string) {
-  const map: Record<string, string> = {
-    active: "进行中",
-    archived: "已归档",
-    suspended: "已暂停",
-    deleted: "已删除"
-  }
-  return map[status] || status
-}
-
-async function fetchProjects() {
+async function loadProjects() {
   loading.value = true
   try {
-    const params: ProjectListParams = {
+    const res = await projectsApi.list({
       page: page.value,
-      page_size: pageSize.value
-    }
-    if (keyword.value) params.keyword = keyword.value
-    if (selectedStatus.value) params.status = selectedStatus.value
-
-    const res = await getProjectListApi(params)
-    projectList.value = res.data.items || []
+      page_size: pageSize.value,
+      keyword: keyword.value || undefined,
+      status: statusFilter.value || undefined
+    })
+    projects.value = res.data.items || []
     total.value = res.data.total || 0
   } catch {
-    // error shown by axios interceptor
+    projects.value = []
+    total.value = 0
   } finally {
     loading.value = false
   }
 }
 
-async function handleCreate() {
-  if (!createFormRef.value) return
-  try {
-    const valid = await createFormRef.value.validate()
-    if (!valid) return
+function onSearch() {
+  page.value = 1
+  loadProjects()
+}
 
-    createLoading.value = true
-    await createProjectApi(createForm)
+function onPageChange(p: number) {
+  page.value = p
+  loadProjects()
+}
+
+function onPageSizeChange(s: number) {
+  pageSize.value = s
+  page.value = 1
+  loadProjects()
+}
+
+function goDetail(row: any) {
+  router.push(`/projects/${row.project_id}`)
+}
+
+function getStatusType(status: string) {
+  const map: Record<string, string> = {
+    active: "success",
+    completed: "info",
+    archived: "warning",
+    suspended: "danger"
+  }
+  return map[status] || ""
+}
+
+function getStatusLabel(status: string) {
+  const map: Record<string, string> = {
+    active: "活跃",
+    completed: "已完成",
+    archived: "已归档",
+    suspended: "已停用"
+  }
+  return map[status] || status
+}
+
+function getTypeLabel(type: string) {
+  const map: Record<string, string> = {
+    course_project: "课程项目",
+    research_project: "科研项目",
+    competition_project: "竞赛项目",
+    enterprise_project: "企业项目"
+  }
+  return map[type] || type
+}
+
+async function handleCreate() {
+  if (!createForm.value.project_name.trim()) {
+    ElMessage.warning("请输入项目名称")
+    return
+  }
+  createLoading.value = true
+  try {
+    await projectsApi.create(createForm.value)
     ElMessage.success("项目创建成功")
     createDialogVisible.value = false
-    createForm.project_name = ""
-    createForm.project_type = "course_project"
-    createForm.description = ""
-    fetchProjects()
+    createForm.value = { project_name: "", project_type: "course_project", description: "" }
+    loadProjects()
   } catch {
-    // error shown by axios interceptor
+    // error handled by interceptor
   } finally {
     createLoading.value = false
   }
 }
 
-function handleSearch() {
-  page.value = 1
-  fetchProjects()
+function openCreateDialog() {
+  createForm.value = { project_name: "", project_type: "course_project", description: "" }
+  createDialogVisible.value = true
 }
 
-function handleReset() {
-  keyword.value = ""
-  selectedStatus.value = ""
-  page.value = 1
-  fetchProjects()
+function formatDate(dateStr: string) {
+  return dateStr ? new Date(dateStr).toLocaleString("zh-CN") : "-"
 }
-
-function handlePageChange(newPage: number) {
-  page.value = newPage
-  fetchProjects()
-}
-
-function handleSizeChange(newSize: number) {
-  pageSize.value = newSize
-  page.value = 1
-  fetchProjects()
-}
-
-function goToDetail(project: Project) {
-  router.push(`/projects/${project.project_id}`)
-}
-
-fetchProjects()
 </script>
 
 <template>
-  <div class="project-list-page">
-    <div class="page-header">
-      <div class="header-left">
-        <h2 class="page-title">项目空间</h2>
-        <span class="page-desc">管理所有参与的项目</span>
-      </div>
-      <el-button type="primary" @click="createDialogVisible = true">
-        <el-icon style="margin-right: 4px"><Plus /></el-icon>
-        新建项目
-      </el-button>
+  <div class="page-container" style="padding: 20px">
+    <div class="page-header" style="margin-bottom: 16px">
+      <h1 class="page-title">项目空间</h1>
+      <p class="page-desc">管理所有项目空间，查看成员和任务</p>
     </div>
 
-    <el-card class="filter-card">
-      <el-form :inline="true" @submit.prevent="handleSearch">
-        <el-form-item label="关键词">
+    <el-card>
+      <!-- 搜索和操作栏 -->
+      <div class="toolbar">
+        <div class="toolbar-left">
           <el-input
             v-model="keyword"
             placeholder="搜索项目名称"
+            style="width: 220px"
             clearable
-            style="width: 200px"
-            @keyup.enter="handleSearch"
-          />
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="selectedStatus" placeholder="全部状态" clearable style="width: 140px">
+            @clear="onSearch"
+            @keyup.enter="onSearch"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+          <el-select v-model="statusFilter" placeholder="状态" style="width: 140px" clearable @change="onSearch">
             <el-option
               v-for="opt in statusOptions"
               :key="opt.value"
@@ -167,112 +169,86 @@ fetchProjects()
               :value="opt.value"
             />
           </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="handleReset">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
+          <el-button type="primary" @click="onSearch">
+            <el-icon><Search /></el-icon> 搜索
+          </el-button>
+        </div>
+        <div class="toolbar-right">
+          <el-button type="primary" @click="openCreateDialog">
+            <el-icon><Plus /></el-icon> 新建项目
+          </el-button>
+        </div>
+      </div>
 
-    <el-card class="table-card">
-      <el-table
-        v-loading="loading"
-        :data="projectList"
-        stripe
-        style="width: 100%"
-        @row-click="(row) => goToDetail(row)"
-      >
-        <el-table-column type="index" label="序号" width="60" align="center" />
-        <el-table-column prop="project_name" label="项目名称" min-width="200" show-overflow-tooltip>
+      <!-- 表格 -->
+      <el-table v-loading="loading" :data="projects" stripe @row-click="goDetail" style="cursor: pointer; margin-top: 12px">
+        <el-table-column prop="project_name" label="项目名称" min-width="180" />
+        <el-table-column prop="project_type" label="类型" width="120">
           <template #default="{ row }">
-            <el-link type="primary" :underline="false" @click.stop="goToDetail(row)">
-              {{ row.project_name }}
-            </el-link>
+            <el-tag size="small">{{ getTypeLabel(row.project_type) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="project_type" label="项目类型" width="120" align="center">
-          <template #default="{ row }">
-            <el-tag size="small">
-              {{ projectTypeOptions.find(t => t.value === row.project_type)?.label || row.project_type }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="status" label="状态" width="100" align="center">
+        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)" size="small">
               {{ getStatusLabel(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="owner_real_name" label="负责人" width="120" align="center">
+        <el-table-column prop="owner_real_name" label="创建人" width="120" />
+        <el-table-column prop="created_at" label="创建时间" width="170">
           <template #default="{ row }">
-            {{ row.owner_real_name || row.owner_username || "-" }}
+            {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="170" align="center">
+        <el-table-column label="操作" width="90" fixed="right">
           <template #default="{ row }">
-            {{ row.created_at ? new Date(row.created_at).toLocaleString("zh-CN") : "-" }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="80" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="primary" size="small" @click.stop="goToDetail(row)">
-              查看
+            <el-button type="primary" size="small" link @click.stop="goDetail(row)">
+              详情
             </el-button>
           </template>
         </el-table-column>
-        <template #empty>
-          <el-empty description="暂无项目，点击右上角" />
-        </template>
       </el-table>
 
-      <div class="pagination-wrapper">
+      <el-empty v-if="!loading && projects.length === 0" description="暂无项目数据" />
+
+      <!-- 分页 -->
+      <div class="pagination-wrap" v-if="total > 0">
         <el-pagination
           v-model:current-page="page"
           v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50]"
           :total="total"
+          :page-sizes="[10, 20, 50]"
           layout="total, sizes, prev, pager, next"
-          @current-change="handlePageChange"
-          @size-change="handleSizeChange"
+          @current-change="onPageChange"
+          @size-change="onPageSizeChange"
         />
       </div>
     </el-card>
 
-    <el-dialog
-      v-model="createDialogVisible"
-      title="新建项目"
-      width="500px"
-      :close-on-click-modal="false"
-      @closed="createFormRef?.resetFields()"
-    >
-      <el-form
-        ref="createFormRef"
-        :model="createForm"
-        :rules="createFormRules"
-        label-width="90px"
-      >
-        <el-form-item label="项目名称" prop="project_name">
+    <!-- 新建项目弹窗 -->
+    <el-dialog v-model="createDialogVisible" title="新建项目" width="520px" destroy-on-close>
+      <el-form :model="createForm" label-width="100px">
+        <el-form-item label="项目名称" required>
           <el-input v-model="createForm.project_name" placeholder="请输入项目名称" maxlength="100" show-word-limit />
         </el-form-item>
-        <el-form-item label="项目类型" prop="project_type">
-          <el-select v-model="createForm.project_type" placeholder="请选择项目类型" style="width: 100%">
+        <el-form-item label="项目类型" required>
+          <el-select v-model="createForm.project_type" style="width: 100%">
             <el-option
-              v-for="opt in projectTypeOptions"
-              :key="opt.value"
-              :label="opt.label"
-              :value="opt.value"
+              v-for="t in projectTypes"
+              :key="t.value"
+              :label="t.label"
+              :value="t.value"
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="项目描述" prop="description">
+        <el-form-item label="项目描述">
           <el-input
             v-model="createForm.description"
             type="textarea"
             :rows="3"
-            placeholder="请输入项目描述（选填）"
+            placeholder="请输入项目描述（可选）"
             maxlength="500"
             show-word-limit
           />
@@ -286,53 +262,36 @@ fetchProjects()
   </div>
 </template>
 
-<style lang="scss" scoped>
-.project-list-page {
-  padding: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
+<script lang="ts">
+import { Search, Plus } from "@element-plus/icons-vue"
+export default { components: { Search, Plus } }
+</script>
 
-.page-header {
+<style scoped>
+.toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
-.header-left {
+.toolbar-left {
   display: flex;
-  align-items: baseline;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.page-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: #1e3a5f;
-  margin: 0;
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.page-desc {
-  font-size: 13px;
-  color: #909399;
-}
-
-.filter-card {
-  margin-bottom: 16px;
-}
-
-.table-card {
-  margin-bottom: 16px;
-}
-
-.pagination-wrapper {
+.pagination-wrap {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
-}
-
-:deep(.el-table__row) {
-  cursor: pointer;
 }
 </style>

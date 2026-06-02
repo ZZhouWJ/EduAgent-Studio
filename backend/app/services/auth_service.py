@@ -1,13 +1,14 @@
 """
 认证 Service 层。
 
-处理登录、登出、Token 生成与解析。
+处理登录、登出、Token 生成与解析、用户注册。
 """
 
 from typing import Any, Dict, Optional
 
 from app.repositories import user_repo
-from app.utils.password import verify_password
+from app.utils.exceptions import ConflictException, UnauthorizedException, ValidationException
+from app.utils.password import hash_password, verify_password
 from app.utils.token import create_access_token, decode_access_token
 
 
@@ -164,3 +165,138 @@ def logout(
         ip_address=ip_address,
         user_agent=user_agent,
     )
+
+
+def register(
+    username: str,
+    password: str,
+    confirm_password: str,
+    real_name: str,
+    student_no: Optional[str] = None,
+    email: Optional[str] = None,
+    phone: Optional[str] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    用户注册（事务保证 users/user_roles/operation_logs 原子性）。
+
+    流程：
+    1. 校验两次密码一致
+    2. 校验参数（username 非空，password 至少 6 字符）
+    3. 检查用户名是否已存在
+    4. bcrypt 哈希密码
+    5. 在同一事务内：创建用户 -> 分配默认角色 -> 写入操作日志
+    6. 事务失败整体回滚
+
+    Args:
+        username: 用户名
+        password: 明文密码（至少 6 字符）
+        confirm_password: 确认密码（必须与 password 一致）
+        real_name: 真实姓名
+        student_no: 学号（可选）
+        email: 邮箱（可选）
+        phone: 手机号（可选）
+        ip_address: 客户端 IP
+        user_agent: 客户端 UA
+
+    Returns:
+        新用户信息（不含 password_hash）
+    """
+    if password != confirm_password:
+        raise ValidationException(message="两次输入的密码不一致")
+
+    if not username or not username.strip():
+        raise ValidationException(message="用户名不能为空")
+
+    if not password or len(password) < 6:
+        raise ValidationException(message="密码至少需要 6 个字符")
+
+    if not real_name or not real_name.strip():
+        raise ValidationException(message="真实姓名不能为空")
+
+    username = username.strip()
+    real_name = real_name.strip()
+
+    if user_repo.check_username_exists(username):
+        raise ConflictException(message="用户名已存在")
+
+    password_hash = hash_password(password)
+
+    from app.database import get_db_transaction
+    with get_db_transaction() as conn:
+        user_id = user_repo.create_user_with_conn(
+            conn=conn,
+            username=username,
+            password_hash=password_hash,
+            real_name=real_name,
+            student_no=(student_no.strip() if student_no else None),
+            email=(email.strip() if email else None),
+            phone=(phone.strip() if phone else None),
+            created_by=None,
+        )
+
+        user_repo.assign_default_role_with_conn(conn=conn, user_id=user_id)
+
+        user_repo.insert_operation_log_with_conn(
+            conn=conn,
+            user_id=user_id,
+            action_type="register",
+            action_desc=f"用户注册: {username}",
+            target_type="user",
+            target_id=user_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+
+    return {
+        "user_id": user_id,
+        "username": username,
+        "real_name": real_name,
+        "student_no": student_no,
+        "email": email,
+        "phone": phone,
+    }
+
+
+def update_password(
+    token: str,
+    old_password: str,
+    new_password: str,
+) -> None:
+    """
+    更新当前用户密码。
+
+    流程：
+    1. 解析 token 获取当前用户
+    2. 校验旧密码
+    3. 新密码至少 6 字符
+    4. 哈希新密码并更新
+
+    Args:
+        token: 当前用户的 JWT token
+        old_password: 旧密码
+        new_password: 新密码（至少 6 字符）
+
+    Raises:
+        UnauthorizedException: token 无效或过期
+        ValidationException: 旧密码错误或新密码不符合要求
+    """
+    user = get_current_user(token)
+    if user is None:
+        raise UnauthorizedException(message="未登录或登录已过期，请重新登录")
+
+    user_id = user["user_id"]
+
+    user_record = user_repo.get_user_by_id_with_password(user_id)
+    if user_record is None:
+        raise UnauthorizedException(message="用户不存在")
+
+    if not verify_password(old_password, user_record["password_hash"]):
+        raise ValidationException(message="旧密码错误")
+
+    if not new_password or len(new_password) < 6:
+        raise ValidationException(message="新密码至少需要 6 个字符")
+
+    new_hash = hash_password(new_password)
+    user_repo.update_password(user_id, new_hash)

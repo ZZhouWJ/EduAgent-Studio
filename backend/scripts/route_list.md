@@ -1,7 +1,7 @@
 # API 路由清单
 
 > 本文档由脚本自动生成，基于 `backend/app/routers/` 目录下所有路由文件的分析。
-> 最后更新时间：2026-05-31
+> 最后更新时间：2026-06-02
 
 ---
 
@@ -21,14 +21,27 @@
 | Method | Path | 函数名 | 功能说明 | 权限 |
 |--------|------|--------|----------|------|
 | POST | /api/auth/login | `login` | 用户登录，返回 token 和用户信息 | 公开 |
+| POST | /api/auth/register | `register` | 用户注册（bcrypt 哈希，分配 student_member 角色） | 公开 |
 | GET | /api/auth/me | `get_me` | 获取当前登录用户信息 | 登录用户 |
+| PUT | /api/auth/me/password | `update_my_password` | 修改当前用户密码 | 登录用户 |
 | POST | /api/auth/logout | `logout` | 用户登出 | 登录用户 |
 
 ### 用户与权限（/api）
 
 | Method | Path | 函数名 | 功能说明 | 权限 |
 |--------|------|--------|----------|------|
-| GET | /api/users | `list_users` | 获取用户列表（分页+搜索） | 管理员 |
+| GET | /api/users | `list_users` | 获取用户列表（分页+搜索+状态过滤） | 管理员 |
+| PUT | /api/users/{id}/status | `update_user_status` | 启用/禁用用户 | 管理员 |
+| PUT | /api/users/{id}/roles | `update_user_roles` | 分配用户角色 | 管理员 |
+| GET | /api/roles | `list_roles` | 获取角色列表 | 登录用户 |
+| GET | /api/permissions | `list_permissions` | 获取权限列表 | 登录用户 |
+
+### 日志（/api/logs）
+
+| Method | Path | 函数名 | 功能说明 | 权限 |
+|--------|------|--------|----------|------|
+| GET | /api/logs/operation | `list_operation_logs` | 操作日志（分页+多条件过滤） | 登录用户 |
+| GET | /api/logs/login | `list_login_logs` | 登录日志（分页+多条件过滤） | 登录用户 |
 | GET | /api/roles | `list_roles` | 获取角色列表 | 登录用户 |
 | GET | /api/permissions | `list_permissions` | 获取权限列表 | 登录用户 |
 
@@ -90,8 +103,7 @@
 | GET | /api/outputs/{output_id} | `get_output_detail` | 获取输出版本详情（含完整 content） | 登录用户（需有权限） |
 | PUT | /api/outputs/{output_id} | `update_output` | 使用乐观锁更新输出版本 | 登录用户（需有权限） |
 | GET | /api/outputs/{output_id}/timeline | `get_output_timeline` | 获取输出版本时间线（基于 parent_output_id） | 登录用户（需有权限） |
-| POST | /api/outputs/{output_id}/save-as | `save_output_as` | 基于已有输出另存为新版本（兼容路径） | 登录用户（需有权限） |
-| POST | /api/outputs/{output_id}/save-as-new-version | `save_output_as_new_version` | 基于已有输出另存为新版本（验收指定路径） | 登录用户（需有权限） |
+| POST | /api/outputs/{output_id}/save-as-new-version | `save_output_as_new_version` | 将当前输出另存为新版本 | 登录用户（需有权限） |
 | POST | /api/outputs/{output_id}/adopt | `adopt_output` | 采用输出作为项目成果 | 登录用户（需有权限） |
 | POST | /api/outputs/{output_id}/submit-review | `submit_for_review` | 提交输出到审核 | 登录用户（需有权限） |
 

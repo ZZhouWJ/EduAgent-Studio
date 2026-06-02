@@ -2,37 +2,43 @@
 
 ## 当前阶段
 
-Stage-11 统计看板与课程展示数据模块：**Codex 审查不通过，已发布 `TASK-011-FIX-statistics-dashboard.md`，等待 Cursor 修复。**
+**最终验收准备。**
 
-Stage-10 成果库与分支合并模块已通过 Fix R2 复审。
+Stage-01 到 Stage-17 已完成开发、审查、修复复审与最终收尾文档复审。`REVIEW-017-FIX-R2-final-polish-run-report.md` 已确认最后一个旧接口文档残留问题修复完成。
 
-## Stage-11 审查结果摘要
+## 阶段完成标记
 
-- Python 语法检查通过；
-- 7 个统计接口已实现并注册；
-- 阻塞问题 1：`statistics_repo.py` 引用了不存在的 `ai_invocations.is_deleted`；
-- 阻塞问题 2：成员贡献统计引用了不存在的 `task_outputs.project_id`；
-- 阻塞问题 3：项目统计返回字段缺少 `member_count`、`task_count`、`output_count`、`approved_output_count`、`invocation_count`、`total_cost` 等验收字段；
-- 阻塞问题 4：模型调用统计缺少 `call_count` 字段；
-- 阻塞问题 5：非 admin 无 project_id 时，成员贡献统计只返回当前用户本人，不符合项目成员贡献排行场景；
-- 暂不允许进入 Stage-12。
+- 后端阶段完成：Stage-01 到 Stage-12 已完成并通过对应审查/复审。
+- 前端阶段完成：Stage-13 到 Stage-16 已完成并通过对应审查/复审。
+- 文档与截图素材完成：Stage-17 已完成最终润色、运行说明、API 路由清单、截图清单、最终检查清单和课程报告素材整理。
+- 当前进入最终验收准备。
+- 仍需在本地 Windows MySQL + Node 环境补做实际运行截图和联调验证。
 
 ## 当前技术栈
 
-- 前端：Vue3 + Vite + Element Plus + Pinia + Vue Router + ECharts
-- 后端：Python FastAPI
-- 数据库：MySQL 8.0
-- 数据库访问：参数化 SQL / Repository 层
-- 模型调用：Mock ModelAdapter + 可选真实模型 API
+- 前端：Vue3 + Vite + TypeScript + Element Plus + Pinia + Vue Router + ECharts，基于 V3 Admin Vite 开源模板二次开发；
+- 后端：Python FastAPI；
+- 数据库：MySQL 8.0；
+- 数据库访问：参数化 SQL / Repository 层；
+- 模型调用：Mock ModelAdapter，支持模型调用日志与成本记录；
+- 文档材料：README、API 路由清单、测试报告素材、截图清单、最终检查清单已整理。
 
-## 当前任务
+## 最终验收前待补做
 
-- `TASK-011-FIX-statistics-dashboard.md`：修复统计看板与课程展示数据模块审查问题
+1. 在 Windows MySQL 环境按顺序执行：
+   - `database/01_create_database.sql`
+   - `database/02_create_tables.sql`
+   - `database/03_create_indexes.sql`
+   - `database/04_insert_initial_data.sql`
+   - `database/05_create_views.sql`
+   - `database/06_create_stored_procedures.sql`
+   - `database/07_test_queries.sql`
+2. 在本地 Python 环境安装后端依赖并启动 FastAPI；
+3. 在本地 Node 环境安装前端依赖并执行构建；
+4. 联调登录、项目、任务、AI 生成、编辑批注、审核、成果库、统计看板等关键路径；
+5. 按截图清单补齐课程报告所需截图；
+6. 将本地实际运行结果补入系统测试与结果分析材料。
 
-## 未完成内容
+## 环境限制说明
 
-- Windows MySQL 环境下补做 Stage-01 SQL 顺序导入验证
-- Stage-02/Stage-03/Stage-04/Stage-05/Stage-06/Stage-07/Stage-08/Stage-09/Stage-10/Stage-11 后端服务运行级验证和接口 curl 验证
-- Stage-11 Fix 复审
-- Stage-12 后端整体联调、运行验证与课程报告素材整理
-
+远程 Ubuntu / WSL 环境当前无法直接访问 Windows MySQL，也缺少 Node 运行环境，因此远程审查阶段主要完成静态审查、后端 py_compile 和文档一致性检查。最终运行截图与接口联调验证需要在本地 Windows MySQL + Node 环境补做。

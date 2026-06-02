@@ -75,6 +75,20 @@
 | TC-026 | 统计看板 | 统计概览 | `curl http://localhost:8000/api/statistics/overview -H "Authorization: Bearer $TOKEN"` | 返回 `{"code":0,"message":"success","data":{"project_count":...,"active_project_count":...,"task_count":...,"pending_review_count":...,"invocation_count":...,"success_invocation_count":...,"artifact_count":...,"total_tokens":...,"total_cost":...}}` |
 | TC-027 | 统计看板 | 成员贡献统计 | `curl http://localhost:8000/api/statistics/member-contributions -H "Authorization: Bearer $TOKEN"` | 返回 `{"code":0,"message":"success","data":[{user_id,real_name,project_count,task_created_count,task_assigned_count,output_created_count,review_count,artifact_adopted_count,invocation_count}]}` |
 
+| TC-028 | 统计看板 | 模型调用统计 | `curl http://localhost:8000/api/statistics/model-calls -H "Authorization: Bearer $TOKEN"` | 返回 `{"code":0,"message":"success","data":[{model_id:...,model_name:...,call_count:...}]}` |
+| TC-029 | 统计看板 | 成本统计 | `curl http://localhost:8000/api/statistics/costs -H "Authorization: Bearer $TOKEN"` | 返回 `{"code":0,"message":"success","data":{total_cost:...,input_cost:...,output_cost:...}}` |
+| TC-030 | 统计看板 | 审核质量统计 | `curl http://localhost:8000/api/statistics/reviews -H "Authorization: Bearer $TOKEN"` | 返回 `{"code":0,"message":"success","data":{review_count:...,approved_count:...,avg_accuracy_score:...}}` |
+| TC-031 | 统计看板 | 最近操作动态 | `curl http://localhost:8000/api/statistics/recent-activities -H "Authorization: Bearer $TOKEN"` | 返回 `{"code":0,"message":"success","data":[{log_id:...,action_type:...,action_desc:...}]}` |
+| TC-032 | 审核中心 | 待审核列表（过滤） | `curl http://localhost:8000/api/reviews/pending?project_id=1 -H "Authorization: Bearer $TOKEN"` | 返回 `{"code":0,"message":"success","data":[{request_id:...}]}` |
+| TC-033 | 审核中心 | 审核详情 | `curl http://localhost:8000/api/reviews/1 -H "Authorization: Bearer $TOKEN"` | 返回 `{"code":0,"message":"success","data":{request_id:...,content:...}}` |
+| TC-034 | 审核中心 | 问题标签列表 | `curl http://localhost:8000/api/issue-tags -H "Authorization: Bearer $TOKEN"` | 返回 `{"code":0,"message":"success","data":[{tag_id:...}]}` |
+| TC-035 | 审核中心 | 完成审核-通过 | `curl -X POST /api/reviews/1/complete -H "Authorization: Bearer $TOKEN" -d '{"review_status":"approved","accuracy_score":9,"completeness_score":8,"logic_score":9,"format_score":8,"usability_score":9,"risk_score":1,"review_comment":"可用","issue_tag_ids":[1]}'` | 返回 `{"code":0,"message":"success"}` |
+| TC-036 | 审核中心 | 完成审核-拒绝 | `curl -X POST /api/reviews/1/complete -H "Authorization: Bearer $TOKEN" -d '{"review_status":"rejected","review_comment":"不合格","issue_tag_ids":[]}'` | 返回 `{"code":0,"message":"success"}` |
+| TC-037 | 任务分支 | 分支列表 | `curl http://localhost:8000/api/tasks/1/branches -H "Authorization: Bearer $TOKEN"` | 返回 `{"code":0,"message":"success","data":[{branch_id:...}]}` |
+| TC-038 | 任务分支 | 分支合并 | `curl -X POST /api/tasks/1/branches/merge -H "Authorization: Bearer $TOKEN" -d '{"source_branch_id":1,"target_branch_id":2,"merge_strategy":"adopt_source","source_output_id":1}'` | 返回 `{"code":0,"message":"success"}` |
+| TC-039 | 输出详情 | 输出时间线 | `curl http://localhost:8000/api/outputs/1/timeline -H "Authorization: Bearer $TOKEN"` | 返回 `{"code":0,"message":"success","data":[{output_id:...}]}` |
+| TC-040 | 输出详情 | 输出批注列表 | `curl http://localhost:8000/api/outputs/1/comments -H "Authorization: Bearer $TOKEN"` | 返回 `{"code":0,"message":"success","data":[{comment_id:...}]}` |
+| TC-041 | 输出详情 | 新增批注 | `curl -X POST /api/outputs/1/comments -H "Authorization: Bearer $TOKEN" -d '{"comment_type":"comment","comment_text":"内容准确"}'` | 返回 `{"code":0,"message":"success"}` |
 > **注**：所有接口测试均需先通过 `/api/auth/login` 获取有效 Token，并在后续请求的 `Authorization` Header 中携带 `Bearer $TOKEN`。密码使用占位符 `<PLACEHOLDER_PASSWORD>`，实际执行时请替换为真实密码。**当前环境无法连接 MySQL，TC-011 及 TC-012 之后所有涉及数据库读写的用例均需在 Windows MySQL 可连接环境中执行，待补充截图。**
 
 ---

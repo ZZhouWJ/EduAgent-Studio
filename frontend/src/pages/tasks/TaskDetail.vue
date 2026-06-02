@@ -1,1125 +1,916 @@
-<script lang="ts" setup>
+<script setup lang="ts">
 import { ref, onMounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
-import {
-  getTaskDetailApi,
-  getTaskBranchesApi,
-  getTaskOutputsApi,
-  getOutputDetailApi,
-  getOutputTimelineApi,
-  generateTaskOutputApi,
-  updateOutputApi,
-  saveOutputAsNewVersionApi,
-  getOutputCommentsApi,
-  createOutputCommentApi,
-  updateCommentStatusApi
-} from "@/common/apis/tasks"
-import { adoptOutputApi } from "@/common/apis/artifacts"
-import { mergeTaskBranchesApi } from "@/common/apis/artifacts"
-import { getModelListApi } from "@/common/apis/models"
-import { getTemplateListApi, getTemplateVersionsApi } from "@/common/apis/prompts"
-import type {
-  Task,
-  TaskBranch,
-  TaskOutput,
-  OutputTimeline,
-  OutputComment,
-  GenerateResultItem
-} from "@/common/apis/tasks/type"
-import type { AIModel } from "@/common/apis/models/type"
-import type { PromptTemplate, PromptVersion } from "@/common/apis/prompts/type"
-import type { MergeBranchesRequestData } from "@/common/apis/artifacts/type"
+import { ArrowLeft, Cpu, ChatLineSquare, CircleCheck, Collection, View, Edit, CopyDocument } from "@element-plus/icons-vue"
+import { ElMessage } from "element-plus"
+import { tasksApi } from "@/api/tasks"
+import { modelsApi } from "@/api/models"
 
 const route = useRoute()
 const router = useRouter()
 const taskId = Number(route.params.taskId)
 
-// ─── Base Data ────────────────────────────────────────────────────────────────
-
 const loading = ref(false)
-const task = ref<Partial<Task>>({})
-const branches = ref<TaskBranch[]>([])
-const outputs = ref<TaskOutput[]>([])
+const task = ref<any>(null)
+const branches = ref<any[]>([])
+const outputs = ref<any[]>([])
 
-// ─── AI Generation ──────────────────────────────────────────────────────────────
-
-const genDialogVisible = ref(false)
-const genLoading = ref(false)
-const genResults = ref<GenerateResultItem[]>([])
-
-const modelList = ref<AIModel[]>([])
-const templateList = ref<PromptTemplate[]>([])
-const versionList = ref<PromptVersion[]>([])
+// AI 生成相关
+const generateDialogVisible = ref(false)
+const generateLoading = ref(false)
+const aiModels = ref<any[]>([])
 const modelsLoading = ref(false)
-const templatesLoading = ref(false)
-const versionsLoading = ref(false)
-
-const genFormRef = ref()
-
-/** 统一表单对象，所有 v-model 和 rules 都绑定此对象 */
-const genForm = ref({
+const generateForm = ref({
+  branch_id: undefined as number | undefined,
   model_ids: [] as number[],
-  branch_id: null as number | null,
-  template_id: null as number | null,
-  prompt_version_id: null as number | null,
+  prompt_version_id: undefined as number | undefined,
   input_text: ""
 })
+const generateResult = ref<any[]>([])
 
-const genRules = {
-  model_ids: [
-    {
-      type: "array",
-      required: true,
-      message: "请至少选择一个模型",
-      trigger: "change"
-    }
-  ],
-  input_text: [
-    { required: true, message: "请输入生成内容描述", trigger: "blur" }
-  ]
-}
+// 输出详情抽屉
+const outputDrawerVisible = ref(false)
+const outputDrawerLoading = ref(false)
+const currentOutput = ref<any>(null)
 
-async function loadModels() {
-  modelsLoading.value = true
-  try {
-    const res = await getModelListApi({ page: 1, page_size: 100 })
-    modelList.value = res.data.items || []
-  } catch { /* shown by interceptor */ }
-  finally { modelsLoading.value = false }
-}
-
-async function loadTemplates(taskTypeId?: number) {
-  templatesLoading.value = true
-  genForm.value.prompt_version_id = null
-  versionList.value = []
-  try {
-    const params: Record<string, unknown> = { page: 1, page_size: 100 }
-    if (taskTypeId) params.task_type_id = taskTypeId
-    const res = await getTemplateListApi(params as Record<string, string | number>)
-    templateList.value = res.data.items || []
-  } catch { /* shown by interceptor */ }
-  finally { templatesLoading.value = false }
-}
-
-async function onTemplateChange(templateId: number) {
-  versionsLoading.value = true
-  try {
-    const res = await getTemplateVersionsApi(templateId)
-    versionList.value = res.data || []
-  } catch { /* shown by interceptor */ }
-  finally { versionsLoading.value = false }
-}
-
-function openGenDialog() {
-  genDialogVisible.value = true
-  genResults.value = []
-  genForm.value = {
-    model_ids: [],
-    branch_id: branches.value.length > 0 ? branches.value[0].branch_id : null,
-    template_id: null,
-    prompt_version_id: null,
-    input_text: task.value.description || ""
-  }
-  versionList.value = []
-  loadModels()
-  loadTemplates(task.value.task_type_id)
-}
-
-async function handleGenerate() {
-  if (!genFormRef.value) return
-  try {
-    const valid = await genFormRef.value.validate()
-    if (!valid) return
-
-    genLoading.value = true
-    genResults.value = []
-    const res = await generateTaskOutputApi(taskId, {
-      model_ids: genForm.value.model_ids,
-      branch_id: genForm.value.branch_id || undefined,
-      prompt_version_id: genForm.value.prompt_version_id || undefined,
-      input_text: genForm.value.input_text
-    })
-    genResults.value = res.data || []
-
-    const allSuccess = genResults.value.every(r => r.status === "success")
-    if (allSuccess) {
-      ElMessage.success("AI 生成完成，请在输出版本列表查看结果")
-      await fetchOutputs()
-    } else {
-      const failed = genResults.value.filter(r => r.status !== "success")
-      if (failed.length === genResults.value.length) {
-        ElMessage.error("所有模型均生成失败")
-      } else {
-        ElMessage.warning(`${failed.length} 个模型生成失败，请查看结果`)
-      }
-    }
-  } catch (err: unknown) {
-    const code = (err as Record<string, unknown>)?.code as number | undefined
-    if (code === 4004) {
-      ElMessage.error("版本已被修改，请刷新后重试")
-    }
-  } finally {
-    genLoading.value = false
-  }
-}
-
-// ─── Output Detail + Comments ─────────────────────────────────────────────────
-
-const detailDialogVisible = ref(false)
-const detailLoading = ref(false)
-const outputDetail = ref<Partial<TaskOutput>>({})
-const outputTimeline = ref<OutputTimeline[]>([])
-
-const comments = ref<OutputComment[]>([])
-const commentsLoading = ref(false)
-const commentFormRef = ref()
-const commentForm = ref({
-  comment_type: "comment" as "comment" | "suggestion" | "approval",
-  comment_text: ""
-})
-const commentRules = {
-  comment_type: [{ required: true, message: "请选择批注类型", trigger: "change" }],
-  comment_text: [{ required: true, message: "请输入批注内容", trigger: "blur" }]
-}
-const commentLoading = ref(false)
-
-async function viewOutputDetail(output: TaskOutput) {
-  detailDialogVisible.value = true
-  detailLoading.value = true
-  outputDetail.value = { ...output }
-  outputTimeline.value = []
-  comments.value = []
-  try {
-    const [detailRes, timelineRes] = await Promise.all([
-      getOutputDetailApi(output.output_id),
-      getOutputTimelineApi(output.output_id)
-    ])
-    outputDetail.value = { ...detailRes.data }
-    outputTimeline.value = timelineRes.data || []
-    loadComments(output.output_id)
-  } catch { /* shown by interceptor */ }
-  finally { detailLoading.value = false }
-}
-
-async function loadComments(outputId: number) {
-  commentsLoading.value = true
-  try {
-    const res = await getOutputCommentsApi(outputId)
-    comments.value = res.data || []
-  } catch { /* shown by interceptor */ }
-  finally { commentsLoading.value = false }
-}
-
-async function handleAddComment() {
-  if (!commentFormRef.value || !outputDetail.value.output_id) return
-  try {
-    const valid = await commentFormRef.value.validate()
-    if (!valid) return
-    commentLoading.value = true
-    await createOutputCommentApi(outputDetail.value.output_id, {
-      comment_type: commentForm.value.comment_type,
-      comment_text: commentForm.value.comment_text
-    })
-    ElMessage.success("批注已添加")
-    commentForm.value.comment_type = "comment"
-    commentForm.value.comment_text = ""
-    loadComments(outputDetail.value.output_id)
-  } catch { /* shown by interceptor */ }
-  finally { commentLoading.value = false }
-}
-
-async function handleUpdateCommentStatus(comment: OutputComment, newStatus: "open" | "resolved" | "closed") {
-  try {
-    await updateCommentStatusApi(comment.comment_id, { status: newStatus })
-    ElMessage.success("批注状态已更新")
-    if (outputDetail.value.output_id) loadComments(outputDetail.value.output_id)
-  } catch { /* shown by interceptor */ }
-}
-
-// ─── Output Edit Dialog ───────────────────────────────────────────────────────
-
+// 输出编辑弹窗
 const editDialogVisible = ref(false)
-const editFormRef = ref()
 const editLoading = ref(false)
 const editForm = ref({
   content: "",
   lock_version: 0,
   edit_summary: ""
 })
-const editRules = {
-  content: [{ required: true, message: "内容不能为空", trigger: "blur" }],
-  lock_version: [{ required: true, message: "版本锁缺失，请刷新后重试", trigger: "blur" }],
-  edit_summary: [{ required: true, message: "请填写修改说明", trigger: "blur" }]
+
+// 批注相关
+const commentDialogVisible = ref(false)
+const commentLoading = ref(false)
+const commentForm = ref({
+  comment_type: "comment" as "comment" | "suggestion" | "approval",
+  comment_text: ""
+})
+const comments = ref<any[]>([])
+const commentsLoading = ref(false)
+
+// 提交审核
+const reviewDialogVisible = ref(false)
+const reviewLoading = ref(false)
+const reviewForm = ref({
+  reviewer_id: undefined as number | undefined,
+  submit_note: ""
+})
+
+// 采用成果
+const adoptDialogVisible = ref(false)
+const adoptLoading = ref(false)
+const adoptForm = ref({
+  artifact_title: "",
+  artifact_type: "course_report",
+  release_version: "",
+  adopt_note: ""
+})
+
+// 另存为新版本
+const saveAsDialogVisible = ref(false)
+const saveAsLoading = ref(false)
+const saveAsForm = ref({
+  output_title: "",
+  content: "",
+  edit_summary: "",
+  branch_id: undefined as number | undefined
+})
+
+const artifactTypes = [
+  { label: "课程报告", value: "course_report" },
+  { label: "数据库设计", value: "db_design" },
+  { label: "文献综述", value: "literature_review" },
+  { label: "实验报告", value: "experiment_report" },
+  { label: "项目提案", value: "proposal" },
+  { label: "其他", value: "other" }
+]
+
+const commentTypes = [
+  { label: "一般意见", value: "comment" },
+  { label: "建议", value: "suggestion" },
+  { label: "审批意见", value: "approval" }
+]
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    const [taskRes, branchesRes, outputsRes] = await Promise.all([
+      tasksApi.getById(taskId),
+      tasksApi.getBranches(taskId),
+      tasksApi.getOutputs(taskId)
+    ])
+    task.value = taskRes.data
+    branches.value = branchesRes.data || []
+    outputs.value = outputsRes.data || []
+  } catch {
+    // error handled
+  } finally {
+    loading.value = false
+  }
+})
+
+// AI 生成
+async function openGenerateDialog() {
+  generateForm.value = {
+    branch_id: branches.value.find(b => b.status === "active")?.branch_id,
+    model_ids: [],
+    prompt_version_id: undefined,
+    input_text: task.value?.description || ""
+  }
+  generateResult.value = []
+  generateDialogVisible.value = true
+  await loadModels()
 }
 
-function openEditDialog() {
-  editFormRef.value?.resetFields()
-  editForm.value.content = outputDetail.value.content || ""
-  editForm.value.lock_version = outputDetail.value.lock_version || 0
-  editForm.value.edit_summary = ""
+async function loadModels() {
+  modelsLoading.value = true
+  try {
+    const res = await modelsApi.getModels({ status: "active", page_size: 100 })
+    aiModels.value = res.data?.items || []
+  } catch {
+    aiModels.value = []
+  } finally {
+    modelsLoading.value = false
+  }
+}
+
+async function handleGenerate() {
+  if (generateForm.value.model_ids.length === 0) {
+    ElMessage.warning("请至少选择一个 AI 模型")
+    return
+  }
+  if (!generateForm.value.input_text.trim()) {
+    ElMessage.warning("请输入生成提示词")
+    return
+  }
+  generateLoading.value = true
+  try {
+    const res = await tasksApi.generate(taskId, {
+      branch_id: generateForm.value.branch_id,
+      model_ids: generateForm.value.model_ids,
+      prompt_version_id: generateForm.value.prompt_version_id,
+      input_text: generateForm.value.input_text
+    })
+    generateResult.value = res.data || []
+    const outputsRes = await tasksApi.getOutputs(taskId)
+    outputs.value = outputsRes.data || []
+    ElMessage.success(`生成完成，共 ${generateResult.value.length} 条结果`)
+  } catch {
+    // error handled
+  } finally {
+    generateLoading.value = false
+  }
+}
+
+// 查看输出详情
+async function viewOutput(outputId: number) {
+  outputDrawerLoading.value = true
+  outputDrawerVisible.value = true
+  currentOutput.value = null
+  try {
+    const res = await tasksApi.getOutputById(outputId)
+    currentOutput.value = res.data
+  } catch {
+    outputDrawerVisible.value = false
+  } finally {
+    outputDrawerLoading.value = false
+  }
+  // 同时加载批注
+  commentsLoading.value = true
+  try {
+    const res = await tasksApi.getOutputComments(outputId)
+    comments.value = res.data || []
+  } catch {
+    comments.value = []
+  } finally {
+    commentsLoading.value = false
+  }
+}
+
+// 编辑输出
+function openEditDialog(output: any) {
+  currentOutput.value = output
+  editForm.value = {
+    content: output.content || "",
+    lock_version: output.lock_version || 0,
+    edit_summary: ""
+  }
+  outputDrawerVisible.value = false
   editDialogVisible.value = true
 }
 
-async function handleEditSave() {
-  if (!editFormRef.value || !outputDetail.value.output_id) return
+async function handleEditOutput() {
+  if (!editForm.value.content.trim()) {
+    ElMessage.warning("内容不能为空")
+    return
+  }
+  if (!editForm.value.edit_summary.trim()) {
+    ElMessage.warning("请填写修改说明")
+    return
+  }
+  editLoading.value = true
   try {
-    const valid = await editFormRef.value.validate()
-    if (!valid) return
-    editLoading.value = true
-    await updateOutputApi(outputDetail.value.output_id, {
-      content: editForm.value.content,
-      lock_version: editForm.value.lock_version,
-      edit_summary: editForm.value.edit_summary
-    })
-    ElMessage.success("保存成功")
+    await tasksApi.updateOutput(currentOutput.value.output_id, editForm.value)
+    ElMessage.success("输出已更新")
     editDialogVisible.value = false
-    await refreshDetail()
-    await fetchOutputs()
-  } catch (err: unknown) {
-    const code = (err as Record<string, unknown>)?.code as number | undefined
-    if (code === 4004) {
-      ElMessage.error("当前内容已被其他成员修改，请刷新后重新编辑，或另存为新版本。")
-    }
+    const outputsRes = await tasksApi.getOutputs(taskId)
+    outputs.value = outputsRes.data || []
+  } catch {
+    // error handled
   } finally {
     editLoading.value = false
   }
 }
 
-// ─── Save As New Version Dialog ───────────────────────────────────────────────
-
-const saveAsDialogVisible = ref(false)
-const saveAsFormRef = ref()
-const saveAsLoading = ref(false)
-const saveAsForm = ref({
-  output_title: "",
-  content: "",
-  edit_summary: ""
-})
-const saveAsRules = {
-  output_title: [{ required: true, message: "请输入版本标题", trigger: "blur" }],
-  content: [{ required: true, message: "内容不能为空", trigger: "blur" }]
-}
-
-function openSaveAsDialog() {
-  saveAsFormRef.value?.resetFields()
-  saveAsForm.value.output_title = `${outputDetail.value.output_title || "新版本"}`
-  saveAsForm.value.content = outputDetail.value.content || ""
-  saveAsForm.value.edit_summary = ""
+// 另存为新版本
+function openSaveAsDialog(output: any) {
+  currentOutput.value = output
+  saveAsForm.value = {
+    output_title: output.output_title || "",
+    content: output.content || "",
+    edit_summary: "",
+    branch_id: output.branch_id
+  }
+  outputDrawerVisible.value = false
+  editDialogVisible.value = false
   saveAsDialogVisible.value = true
 }
 
-async function handleSaveAs() {
-  if (!saveAsFormRef.value || !outputDetail.value.output_id) return
+async function handleSaveAsNewVersion() {
+  if (!saveAsForm.value.output_title.trim()) {
+    ElMessage.warning("请输入输出标题")
+    return
+  }
+  if (!saveAsForm.value.content.trim()) {
+    ElMessage.warning("内容不能为空")
+    return
+  }
+  if (!currentOutput.value) return
+  saveAsLoading.value = true
   try {
-    const valid = await saveAsFormRef.value.validate()
-    if (!valid) return
-    saveAsLoading.value = true
-    const res = await saveOutputAsNewVersionApi(outputDetail.value.output_id, {
+    const res = await tasksApi.saveAsNewVersion(currentOutput.value.output_id, {
       output_title: saveAsForm.value.output_title,
       content: saveAsForm.value.content,
       edit_summary: saveAsForm.value.edit_summary,
-      branch_id: outputDetail.value.branch_id || undefined
+      branch_id: saveAsForm.value.branch_id
     })
-    ElMessage.success(`新版本 v${res.data?.version_no} 已创建`)
+    ElMessage.success("新版本已保存")
     saveAsDialogVisible.value = false
-    await fetchOutputs()
-    if (res.data?.output_id) {
-      const newOutput: TaskOutput = { ...outputDetail.value, ...res.data } as TaskOutput
-      await viewOutputDetail(newOutput)
+    const outputsRes = await tasksApi.getOutputs(taskId)
+    outputs.value = outputsRes.data || []
+    const newOutputId = res.data?.output_id
+    if (newOutputId) {
+      await viewOutput(newOutputId)
     }
-  } catch { /* shown by interceptor */ }
-  finally { saveAsLoading.value = false }
-}
-
-// ─── Adopt Output Dialog ──────────────────────────────────────────────────────
-
-const adoptDialogVisible = ref(false)
-const adoptFormRef = ref()
-const adoptLoading = ref(false)
-const adoptForm = ref({
-  artifact_title: "",
-  artifact_type: "",
-  release_version: "v1.0",
-  adopt_note: ""
-})
-const adoptRules = {
-  artifact_title: [{ required: true, message: "请输入成果标题", trigger: "blur" }],
-  artifact_type: [{ required: true, message: "请选择成果类型", trigger: "change" }]
-}
-
-function openAdoptDialog() {
-  adoptFormRef.value?.resetFields()
-  adoptForm.value = {
-    artifact_title: outputDetail.value.output_title || "",
-    artifact_type: "",
-    release_version: "v1.0",
-    adopt_note: ""
+  } catch {
+    // error handled
+  } finally {
+    saveAsLoading.value = false
   }
-  adoptDialogVisible.value = true
 }
 
+// 添加批注
+async function handleAddComment() {
+  if (!commentForm.value.comment_text.trim()) {
+    ElMessage.warning("请输入批注内容")
+    return
+  }
+  if (!currentOutput.value) return
+  commentLoading.value = true
+  try {
+    await tasksApi.addComment(currentOutput.value.output_id, commentForm.value)
+    ElMessage.success("批注已添加")
+    commentForm.value = { comment_type: "comment", comment_text: "" }
+    const res = await tasksApi.getOutputComments(currentOutput.value.output_id)
+    comments.value = res.data || []
+  } catch {
+    // error handled
+  } finally {
+    commentLoading.value = false
+  }
+}
+
+// 更新批注状态
+async function updateCommentStatus(commentId: number, status: string) {
+  try {
+    await tasksApi.updateCommentStatus(commentId, status as any)
+    ElMessage.success("批注状态已更新")
+    if (currentOutput.value) {
+      const res = await tasksApi.getOutputComments(currentOutput.value.output_id)
+      comments.value = res.data || []
+    }
+  } catch {
+    // error handled
+  }
+}
+
+// 提交审核
+async function handleSubmitReview() {
+  if (!currentOutput.value) return
+  reviewLoading.value = true
+  try {
+    const res = await tasksApi.submitReview(currentOutput.value.output_id, {
+      reviewer_id: reviewForm.value.reviewer_id,
+      submit_note: reviewForm.value.submit_note
+    })
+    ElMessage.success(`提交审核成功，请求 ID: ${res.data.request_id}`)
+    reviewDialogVisible.value = false
+    const outputsRes = await tasksApi.getOutputs(taskId)
+    outputs.value = outputsRes.data || []
+  } catch {
+    // error handled
+  } finally {
+    reviewLoading.value = false
+  }
+}
+
+// 采用成果
 async function handleAdopt() {
-  if (!adoptFormRef.value || !outputDetail.value.output_id) return
+  if (!adoptForm.value.artifact_title.trim()) {
+    ElMessage.warning("请输入成果标题")
+    return
+  }
+  if (!currentOutput.value) return
+  adoptLoading.value = true
   try {
-    const valid = await adoptFormRef.value.validate()
-    if (!valid) return
-    adoptLoading.value = true
-    await adoptOutputApi(outputDetail.value.output_id, adoptForm.value)
-    ElMessage.success("成果采用成功")
+    const res = await tasksApi.adoptOutput(currentOutput.value.output_id, adoptForm.value)
+    ElMessage.success(`成果采用成功，成果 ID: ${res.data.adopted_id}`)
     adoptDialogVisible.value = false
-    await fetchTask()
-  } catch { /* shown by interceptor */ }
-  finally { adoptLoading.value = false }
+    const outputsRes = await tasksApi.getOutputs(taskId)
+    outputs.value = outputsRes.data || []
+  } catch {
+    // error handled
+  } finally {
+    adoptLoading.value = false
+  }
 }
 
-// ─── Branch Merge Dialog ──────────────────────────────────────────────────────
-
-const mergeDialogVisible = ref(false)
-const mergeFormRef = ref()
-const mergeLoading = ref(false)
-const mergeForm = ref<MergeBranchesRequestData>({
-  source_branch_id: 0,
-  target_branch_id: 0,
-  source_output_id: undefined,
-  target_output_id: undefined,
-  merge_strategy: "manual_merge",
-  merged_output_title: "",
-  merged_content: "",
-  merge_note: ""
-})
-const mergeRules = {
-  merge_strategy: [{ required: true, message: "请选择合并策略", trigger: "change" }],
-  source_branch_id: [{ required: true, message: "请选择源分支", trigger: "change" }],
-  target_branch_id: [{ required: true, message: "请选择目标分支", trigger: "change" }],
-  merged_output_title: [{ required: true, message: "请输入新版本标题", trigger: "blur" }],
-  merged_content: [{ required: true, message: "请输入合并内容", trigger: "blur" }]
-}
-
-function openMergeDialog() {
-  mergeFormRef.value?.resetFields()
-  const activeBranches = branches.value.filter(b => b.status === "active")
-  mergeForm.value = {
-    source_branch_id: activeBranches.length > 0 ? activeBranches[0].branch_id : (branches.value[0]?.branch_id || 0),
-    target_branch_id: activeBranches.length > 1 ? activeBranches[1].branch_id : (branches.value[1]?.branch_id || 0),
-    source_output_id: undefined,
-    target_output_id: undefined,
-    merge_strategy: "manual_merge",
-    merged_output_title: "",
-    merged_content: "",
-    merge_note: ""
-  }
-  mergeDialogVisible.value = true
-}
-
-async function handleMerge() {
-  if (!mergeFormRef.value) return
-  if (mergeForm.value.source_branch_id === mergeForm.value.target_branch_id) {
-    ElMessage.warning("源分支和目标分支不能相同")
-    return
-  }
-  if (mergeForm.value.merge_strategy === "adopt_source" && !mergeForm.value.source_output_id) {
-    ElMessage.warning("采用源分支策略必须选择源输出")
-    return
-  }
-  if (mergeForm.value.merge_strategy === "adopt_target" && !mergeForm.value.target_output_id) {
-    ElMessage.warning("采用目标分支策略必须选择目标输出")
-    return
-  }
-  if (mergeForm.value.merge_strategy === "manual_merge") {
-    if (!mergeForm.value.merged_output_title?.trim()) {
-      ElMessage.warning("手动合并策略必须填写新版本标题")
-      return
-    }
-    if (!mergeForm.value.merged_content?.trim()) {
-      ElMessage.warning("手动合并策略必须填写合并内容")
-      return
-    }
-  }
-  if (mergeForm.value.merge_strategy === "adopt_separately") {
-    if (!mergeForm.value.source_output_id && !mergeForm.value.target_output_id) {
-      ElMessage.warning("分别保留时至少需要选择一个输出版本")
-      return
-    }
-  }
-  try {
-    const valid = await mergeFormRef.value.validate()
-    if (!valid) return
-    mergeLoading.value = true
-    await mergeTaskBranchesApi(taskId, mergeForm.value)
-    ElMessage.success("分支合并成功")
-    mergeDialogVisible.value = false
-    await fetchTask()
-  } catch { /* shown by interceptor */ }
-  finally { mergeLoading.value = false }
-}
-
-// ─── Helpers ────────────────────────────────────────────────────────────────────
-
-async function refreshDetail() {
-  if (!outputDetail.value.output_id) return
-  try {
-    const res = await getOutputDetailApi(outputDetail.value.output_id)
-    outputDetail.value = { ...res.data }
-  } catch { /* shown by interceptor */ }
-}
-
-async function fetchOutputs() {
-  const res = await getTaskOutputsApi(taskId, { page: 1, page_size: 50 })
-  outputs.value = getOutputList(res.data)
-}
-
-function getOutputList(data: unknown): TaskOutput[] {
-  if (Array.isArray(data)) return data
-  const obj = data as Record<string, unknown>
-  if (obj && Array.isArray(obj.items)) return obj.items as TaskOutput[]
-  return []
+function formatDate(dateStr: string) {
+  return dateStr ? new Date(dateStr).toLocaleString("zh-CN") : "-"
 }
 
 function getStatusType(status: string) {
-  const m: Record<string, string> = {
-    draft: "info", pending: "info", running: "primary", in_progress: "primary",
-    generated: "success", submitted: "warning", approved: "success",
-    rejected: "danger", revision_required: "warning", adopted: "success", deleted: "info"
+  const map: Record<string, string> = {
+    draft: "info",
+    generated: "primary",
+    submitted: "warning",
+    approved: "success",
+    rejected: "danger",
+    revision_required: "danger",
+    adopted: "success",
+    conflict_pending: "warning"
   }
-  return m[status] || "info"
-}
-
-function getStatusLabel(status: string) {
-  const m: Record<string, string> = {
-    draft: "草稿", pending: "待处理", running: "进行中", in_progress: "进行中",
-    generated: "已生成", submitted: "已提交", approved: "已通过",
-    rejected: "已拒绝", revision_required: "需修改", adopted: "已采用", deleted: "已删除"
-  }
-  return m[status] || status
-}
-
-function getPriorityTagType(p: string) {
-  return { high: "danger", normal: "primary", low: "info" }[p] || "info"
-}
-
-function getPriorityLabel(p: string) {
-  return { high: "高", normal: "中", low: "低" }[p] || p
-}
-
-function getSourceTypeLabel(type: string) {
-  return { ai_generated: "AI 生成", manual: "人工编辑" }[type] || type
+  return map[status] || ""
 }
 
 function getCommentTypeLabel(type: string) {
-  return { comment: "批注", suggestion: "修改建议", approval: "审核意见" }[type] || type
+  const map: Record<string, string> = {
+    comment: "一般意见",
+    suggestion: "建议",
+    approval: "审批意见"
+  }
+  return map[type] || type
 }
 
-function getCommentStatusLabel(status: string) {
-  return { open: "待处理", resolved: "已解决", closed: "已关闭" }[status] || status
+function getCommentTypeTag(type: string) {
+  const map: Record<string, string> = {
+    comment: "",
+    suggestion: "warning",
+    approval: "success"
+  }
+  return map[type] || ""
 }
 
 function getCommentStatusType(status: string) {
-  return { open: "warning", resolved: "success", closed: "info" }[status] || "info"
+  const map: Record<string, string> = {
+    open: "",
+    resolved: "success",
+    closed: "info"
+  }
+  return map[status] || ""
 }
-
-function getGenStatusType(status: string) {
-  return status === "success" ? "success" : "danger"
-}
-
-function getModelDisplayName(modelId: number) {
-  const m = modelList.value.find(m => m.model_id === modelId)
-  return m?.display_name || m?.model_name || `模型 #${modelId}`
-}
-
-async function fetchTask() {
-  loading.value = true
-  try {
-    const [taskRes, branchesRes, outputsRes] = await Promise.all([
-      getTaskDetailApi(taskId),
-      getTaskBranchesApi(taskId),
-      getTaskOutputsApi(taskId, { page: 1, page_size: 50 })
-    ])
-    task.value = taskRes.data
-    branches.value = branchesRes.data || []
-    outputs.value = getOutputList(outputsRes.data)
-  } catch { /* shown by interceptor */ }
-  finally { loading.value = false }
-}
-
-onMounted(fetchTask)
 </script>
 
 <template>
-  <div class="task-detail-page">
-    <div class="page-header">
-      <el-button text @click="$router.back()">
-        <el-icon style="margin-right: 4px"><ArrowLeft /></el-icon>
-        返回
+  <div class="page-container" style="padding: 20px">
+    <div class="page-header" style="margin-bottom: 16px">
+      <el-button text @click="router.push('/tasks')">
+        <el-icon><ArrowLeft /></el-icon> 返回任务列表
       </el-button>
-      <h2 class="page-title">{{ task.title || "任务详情" }}</h2>
+      <h1 class="page-title">{{ task?.title || "任务详情" }}</h1>
     </div>
 
-    <el-card v-loading="loading">
-      <el-tabs>
-        <!-- 基本信息 -->
-        <el-tab-pane label="基本信息">
-          <el-descriptions :column="2" border>
-            <el-descriptions-item label="所属项目" :span="2">
-              <el-link v-if="task.project_id" type="primary" :underline="false"
-                @click="router.push(`/projects/${task.project_id}`)">
-                {{ task.project_name || `项目 #${task.project_id}` }}
-              </el-link>
-              <span v-else>-</span>
+    <el-row :gutter="16" style="margin-bottom: 16px">
+      <!-- 左侧：任务信息 -->
+      <el-col :span="12">
+        <el-card v-loading="loading">
+          <template #header>
+            <span style="font-weight: 600">任务基本信息</span>
+          </template>
+          <el-descriptions :column="2" border size="small">
+            <el-descriptions-item label="任务ID">{{ task?.task_id }}</el-descriptions-item>
+            <el-descriptions-item label="状态">
+              <el-tag size="small">{{ task?.status }}</el-tag>
             </el-descriptions-item>
-            <el-descriptions-item label="任务标题" :span="2">{{ task.title || "-" }}</el-descriptions-item>
-            <el-descriptions-item label="任务类型">{{ task.type_name || "-" }}</el-descriptions-item>
-            <el-descriptions-item label="优先级">
-              <el-tag size="small" :type="getPriorityTagType(task.priority || '')">
-                {{ getPriorityLabel(task.priority || '') }}
-              </el-tag>
-            </el-descriptions-item>
-            <el-descriptions-item label="任务状态">
-              <el-tag size="small" :type="getStatusType(task.status || '')">
-                {{ getStatusLabel(task.status || '') }}
-              </el-tag>
-            </el-descriptions-item>
-            <el-descriptions-item label="负责人">
-              {{ task.assignee_real_name || task.assignee_username || "-" }}
-            </el-descriptions-item>
-            <el-descriptions-item label="截止时间">
-              {{ task.due_date ? new Date(task.due_date).toLocaleDateString("zh-CN") : "-" }}
-            </el-descriptions-item>
-            <el-descriptions-item label="创建人">
-              {{ task.creator_real_name || task.creator_username || "-" }}
-            </el-descriptions-item>
-            <el-descriptions-item label="创建时间">
-              {{ task.created_at ? new Date(task.created_at).toLocaleString("zh-CN") : "-" }}
-            </el-descriptions-item>
-            <el-descriptions-item label="任务描述" :span="2">
-              {{ task.description || "暂无描述" }}
-            </el-descriptions-item>
+            <el-descriptions-item label="任务标题" :span="2">{{ task?.title }}</el-descriptions-item>
+            <el-descriptions-item label="任务类型">{{ task?.type_name || task?.task_type_name || "-" }}</el-descriptions-item>
+            <el-descriptions-item label="优先级">{{ task?.priority }}</el-descriptions-item>
+            <el-descriptions-item label="负责人">{{ task?.assignee_real_name || "-" }}</el-descriptions-item>
+            <el-descriptions-item label="描述" :span="2">{{ task?.description || "-" }}</el-descriptions-item>
+            <el-descriptions-item label="创建时间" :span="2">{{ formatDate(task?.created_at) }}</el-descriptions-item>
           </el-descriptions>
-        </el-tab-pane>
+        </el-card>
+      </el-col>
 
-        <!-- 分支 -->
-        <el-tab-pane label="分支">
-          <div style="margin-bottom: 12px; text-align: right">
+      <!-- 右侧：AI 生成 -->
+      <el-col :span="12">
+        <el-card>
+          <template #header>
+            <span style="font-weight: 600">AI 生成</span>
+          </template>
+          <div class="generate-panel">
+            <el-alert
+              title="调用配置的 AI 模型为当前任务生成内容初稿，可选择多个模型对比效果"
+              type="info"
+              :closable="false"
+              style="margin-bottom: 16px"
+            />
             <el-button
-              v-if="branches.length >= 2"
-              type="warning"
-              size="small"
-              @click="openMergeDialog"
-            >分支合并</el-button>
-          </div>
-          <el-table :data="branches" stripe style="width: 100%">
-            <el-table-column type="index" label="序号" width="60" align="center" />
-            <el-table-column prop="branch_name" label="分支名称" min-width="180" />
-            <el-table-column prop="base_output_title" label="基准版本" width="180" show-overflow-tooltip>
-              <template #default="{ row }">{{ row.base_output_title || "-" }}</template>
-            </el-table-column>
-            <el-table-column prop="status" label="状态" width="100" align="center">
-              <template #default="{ row }">
-                <el-tag size="small" :type="getStatusType(row.status)">
-                  {{ getStatusLabel(row.status) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="creator_real_name" label="创建人" width="120" align="center">
-              <template #default="{ row }">{{ row.creator_real_name || row.creator_username || "-" }}</template>
-            </el-table-column>
-            <el-table-column prop="created_at" label="创建时间" width="170" align="center">
-              <template #default="{ row }">
-                {{ row.created_at ? new Date(row.created_at).toLocaleString("zh-CN") : "-" }}
-              </template>
-            </el-table-column>
-            <template #empty><el-empty description="暂无分支" /></template>
-          </el-table>
-        </el-tab-pane>
-
-        <!-- 输出版本 -->
-        <el-tab-pane label="输出版本">
-          <div style="margin-bottom: 12px; text-align: right">
-            <el-button type="primary" @click="openGenDialog">
-              <el-icon style="margin-right: 4px"><MagicStick /></el-icon>
-              AI 生成
+              type="primary"
+              size="large"
+              @click="openGenerateDialog"
+              style="width: 100%"
+            >
+              <el-icon><Cpu /></el-icon>
+              发起 AI 生成
             </el-button>
+            <p class="generate-tip">生成结果将出现在下方「输出版本」列表中</p>
           </div>
-          <el-table :data="outputs" stripe style="width: 100%" @row-click="(row) => viewOutputDetail(row)">
-            <el-table-column type="index" label="序号" width="60" align="center" />
-            <el-table-column prop="output_title" label="版本标题" min-width="180" show-overflow-tooltip>
-              <template #default="{ row }">
-                <el-link type="primary" :underline="false">
-                  {{ row.output_title || `版本 ${row.version_no}` }}
-                </el-link>
-              </template>
-            </el-table-column>
-            <el-table-column prop="version_no" label="版本号" width="80" align="center" />
-            <el-table-column prop="source_type" label="来源" width="100" align="center">
-              <template #default="{ row }">
-                <el-tag size="small" :type="row.source_type === 'ai_generated' ? 'primary' : 'success'">
-                  {{ getSourceTypeLabel(row.source_type) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="status" label="状态" width="100" align="center">
-              <template #default="{ row }">
-                <el-tag size="small" :type="getStatusType(row.status)">
-                  {{ getStatusLabel(row.status) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="creator_real_name" label="创建人" width="120" align="center">
-              <template #default="{ row }">{{ row.creator_real_name || row.creator_username || "-" }}</template>
-            </el-table-column>
-            <el-table-column prop="created_at" label="创建时间" width="170" align="center">
-              <template #default="{ row }">
-                {{ row.created_at ? new Date(row.created_at).toLocaleString("zh-CN") : "-" }}
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="80" align="center" fixed="right">
-              <template #default="{ row }">
-                <el-button link type="primary" size="small" @click.stop="viewOutputDetail(row)">查看</el-button>
-              </template>
-            </el-table-column>
-            <template #empty><el-empty description="暂无输出版本，点击「AI 生成」创建" /></template>
-          </el-table>
-        </el-tab-pane>
-      </el-tabs>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 分支信息 -->
+    <el-card v-if="branches.length > 0" style="margin-bottom: 16px">
+      <template #header>
+        <span style="font-weight: 600">分支列表</span>
+      </template>
+      <el-tag
+        v-for="b in branches"
+        :key="b.branch_id"
+        :type="b.status === 'active' ? 'success' : 'info'"
+        style="margin-right: 8px; margin-bottom: 4px"
+      >
+        {{ b.branch_name }} ({{ b.status }})
+      </el-tag>
     </el-card>
 
-    <!-- ─── AI Generation Dialog ─────────────────────────────────────────────── -->
-    <el-dialog
-      v-model="genDialogVisible"
-      title="AI 生成"
-      width="680px"
-      :close-on-click-modal="false"
-    >
-      <el-form ref="genFormRef" :model="genForm" :rules="genRules" label-width="100px">
-        <el-form-item label="选择模型" prop="model_ids">
-          <el-select
-            v-model="genForm.model_ids"
-            multiple
-            placeholder="请选择模型（可多选）"
-            style="width: 100%"
-            :loading="modelsLoading"
-            filterable
-          >
-            <el-option v-for="m in modelList" :key="m.model_id" :label="m.display_name" :value="m.model_id" />
-          </el-select>
-        </el-form-item>
+    <!-- 输出版本列表 -->
+    <el-card>
+      <template #header>
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <span style="font-weight: 600">输出版本列表</span>
+          <span style="font-size: 12px; color: #909399">{{ outputs.length }} 个版本</span>
+        </div>
+      </template>
+      <el-table :data="outputs" stripe v-loading="loading">
+        <el-table-column prop="version_no" label="版本号" width="90">
+          <template #default="{ row }">
+            <el-tag size="small">v{{ row.version_no }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="output_title" label="标题" min-width="200" />
+        <el-table-column prop="branch_name" label="分支" width="120" />
+        <el-table-column prop="source_type" label="来源" width="80" />
+        <el-table-column prop="status" label="状态" width="140">
+          <template #default="{ row }">
+            <el-tag size="small" :type="getStatusType(row.status)">{{ row.status }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="creator_username" label="创建人" width="100" />
+        <el-table-column prop="created_at" label="创建时间" width="170">
+          <template #default="{ row }">
+            {{ formatDate(row.created_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="220" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" size="small" link @click="viewOutput(row.output_id)">
+              <el-icon><View /></el-icon> 查看
+            </el-button>
+            <el-button
+              v-if="row.status !== 'adopted'"
+              type="warning"
+              size="small"
+              link
+              @click="openEditDialog(row)"
+            >
+              <el-icon><Edit /></el-icon> 编辑
+            </el-button>
+            <el-button
+              v-if="row.status === 'approved'"
+              type="success"
+              size="small"
+              link
+              @click="() => { currentOutput = row; adoptDialogVisible = true }"
+            >
+              <el-icon><Collection /></el-icon> 采用
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-if="!loading && outputs.length === 0" description="暂无输出，请先点击「发起 AI 生成」" />
+    </el-card>
 
-        <el-form-item label="提示词模板">
-          <el-select
-            v-model="genForm.template_id"
-            placeholder="选择模板（可选）"
-            style="width: 100%"
-            :loading="templatesLoading"
-            clearable
-            @change="(val: number) => val && onTemplateChange(val)"
-          >
-            <el-option v-for="t in templateList" :key="t.template_id" :label="t.template_name" :value="t.template_id" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item v-if="versionList.length > 0" label="模板版本">
-          <el-select
-            v-model="genForm.prompt_version_id"
-            placeholder="选择版本（可选）"
-            style="width: 100%"
-            :loading="versionsLoading"
-            clearable
-          >
+    <!-- AI 生成弹窗 -->
+    <el-dialog v-model="generateDialogVisible" title="发起 AI 生成" width="600px" destroy-on-close>
+      <el-form :model="generateForm" label-width="100px">
+        <el-form-item label="选择分支">
+          <el-select v-model="generateForm.branch_id" placeholder="默认主分支" clearable style="width: 100%">
             <el-option
-              v-for="v in versionList"
-              :key="v.prompt_version_id"
-              :label="`v${v.version_no} - ${v.version_name || ''}`"
-              :value="v.prompt_version_id"
+              v-for="b in branches"
+              :key="b.branch_id"
+              :label="b.branch_name"
+              :value="b.branch_id"
             />
           </el-select>
         </el-form-item>
-
-        <el-form-item label="生成内容" prop="input_text">
+        <el-form-item label="选择模型" required>
+          <el-checkbox-group v-model="generateForm.model_ids">
+            <el-checkbox
+              v-for="m in aiModels"
+              :key="m.model_id"
+              :value="m.model_id"
+              :label="m.model_id"
+              style="margin-right: 12px; display: block; margin-bottom: 6px"
+            >
+              {{ m.display_name || m.model_name || `模型 #${m.model_id}` }}
+              <span style="color: #909399; font-size: 12px">
+                ({{ m.provider_name }})
+              </span>
+            </el-checkbox>
+          </el-checkbox-group>
+          <div v-if="aiModels.length === 0 && !modelsLoading" style="color: #909399; font-size: 13px">
+            暂无可用模型
+          </div>
+        </el-form-item>
+        <el-form-item label="生成提示词" required>
           <el-input
-            v-model="genForm.input_text"
+            v-model="generateForm.input_text"
             type="textarea"
-            :rows="4"
-            placeholder="请描述需要生成的内容"
-            maxlength="1000"
+            :rows="5"
+            placeholder="请输入生成提示词，例如：请生成数据库课程报告需求分析部分"
+            maxlength="2000"
             show-word-limit
           />
         </el-form-item>
       </el-form>
 
-      <div v-if="genResults.length > 0" style="margin-top: 16px">
-        <el-divider content-position="left">生成结果</el-divider>
-        <div style="max-height: 240px; overflow-y: auto">
-          <el-card
-            v-for="r in genResults"
-            :key="r.invocation_id"
-            shadow="never"
-            class="gen-result-card"
-            :body-style="{ padding: '10px 12px' }"
-          >
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px">
-              <span style="font-weight: 600; font-size: 14px">
-                {{ getModelDisplayName(r.model_id) }}
-              </span>
-              <el-tag size="small" :type="getGenStatusType(r.status)">
-                {{ r.status === "success" ? "成功" : "失败" }}
-              </el-tag>
-            </div>
-            <div v-if="r.status === 'success'" style="font-size: 13px; color: #67c23a">
-              生成完成，版本 v{{ r.version_no }}，输出 ID: {{ r.output_id || "-" }}
-            </div>
-            <div v-if="r.status === 'failed' && r.error_message" style="font-size: 13px; color: #f56c6c">
-              错误：{{ r.error_message }}
-            </div>
-            <div v-if="r.status === 'success'" style="font-size: 12px; color: #909399; margin-top: 4px">
-              输入 tokens: {{ r.input_tokens || 0 }} · 输出 tokens: {{ r.output_tokens || 0 }} · 耗时: {{ r.latency_ms || 0 }}ms
-            </div>
-          </el-card>
+      <!-- 生成结果 -->
+      <div v-if="generateResult.length > 0" style="margin-top: 16px; border-top: 1px solid #e4e7ed; padding-top: 16px">
+        <div style="font-weight: 600; margin-bottom: 8px">生成结果</div>
+        <div v-for="r in generateResult" :key="r.invocation_id" style="margin-bottom: 8px">
+          <el-tag size="small" :type="r.status === 'success' || r.status === 'completed' ? 'success' : 'danger'">
+            {{ r.status }}
+          </el-tag>
+          <span style="margin-left: 8px; font-size: 13px">
+            模型 #{{ r.model_id }}
+            <span v-if="r.output_id" style="color: #67c23a">→ 输出 #{{ r.output_id }}</span>
+            <span v-if="r.error_message" style="color: #f56c6c">，错误：{{ r.error_message }}</span>
+          </span>
         </div>
       </div>
 
       <template #footer>
-        <el-button @click="genDialogVisible = false">关闭</el-button>
-        <el-button type="primary" :loading="genLoading" @click="handleGenerate">开始生成</el-button>
+        <el-button @click="generateDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="generateLoading" @click="handleGenerate">
+          开始生成
+        </el-button>
       </template>
     </el-dialog>
 
-    <!-- ─── Output Detail Dialog ────────────────────────────────────────────────── -->
-    <el-dialog
-      v-model="detailDialogVisible"
-      :title="`版本详情 - ${outputDetail.output_title || `v${outputDetail.version_no}`}`"
-      width="800px"
-      :close-on-click-modal="true"
-    >
-      <div v-loading="detailLoading">
-        <el-descriptions :column="2" border style="margin-bottom: 12px">
-          <el-descriptions-item label="版本标题">{{ outputDetail.output_title || "-" }}</el-descriptions-item>
-          <el-descriptions-item label="版本号">v{{ outputDetail.version_no }}</el-descriptions-item>
-          <el-descriptions-item label="来源">
-            <el-tag size="small">{{ getSourceTypeLabel(outputDetail.source_type || "") }}</el-tag>
+    <!-- 输出详情抽屉 -->
+    <el-drawer v-model="outputDrawerVisible" title="输出详情" size="640px" direction="rtl" destroy-on-close>
+      <div v-loading="outputDrawerLoading">
+        <el-descriptions v-if="currentOutput" :column="2" border size="small" style="margin-bottom: 16px">
+          <el-descriptions-item label="版本号">
+            <el-tag size="small">v{{ currentOutput.version_no }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="状态">
-            <el-tag size="small" :type="getStatusType(outputDetail.status || '')">
-              {{ getStatusLabel(outputDetail.status || "") }}
-            </el-tag>
+            <el-tag size="small" :type="getStatusType(currentOutput.status)">{{ currentOutput.status }}</el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="版本锁">v{{ outputDetail.lock_version }}</el-descriptions-item>
-          <el-descriptions-item label="创建人">
-            {{ outputDetail.creator_real_name || outputDetail.creator_username || "-" }}
-          </el-descriptions-item>
-          <el-descriptions-item label="创建时间">
-            {{ outputDetail.created_at ? new Date(outputDetail.created_at).toLocaleString("zh-CN") : "-" }}
-          </el-descriptions-item>
+          <el-descriptions-item label="分支">{{ currentOutput.branch_name }}</el-descriptions-item>
+          <el-descriptions-item label="创建人">{{ currentOutput.creator_username }}</el-descriptions-item>
+          <el-descriptions-item label="更新时间" :span="2">{{ formatDate(currentOutput.last_modified_at || currentOutput.created_at) }}</el-descriptions-item>
+          <el-descriptions-item label="修改说明" :span="2">{{ currentOutput.edit_summary || "-" }}</el-descriptions-item>
         </el-descriptions>
 
-        <div style="margin-bottom: 12px">
-          <el-button type="primary" size="small" @click="openEditDialog">编辑输出</el-button>
-          <el-button size="small" @click="openSaveAsDialog">另存为新版本</el-button>
+        <div style="margin-bottom: 16px">
+          <div style="font-weight: 600; margin-bottom: 8px">正文内容</div>
+          <div class="output-content">{{ currentOutput?.content || "暂无内容" }}</div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px">
           <el-button
-            v-if="outputDetail.status === 'approved'"
+            v-if="currentOutput?.status !== 'adopted'"
+            type="warning"
+            size="small"
+            @click="openEditDialog(currentOutput)"
+          >
+            <el-icon><Edit /></el-icon> 编辑输出
+          </el-button>
+          <el-button
+            v-if="currentOutput?.status === 'approved'"
             type="success"
             size="small"
-            @click="openAdoptDialog"
-          >采用为成果</el-button>
+            @click="adoptDialogVisible = true"
+          >
+            <el-icon><Collection /></el-icon> 采用成果
+          </el-button>
+          <el-button
+            v-if="currentOutput?.status !== 'adopted'"
+            type="primary"
+            size="small"
+            @click="openSaveAsDialog(currentOutput)"
+          >
+            <el-icon><CopyDocument /></el-icon> 另存为新版本
+          </el-button>
+          <el-button
+            v-if="['generated', 'draft', 'revision_required'].includes(currentOutput?.status || '')"
+            type="primary"
+            size="small"
+            @click="reviewDialogVisible = true"
+          >
+            <el-icon><CircleCheck /></el-icon> 提交审核
+          </el-button>
         </div>
 
-        <div v-if="outputDetail.content" class="content-preview">
-          <div class="content-label">版本内容</div>
-          <el-input :model-value="outputDetail.content" type="textarea" :rows="8" readonly resize="none" />
-        </div>
-
-        <!-- Comments -->
-        <div class="comments-section">
-          <div class="content-label">批注列表</div>
-          <div v-loading="commentsLoading" style="min-height: 60px">
-            <div v-if="comments.length === 0 && !commentsLoading" style="color: #909399; font-size: 13px; padding: 8px 0">
-              暂无批注
+        <!-- 批注列表 -->
+        <div>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px">
+            <div style="font-weight: 600; display: flex; align-items: center; gap: 6px">
+              <el-icon><ChatLineSquare /></el-icon>
+              批注列表
+              <el-tag size="small">{{ comments.length }}</el-tag>
             </div>
-            <el-card
-              v-for="c in comments"
-              :key="c.comment_id"
-              shadow="never"
-              class="comment-card"
-              :body-style="{ padding: '10px 12px' }"
-            >
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px">
-                <div style="display: flex; align-items: center; gap: 8px">
-                  <el-tag size="small">{{ getCommentTypeLabel(c.comment_type) }}</el-tag>
-                  <span style="font-size: 13px; color: #606266">
-                    {{ c.commenter_real_name || c.commenter_username || "未知用户" }}
-                  </span>
-                  <span style="font-size: 12px; color: #909399">
-                    {{ new Date(c.created_at).toLocaleString("zh-CN") }}
-                  </span>
-                </div>
-                <el-tag size="small" :type="getCommentStatusType(c.status)">
-                  {{ getCommentStatusLabel(c.status) }}
-                </el-tag>
-              </div>
-              <div style="font-size: 13px; color: #303133; white-space: pre-wrap">{{ c.comment_text }}</div>
-              <div style="margin-top: 6px">
-                <el-button
-                  v-if="c.status === 'open'"
-                  link type="success" size="small"
-                  @click="handleUpdateCommentStatus(c, 'resolved')"
-                >标记为已解决</el-button>
-                <el-button
-                  v-if="c.status !== 'closed'"
-                  link type="info" size="small"
-                  @click="handleUpdateCommentStatus(c, 'closed')"
-                >关闭</el-button>
-              </div>
-            </el-card>
+            <el-button type="primary" size="small" @click="commentDialogVisible = true">
+              添加批注
+            </el-button>
           </div>
 
-          <el-form ref="commentFormRef" :model="commentForm" :rules="commentRules" inline style="margin-top: 12px">
-            <el-form-item prop="comment_type" style="margin-bottom: 0; width: 140px">
-              <el-select v-model="commentForm.comment_type" placeholder="批注类型" style="width: 130px">
-                <el-option label="批注" value="comment" />
-                <el-option label="修改建议" value="suggestion" />
-                <el-option label="审核意见" value="approval" />
-              </el-select>
-            </el-form-item>
-            <el-form-item prop="comment_text" style="margin-bottom: 0; flex: 1">
-              <el-input v-model="commentForm.comment_text" placeholder="输入批注内容" style="width: 100%" />
-            </el-form-item>
-            <el-form-item style="margin-bottom: 0">
-              <el-button type="primary" size="small" :loading="commentLoading" @click="handleAddComment">添加</el-button>
-            </el-form-item>
-          </el-form>
-        </div>
-
-        <!-- Timeline -->
-        <div v-if="outputTimeline.length > 0" class="timeline-section">
-          <div class="content-label">版本时间线</div>
-          <el-timeline>
-            <el-timeline-item
-              v-for="item in outputTimeline"
-              :key="item.output_id"
-              :timestamp="new Date(item.created_at).toLocaleString('zh-CN')"
-              placement="top"
-            >
-              <el-card shadow="never">
-                <p>
-                  <strong>{{ item.output_title || `v${item.version_no}` }}</strong>
-                  <el-tag size="small" style="margin-left: 8px"
-                    :type="item.source_type === 'ai_generated' ? 'primary' : 'success'">
-                    {{ getSourceTypeLabel(item.source_type) }}
+          <div v-loading="commentsLoading">
+            <div v-for="c in comments" :key="c.comment_id" class="comment-item">
+              <div class="comment-header">
+                <div>
+                  <el-tag size="small" :type="getCommentTypeTag(c.comment_type)" style="margin-right: 6px">
+                    {{ getCommentTypeLabel(c.comment_type) }}
                   </el-tag>
-                </p>
-              </el-card>
-            </el-timeline-item>
-          </el-timeline>
+                  <span style="font-weight: 500">{{ c.commenter_real_name || c.commenter_username }}</span>
+                </div>
+                <el-tag size="small" :type="getCommentStatusType(c.status)">{{ c.status }}</el-tag>
+              </div>
+              <div class="comment-text">{{ c.comment_text }}</div>
+              <div class="comment-footer">
+                <span>{{ formatDate(c.created_at) }}</span>
+                <el-dropdown
+                  v-if="c.status === 'open'"
+                  @command="(cmd: string) => updateCommentStatus(c.comment_id, cmd)"
+                >
+                  <el-button size="small" link>更多</el-button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item command="resolved">标记为已解决</el-dropdown-item>
+                      <el-dropdown-item command="closed">关闭批注</el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+              </div>
+            </div>
+            <el-empty v-if="comments.length === 0 && !commentsLoading" description="暂无批注" />
+          </div>
         </div>
       </div>
-      <template #footer>
-        <el-button @click="detailDialogVisible = false">关闭</el-button>
-      </template>
-    </el-dialog>
+    </el-drawer>
 
-    <!-- ─── Edit Output Dialog ─────────────────────────────────────────────── -->
-    <el-dialog v-model="editDialogVisible" title="编辑输出" width="680px" :close-on-click-modal="false">
-      <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="90px">
-        <el-form-item label="版本锁">v{{ editForm.lock_version }}</el-form-item>
-        <el-form-item label="内容" prop="content">
-          <el-input v-model="editForm.content" type="textarea" :rows="10" placeholder="请输入正文内容" />
+    <!-- 编辑输出弹窗 -->
+    <el-dialog v-model="editDialogVisible" title="编辑输出" width="700px" destroy-on-close>
+      <el-form :model="editForm" label-width="110px">
+        <el-form-item label="正文内容" required>
+          <el-input
+            v-model="editForm.content"
+            type="textarea"
+            :rows="12"
+            placeholder="请输入修改后的内容"
+          />
         </el-form-item>
-        <el-form-item label="修改说明" prop="edit_summary">
+        <el-form-item label="修改说明" required>
           <el-input
             v-model="editForm.edit_summary"
             type="textarea"
             :rows="2"
-            placeholder="请描述本次修改内容（必填）"
-            maxlength="500"
-            show-word-limit
+            placeholder="请简要说明本次修改的内容"
           />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="editDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="editLoading" @click="handleEditSave">保存</el-button>
+        <el-button type="primary" :loading="editLoading" @click="handleEditOutput">保存修改</el-button>
       </template>
     </el-dialog>
 
-    <!-- ─── Save As New Version Dialog ──────────────────────────────────── -->
-    <el-dialog v-model="saveAsDialogVisible" title="另存为新版本" width="680px" :close-on-click-modal="false">
-      <el-form ref="saveAsFormRef" :model="saveAsForm" :rules="saveAsRules" label-width="90px">
-        <el-form-item label="版本标题" prop="output_title">
-          <el-input v-model="saveAsForm.output_title" placeholder="请输入新版本标题" maxlength="200" show-word-limit />
+    <!-- 添加批注弹窗 -->
+    <el-dialog v-model="commentDialogVisible" title="添加批注" width="500px" destroy-on-close>
+      <el-form :model="commentForm" label-width="100px">
+        <el-form-item label="批注类型" required>
+          <el-select v-model="commentForm.comment_type" style="width: 100%">
+            <el-option
+              v-for="t in commentTypes"
+              :key="t.value"
+              :label="t.label"
+              :value="t.value"
+            />
+          </el-select>
         </el-form-item>
-        <el-form-item label="正文内容" prop="content">
-          <el-input v-model="saveAsForm.content" type="textarea" :rows="10" placeholder="请输入内容" />
+        <el-form-item label="批注内容" required>
+          <el-input
+            v-model="commentForm.comment_text"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入批注内容"
+          />
         </el-form-item>
-        <el-form-item label="变更说明" prop="edit_summary">
+      </el-form>
+      <template #footer>
+        <el-button @click="commentDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="commentLoading" @click="handleAddComment">提交批注</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 提交审核弹窗 -->
+    <el-dialog v-model="reviewDialogVisible" title="提交审核" width="480px" destroy-on-close>
+      <el-form :model="reviewForm" label-width="100px">
+        <el-form-item label="审核说明">
+          <el-input
+            v-model="reviewForm.submit_note"
+            type="textarea"
+            :rows="3"
+            placeholder="提交说明（可选）"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="reviewDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="reviewLoading" @click="handleSubmitReview">提交审核</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 采用成果弹窗 -->
+    <el-dialog v-model="adoptDialogVisible" title="采用为成果" width="500px" destroy-on-close>
+      <el-form :model="adoptForm" label-width="100px">
+        <el-form-item label="成果标题" required>
+          <el-input v-model="adoptForm.artifact_title" placeholder="请输入成果标题" />
+        </el-form-item>
+        <el-form-item label="成果类型" required>
+          <el-select v-model="adoptForm.artifact_type" style="width: 100%">
+            <el-option
+              v-for="t in artifactTypes"
+              :key="t.value"
+              :label="t.label"
+              :value="t.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="发布版本">
+          <el-input v-model="adoptForm.release_version" placeholder="例如 v1.0" />
+        </el-form-item>
+        <el-form-item label="采用说明">
+          <el-input
+            v-model="adoptForm.adopt_note"
+            type="textarea"
+            :rows="3"
+            placeholder="采用说明（可选）"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="adoptDialogVisible = false">取消</el-button>
+        <el-button type="success" :loading="adoptLoading" @click="handleAdopt">确认采用</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 另存为新版本弹窗 -->
+    <el-dialog v-model="saveAsDialogVisible" title="另存为新版本" width="600px" destroy-on-close>
+      <el-form :model="saveAsForm" label-width="100px">
+        <el-form-item label="输出标题" required>
+          <el-input v-model="saveAsForm.output_title" placeholder="请输入输出标题" />
+        </el-form-item>
+        <el-form-item label="目标分支">
+          <el-select v-model="saveAsForm.branch_id" placeholder="默认当前分支" clearable style="width: 100%">
+            <el-option
+              v-for="b in branches"
+              :key="b.branch_id"
+              :label="b.branch_name"
+              :value="b.branch_id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="内容" required>
+          <el-input
+            v-model="saveAsForm.content"
+            type="textarea"
+            :rows="8"
+            placeholder="请输入内容"
+          />
+        </el-form-item>
+        <el-form-item label="修改说明">
           <el-input
             v-model="saveAsForm.edit_summary"
             type="textarea"
             :rows="2"
-            placeholder="描述本次变更（选填）"
-            maxlength="500"
-            show-word-limit
+            placeholder="请简要说明本次保存的内容变更（可选）"
           />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="saveAsDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saveAsLoading" @click="handleSaveAs">创建新版本</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- ─── Adopt Output Dialog ─────────────────────────────────────────────── -->
-    <el-dialog v-model="adoptDialogVisible" title="采用为成果" width="520px" :close-on-click-modal="false">
-      <el-form ref="adoptFormRef" :model="adoptForm" :rules="adoptRules" label-width="100px">
-        <el-form-item label="成果标题" prop="artifact_title">
-          <el-input v-model="adoptForm.artifact_title" placeholder="请输入成果标题" maxlength="200" show-word-limit />
-        </el-form-item>
-        <el-form-item label="成果类型" prop="artifact_type">
-          <el-select v-model="adoptForm.artifact_type" placeholder="请选择成果类型" style="width: 100%">
-            <el-option label="报告章节" value="report_section" />
-            <el-option label="需求分析" value="requirements" />
-            <el-option label="设计文档" value="design" />
-            <el-option label="代码" value="code" />
-            <el-option label="测试文档" value="test" />
-            <el-option label="使用手册" value="manual" />
-            <el-option label="其他" value="other" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="发布版本">
-          <el-input v-model="adoptForm.release_version" placeholder="如 v1.0" maxlength="50" />
-        </el-form-item>
-        <el-form-item label="采用说明">
-          <el-input v-model="adoptForm.adopt_note" type="textarea" :rows="3" placeholder="描述此成果的用途（选填）" maxlength="500" show-word-limit />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="adoptDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="adoptLoading" @click="handleAdopt">确认采用</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- ─── Branch Merge Dialog ─────────────────────────────────────────────── -->
-    <el-dialog v-model="mergeDialogVisible" title="分支合并" width="600px" :close-on-click-modal="false">
-      <el-form ref="mergeFormRef" :model="mergeForm" :rules="mergeRules" label-width="100px">
-        <el-form-item label="合并策略" prop="merge_strategy">
-          <el-select v-model="mergeForm.merge_strategy" placeholder="请选择合并策略" style="width: 100%">
-            <el-option label="采用源分支 (adopt_source)" value="adopt_source" />
-            <el-option label="采用目标分支 (adopt_target)" value="adopt_target" />
-            <el-option label="手动合并 (manual_merge)" value="manual_merge" />
-            <el-option label="分别采用 (adopt_separately)" value="adopt_separately" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="源分支" prop="source_branch_id">
-          <el-select v-model="mergeForm.source_branch_id" placeholder="选择源分支" style="width: 100%">
-            <el-option v-for="b in branches" :key="b.branch_id" :label="b.branch_name" :value="b.branch_id" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="目标分支" prop="target_branch_id">
-          <el-select v-model="mergeForm.target_branch_id" placeholder="选择目标分支" style="width: 100%">
-            <el-option v-for="b in branches" :key="b.branch_id" :label="b.branch_name" :value="b.branch_id" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item v-if="mergeForm.merge_strategy === 'adopt_source' || mergeForm.merge_strategy === 'adopt_target'" label="选择输出">
-          <el-select
-            v-if="mergeForm.merge_strategy === 'adopt_source'"
-            v-model="mergeForm.source_output_id"
-            placeholder="选择源分支输出"
-            style="width: 100%"
-          >
-            <el-option v-for="o in outputs" :key="o.output_id" :label="`v${o.version_no} - ${o.output_title || '无标题'}`" :value="o.output_id" />
-          </el-select>
-          <el-select
-            v-if="mergeForm.merge_strategy === 'adopt_target'"
-            v-model="mergeForm.target_output_id"
-            placeholder="选择目标分支输出"
-            style="width: 100%"
-          >
-            <el-option v-for="o in outputs" :key="o.output_id" :label="`v${o.version_no} - ${o.output_title || '无标题'}`" :value="o.output_id" />
-          </el-select>
-        </el-form-item>
-
-        <!-- adopt_separately: both source and target outputs required -->
-        <el-form-item v-if="mergeForm.merge_strategy === 'adopt_separately'" label="源分支输出">
-          <el-select
-            v-model="mergeForm.source_output_id"
-            placeholder="选择源分支输出"
-            style="width: 100%"
-            clearable
-          >
-            <el-option v-for="o in outputs" :key="o.output_id" :label="`v${o.version_no} - ${o.output_title || '无标题'}`" :value="o.output_id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item v-if="mergeForm.merge_strategy === 'adopt_separately'" label="目标分支输出">
-          <el-select
-            v-model="mergeForm.target_output_id"
-            placeholder="选择目标分支输出"
-            style="width: 100%"
-            clearable
-          >
-            <el-option v-for="o in outputs" :key="o.output_id" :label="`v${o.version_no} - ${o.output_title || '无标题'}`" :value="o.output_id" />
-          </el-select>
-        </el-form-item>
-
-        <el-form-item
-          v-if="mergeForm.merge_strategy === 'manual_merge'"
-          label="新版本标题"
-          prop="merged_output_title"
-        >
-          <el-input v-model="mergeForm.merged_output_title" placeholder="请输入合并后的版本标题" maxlength="200" />
-        </el-form-item>
-
-        <el-form-item
-          v-if="mergeForm.merge_strategy === 'manual_merge'"
-          label="合并内容"
-          prop="merged_content"
-        >
-          <el-input v-model="mergeForm.merged_content" type="textarea" :rows="6" placeholder="请输入合并后的正文内容" />
-        </el-form-item>
-
-        <el-form-item label="合并说明">
-          <el-input v-model="mergeForm.merge_note" type="textarea" :rows="2" placeholder="描述本次合并（选填）" maxlength="500" show-word-limit />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="mergeDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="mergeLoading" @click="handleMerge">执行合并</el-button>
+        <el-button type="primary" :loading="saveAsLoading" @click="handleSaveAsNewVersion">保存新版本</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
-<style lang="scss" scoped>
-.task-detail-page {
-  padding: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
+<style scoped>
 .page-header {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
+  flex-direction: column;
+  gap: 4px;
 }
+
 .page-title {
   font-size: 20px;
   font-weight: 700;
   color: #1e3a5f;
+  margin: 4px 0 0;
+}
+
+.generate-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.generate-tip {
+  text-align: center;
+  font-size: 12px;
+  color: #909399;
   margin: 0;
 }
-:deep(.el-table__row) { cursor: pointer; }
-.content-preview { margin-bottom: 16px; }
-.content-label {
+
+.output-content {
+  background: #f5f7fa;
+  border-radius: 6px;
+  padding: 12px;
   font-size: 13px;
-  font-weight: 600;
-  color: #606266;
+  line-height: 1.8;
+  color: #303133;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.comment-item {
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: #fff;
+}
+
+.comment-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 8px;
 }
-.timeline-section { margin-top: 16px; }
-.comments-section {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #ebeef5;
+
+.comment-text {
+  font-size: 13px;
+  color: #303133;
+  line-height: 1.6;
+  margin-bottom: 6px;
 }
-.comment-card { margin-bottom: 8px; border: 1px solid #ebeef5; }
-.gen-result-card { margin-bottom: 8px; border: 1px solid #ebeef5; }
+
+.comment-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #909399;
+}
 </style>

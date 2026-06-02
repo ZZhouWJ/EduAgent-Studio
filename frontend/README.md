@@ -1,266 +1,175 @@
 # AI-Collab-Audit-System — Frontend
 
-> 智研协作 AI 项目质量审计系统前端。基于 V3 Admin Vite 模板二次开发。
+> 智研协作 AI 项目质量审计系统前端。轻量 Vue3 演示版。
 
-## 开源模板说明
+## 背景说明
 
-本项目前端**基于 [V3 Admin Vite](https://github.com/un-pany/v3-admin-vite)** 模板进行二次开发。
-
-| 项目 | 内容 |
-|------|------|
-| **模板名称** | V3 Admin Vite |
-| **GitHub** | https://github.com/un-pany/v3-admin-vite |
-| **作者** | pany <https://github.com/pany-ang> |
-| **许可证** | MIT License |
-| **Copyright** | Copyright (c) 2022-present pany |
-
-详细归属说明请参见 [NOTICE.md](./NOTICE.md)。
-
-### 模板来源合规性
-
-- V3 Admin Vite 采用 MIT 许可证，允许自由使用、复制、修改和分发
-- 本项目保留了完整的 LICENSE 文件（MIT License）
-- 本项目新增了 NOTICE.md 文件，明确说明模板来源和修改内容
-- 本项目未删除原作者版权声明
-- 本项目未将模板包装为原创
-
-### 本项目的裁剪与修改
-
-1. 将系统名称、品牌标识替换为"智研协作 AI 项目质量审计系统"
-2. 替换登录页，去除验证码逻辑，对接后端 `/api/auth/login` 接口
-3. 修改路由配置，替换示例路由为业务占位页面
-4. 修改用户状态管理，对接后端 `/api/auth/me` 和 `/api/auth/logout` 接口
-5. 修改 Axios 封装，适配后端统一返回格式 `{ code: 0, message: "success", data: {} }`
-6. 删除模板自带示例页面（demo、permission 等）
-7. 删除模板原 README.zh-CN.md，保留英文版并重写
-8. 移除 `.env.production` 和 `.env.staging` 中的 Apifox Mock API 地址
-9. 移除 `vite.config.ts` 中的 mock 反向代理配置
-10. 替换 Logo 和品牌图片
+本前端原基于 V3 Admin Vite 模板开发。由于模板在本地运行中持续出现端口、代理、CORS、登录链路等问题，项目决定放弃复杂模板，改为重写一个轻量 Vue3 前端演示版，保证课程演示稳定可用。
 
 ## 技术栈
 
-| 组件 | 技术 | 来源 |
+| 组件 | 技术 | 版本 |
 |------|------|------|
-| 框架 | Vue 3 (Composition API) | 模板 |
-| 构建工具 | Vite 7 | 模板 |
-| UI 组件库 | Element Plus 2.13 | 模板 |
-| 状态管理 | Pinia 3.0 | 模板 |
-| 路由 | Vue Router 4.6 | 模板 |
-| HTTP 客户端 | Axios 1.13 | 模板 |
-| 图标 | @element-plus/icons-vue | 模板 |
-| CSS 方案 | UnoCSS + Sass | 模板 |
-| 语言 | TypeScript | 模板 |
+| 框架 | Vue 3 (Composition API) | ^3.5 |
+| 构建工具 | Vite | ^7.0 |
+| UI 组件库 | Element Plus | ^2.13 |
+| 状态管理 | Pinia | ^3.0 |
+| 路由 | Vue Router | ^4.6 |
+| HTTP 客户端 | Axios | ^1.13 |
+| 语言 | TypeScript | ^5.9 |
 
 ## 环境要求
 
 - Node.js 18+
 - npm 或 pnpm
 
-## 安装依赖
+## 启动前端
 
 ```bash
 cd frontend
-
-# npm
 npm install
-
-# 或 pnpm（模板推荐）
-pnpm install
-```
-
-## 配置
-
-> **重要**：本项目**不使用** V3 Admin Vite 原模板的 Apifox Mock API。所有环境变量中的 API 地址均指向本项目 FastAPI 后端。
-
-### 环境变量文件说明
-
-| 文件 | 用途 | VITE_BASE_URL 默认值 |
-|------|------|---------------------|
-| `.env` | 所有环境共享 | `http://127.0.0.1:8000` |
-| `.env.development` | 开发环境 | `http://127.0.0.1:8000` |
-| `.env.staging` | 预发布环境 | `http://127.0.0.1:8000`（需替换为实际地址）|
-| `.env.production` | 生产环境 | `http://127.0.0.1:8000`（需替换为实际地址）|
-
-### 修改步骤
-
-复制环境变量示例文件：
-
-```bash
-cp .env.example .env
-```
-
-`.env` 默认内容：
-
-```env
-VITE_APP_TITLE = 智研协作 AI 项目质量审计系统
-VITE_ROUTER_HISTORY = hash
-VITE_BASE_URL = http://127.0.0.1:8000
-VITE_PUBLIC_PATH = /
-```
-
-- **本地开发**：`VITE_BASE_URL` 保持 `http://127.0.0.1:8000` 即可
-- **预发布/生产**：请将 `.env.staging` / `.env.production` 中的 `VITE_BASE_URL` 替换为实际后端服务器地址
-
-## 启动开发服务器
-
-```bash
 npm run dev
-# 或 pnpm
-pnpm dev
 ```
 
 访问：http://localhost:5173
 
-## 构建生产版本
+## 启动后端
 
 ```bash
-npm run build
-# 或 pnpm
-pnpm build
+cd backend
+# 首次需要创建虚拟环境和安装依赖
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+# 启动后端（默认端口 8000，与前端 proxy target 一致）
+python run.py
 ```
+
+> 前端 Vite proxy 将 `/api/*` 请求转发到 `http://127.0.0.1:8000`，不直接在浏览器跨域请求后端。
+
+## 配置
+
+环境变量文件 `.env.development`：
+
+```env
+VITE_PUBLIC_PATH=/
+```
+
+Vite proxy 配置在 `vite.config.ts` 中，target 为 `http://127.0.0.1:8000`。
 
 ## 测试账号
 
-后端数据库初始化后，默认测试账号：
-
 - 用户名：`admin`
-- 密码：`Admin@123456`
+- 密码：`admin123`
 
-> 初始账号密码由 `database/04_insert_initial_data.sql` 决定。
+> 账号由 `database/04_insert_initial_data.sql` 初始化。
 
-## 当前阶段实现范围
+## 已实现页面
 
-Stage-17 已完成前端全部核心业务模块，包括：
+| 页面 | 路由 | 说明 |
+|------|------|------|
+| 登录页 | `/login` | 对接 `/api/auth/login`、`/api/auth/me`，支持跳转注册 |
+| 注册页 | `/register` | 用户注册，默认分配 student_member 角色 |
+| 首页 Dashboard | `/dashboard` | 流程卡片、模块入口 |
+| 项目空间 | `/projects` | 项目列表（搜索/状态筛选）+ 创建项目 |
+| 项目详情 | `/projects/:projectId` | 7 Tab：概览/成员/任务/成果/调用/日志/统计 |
+| 任务与版本 | `/tasks` | 全局任务列表 |
+| 任务详情 | `/tasks/:taskId` | 任务信息 + 分支管理 + AI 生成 + 输出版本 + 批注协作 |
+| AI 生成 | `/generate` | 全局 AI 生成入口 |
+| 提示词管理 | `/prompts` | 模板列表 + 版本管理（创建/编辑/激活） |
+| 审核中心 | `/reviews` | 三 Tab：待审核/我提交的/审核历史，评分仪表盘，问题标签 |
+| 成果库 | `/artifacts` | 成果列表（项目/类型筛选）+ Markdown 导出 |
+| 调用审计 | `/invocations` | 调用日志（项目/模型/状态/日期筛选）+ 详情对话框 |
+| 成本统计 | `/costs` | 四摘要卡片 + 按模型/按项目统计（可排序） |
+| 统计看板 | `/statistics` | 概览统计、调用、成本、审核质量、成员贡献、最近动态 |
+| 模型管理 | `/models` | 供应商 + 模型列表 + 启用禁用 |
+| 用户管理 | `/users` | 用户列表（搜索/状态筛选）+ 启用禁用 + 角色分配 |
+| 操作日志 | `/logs/operation` | 操作日志（操作人/对象/类型/日期筛选）+ 变更详情 |
+| 登录日志 | `/logs/login` | 登录记录（状态/日期筛选）+ IP/UA 信息 |
+| 个人中心 | `/profile` | 用户信息展示 + 修改密码 |
 
-- [x] 基于 V3 Admin Vite 模板二次开发
-- [x] Vue3 + Vite + TypeScript + Element Plus 项目基础结构
-- [x] Pinia 用户状态管理
-- [x] Vue Router 路由基础（含守卫）
-- [x] 登录页（对接 `/api/auth/login`、`/api/auth/me`）
-- [x] 后台管理整体布局（左侧导航 + 顶部栏 + 标签栏）
-- [x] 首页（Dashboard，含流程卡片与数据卡片）
-- [x] 项目空间（项目列表、详情、创建、成员管理）
-- [x] 任务与版本（任务列表、详情、分支管理、版本管理）
-- [x] AI 生成（多模型批量调用、Mock 机制）
-- [x] 人工编辑与批注（输出编辑、另存版本、批注列表）
-- [x] 审核中心（待审核列表、审核详情、评分与提交）
-- [x] 成果库（成果列表、成果详情）
-- [x] 统计看板（概览、模型调用、成本、审核质量、成员贡献）
-- [x] 模型管理（供应商列表、模型列表）
+## 未实现或简化内容
 
-### 页面模块说明
-
-| 页面 | 路由 | 文件 | 对接后端 |
-|------|------|------|---------|
-| 登录页 | `/login` | `pages/login/index.vue` | `/api/auth/login`、`/api/auth/me` |
-| 首页 | `/dashboard` | `pages/dashboard/index.vue` | `/api/statistics/overview` |
-| 项目空间 | `/projects` | `pages/projects/index.vue` | `/api/projects` |
-| 项目详情 | `/projects/:projectId` | `pages/projects/ProjectDetail.vue` | `/api/projects/{id}` |
-| 任务与版本 | `/tasks` | `pages/tasks/index.vue` | 任务列表入口（从项目详情进入）；任务详情：`GET /api/tasks/{id}` |
-| 任务详情 | `/tasks/:taskId` | `pages/tasks/TaskDetail.vue` | 分支/版本/生成/批注相关接口 |
-| 审核中心 | `/reviews` | `pages/reviews/index.vue` | `/api/reviews/pending` |
-| 审核详情 | `/reviews/:requestId` | `pages/reviews/ReviewDetail.vue` | `/api/reviews/{id}` |
-| 成果库 | `/artifacts` | `pages/artifacts/ArtifactList.vue` | `/api/projects/{project_id}/artifacts` |
-| 成果详情 | `/artifacts/:adoptedId` | `pages/artifacts/ArtifactDetail.vue` | `/api/artifacts/{adopted_id}` |
-| 统计看板 | `/statistics` | `pages/statistics/StatisticsDashboard.vue` | `/api/statistics/*` |
-| 模型管理 | `/models` | `pages/models/index.vue` | `/api/ai-models` |
-| 错误页 | `/404`、`/403` | `pages/error/*.vue` | — |
-
-> **注**：当前所有 AI 模型调用使用 Mock 机制，返回模拟数据。扩展真实模型 API 时仅需实现 `ModelAdapter` 接口，无需修改前端或后端业务代码。
-
-### Apifox Mock API 清理状态
-
-- [x] 已移除 `.env.production` 中的 Apifox Mock 地址
-- [x] 已移除 `.env.staging` 中的 Apifox Mock 地址
-- [x] 已移除 `vite.config.ts` 中的 mock 反向代理配置
-- [x] 所有环境变量中的 API 地址均指向本项目 FastAPI 后端
-
-### 本阶段未包含的内容
-
-以下内容不在本阶段范围内：
-
-- 真实 AI 模型 API 接入（当前使用 Mock）
-- 前端 E2E 测试
-- CI/CD 自动化测试流水线
-- Docker 容器化部署
-
-### 本地 Node 环境说明
-
-- 前端构建验证需要本地 Node 18+ 环境
-- 当前开发环境如无 Node，部分前端功能截图需在本地 Windows 环境补做
+- 复杂动态权限系统（当前为路由级守卫）
+- 标签栏（tags-view）已移除
+- 主题切换、暗色模式已移除
+- 独立分支合并管理页面（合并功能在任务详情内）
+- 独立版本对比页面（时间线对比在任务详情内）
 
 ## 目录结构
 
 ```
 frontend/
-├── .env.example              # 环境变量示例
-├── .env                      # 环境变量（勿提交）
-├── LICENSE                   # MIT 许可证（来自 V3 Admin Vite）
-├── NOTICE.md                 # 开源归属说明
+├── .env.development         # 开发环境变量
+├── .env.example            # 环境变量示例
 ├── index.html
 ├── package.json
-├── vite.config.ts
+├── vite.config.ts          # Vite 配置（含 proxy）
 ├── tsconfig.json
 └── src/
     ├── App.vue              # 根组件
-    ├── main.ts              # 应用入口
-    ├── common/              # 通用模块（来自模板）
-    │   ├── assets/         # 静态资源（含品牌 Logo）
-    │   ├── components/      # 通用组件
-    │   ├── composables/     # 组合式函数
-    │   ├── constants/       # 常量
-    │   └── utils/          # 工具函数
-    ├── http/
-    │   └── axios.ts        # Axios 封装（已适配后端统一返回格式）
-    ├── layouts/             # 后台布局组件（来自模板）
-    │   ├── components/     # 布局子组件
-    │   ├── modes/          # 布局模式
-    │   └── config.ts
-    ├── pages/              # 页面组件
-    │   ├── dashboard/      # 首页
-    │   ├── projects/       # 项目空间
-    │   ├── tasks/          # 任务与版本
-    │   ├── reviews/        # 审核中心
-    │   ├── artifacts/       # 成果库
-    │   ├── statistics/     # 统计看板
-    │   ├── models/         # 模型管理
+    ├── main.ts             # 应用入口
+    ├── assets/
+    │   └── main.css       # 全局样式
+    ├── layouts/
+    │   └── BackendLayout.vue  # 后台整体布局（侧边栏+顶部栏+内容区）
+    ├── pages/
     │   ├── login/          # 登录页
-    │   ├── error/           # 错误页
-    │   └── redirect/        # 重定向页
-    ├── pinia/               # 状态管理（来自模板）
-    │   └── stores/
-    ├── plugins/             # 插件（来自模板）
-    └── router/              # 路由配置（已替换为业务路由）
+    │   ├── register/        # 注册页
+    │   ├── dashboard/       # 首页
+    │   ├── projects/        # 项目列表、详情（7 Tab）
+    │   ├── tasks/           # 任务列表、详情（分支+版本+AI生成）
+    │   ├── generate/        # AI 生成
+    │   ├── prompts/         # 提示词管理
+    │   ├── reviews/         # 审核中心
+    │   ├── artifacts/       # 成果库
+    │   ├── invocations/     # 调用审计
+    │   ├── costs/           # 成本统计
+    │   ├── statistics/       # 统计看板
+    │   ├── models/          # 模型管理
+    │   ├── users/           # 用户管理
+    │   ├── profile/         # 个人中心
+    │   └── logs/            # 操作日志、登录日志
+    ├── api/
+    │   ├── auth.ts         # 认证（登录/注册/用户/角色）
+    │   ├── projects.ts      # 项目 CRUD + 成员
+    │   ├── tasks.ts         # 任务 + 分支 + 输出 + 批注
+    │   ├── models.ts        # 模型管理 + 任务类型
+    │   ├── reviews.ts       # 审核
+    │   ├── artifacts.ts      # 成果
+    │   ├── invocations.ts   # 调用日志
+    │   ├── costs.ts         # 成本统计
+    │   ├── logs.ts          # 操作日志 + 登录日志
+    │   ├── statistics.ts    # 统计看板
+    │   └── prompts.ts       # 提示词模板
+    ├── router/
+    │   ├── index.ts        # 路由定义（静态路由，含 18 个页面）
+    │   └── guard.ts        # 路由守卫（未登录重定向）
+    ├── stores/
+    │   └── user.ts         # 用户状态（token + 用户信息）
+    └── utils/
+        └── request.ts       # Axios 封装（统一响应拦截）
 ```
 
 ## 与后端联调
 
-1. 确保后端已启动（`cd backend && python run.py`）
-2. 确保数据库已初始化（执行 `database/01` 到 `07` 脚本）
-3. 确认 `.env` 中 `VITE_BASE_URL` 指向正确后端地址
-4. 使用测试账号登录
+1. 确保 MySQL 数据库已初始化（执行 `database/01` ~ `07` 脚本）
+2. 启动后端：`python run.py --port 8002`
+3. 启动前端：`npm run dev`
+4. 打开 http://localhost:5173 → 自动跳转登录页
+5. 使用测试账号登录
 
 ## 常见问题
 
-### Q1: 编译报 TS 错误
+### Q1: 登录后白屏
 
-确保使用 V3 Admin Vite 推荐的 Node 18+ 环境：
+检查后端是否在 8002 端口运行，proxy target 是否匹配。
 
-```bash
-node -v  # 应 >= 18
-npm install
-npm run build
-```
+### Q2: API 请求 404
 
-### Q2: 登录后跳转白屏
+确认后端已启动，端口与 proxy target 一致（默认 8002）。
 
-检查浏览器控制台是否有跨域错误。确保后端 `backend/app/main.py` 已配置 CORS 中间件（已默认启用 `allow_origins=["*"]`）。
+### Q3: 编译报 TS 错误
 
-### Q3: 环境变量修改后不生效
-
-Vite 的环境变量需要重启开发服务器：
-
-```bash
-# 修改 .env 后
-npm run dev
-```
+确保 Node >= 18，重新 `npm install`。

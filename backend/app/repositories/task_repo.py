@@ -912,3 +912,45 @@ def get_comment_project_context(comment_id: int) -> Optional[Dict[str, Any]]:
     with get_db_cursor() as cursor:
         cursor.execute(sql, (comment_id,))
         return cursor.fetchone()
+
+
+# =============================================================================
+# 版本对比查询
+# =============================================================================
+
+def get_output_versions_for_compare(
+    output1_id: int,
+    output2_id: int,
+) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """
+    获取两个输出版本的详细信息用于对比。
+
+    Args:
+        output1_id: 第一个输出 ID
+        output2_id: 第二个输出 ID
+
+    Returns:
+        (output1, output2) 元组，其中任一不存在则为 None
+    """
+    sql = """
+        SELECT o.output_id, o.task_id, o.branch_id, o.invocation_id,
+               o.version_no, o.output_title, o.content, o.source_type,
+               o.parent_output_id, o.lock_version,
+               o.last_modified_at, o.last_modified_by,
+               o.edit_summary, o.is_final_candidate, o.status,
+               o.created_at, o.created_by,
+               t.title AS task_title,
+               b.branch_name,
+               c.username AS creator_username, c.real_name AS creator_real_name
+        FROM task_outputs o
+        INNER JOIN project_tasks t ON o.task_id = t.task_id AND t.is_deleted = 0
+        LEFT JOIN task_branches b ON o.branch_id = b.branch_id AND b.is_deleted = 0
+        LEFT JOIN users c ON o.created_by = c.user_id AND c.is_deleted = 0
+        WHERE o.output_id = %s AND o.is_deleted = 0
+    """
+    with get_db_cursor() as cursor:
+        cursor.execute(sql, (output1_id,))
+        output1 = cursor.fetchone()
+        cursor.execute(sql, (output2_id,))
+        output2 = cursor.fetchone()
+    return output1, output2

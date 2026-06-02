@@ -42,6 +42,7 @@ def get_connection():
         pymysql.Error: 连接失败时抛出
     """
     params = _get_connection_params()
+    params["charset"] = "utf8mb4"
     return pymysql.connect(**params, cursorclass=DictCursor, autocommit=False)
 
 

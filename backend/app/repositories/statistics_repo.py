@@ -461,15 +461,22 @@ def get_cost_stats(
             cr.model_id,
             m.model_name,
             m.display_name,
+            COALESCE(mp.provider_name, '') AS provider_name,
+            COUNT(*) AS call_count,
+            COALESCE(SUM(cr.input_cost), 0) AS input_cost,
+            COALESCE(SUM(cr.output_cost), 0) AS output_cost,
             COALESCE(SUM(cr.total_cost), 0) AS total_cost,
-            COALESCE(SUM(cr.total_tokens), 0) AS total_tokens
+            COALESCE(SUM(cr.total_tokens), 0) AS total_tokens,
+            COALESCE(SUM(cr.input_tokens), 0) AS input_tokens,
+            COALESCE(SUM(cr.output_tokens), 0) AS output_tokens
         FROM cost_records cr
         INNER JOIN ai_models m ON cr.model_id = m.model_id AND m.is_deleted = 0
+        LEFT JOIN model_providers mp ON m.provider_id = mp.provider_id AND mp.is_deleted = 0
         WHERE 1=1
         {by_model_filter}
         {by_model_date}
         {by_model_member}
-        GROUP BY cr.model_id, m.model_name, m.display_name
+        GROUP BY cr.model_id, m.model_name, m.display_name, mp.provider_name
         ORDER BY total_cost DESC
     """
     with get_db_cursor() as cursor:
@@ -483,8 +490,9 @@ def get_cost_stats(
         SELECT
             cr.project_id,
             p.project_name,
-            COALESCE(SUM(cr.total_cost), 0) AS total_cost,
-            COALESCE(SUM(cr.total_tokens), 0) AS total_tokens
+            COUNT(*) AS call_count,
+            COALESCE(SUM(cr.total_tokens), 0) AS total_tokens,
+            COALESCE(SUM(cr.total_cost), 0) AS total_cost
         FROM cost_records cr
         INNER JOIN projects p ON cr.project_id = p.project_id AND p.is_deleted = 0
         WHERE 1=1
@@ -496,7 +504,11 @@ def get_cost_stats(
     """
     with get_db_cursor() as cursor:
         cursor.execute(by_project_sql, by_project_params)
-        cost_by_project = [_normalize_row(r) for r in cursor.fetchall()]
+        rows = cursor.fetchall()
+        cost_by_project = [
+            {**_normalize_row(r), "input_tokens": 0, "output_tokens": 0, "avg_cost_per_call": (r.get("total_cost") or 0) / (r.get("call_count") or 1)}
+            for r in rows
+        ]
 
     # 按用户分成本
     by_user_params = params.copy()

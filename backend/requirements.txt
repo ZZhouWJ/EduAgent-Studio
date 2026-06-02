@@ -3,29 +3,29 @@
 # Python 3.10+
 # ============================================================
 
-# Web 框架
+# Web Framework
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
 
-# 数据库驱动
+# Database Driver
 pymysql>=1.1.0
 
-# 配置管理
+# Configuration Management
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
 
-# 环境变量
+# Environment Variables
 python-dotenv>=1.0.0
 
-# HTTP 客户端（可替换为 httpx 进行测试）
+# HTTP Client (can replace with httpx for testing)
 httpx>=0.26.0
 
 # JSON Web Token
 PyJWT>=2.8.0
 
-# 密码哈希（供后续认证使用）
+# Password Hashing (for authentication)
 bcrypt>=4.1.0
 passlib[bcrypt]>=1.7.4
 
-# AES-GCM 加密（供 API Key 加密使用）
+# AES-GCM Encryption (for API Key encryption)
 cryptography>=42.0.0

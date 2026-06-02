@@ -1,89 +1,335 @@
 # 前端路由清单
 
-> 本文档整理智研协作 AI 项目质量审计系统前端所有已实现路由，标注对应页面文件和主要对接后端接口。
-> 基于 `frontend/src/router/index.ts` 和 `frontend/src/router/guard.ts` 生成。
-> 最后更新时间：2026-06-01
+> 本文档记录 AI-Collab-Audit-System 前端所有已实现页面路由。
+> 基于 `frontend/src/router/index.ts` 生成。
 
 ---
 
-## 路由总览
+## 路由总览（共 18 个页面）
 
-| # | 路由 | 页面 | 组件文件 | 说明 | 对接后端接口 |
-|---|------|------|----------|------|-------------|
-| 1 | `/login` | 登录页 | `pages/login/index.vue` | 用户登录，对接认证接口 | `POST /api/auth/login`<br>`GET /api/auth/me`<br>`POST /api/auth/logout` |
-| 2 | `/dashboard` | 首页 | `pages/dashboard/index.vue` | 统计概览、流程卡片 | `GET /api/statistics/overview` |
-| 3 | `/projects` | 项目空间列表 | `pages/projects/index.vue` | 项目列表、创建项目弹窗 | `GET /api/projects`<br>`POST /api/projects`<br>`DELETE /api/projects/{id}` |
-| 4 | `/projects/:projectId` | 项目详情 | `pages/projects/ProjectDetail.vue` | 成员列表、任务列表、成果列表 | `GET /api/projects/{id}`<br>`GET /api/projects/{id}/members`<br>`GET /api/projects/{id}/tasks` |
-| 5 | `/tasks` | 任务列表入口 | `pages/tasks/index.vue` | 全局任务列表入口，引导至项目空间查看详情 | 从项目详情进入；任务详情：`GET /api/tasks/{id}` |
-| 6 | `/tasks/:taskId` | 任务详情 | `pages/tasks/TaskDetail.vue` | 分支、版本、AI生成面板、编辑、批注 | `GET /api/tasks/{id}`<br>`GET /api/tasks/{id}/branches`<br>`GET /api/tasks/{id}/outputs`<br>`POST /api/tasks/{id}/generate`<br>`GET /api/outputs/{id}/comments` |
-| 7 | `/reviews` | 审核中心列表 | `pages/reviews/index.vue` | 待审核列表、审核统计 | `GET /api/reviews/pending` |
-| 8 | `/reviews/:requestId` | 审核详情 | `pages/reviews/ReviewDetail.vue` | 输出内容查看、评分弹窗、提交审核 | `GET /api/reviews/{id}`<br>`POST /api/reviews/{id}/complete`<br>`GET /api/issue-tags` |
-| 9 | `/artifacts` | 成果库列表 | `pages/artifacts/ArtifactList.vue` | 所有已采用成果列表（按项目查询） | `GET /api/projects/{project_id}/artifacts` |
-| 10 | `/artifacts/:adoptedId` | 成果详情 | `pages/artifacts/ArtifactDetail.vue` | 成果完整内容展示 | `GET /api/artifacts/{adopted_id}` |
-| 11 | `/statistics` | 统计看板 | `pages/statistics/StatisticsDashboard.vue` | 多维度统计图表 | `GET /api/statistics/overview`<br>`GET /api/statistics/projects`<br>`GET /api/statistics/model-calls`<br>`GET /api/statistics/costs`<br>`GET /api/statistics/reviews`<br>`GET /api/statistics/member-contributions`<br>`GET /api/statistics/recent-activities` |
-| 12 | `/models` | 模型管理 | `pages/models/index.vue` | 供应商、模型、API配置管理 | `GET /api/model-providers`<br>`GET /api/ai-models`<br>`GET /api/api-configs` |
-| 13 | `/404` | 404 错误页 | `pages/error/404.vue` | 路由未匹配 | — |
-| 14 | `/403` | 403 错误页 | `pages/error/403.vue` | 无权限访问 | — |
-
----
-
-## 路由守卫说明
-
-| 路由 | 守卫规则 |
-|------|---------|
-| `/login` | 未登录用户允许访问；已登录用户访问自动跳转首页 |
-| `/dashboard` | 需要登录，无权限则跳转 `/403` |
-| `/projects` | 需要登录 |
-| `/projects/:projectId` | 需要登录（详细权限由后端接口控制）|
-| `/tasks` | 需要登录 |
-| `/tasks/:taskId` | 需要登录（详细权限由后端接口控制）|
-| `/reviews` | 需要登录 |
-| `/reviews/:requestId` | 需要登录（详细权限由后端接口控制）|
-| `/artifacts` | 需要登录 |
-| `/artifacts/:adoptedId` | 需要登录（详细权限由后端接口控制）|
-| `/statistics` | 需要登录 |
-| `/models` | 需要登录 |
-| `/403`、`/404` | 无限制 |
-
-> **注**：当前前端所有登录用户均可访问全部页面，路由级权限由后端接口控制（部分接口返回 403）。
+| # | 路由 | 页面文件 | 说明 | 主要接口 | 截图建议 |
+|---|------|----------|------|----------|---------|
+| 1 | `/login` | `pages/login/index.vue` | 登录页，支持跳转注册 | `POST /api/auth/login` | 登录页截图 |
+| 2 | `/register` | `pages/register/index.vue` | 注册页，默认分配 student_member 角色 | `POST /api/auth/register` | 注册页截图 |
+| 3 | `/dashboard` | `pages/dashboard/index.vue` | 首页仪表盘 | 无数据接口（占位） | 首页截图 |
+| 4 | `/projects` | `pages/projects/index.vue` | 项目列表（搜索/状态筛选） | `GET/POST /api/projects` | 项目列表截图 |
+| 5 | `/projects/:projectId` | `pages/projects/ProjectDetail.vue` | 项目详情，7 Tab | 详见下方 | 项目详情各 Tab 截图 |
+| 6 | `/tasks` | `pages/tasks/index.vue` | 全局任务列表 | `GET /api/projects/:id/tasks` | 任务列表截图 |
+| 7 | `/tasks/:taskId` | `pages/tasks/TaskDetail.vue` | 任务详情（分支/版本/AI生成/批注） | 详见下方 | 任务详情各功能截图 |
+| 8 | `/generate` | `pages/generate/index.vue` | AI 生成入口 | `POST /api/tasks/:id/generate` | AI 生成截图 |
+| 9 | `/prompts` | `pages/prompts/index.vue` | 提示词模板管理 | `GET /api/prompt-templates` | 模板列表截图 |
+| 10 | `/reviews` | `pages/reviews/index.vue` | 审核中心，三 Tab | `GET /api/reviews/pending` | 审核中心截图 |
+| 11 | `/artifacts` | `pages/artifacts/index.vue` | 成果库（筛选/导出） | `GET /api/projects/:id/artifacts` | 成果库截图 |
+| 12 | `/invocations` | `pages/invocations/index.vue` | 调用审计 | `GET /api/invocations` | 调用日志截图 |
+| 13 | `/costs` | `pages/costs/index.vue` | 成本统计 | `GET /api/statistics/costs` | 成本统计截图 |
+| 14 | `/statistics` | `pages/statistics/index.vue` | 统计看板 | 7 个统计接口 | 统计看板截图 |
+| 15 | `/models` | `pages/models/index.vue` | 模型管理 | `GET /api/ai-models` | 模型管理截图 |
+| 16 | `/users` | `pages/users/index.vue` | 用户管理 | `GET /api/users` | 用户管理截图 |
+| 17 | `/logs/operation` | `pages/logs/operation.vue` | 操作日志 | `GET /api/logs/operation` | 操作日志截图 |
+| 18 | `/logs/login` | `pages/logs/login.vue` | 登录日志 | `GET /api/logs/login` | 登录日志截图 |
+| 19 | `/profile` | `pages/profile/index.vue` | 个人中心 | `PUT /api/auth/me/password` | 个人中心截图 |
 
 ---
 
-## 路由嵌套关系
+## 路由文件对应关系
 
 ```
-/ (Layouts)
-├── /dashboard                    → Dashboard
-├── /projects                    → Projects (列表)
-├── /projects/:projectId         → ProjectDetail
-├── /tasks                       → Tasks (列表)
-├── /tasks/:taskId               → TaskDetail
-├── /reviews                     → Reviews (列表)
-├── /reviews/:requestId          → ReviewDetail
-├── /artifacts                   → Artifacts (列表)
-├── /artifacts/:adoptedId        → ArtifactDetail
-├── /statistics                  → StatisticsDashboard
-├── /models                      → Models
-├── /login                       → Login
-├── /403                         → 403
-└── /404                         → 404
+frontend/src/router/index.ts
+  ├── /login              → pages/login/index.vue
+  ├── /register           → pages/register/index.vue
+  ├── /dashboard          → pages/dashboard/index.vue
+  ├── /projects           → pages/projects/index.vue
+  ├── /projects/:projectId → pages/projects/ProjectDetail.vue
+  ├── /tasks             → pages/tasks/index.vue
+  ├── /tasks/:taskId     → pages/tasks/TaskDetail.vue
+  ├── /generate           → pages/generate/index.vue
+  ├── /prompts            → pages/prompts/index.vue
+  ├── /reviews            → pages/reviews/index.vue
+  ├── /artifacts          → pages/artifacts/index.vue
+  ├── /invocations        → pages/invocations/index.vue
+  ├── /costs             → pages/costs/index.vue
+  ├── /statistics         → pages/statistics/index.vue
+  ├── /models            → pages/models/index.vue
+  ├── /users             → pages/users/index.vue
+  ├── /logs/operation    → pages/logs/operation.vue
+  ├── /logs/login         → pages/logs/login.vue
+  └── /profile           → pages/profile/index.vue
 ```
 
 ---
 
-## 截图建议
+## 各路由详细说明
 
-| 页面 | 建议截图点 |
-|------|-----------|
-| `/login` | 登录表单、登录成功跳转 |
-| `/dashboard` | 流程卡片、统计数据卡片 |
-| `/projects` | 项目列表、创建项目弹窗 |
-| `/projects/:projectId` | 成员列表、任务列表、Tab 切换 |
-| `/tasks` | 任务列表、筛选条件 |
-| `/tasks/:taskId` | 分支列表、版本时间线、AI 生成面板 |
-| `/reviews` | 待审核列表、审核状态统计 |
-| `/reviews/:requestId` | 输出内容、评分弹窗 |
-| `/artifacts` | 成果列表、筛选 |
-| `/artifacts/:adoptedId` | 成果详情、版本信息 |
-| `/statistics` | 多个统计图表（概览、调用量、成本、审核质量）|
-| `/models` | 模型列表、供应商列表 |
+### 1. 登录 `/login`
+
+**页面文件**: `pages/login/index.vue`
+
+**功能**: 用户登录系统，支持跳转注册页。
+
+**主要接口**:
+- `POST /api/auth/login` — 登录认证
+- `GET /api/auth/me` — 获取当前用户信息
+
+**截图建议**: 登录页整体截图、登录成功跳转截图
+
+---
+
+### 2. 注册 `/register`
+
+**页面文件**: `pages/register/index.vue`
+
+**功能**: 用户注册，bcrypt 哈希存储密码，默认分配 student_member 角色。
+
+**主要接口**:
+- `POST /api/auth/register` — 用户注册
+
+**截图建议**: 注册页截图
+
+---
+
+### 3. 首页 `/dashboard`
+
+**页面文件**: `pages/dashboard/index.vue`
+
+**功能**: 首页仪表盘，展示系统概览和模块入口。
+
+---
+
+### 4. 项目列表 `/projects`
+
+**页面文件**: `pages/projects/index.vue`
+
+**功能**: 项目列表（搜索/状态筛选）、创建项目。
+
+**主要接口**:
+- `GET /api/projects` — 获取项目列表（分页）
+- `POST /api/projects` — 创建新项目
+
+---
+
+### 5. 项目详情 `/projects/:projectId`
+
+**页面文件**: `pages/projects/ProjectDetail.vue`
+
+**功能**: 7 Tab 专业分栏：概览/成员/任务/成果/调用/日志/统计
+
+**主要接口**:
+- `GET /api/projects/:projectId` — 项目详情
+- `GET /api/projects/:projectId/members` — 成员列表
+- `POST /api/projects/:projectId/members` — 添加成员
+- `PUT /api/projects/:projectId/members/:memberId` — 更新成员角色
+- `DELETE /api/projects/:projectId/members/:memberId` — 移除成员
+- `GET /api/projects/:projectId/tasks` — 任务列表
+- `POST /api/projects/:projectId/tasks` — 创建任务
+- `PUT /api/projects/:projectId` — 更新项目
+- `POST /api/projects/:projectId/archive` — 归档项目
+- `GET /api/statistics/projects?project_id=X` — 项目统计
+
+**截图建议**: 概览 Tab、成员 Tab、任务 Tab 各一张
+
+---
+
+### 6. 任务列表 `/tasks`
+
+**页面文件**: `pages/tasks/index.vue`
+
+**功能**: 全局任务列表，支持搜索和状态筛选。
+
+**主要接口**:
+- `GET /api/projects/:id/tasks` — 获取任务列表
+
+---
+
+### 7. 任务详情 `/tasks/:taskId`
+
+**页面文件**: `pages/tasks/TaskDetail.vue`
+
+**功能**: 任务详情 + 分支管理 + AI 生成 + 输出版本 + 批注协作 + 提交审核 + 成果采用。
+
+**主要接口**:
+- `GET /api/tasks/:taskId` — 任务详情
+- `GET /api/tasks/:taskId/branches` — 分支列表
+- `POST /api/tasks/:taskId/branches` — 创建分支
+- `POST /api/tasks/:taskId/branches/merge` — 分支合并
+- `GET /api/tasks/:taskId/outputs` — 输出列表
+- `POST /api/tasks/:taskId/generate` — AI 生成
+- `GET /api/outputs/:outputId` — 输出详情
+- `PUT /api/outputs/:outputId` — 更新输出（乐观锁）
+- `POST /api/outputs/:outputId/save-as-new-version` — 另存新版本
+- `POST /api/outputs/:outputId/submit-review` — 提交审核
+- `POST /api/outputs/:outputId/adopt` — 成果采用
+- `GET /api/outputs/:outputId/comments` — 批注列表
+- `POST /api/outputs/:outputId/comments` — 添加批注
+- `PUT /api/comments/:commentId/status` — 更新批注状态
+- `GET /api/ai-models` — 模型列表
+- `GET /api/prompt-templates` — 提示词模板
+
+**截图建议**: 任务信息、分支列表、输出版本、AI 生成弹窗、输出详情抽屉、批注列表、完成审核弹窗各一张
+
+---
+
+### 8. AI 生成 `/generate`
+
+**页面文件**: `pages/generate/index.vue`
+
+**功能**: 全局 AI 生成入口，支持选择模型和分支。
+
+**主要接口**:
+- `POST /api/tasks/:taskId/generate` — AI 生成
+- `GET /api/ai-models` — 模型列表
+- `GET /api/prompt-templates` — 模板列表
+
+---
+
+### 9. 提示词管理 `/prompts`
+
+**页面文件**: `pages/prompts/index.vue`
+
+**功能**: 提示词模板管理（模板列表 + 版本管理）。
+
+**主要接口**:
+- `GET /api/prompt-templates` — 模板列表
+- `POST /api/prompt-templates` — 创建模板
+- `PUT /api/prompt-templates/:id` — 更新模板
+- `DELETE /api/prompt-templates/:id` — 删除模板
+- `GET /api/prompt-templates/:id/versions` — 版本列表
+- `POST /api/prompt-templates/:id/versions` — 新增版本
+- `POST /api/prompt-templates/:id/versions/:vid/activate` — 激活版本
+- `GET /api/task-types` — 任务类型
+
+---
+
+### 10. 审核中心 `/reviews`
+
+**页面文件**: `pages/reviews/index.vue`
+
+**功能**: 三 Tab（待审核/我提交的/审核历史）+ 评分仪表盘 + 问题标签。
+
+**主要接口**:
+- `GET /api/reviews/pending` — 待审核列表
+- `GET /api/reviews/:requestId` — 审核详情
+- `POST /api/reviews/:requestId/complete` — 完成审核
+- `GET /api/issue-tags` — 问题标签列表
+- `GET /api/statistics/reviews` — 审核统计
+
+**截图建议**: 审核列表、审核详情抽屉、评分弹窗各一张
+
+---
+
+### 11. 成果库 `/artifacts`
+
+**页面文件**: `pages/artifacts/index.vue`
+
+**功能**: 成果列表（按项目/类型筛选）+ Markdown 导出 + 详情抽屉。
+
+**主要接口**:
+- `GET /api/projects/:id/artifacts` — 项目成果列表
+- `GET /api/artifacts/:adoptedId` — 成果详情
+
+---
+
+### 12. 调用审计 `/invocations`
+
+**页面文件**: `pages/invocations/index.vue`
+
+**功能**: 调用日志（项目/模型/状态/日期筛选）+ 详情对话框（输入/输出预览）。
+
+**主要接口**:
+- `GET /api/invocations` — 调用日志列表
+- `GET /api/invocations/:id` — 调用详情
+
+---
+
+### 13. 成本统计 `/costs`
+
+**页面文件**: `pages/costs/index.vue`
+
+**功能**: 四摘要卡片 + 筛选栏 + 按模型/按项目两 Tab + 可排序列。
+
+**主要接口**:
+- `GET /api/statistics/costs` — 成本统计
+
+---
+
+### 14. 统计看板 `/statistics`
+
+**页面文件**: `pages/statistics/index.vue`
+
+**功能**: 概览卡片 + AI 调用 + 成本 + 项目 + 审核质量 + 成员贡献 + 最近动态。
+
+**主要接口**:
+- `GET /api/statistics/overview` — 统计概览
+- `GET /api/statistics/projects` — 项目统计
+- `GET /api/statistics/model-calls` — 模型调用
+- `GET /api/statistics/costs` — 成本统计
+- `GET /api/statistics/reviews` — 审核质量
+- `GET /api/statistics/member-contributions` — 成员贡献
+- `GET /api/statistics/recent-activities` — 最近动态
+
+---
+
+### 15. 模型管理 `/models`
+
+**页面文件**: `pages/models/index.vue`
+
+**功能**: 供应商列表 + 模型列表（启用禁用）+ API Key 脱敏展示。
+
+**主要接口**:
+- `GET /api/model-providers` — 供应商列表
+- `POST /api/model-providers` — 创建供应商
+- `GET /api/ai-models` — 模型列表
+- `POST /api/ai-models` — 创建模型
+- `GET /api/api-configs` — API 配置列表
+- `POST /api/api-configs` — 创建 API 配置
+
+---
+
+### 16. 用户管理 `/users`
+
+**页面文件**: `pages/users/index.vue`
+
+**功能**: 用户列表（搜索/状态筛选）+ 启用禁用 + 角色分配。
+
+**主要接口**:
+- `GET /api/users` — 用户列表
+- `PUT /api/users/:id/status` — 启用/禁用用户
+- `PUT /api/users/:id/roles` — 分配角色
+- `GET /api/roles` — 角色列表
+
+---
+
+### 17. 操作日志 `/logs/operation`
+
+**页面文件**: `pages/logs/operation.vue`
+
+**功能**: 操作日志（操作人/对象类型/操作类型/日期筛选）+ 变更详情（old→new）。
+
+**主要接口**:
+- `GET /api/logs/operation` — 操作日志列表
+
+---
+
+### 18. 登录日志 `/logs/login`
+
+**页面文件**: `pages/logs/login.vue`
+
+**功能**: 登录日志（用户名/状态/日期筛选）+ IP/UA/失败原因。
+
+**主要接口**:
+- `GET /api/logs/login` — 登录日志列表
+
+---
+
+### 19. 个人中心 `/profile`
+
+**页面文件**: `pages/profile/index.vue`
+
+**功能**: 用户信息展示 + 修改密码。
+
+**主要接口**:
+- `GET /api/auth/me` — 获取当前用户
+- `PUT /api/auth/me/password` — 修改密码
+
+---
+
+*本文件最后更新：2026-06-02*

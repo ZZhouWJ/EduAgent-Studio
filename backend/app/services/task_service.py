@@ -1051,3 +1051,53 @@ def _comment_row_to_dict(row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at"),
     }
+
+
+# =============================================================================
+# 版本对比
+# GET /api/outputs/compare
+# =============================================================================
+
+def compare_outputs(
+    token: str,
+    output1_id: int,
+    output2_id: int,
+) -> Dict[str, Any]:
+    """
+    对比两个输出版本。
+
+    - 仅项目成员可访问
+    - 返回两个输出的完整信息用于前端对比
+    """
+    user = _require_auth(token)
+
+    output1, output2 = task_repo.get_output_versions_for_compare(output1_id, output2_id)
+
+    if output1 is None:
+        raise NotFoundException(message=f"输出版本 {output1_id} 不存在")
+    if output2 is None:
+        raise NotFoundException(message=f"输出版本 {output2_id} 不存在")
+
+    task_id1 = output1["task_id"]
+    task_id2 = output2["task_id"]
+
+    if task_id1 != task_id2:
+        raise ValidationException(message="两个输出版本必须属于同一任务")
+
+    task = task_repo.get_task_by_id(task_id1)
+    if task is None:
+        raise NotFoundException(message="关联任务不存在")
+
+    project_id = task["project_id"]
+
+    if not _can_access_project(project_id, user["user_id"]):
+        raise ForbiddenException(message="无权访问此输出版本")
+
+    return {
+        "output1": _output_detail_to_dict(output1),
+        "output2": _output_detail_to_dict(output2),
+        "task": {
+            "task_id": task["task_id"],
+            "title": task["title"],
+        },
+    }

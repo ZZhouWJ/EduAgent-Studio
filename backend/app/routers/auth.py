@@ -1,14 +1,16 @@
 """
 认证路由。
 
+POST /api/auth/register - 用户注册
 POST /api/auth/login   - 用户登录
 GET  /api/auth/me      - 当前用户
+PUT  /api/auth/me/password - 修改密码
 POST /api/auth/logout  - 登出
 """
 
 from typing import Optional
 
-from fastapi import APIRouter, Header, HTTPException, Request, status
+from fastapi import APIRouter, Body, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from app.services import auth_service
@@ -21,6 +23,21 @@ router = APIRouter(prefix="/api/auth", tags=["认证"])
 class LoginRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=50)
     password: str = Field(..., min_length=1)
+
+
+class RegisterRequest(BaseModel):
+    username: str = Field(..., min_length=1, max_length=50)
+    password: str = Field(..., min_length=6, max_length=100)
+    confirm_password: str = Field(..., min_length=6, max_length=100)
+    real_name: str = Field(..., min_length=1, max_length=50)
+    student_no: Optional[str] = Field(None, max_length=20)
+    email: Optional[str] = Field(None, max_length=100)
+    phone: Optional[str] = Field(None, max_length=20)
+
+
+class UpdatePasswordRequest(BaseModel):
+    old_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=6, max_length=100)
 
 
 def _extract_token(authorization: Optional[str]) -> str:
@@ -122,3 +139,60 @@ async def logout(
         )
 
     return success_response(data={})
+
+
+@router.post("/register")
+async def register(request: Request, body: RegisterRequest) -> dict:
+    """
+    用户注册。
+
+    注册成功后返回新用户信息，不返回 token（需登录）。
+    """
+    ip_address = _get_client_ip(request)
+    user_agent = request.headers.get("User-Agent", "")
+
+    try:
+        user = auth_service.register(
+            username=body.username,
+            password=body.password,
+            confirm_password=body.confirm_password,
+            real_name=body.real_name,
+            student_no=body.student_no,
+            email=body.email,
+            phone=body.phone,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        return success_response(data=user)
+    except Exception as e:
+        if hasattr(e, "code") and hasattr(e, "message"):
+            return error_response(message=e.message, code=e.code)
+        return error_response(message=str(e), code=4000)
+
+
+@router.put("/me/password")
+async def update_my_password(
+    request: Request,
+    body: UpdatePasswordRequest,
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+) -> dict:
+    """
+    修改当前用户密码。
+
+    需要提供旧密码进行验证。
+    """
+    token = _extract_token(authorization)
+    ip_address = _get_client_ip(request)
+    user_agent = request.headers.get("User-Agent", "")
+
+    try:
+        auth_service.update_password(
+            token=token,
+            old_password=body.old_password,
+            new_password=body.new_password,
+        )
+        return success_response(data={})
+    except Exception as e:
+        if hasattr(e, "code") and hasattr(e, "message"):
+            return error_response(message=e.message, code=e.code)
+        return error_response(message=str(e), code=4000)

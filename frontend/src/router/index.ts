@@ -1,181 +1,140 @@
+import { createRouter, createWebHashHistory } from "vue-router"
 import type { RouteRecordRaw } from "vue-router"
-import { createRouter } from "vue-router"
-import { routerConfig } from "@/router/config"
-import { registerNavigationGuard } from "@/router/guard"
-import { flatMultiLevelRoutes } from "./helper"
+import { setupGuard } from "./guard"
 
-const Layouts = () => import("@/layouts/index.vue")
-
-/**
- * @name 常驻路由
- * @description 除了 redirect/403/404/login 等隐藏页面，其他页面建议设置唯一的 Name 属性
- */
-export const constantRoutes: RouteRecordRaw[] = [
-  {
-    path: "/redirect",
-    component: Layouts,
-    meta: { hidden: true },
-    children: [
-      {
-        path: ":path(.*)",
-        component: () => import("@/pages/redirect/index.vue")
-      }
-    ]
-  },
-  {
-    path: "/403",
-    component: () => import("@/pages/error/403.vue"),
-    meta: { hidden: true }
-  },
-  {
-    path: "/404",
-    component: () => import("@/pages/error/404.vue"),
-    meta: { hidden: true },
-    alias: "/:pathMatch(.*)*"
-  },
+const routes: RouteRecordRaw[] = [
   {
     path: "/login",
+    name: "Login",
     component: () => import("@/pages/login/index.vue"),
     meta: { hidden: true }
   },
   {
+    path: "/register",
+    name: "Register",
+    component: () => import("@/pages/register/index.vue"),
+    meta: { hidden: true }
+  },
+  {
     path: "/",
-    component: Layouts,
+    component: () => import("@/layouts/BackendLayout.vue"),
     redirect: "/dashboard",
     children: [
       {
         path: "dashboard",
-        component: () => import("@/pages/dashboard/index.vue"),
         name: "Dashboard",
-        meta: {
-          title: "首页",
-          svgIcon: "dashboard",
-          affix: true
-        }
+        component: () => import("@/pages/dashboard/index.vue"),
+        meta: { title: "首页" }
       },
       {
         path: "projects",
-        component: () => import("@/pages/projects/index.vue"),
         name: "Projects",
-        meta: {
-          title: "项目空间",
-          svgIcon: "dashboard"
-        }
+        component: () => import("@/pages/projects/index.vue"),
+        meta: { title: "项目空间" }
       },
       {
         path: "projects/:projectId",
-        component: () => import("@/pages/projects/ProjectDetail.vue"),
         name: "ProjectDetail",
-        meta: {
-          title: "项目详情",
-          svgIcon: "dashboard",
-          hidden: true
-        }
+        component: () => import("@/pages/projects/ProjectDetail.vue"),
+        meta: { title: "项目详情", hidden: true }
       },
       {
         path: "tasks",
-        component: () => import("@/pages/tasks/index.vue"),
         name: "Tasks",
-        meta: {
-          title: "任务与版本",
-          svgIcon: "dashboard"
-        }
+        component: () => import("@/pages/tasks/index.vue"),
+        meta: { title: "任务与版本" }
       },
       {
         path: "tasks/:taskId",
-        component: () => import("@/pages/tasks/TaskDetail.vue"),
         name: "TaskDetail",
-        meta: {
-          title: "任务详情",
-          svgIcon: "dashboard",
-          hidden: true
-        }
+        component: () => import("@/pages/tasks/TaskDetail.vue"),
+        meta: { title: "任务详情", hidden: true }
+      },
+      {
+        path: "generate",
+        name: "Generate",
+        component: () => import("@/pages/generate/index.vue"),
+        meta: { title: "AI 生成" }
+      },
+      {
+        path: "prompts",
+        name: "Prompts",
+        component: () => import("@/pages/prompts/index.vue"),
+        meta: { title: "提示词管理" }
       },
       {
         path: "reviews",
-        component: () => import("@/pages/reviews/index.vue"),
         name: "Reviews",
-        meta: {
-          title: "审核中心",
-          svgIcon: "dashboard"
-        }
-      },
-      {
-        path: "reviews/:requestId",
-        component: () => import("@/pages/reviews/ReviewDetail.vue"),
-        name: "ReviewDetail",
-        meta: {
-          title: "审核详情",
-          svgIcon: "dashboard",
-          hidden: true
-        }
+        component: () => import("@/pages/reviews/index.vue"),
+        meta: { title: "审核中心" }
       },
       {
         path: "artifacts",
-        component: () => import("@/pages/artifacts/ArtifactList.vue"),
         name: "Artifacts",
-        meta: {
-          title: "成果库",
-          svgIcon: "dashboard"
-        }
+        component: () => import("@/pages/artifacts/index.vue"),
+        meta: { title: "成果库" }
       },
       {
-        path: "artifacts/:adoptedId",
-        component: () => import("@/pages/artifacts/ArtifactDetail.vue"),
-        name: "ArtifactDetail",
-        meta: {
-          title: "成果详情",
-          svgIcon: "dashboard",
-          hidden: true
-        }
+        path: "invocations",
+        name: "Invocations",
+        component: () => import("@/pages/invocations/index.vue"),
+        meta: { title: "调用审计" }
+      },
+      {
+        path: "costs",
+        name: "Costs",
+        component: () => import("@/pages/costs/index.vue"),
+        meta: { title: "成本统计" }
       },
       {
         path: "statistics",
-        component: () => import("@/pages/statistics/StatisticsDashboard.vue"),
         name: "Statistics",
-        meta: {
-          title: "统计看板",
-          svgIcon: "dashboard"
-        }
+        component: () => import("@/pages/statistics/index.vue"),
+        meta: { title: "统计看板" }
       },
       {
         path: "models",
-        component: () => import("@/pages/models/index.vue"),
         name: "Models",
-        meta: {
-          title: "模型管理",
-          svgIcon: "dashboard"
-        }
+        component: () => import("@/pages/models/index.vue"),
+        meta: { title: "模型管理" }
+      },
+      {
+        path: "users",
+        name: "Users",
+        component: () => import("@/pages/users/index.vue"),
+        meta: { title: "用户管理" }
+      },
+      {
+        path: "logs/operation",
+        name: "OperationLogs",
+        component: () => import("@/pages/logs/operation.vue"),
+        meta: { title: "操作日志" }
+      },
+      {
+        path: "logs/login",
+        name: "LoginLogs",
+        component: () => import("@/pages/logs/login.vue"),
+        meta: { title: "登录日志" }
+      },
+      {
+        path: "profile",
+        name: "Profile",
+        component: () => import("@/pages/profile/index.vue"),
+        meta: { title: "个人中心", hidden: true }
       }
     ]
+  },
+  {
+    path: "/:pathMatch(.*)*",
+    redirect: "/login"
   }
 ]
 
-/**
- * @name 动态路由
- * @description 本项目当前阶段不使用动态权限路由，所有登录用户均可访问全部页面
- */
-export const dynamicRoutes: RouteRecordRaw[] = []
-
-/** 路由实例 */
-export const router = createRouter({
-  history: routerConfig.history,
-  routes: routerConfig.thirdLevelRouteCache ? flatMultiLevelRoutes(constantRoutes) : constantRoutes
+const router = createRouter({
+  history: createWebHashHistory(),
+  routes
 })
 
-/** 重置路由 */
-export function resetRouter() {
-  try {
-    router.getRoutes().forEach((route) => {
-      const { name, meta } = route
-      if (name && meta.roles?.length) {
-        router.hasRoute(name) && router.removeRoute(name)
-      }
-    })
-  } catch {
-    location.reload()
-  }
-}
+setupGuard(router)
 
-// 注册路由导航守卫
-registerNavigationGuard(router)
+export default router
