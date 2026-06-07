@@ -129,7 +129,7 @@ async def list_project_tasks(
     project_id: int = Path(..., gt=0),
     authorization: Optional[str] = Header(None, alias="Authorization"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=500),
     status: Optional[str] = Query(None),
     keyword: Optional[str] = Query(None, max_length=100),
 ) -> dict:

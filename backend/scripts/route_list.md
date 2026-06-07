@@ -21,9 +21,9 @@
 | Method | Path | 函数名 | 功能说明 | 权限 |
 |--------|------|--------|----------|------|
 | POST | /api/auth/login | `login` | 用户登录，返回 token 和用户信息 | 公开 |
-| POST | /api/auth/register | `register` | 用户注册（bcrypt 哈希，分配 student_member 角色） | 公开 |
+| POST | /api/auth/register | `register` | 用户注册（bcrypt 哈希，校验 confirm_password，默认分配 student_member 角色，同事务写入用户/角色/日志） | 公开 |
 | GET | /api/auth/me | `get_me` | 获取当前登录用户信息 | 登录用户 |
-| PUT | /api/auth/me/password | `update_my_password` | 修改当前用户密码 | 登录用户 |
+| PUT | /api/auth/me/password | `update_my_password` | 修改当前用户密码（需验证旧密码） | 登录用户 |
 | POST | /api/auth/logout | `logout` | 用户登出 | 登录用户 |
 
 ### 用户与权限（/api）
@@ -187,7 +187,7 @@
 
 | Method | Path | 函数名 | 功能说明 | 权限 |
 |--------|------|--------|----------|------|
-| GET | /api/invocations | `list_invocations` | 分页查询调用日志列表 | admin：全部；普通成员：仅自己有权限项目 |
+| GET | /api/invocations | `list_invocations` | 分页查询调用日志列表（支持 project_id/task_id/model_id/status 筛选，暂不支持日期筛选） | admin：全部；普通成员：仅自己有权限项目 |
 | GET | /api/invocations/{invocation_id} | `get_invocation_detail` | 获取调用详情 | 登录用户（需有项目访问权限） |
 
 ---

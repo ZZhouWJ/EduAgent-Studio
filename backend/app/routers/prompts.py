@@ -96,7 +96,7 @@ async def list_templates(
     task_type_id: Optional[int] = Query(None, gt=0),
     keyword: Optional[str] = Query(None, max_length=100),
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=500),
 ) -> dict:
     """分页查询提示词模板列表（已登录用户均可查看）。"""
     token = _extract_token(authorization)

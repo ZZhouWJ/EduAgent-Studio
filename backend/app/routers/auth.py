@@ -33,6 +33,21 @@ class RegisterRequest(BaseModel):
     student_no: Optional[str] = Field(None, max_length=20)
     email: Optional[str] = Field(None, max_length=100)
     phone: Optional[str] = Field(None, max_length=20)
+    role_ids: Optional[list[int]] = Field(
+        None,
+        description="注册时选择的角色 ID 列表（不含 admin）",
+    )
+
+
+class UpdateProfileRequest(BaseModel):
+    real_name: str = Field(..., min_length=1, max_length=50)
+    student_no: Optional[str] = Field(None, max_length=20)
+    email: Optional[str] = Field(None, max_length=100)
+    phone: Optional[str] = Field(None, max_length=20)
+
+
+class UpdateMyRolesRequest(BaseModel):
+    role_ids: list[int] = Field(..., description="新的角色 ID 列表（不含 admin）")
 
 
 class UpdatePasswordRequest(BaseModel):
@@ -160,10 +175,72 @@ async def register(request: Request, body: RegisterRequest) -> dict:
             student_no=body.student_no,
             email=body.email,
             phone=body.phone,
+            role_ids=body.role_ids,
             ip_address=ip_address,
             user_agent=user_agent,
         )
         return success_response(data=user)
+    except Exception as e:
+        if hasattr(e, "code") and hasattr(e, "message"):
+            return error_response(message=e.message, code=e.code)
+        return error_response(message=str(e), code=4000)
+
+
+@router.put("/me")
+async def update_my_profile(
+    request: Request,
+    body: UpdateProfileRequest,
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+) -> dict:
+    """
+    修改当前用户的基本信息（用户名不可修改）。
+
+    需要提供有效的 token。
+    """
+    token = _extract_token(authorization)
+    ip_address = _get_client_ip(request)
+    user_agent = request.headers.get("User-Agent", "")
+
+    try:
+        updated_user = auth_service.update_my_profile(
+            token=token,
+            real_name=body.real_name,
+            student_no=body.student_no,
+            email=body.email,
+            phone=body.phone,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        return success_response(data=updated_user)
+    except Exception as e:
+        if hasattr(e, "code") and hasattr(e, "message"):
+            return error_response(message=e.message, code=e.code)
+        return error_response(message=str(e), code=4000)
+
+
+@router.patch("/me/roles")
+async def update_my_roles(
+    request: Request,
+    body: UpdateMyRolesRequest,
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+) -> dict:
+    """
+    当前用户修改自己的角色（不可选择 admin）。
+
+    需要提供有效的 token。
+    """
+    token = _extract_token(authorization)
+    ip_address = _get_client_ip(request)
+    user_agent = request.headers.get("User-Agent", "")
+
+    try:
+        auth_service.update_my_roles(
+            token=token,
+            role_ids=body.role_ids,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        return success_response(data={})
     except Exception as e:
         if hasattr(e, "code") and hasattr(e, "message"):
             return error_response(message=e.message, code=e.code)
@@ -196,3 +273,13 @@ async def update_my_password(
         if hasattr(e, "code") and hasattr(e, "message"):
             return error_response(message=e.message, code=e.code)
         return error_response(message=str(e), code=4000)
+
+
+@router.get("/roles")
+async def list_my_roles() -> dict:
+    """
+    获取角色列表（不含 admin，用于个人中心等普通用户页面）。
+    无需特殊权限。
+    """
+    roles = auth_service.list_roles_public()
+    return success_response(data=roles)

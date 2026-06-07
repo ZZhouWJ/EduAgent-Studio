@@ -91,7 +91,7 @@ async def list_invocations(
     model_id: Optional[int] = Query(None, gt=0),
     status: Optional[str] = Query(None, max_length=20),
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=500),
 ) -> dict:
     """
     分页查询调用日志列表。

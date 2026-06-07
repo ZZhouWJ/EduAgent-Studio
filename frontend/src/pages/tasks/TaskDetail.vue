@@ -1,19 +1,64 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue"
+import { ref, onMounted, computed } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { ArrowLeft, Cpu, ChatLineSquare, CircleCheck, Collection, View, Edit, CopyDocument } from "@element-plus/icons-vue"
 import { ElMessage } from "element-plus"
 import { tasksApi } from "@/api/tasks"
 import { modelsApi } from "@/api/models"
+import { projectsApi } from "@/api/projects"
+import { useUserStore } from "@/stores/user"
+import { useProjectRoleStore } from "@/stores/projectRole"
+import {
+  canGenerateOutput,
+  canEditOutput,
+  canCommentOutput,
+  canSubmitReview,
+  canCompleteReview,
+  canAdoptOutput,
+  canMergeBranches,
+  PROJECT_ROLE_LABEL
+} from "@/utils/permission"
+import type { ProjectRole } from "@/utils/permission"
 
 const route = useRoute()
 const router = useRouter()
 const taskId = Number(route.params.taskId)
 
+const userStore = useUserStore()
+const projectRoleStore = useProjectRoleStore()
+
 const loading = ref(false)
 const task = ref<any>(null)
 const branches = ref<any[]>([])
 const outputs = ref<any[]>([])
+
+// ── Permission helpers ────────────────────────────────────────────────────────
+
+const currentUser = computed(() => userStore.userInfo)
+
+/** Derive project_id from task data */
+const projectId = computed(() => task.value?.project_id ?? null)
+
+/** Current user's project_role */
+const myProjectRole = computed<ProjectRole | null>(() => {
+  if (!currentUser.value || !projectId.value) return null
+  return projectRoleStore.getCurrentUserProjectRole(projectId.value, currentUser.value.user_id)
+})
+
+/** Whether user can generate AI output */
+const canGenerate = computed(() => canGenerateOutput(currentUser.value, myProjectRole.value))
+/** Whether user can edit an output */
+const canEdit = computed(() => canEditOutput(currentUser.value, myProjectRole.value))
+/** Whether user can comment */
+const canComment = computed(() => canCommentOutput(currentUser.value, myProjectRole.value))
+/** Whether user can submit for review */
+const canSubmit = computed(() => canSubmitReview(currentUser.value, myProjectRole.value))
+/** Whether user can complete a review (act as reviewer) */
+const canComplete = computed(() => canCompleteReview(currentUser.value, myProjectRole.value))
+/** Whether user can adopt output as artifact */
+const canAdopt = computed(() => canAdoptOutput(currentUser.value, myProjectRole.value))
+/** Whether user can merge branches */
+const canMerge = computed(() => canMergeBranches(currentUser.value, myProjectRole.value))
 
 // AI 生成相关
 const generateDialogVisible = ref(false)
@@ -106,6 +151,12 @@ onMounted(async () => {
     task.value = taskRes.data
     branches.value = branchesRes.data || []
     outputs.value = outputsRes.data || []
+
+    // Pre-load project members so project role store is populated
+    if (task.value?.project_id) {
+      const membersRes = await projectsApi.getMembers(task.value.project_id)
+      projectRoleStore.setMembers(task.value.project_id, membersRes.data || [])
+    }
   } catch {
     // error handled
   } finally {
@@ -444,11 +495,15 @@ function getCommentStatusType(status: string) {
               size="large"
               @click="openGenerateDialog"
               style="width: 100%"
+              :disabled="!canGenerate"
             >
               <el-icon><Cpu /></el-icon>
               发起 AI 生成
             </el-button>
-            <p class="generate-tip">生成结果将出现在下方「输出版本」列表中</p>
+            <p v-if="!canGenerate" class="generate-tip" style="color: #f56c6c">
+              您暂无 AI 生成权限（请确认已加入项目）
+            </p>
+            <p v-else class="generate-tip">生成结果将出现在下方「输出版本」列表中</p>
           </div>
         </el-card>
       </el-col>
@@ -503,7 +558,7 @@ function getCommentStatusType(status: string) {
               <el-icon><View /></el-icon> 查看
             </el-button>
             <el-button
-              v-if="row.status !== 'adopted'"
+              v-if="row.status !== 'adopted' && canEdit"
               type="warning"
               size="small"
               link
@@ -511,8 +566,24 @@ function getCommentStatusType(status: string) {
             >
               <el-icon><Edit /></el-icon> 编辑
             </el-button>
+            <el-tooltip
+              v-if="row.status === 'approved' && !canAdopt"
+              content="仅项目负责人/指导教师可采纳成果"
+              placement="top"
+            >
+              <span>
+                <el-button
+                  type="success"
+                  size="small"
+                  link
+                  disabled
+                >
+                  <el-icon><Collection /></el-icon> 采用
+                </el-button>
+              </span>
+            </el-tooltip>
             <el-button
-              v-if="row.status === 'approved'"
+              v-else-if="row.status === 'approved' && canAdopt"
               type="success"
               size="small"
               link
@@ -617,15 +688,27 @@ function getCommentStatusType(status: string) {
         <!-- 操作按钮 -->
         <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px">
           <el-button
-            v-if="currentOutput?.status !== 'adopted'"
+            v-if="currentOutput?.status !== 'adopted' && canEdit"
             type="warning"
             size="small"
             @click="openEditDialog(currentOutput)"
           >
             <el-icon><Edit /></el-icon> 编辑输出
           </el-button>
+          <!-- 采用成果按钮：仅 admin/leader/teacher 可用 -->
+          <el-tooltip
+            v-if="currentOutput?.status === 'approved' && !canAdopt"
+            content="仅项目负责人/指导教师可采纳成果"
+            placement="top"
+          >
+            <span>
+              <el-button type="success" size="small" disabled>
+                <el-icon><Collection /></el-icon> 采用成果
+              </el-button>
+            </span>
+          </el-tooltip>
           <el-button
-            v-if="currentOutput?.status === 'approved'"
+            v-else-if="currentOutput?.status === 'approved' && canAdopt"
             type="success"
             size="small"
             @click="adoptDialogVisible = true"
@@ -658,9 +741,10 @@ function getCommentStatusType(status: string) {
               批注列表
               <el-tag size="small">{{ comments.length }}</el-tag>
             </div>
-            <el-button type="primary" size="small" @click="commentDialogVisible = true">
+            <el-button type="primary" size="small" @click="commentDialogVisible = true" v-if="canComment">
               添加批注
             </el-button>
+            <el-tag v-else size="small" type="info" style="cursor: default">暂无批注权限</el-tag>
           </div>
 
           <div v-loading="commentsLoading">

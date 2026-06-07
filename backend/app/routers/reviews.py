@@ -105,7 +105,7 @@ async def list_pending_reviews(
     request: Request,
     authorization: Optional[str] = Header(None, alias="Authorization"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=500),
     project_id: Optional[int] = Query(None, gt=0),
 ) -> dict:
     """查询待审核列表（分页，需有权限）。"""

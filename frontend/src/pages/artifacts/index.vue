@@ -4,6 +4,12 @@ import { View, Download } from "@element-plus/icons-vue"
 import { ElMessage } from "element-plus"
 import { artifactsApi } from "@/api/artifacts"
 import { projectsApi } from "@/api/projects"
+import { useUserStore } from "@/stores/user"
+import { useProjectRoleStore } from "@/stores/projectRole"
+import { isAdmin } from "@/utils/permission"
+
+const userStore = useUserStore()
+const projectRoleStore = useProjectRoleStore()
 
 const loading = ref(false)
 const artifacts = ref<any[]>([])
@@ -40,6 +46,20 @@ const artifactTypeMap: Record<string, string> = {
   other: "其他"
 }
 
+// ── Permission helpers ─────────────────────────────────────────────────────────
+
+const currentUser = computed(() => userStore.userInfo)
+
+/** Filter artifacts so non-admin users only see artifacts from projects they are members of */
+function filterByProjectMembership(items: any[]): any[] {
+  if (isAdmin(currentUser.value)) return items
+  return items.filter(a => {
+    if (!a.project_id || !currentUser.value) return false
+    const role = projectRoleStore.getCurrentUserProjectRole(a.project_id, currentUser.value.user_id)
+    return role !== null
+  })
+}
+
 onMounted(async () => {
   await loadProjectOptions()
   await loadArtifacts()
@@ -47,32 +67,55 @@ onMounted(async () => {
 
 async function loadProjectOptions() {
   try {
-    const res = await projectsApi.list({ page: 1, page_size: 100 })
-    projectOptions.value = res.data?.items || []
+    const res = await projectsApi.list({ page: 1, page_size: 200 })
+    const allProjects = res.data?.items || []
+
+    // Admin sees all projects; others only see projects they belong to
+    if (isAdmin(currentUser.value)) {
+      projectOptions.value = allProjects
+    } else {
+      const accessible: any[] = []
+      for (const p of allProjects) {
+        await ensureProjectMembers(p.project_id)
+        const role = projectRoleStore.getCurrentUserProjectRole(p.project_id, currentUser.value?.user_id ?? 0)
+        if (role !== null) accessible.push(p)
+      }
+      projectOptions.value = accessible
+    }
   } catch {
     projectOptions.value = []
   }
+}
+
+async function ensureProjectMembers(projectId: number) {
+  if (projectRoleStore.getMembers(projectId).length > 0) return
+  try {
+    const res = await projectsApi.getMembers(projectId)
+    projectRoleStore.setMembers(projectId, res.data || [])
+  } catch { /* ignore */ }
 }
 
 async function loadArtifacts() {
   loading.value = true
   try {
     let res
-    if (filterProjectId.value) {
-      res = await artifactsApi.list(filterProjectId.value, {
+    // If no project filter is set, use the first accessible project as default
+    const targetProjectId = filterProjectId.value ?? projectOptions.value[0]?.project_id ?? null
+
+    if (targetProjectId) {
+      res = await artifactsApi.list(targetProjectId, {
         page: page.value, page_size: pageSize.value,
         artifact_type: filterArtifactType.value || undefined
       })
-      artifacts.value = res.data?.items || []
+      let items = res.data?.items || []
+      // Apply project membership filter for non-admin users
+      items = filterByProjectMembership(items)
+      artifacts.value = items
+      total.value = items.length
     } else {
-      // Fetch from all projects - just load the first project's artifacts
-      res = await artifactsApi.list(projectOptions.value[0]?.project_id, {
-        page: page.value, page_size: pageSize.value,
-        artifact_type: filterArtifactType.value || undefined
-      })
-      artifacts.value = res.data?.items || []
+      artifacts.value = []
+      total.value = 0
     }
-    total.value = res.data?.total || 0
   } catch {
     artifacts.value = []
     total.value = 0

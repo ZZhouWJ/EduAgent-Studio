@@ -384,18 +384,22 @@ def list_users(
     return rows, total
 
 
-def list_roles() -> List[Dict[str, Any]]:
+def list_roles(include_admin: bool = True) -> List[Dict[str, Any]]:
     """
     查询所有可用角色（不含软删除）。
 
-    Returns:
-        角色列表
+    Args:
+        include_admin: 是否包含 admin 角色，默认 True。
     """
-    sql = """
+    if include_admin:
+        where_clause = "is_deleted = 0"
+    else:
+        where_clause = "is_deleted = 0 AND role_code != 'admin'"
+    sql = f"""
         SELECT role_id, role_name, role_code, description, status,
                created_at, updated_at
         FROM roles
-        WHERE is_deleted = 0
+        WHERE {where_clause}
         ORDER BY created_at ASC
     """
     with get_db_cursor() as cursor:
@@ -555,6 +559,40 @@ def assign_default_role_with_conn(
         cursor.close()
 
 
+def assign_roles_with_conn(
+    conn,
+    user_id: int,
+    role_ids: Optional[list[int]] = None,
+) -> None:
+    """
+    为新用户分配角色（在外部事务中执行）。
+
+    若 role_ids 为 None，则分配默认角色 student_member。
+
+    Args:
+        conn: 外部传入的数据库连接
+        user_id: 用户 ID
+        role_ids: 角色 ID 列表（不含 admin），或 None 表示默认角色
+    """
+    if role_ids is None or len(role_ids) == 0:
+        assign_default_role_with_conn(conn, user_id)
+        return
+
+    now = datetime.now()
+    cursor = conn.cursor()
+    try:
+        for role_id in role_ids:
+            cursor.execute(
+                """
+                INSERT INTO user_roles (user_id, role_id, is_deleted, created_at)
+                VALUES (%s, %s, 0, %s)
+                """,
+                (user_id, role_id, now),
+            )
+    finally:
+        cursor.close()
+
+
 def check_username_exists(username: str) -> bool:
     """
     检查用户名是否已存在。
@@ -613,6 +651,43 @@ def update_user_status(user_id: int, status: str) -> int:
     with get_db_cursor() as cursor:
         cursor.execute(sql, (status, datetime.now(), user_id))
         return cursor.rowcount
+
+
+def update_user_profile(
+    user_id: int,
+    real_name: str,
+    student_no: Optional[str] = None,
+    email: Optional[str] = None,
+    phone: Optional[str] = None,
+) -> bool:
+    """
+    更新用户基本信息（用户名不可修改）。
+
+    Args:
+        user_id: 用户 ID
+        real_name: 真实姓名
+        student_no: 学号（可选）
+        email: 邮箱（可选）
+        phone: 手机号（可选）
+
+    Returns:
+        True 表示更新成功，False 表示无记录被更新
+    """
+    sql = """
+        UPDATE users
+        SET real_name = %s, student_no = %s, email = %s, phone = %s, updated_at = %s
+        WHERE user_id = %s AND is_deleted = 0
+    """
+    with get_db_cursor() as cursor:
+        cursor.execute(sql, (
+            real_name,
+            student_no,
+            email,
+            phone,
+            datetime.now(),
+            user_id,
+        ))
+        return cursor.rowcount > 0
 
 
 def update_user_roles(user_id: int, role_ids: List[int]) -> None:

@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { ref } from "vue"
+import { ref, onMounted } from "vue"
 import { useRouter } from "vue-router"
 import { Lock, User } from "@element-plus/icons-vue"
 import { ElMessage } from "element-plus"
-import { authApi } from "@/api/auth"
+import { authApi, type Role } from "@/api/auth"
 
 const router = useRouter()
 
 const loading = ref(false)
+const roles = ref<Role[]>([])
+const selectedRoleIds = ref<number[]>([])
+
 const registerForm = ref({
   username: "",
   real_name: "",
@@ -16,6 +19,17 @@ const registerForm = ref({
   phone: "",
   password: "",
   confirm_password: ""
+})
+
+onMounted(async () => {
+  try {
+    const res = await authApi.listRoles()
+    roles.value = (res.data as any).filter(
+      (r: Role) => r.role_code !== "admin"
+    )
+  } catch {
+    // roles load failed, ignore
+  }
 })
 
 async function handleRegister() {
@@ -32,7 +46,8 @@ async function handleRegister() {
       email: registerForm.value.email || undefined,
       phone: registerForm.value.phone || undefined,
       password: registerForm.value.password,
-      confirm_password: registerForm.value.confirm_password
+      confirm_password: registerForm.value.confirm_password,
+      role_ids: selectedRoleIds.value.length > 0 ? selectedRoleIds.value : undefined
     })
     ElMessage.success("注册成功，请登录")
     router.push("/login")
@@ -96,6 +111,23 @@ function goToLogin() {
             size="large"
             clearable
           />
+        </el-form-item>
+        <el-form-item label="选择角色（选填）">
+          <el-select
+            v-model="selectedRoleIds"
+            multiple
+            placeholder="请选择角色（可选，不选则为学生成员）"
+            size="large"
+            style="width: 100%"
+            clearable
+          >
+            <el-option
+              v-for="role in roles"
+              :key="role.role_id"
+              :label="role.role_name + (role.description ? ' - ' + role.description : '')"
+              :value="role.role_id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item>
           <el-input

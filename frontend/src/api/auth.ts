@@ -8,6 +8,7 @@ export interface RegisterParams {
   student_no?: string
   email?: string
   phone?: string
+  role_ids?: number[]
 }
 
 export interface User {
@@ -27,6 +28,13 @@ export interface Role {
   role_name: string
   role_code: string
   description?: string
+}
+
+export interface UpdateProfileParams {
+  real_name: string
+  student_no?: string
+  email?: string
+  phone?: string
 }
 
 export const authApi = {
@@ -56,6 +64,14 @@ export const authApi = {
     })
   },
 
+  updateProfile(data: UpdateProfileParams) {
+    return request.put("/api/auth/me", data)
+  },
+
+  updateMyRoles(role_ids: number[]) {
+    return request.patch("/api/auth/me/roles", { role_ids })
+  },
+
   listUsers(params?: { page?: number; page_size?: number; keyword?: string; status?: string }) {
     return request.get<{ data: { items: User[]; total: number } }>("/api/users", { params })
   },
@@ -69,6 +85,6 @@ export const authApi = {
   },
 
   listRoles() {
-    return request.get<{ data: Role[] }>("/api/roles")
+    return request.get<{ data: Role[] }>("/api/auth/roles")
   }
 }

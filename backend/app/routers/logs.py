@@ -34,7 +34,7 @@ def _resolve_current_user(authorization: Optional[str]) -> dict:
 async def list_operation_logs(
     authorization: Optional[str] = Header(None, alias="Authorization"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=500),
     user_id: Optional[int] = Query(None, description="按用户 ID 过滤"),
     target_type: Optional[str] = Query(None, description="按目标类型过滤（project/task/output/review）"),
     action_type: Optional[str] = Query(None, description="按操作类型过滤"),
@@ -64,7 +64,7 @@ async def list_operation_logs(
 async def list_login_logs(
     authorization: Optional[str] = Header(None, alias="Authorization"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=500),
     user_id: Optional[int] = Query(None, description="按用户 ID 过滤"),
     login_status: Optional[str] = Query(None, description="按登录状态过滤（success/failed）"),
     start_date: Optional[str] = Query(None, description="开始日期（YYYY-MM-DD）"),

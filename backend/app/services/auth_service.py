@@ -175,6 +175,7 @@ def register(
     student_no: Optional[str] = None,
     email: Optional[str] = None,
     phone: Optional[str] = None,
+    role_ids: Optional[list[int]] = None,
     ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -185,9 +186,10 @@ def register(
     1. 校验两次密码一致
     2. 校验参数（username 非空，password 至少 6 字符）
     3. 检查用户名是否已存在
-    4. bcrypt 哈希密码
-    5. 在同一事务内：创建用户 -> 分配默认角色 -> 写入操作日志
-    6. 事务失败整体回滚
+    4. 校验 role_ids 不含 admin
+    5. bcrypt 哈希密码
+    6. 在同一事务内：创建用户 -> 分配角色 -> 写入操作日志
+    7. 事务失败整体回滚
 
     Args:
         username: 用户名
@@ -197,6 +199,7 @@ def register(
         student_no: 学号（可选）
         email: 邮箱（可选）
         phone: 手机号（可选）
+        role_ids: 注册时选择的角色 ID 列表（不含 admin，可选）
         ip_address: 客户端 IP
         user_agent: 客户端 UA
 
@@ -221,6 +224,9 @@ def register(
     if user_repo.check_username_exists(username):
         raise ConflictException(message="用户名已存在")
 
+    if role_ids is not None:
+        _validate_role_ids_for_user(role_ids)
+
     password_hash = hash_password(password)
 
     from app.database import get_db_transaction
@@ -236,7 +242,11 @@ def register(
             created_by=None,
         )
 
-        user_repo.assign_default_role_with_conn(conn=conn, user_id=user_id)
+        user_repo.assign_roles_with_conn(
+            conn=conn,
+            user_id=user_id,
+            role_ids=role_ids,
+        )
 
         user_repo.insert_operation_log_with_conn(
             conn=conn,
@@ -300,3 +310,128 @@ def update_password(
 
     new_hash = hash_password(new_password)
     user_repo.update_password(user_id, new_hash)
+
+
+def list_roles_public() -> list[dict]:
+    """获取角色列表（不含 admin），无需认证。"""
+    return user_repo.list_roles(include_admin=False)
+
+
+# =============================================================================
+# 用户自主角色与资料管理
+# =============================================================================
+
+def _validate_role_ids_for_user(role_ids: list[int]) -> None:
+    """
+    校验 role_ids 不包含 admin。
+
+    Raises:
+        ValidationException: 如果包含 admin 角色
+    """
+    all_roles = user_repo.list_roles()
+    admin_role_ids = {r["role_id"] for r in all_roles if r["role_code"] == "admin"}
+    for rid in role_ids:
+        if rid in admin_role_ids:
+            raise ValidationException(message="无法选择管理员角色")
+
+
+def update_my_profile(
+    token: str,
+    real_name: str,
+    student_no: Optional[str] = None,
+    email: Optional[str] = None,
+    phone: Optional[str] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    当前用户修改自己的基本信息（用户名不可修改）。
+
+    Args:
+        token: 当前用户的 JWT token
+        real_name: 真实姓名
+        student_no: 学号（可选）
+        email: 邮箱（可选）
+        phone: 手机号（可选）
+        ip_address: 客户端 IP
+        user_agent: 客户端 UA
+
+    Returns:
+        更新后的用户信息
+    """
+    user = get_current_user(token)
+    if user is None:
+        raise UnauthorizedException(message="未登录或登录已过期，请重新登录")
+
+    if not real_name or not real_name.strip():
+        raise ValidationException(message="真实姓名不能为空")
+
+    user_id = user["user_id"]
+
+    updated = user_repo.update_user_profile(
+        user_id=user_id,
+        real_name=real_name.strip(),
+        student_no=(student_no.strip() if student_no else None),
+        email=(email.strip() if email else None),
+        phone=(phone.strip() if phone else None),
+    )
+
+    if not updated:
+        raise UnauthorizedException(message="用户不存在或无权更新")
+
+    user_repo.insert_operation_log(
+        user_id=user_id,
+        action_type="profile:update",
+        action_desc="更新个人基本信息",
+        target_type="user",
+        target_id=user_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+
+    return {
+        "user_id": user_id,
+        "real_name": real_name.strip(),
+        "student_no": (student_no.strip() if student_no else None),
+        "email": (email.strip() if email else None),
+        "phone": (phone.strip() if phone else None),
+    }
+
+
+def update_my_roles(
+    token: str,
+    role_ids: list[int],
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
+) -> None:
+    """
+    当前用户修改自己的角色（不可选择 admin）。
+
+    Args:
+        token: 当前用户的 JWT token
+        role_ids: 新的角色 ID 列表（不含 admin）
+        ip_address: 客户端 IP
+        user_agent: 客户端 UA
+
+    Raises:
+        UnauthorizedException: 未登录或 token 无效
+        ValidationException: 包含 admin 角色
+    """
+    user = get_current_user(token)
+    if user is None:
+        raise UnauthorizedException(message="未登录或登录已过期，请重新登录")
+
+    _validate_role_ids_for_user(role_ids)
+
+    user_id = user["user_id"]
+    user_repo.update_user_roles(user_id, role_ids)
+
+    user_repo.insert_operation_log(
+        user_id=user_id,
+        action_type="role:update",
+        action_desc="更新个人角色",
+        target_type="user",
+        target_id=user_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )

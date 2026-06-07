@@ -25,10 +25,23 @@ import { invocationsApi } from "@/api/invocations"
 import type { Artifact } from "@/api/artifacts"
 import type { Invocation } from "@/api/invocations"
 import type { RecentActivity } from "@/api/statistics"
+import { useUserStore } from "@/stores/user"
+import { useProjectRoleStore } from "@/stores/projectRole"
+import {
+  canManageProject,
+  canManageMembers,
+  canCreateTask,
+  isAdmin,
+  PROJECT_ROLE_LABEL
+} from "@/utils/permission"
+import type { ProjectRole } from "@/utils/permission"
 
 const route = useRoute()
 const router = useRouter()
 const projectId = Number(route.params.projectId)
+
+const userStore = useUserStore()
+const projectRoleStore = useProjectRoleStore()
 
 const loading = ref(false)
 const project = ref<any>(null)
@@ -86,19 +99,20 @@ const operationLogsPageSize = ref(10)
 // Statistics data
 const projectStats = ref<any>(null)
 
-// Task types map
-const taskTypeNameMap: Record<number, string> = {}
+// Task types map — populated from /api/task-types on mount
+const taskTypeNameMap = ref<Record<number, string>>({})
 
+// Fallback task types (English labels, no encoding risk) — used only if API fails
 const taskTypes = [
-  { task_type_id: 1, type_name: "需求分析" },
-  { task_type_id: 2, type_name: "数据库设计" },
-  { task_type_id: 3, type_name: "SQL 编写" },
-  { task_type_id: 4, type_name: "摘要润色" },
-  { task_type_id: 5, type_name: "文献综述" },
-  { task_type_id: 6, type_name: "PPT 撰写" },
-  { task_type_id: 7, type_name: "提案修订" },
-  { task_type_id: 8, type_name: "实验总结" },
-  { task_type_id: 9, type_name: "代码注释" }
+  { task_type_id: 1, type_name: "Requirement Analysis" },
+  { task_type_id: 2, type_name: "DB Schema Design" },
+  { task_type_id: 3, type_name: "SQL Explanation" },
+  { task_type_id: 4, type_name: "Abstract Polish" },
+  { task_type_id: 5, type_name: "Literature Summary" },
+  { task_type_id: 6, type_name: "PPT Copywriting" },
+  { task_type_id: 7, type_name: "Proposal Revision" },
+  { task_type_id: 8, type_name: "Experiment Summary" },
+  { task_type_id: 9, type_name: "Code Annotation" }
 ]
 
 const createTaskDialogVisible = ref(false)
@@ -119,6 +133,27 @@ const priorityOptions = [
   { label: "紧急", value: "urgent" }
 ]
 
+// ── Permission helpers ────────────────────────────────────────────────────────
+
+const currentUser = computed(() => userStore.userInfo)
+
+/** Current user's project_role in this project */
+const myProjectRole = computed<ProjectRole | null>(() => {
+  if (!currentUser.value) return null
+  return projectRoleStore.getCurrentUserProjectRole(projectId, currentUser.value.user_id)
+})
+
+/** Can edit/archive project settings */
+const canManage = computed(() => canManageProject(currentUser.value, myProjectRole.value))
+
+/** Can add/remove members, change roles */
+const canManageMembersHere = computed(() => canManageMembers(currentUser.value, myProjectRole.value))
+
+/** Can create tasks */
+const canCreateTasks = computed(() => canCreateTask(currentUser.value, myProjectRole.value))
+
+// ── Lifecycle ────────────────────────────────────────────────────────────────
+
 onMounted(async () => {
   loading.value = true
   try {
@@ -126,7 +161,8 @@ onMounted(async () => {
     project.value = projRes.data
     await Promise.all([
       loadMembers(),
-      loadProjectStats()
+      loadProjectStats(),
+      loadTaskTypes()
     ])
   } catch {
     ElMessage.error("加载项目信息失败")
@@ -136,15 +172,21 @@ onMounted(async () => {
 })
 
 async function loadTaskTypes() {
-  if (Object.keys(taskTypeNameMap).length > 0) return
+  // Already populated from API — skip
+  if (Object.keys(taskTypeNameMap.value).length > 0) return
   try {
     const { modelsApi } = await import("@/api/models")
     const res = await modelsApi.getTaskTypes()
-    res.data.forEach((t: any) => {
-      taskTypeNameMap[t.task_type_id] = t.type_name
+    const items = res.data || []
+    // Populate the reactive map (used by getTaskTypeName)
+    taskTypeNameMap.value = {}
+    items.forEach((t: any) => {
+      taskTypeNameMap.value[t.task_type_id] = t.type_name
     })
+    // Also update the taskTypes select options array
+    taskTypes.splice(0, taskTypes.length, ...items)
   } catch {
-    // use fallback
+    // API failed — keep English fallback in taskTypes, taskTypeNameMap stays empty
   }
 }
 
@@ -152,6 +194,8 @@ async function loadMembers() {
   try {
     const res = await projectsApi.getMembers(projectId)
     members.value = res.data || []
+    // Cache members in project role store for permission checks
+    projectRoleStore.setMembers(projectId, members.value)
   } catch {
     members.value = []
   }
@@ -333,7 +377,7 @@ function formatDate(dateStr: string) {
 }
 
 function getTaskTypeName(taskTypeId: number) {
-  return taskTypeNameMap[taskTypeId] || taskTypes.find(t => t.task_type_id === taskTypeId)?.type_name || "未知"
+  return taskTypeNameMap.value[taskTypeId] || taskTypes.find(t => t.task_type_id === taskTypeId)?.type_name || "未知"
 }
 
 function getStatusType(status: string) {
@@ -431,7 +475,11 @@ function getInvocationStatusType(status: string): string {
           <el-icon><ArrowLeft /></el-icon> 返回项目列表
         </el-button>
         <div class="header-actions">
-          <el-button type="primary" @click="openCreateTaskDialog" v-if="activeTab === 'tasks'">
+          <!-- 项目角色提示标签 -->
+          <el-tag v-if="myProjectRole" size="small" type="warning">
+            我的项目角色：{{ PROJECT_ROLE_LABEL[myProjectRole] || myProjectRole }}
+          </el-tag>
+          <el-button type="primary" @click="openCreateTaskDialog" v-if="activeTab === 'tasks' && canCreateTasks">
             <el-icon><Plus /></el-icon> 创建任务
           </el-button>
         </div>
@@ -523,9 +571,12 @@ function getInvocationStatusType(status: string): string {
         <!-- Tab 2: 成员 -->
         <el-tab-pane label="成员" name="members">
           <div style="margin-bottom: 12px">
-            <el-button type="primary" @click="addMemberDialogVisible = true">
-              <el-icon><UserPlus /></el-icon> 添加成员
+            <el-button type="primary" @click="addMemberDialogVisible = true" v-if="canManageMembersHere">
+              <el-icon><Plus /></el-icon> 添加成员
             </el-button>
+            <el-tag v-else-if="myProjectRole" size="small" type="info" style="margin-left: 8px">
+              您是 {{ PROJECT_ROLE_LABEL[myProjectRole] || myProjectRole }}，无添加成员权限
+            </el-tag>
           </div>
           <el-table :data="members" stripe>
             <el-table-column prop="real_name" label="真实姓名" min-width="120" />
@@ -543,9 +594,16 @@ function getInvocationStatusType(status: string): string {
             </el-table-column>
             <el-table-column label="操作" width="100" fixed="right">
               <template #default="{ row }">
-                <el-button type="danger" size="small" link @click="handleRemoveMember(row)">
+                <el-button
+                  v-if="canManageMembersHere && row.user_id !== currentUser?.user_id"
+                  type="danger"
+                  size="small"
+                  link
+                  @click="handleRemoveMember(row)"
+                >
                   <el-icon><Delete /></el-icon>
                 </el-button>
+                <span v-else-if="row.user_id === currentUser?.user_id" style="color: #909399; font-size: 12px">本人</span>
               </template>
             </el-table-column>
           </el-table>
@@ -564,7 +622,7 @@ function getInvocationStatusType(status: string): string {
               <el-option label="已通过" value="approved" />
               <el-option label="已采纳" value="adopted" />
             </el-select>
-            <el-button type="primary" @click="openCreateTaskDialog">
+            <el-button type="primary" @click="openCreateTaskDialog" v-if="canCreateTasks">
               <el-icon><Plus /></el-icon> 创建任务
             </el-button>
           </div>

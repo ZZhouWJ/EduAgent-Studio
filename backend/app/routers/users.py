@@ -54,7 +54,7 @@ class UpdateRolesBody(BaseModel):
 async def list_users(
     authorization: Optional[str] = Header(None, alias="Authorization"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=500),
     keyword: Optional[str] = Query(None),
     status: Optional[str] = Query(None, description="按状态过滤（active/inactive/suspended）"),
 ) -> dict:
@@ -130,7 +130,7 @@ async def list_roles(
     authorization: Optional[str] = Header(None, alias="Authorization"),
 ) -> dict:
     """
-    获取角色列表。
+    获取角色列表（不含 admin）。
 
     登录用户均可访问。
     """
@@ -139,7 +139,7 @@ async def list_roles(
     except (UnauthorizedException, ForbiddenException):
         raise
 
-    roles = user_service.list_roles_service()
+    roles = auth_service.list_roles_public()
     return success_response(data=roles)
 
 

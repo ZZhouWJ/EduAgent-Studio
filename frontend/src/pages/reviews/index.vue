@@ -1,9 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue"
+import { ref, onMounted, computed } from "vue"
 import { View } from "@element-plus/icons-vue"
 import { ElMessage } from "element-plus"
 import { reviewsApi } from "@/api/reviews"
 import { statisticsApi } from "@/api/statistics"
+import { useUserStore } from "@/stores/user"
+import { useProjectRoleStore } from "@/stores/projectRole"
+import { isAdmin, canCompleteReview } from "@/utils/permission"
+import type { ProjectRole } from "@/utils/permission"
+
+const userStore = useUserStore()
+const projectRoleStore = useProjectRoleStore()
 
 const activeTab = ref("pending")
 const loading = ref(false)
@@ -48,6 +55,34 @@ const completeForm = ref({
 // Stats
 const reviewStats = ref<any>(null)
 
+// ── Permission helpers ─────────────────────────────────────────────────────────
+
+const currentUser = computed(() => userStore.userInfo)
+
+/** Whether the current user can complete a review (act as reviewer) */
+function userCanCompleteReview(review: any): boolean {
+  if (isAdmin(currentUser.value)) return true
+  if (!currentUser.value) return false
+  // If the user is assigned as the reviewer, they can complete it
+  if (review.reviewer_id === currentUser.value.user_id) return true
+  // Otherwise, check project role
+  if (!review.project_id) return false
+  const role = projectRoleStore.getCurrentUserProjectRole(review.project_id, currentUser.value.user_id)
+  return canCompleteReview(currentUser.value, role)
+}
+
+/** Load project members so the role store is populated for permission checks */
+async function ensureProjectMembers(projectId: number) {
+  if (!currentUser.value) return
+  const existing = projectRoleStore.getMembers(projectId)
+  if (existing.length > 0) return
+  try {
+    const { projectsApi: projApi } = await import("@/api/projects")
+    const res = await projApi.getMembers(projectId)
+    projectRoleStore.setMembers(projectId, res.data || [])
+  } catch { /* ignore */ }
+}
+
 onMounted(async () => {
   await Promise.all([loadProjectOptions(), loadReviewStats()])
   await loadData()
@@ -76,13 +111,32 @@ async function loadData() {
   loading.value = true
   try {
     if (activeTab.value === "pending") {
+      // Pre-load members for all projects in the list so permission checks work
+      for (const p of projectOptions.value) {
+        await ensureProjectMembers(p.project_id)
+      }
+
       const res = await reviewsApi.getPending({
         page: page.value, page_size: pageSize.value,
         project_id: filterProjectId.value || undefined,
         reviewer_id: filterReviewerId.value || undefined
       })
-      pendingReviews.value = res.data?.items || []
-      total.value = res.data?.total || 0
+      let items = res.data?.items || []
+
+      // Non-admin users can only see reviews where they are the assigned reviewer,
+      // or reviews for projects they are members of
+      if (!isAdmin(currentUser.value)) {
+        items = items.filter((r: any) => {
+          // See reviews assigned to the current user
+          if (r.reviewer_id === currentUser.value?.user_id) return true
+          // See reviews from projects the user is a member of
+          const role = projectRoleStore.getCurrentUserProjectRole(r.project_id, currentUser.value?.user_id ?? 0)
+          return role !== null
+        })
+      }
+
+      pendingReviews.value = items
+      total.value = items.length
     } else if (activeTab.value === "submitted") {
       // Use the same API with different params
       const res = await reviewsApi.getPending({
@@ -90,8 +144,15 @@ async function loadData() {
         project_id: filterProjectId.value || undefined,
         status: "submitted"
       })
-      mySubmittedReviews.value = res.data?.items || []
-      total.value = res.data?.total || 0
+      let items = res.data?.items || []
+
+      // Non-admin users only see their own submitted reviews
+      if (!isAdmin(currentUser.value)) {
+        items = items.filter((r: any) => r.submitter_id === currentUser.value?.user_id)
+      }
+
+      mySubmittedReviews.value = items
+      total.value = items.length
     } else {
       // All reviews
       const res = await reviewsApi.getPending({
@@ -99,8 +160,18 @@ async function loadData() {
         project_id: filterProjectId.value || undefined,
         status: "approved,rejected,revision_required"
       })
-      reviewHistory.value = res.data?.items || []
-      total.value = res.data?.total || 0
+      let items = res.data?.items || []
+
+      // Non-admin users only see reviews from projects they are members of
+      if (!isAdmin(currentUser.value)) {
+        items = items.filter((r: any) => {
+          const role = projectRoleStore.getCurrentUserProjectRole(r.project_id, currentUser.value?.user_id ?? 0)
+          return role !== null
+        })
+      }
+
+      reviewHistory.value = items
+      total.value = items.length
     }
   } catch {
     total.value = 0
@@ -333,8 +404,13 @@ function computeAvgScore(review: any) {
             <el-button type="primary" size="small" link @click="viewReview(row.request_id)">
               <el-icon><View /></el-icon> 详情
             </el-button>
-            <el-button v-if="row.request_status === 'pending'" type="success" size="small" link
-              @click="openCompleteDialog(row)">
+            <el-button
+              v-if="row.request_status === 'pending' && userCanCompleteReview(row)"
+              type="success"
+              size="small"
+              link
+              @click="openCompleteDialog(row)"
+            >
               完成审核
             </el-button>
           </template>
@@ -409,9 +485,21 @@ function computeAvgScore(review: any) {
           </el-card>
 
           <div v-if="currentReview.request_status === 'pending'" style="margin-top: 20px">
-            <el-button type="success" size="large" @click="openCompleteDialog(currentReview)">
+            <el-button
+              v-if="canComplete"
+              type="success"
+              size="large"
+              @click="openCompleteDialog(currentReview)"
+            >
               完成审核
             </el-button>
+            <el-alert
+              v-else
+              type="warning"
+              :closable="false"
+              show-icon
+              description="您没有审核权限，只有项目负责人、指导教师或审核员才能完成审核"
+            />
           </div>
         </template>
       </div>

@@ -3,7 +3,7 @@ import { ref, onMounted } from "vue"
 import { Search, RefreshRight } from "@element-plus/icons-vue"
 import { ElMessage } from "element-plus"
 import { logsApi } from "@/api/logs"
-import { projectsApi } from "@/api/projects"
+import { usersApi } from "@/api/users"
 
 const loading = ref(false)
 const tableData = ref<any[]>([])
@@ -56,14 +56,8 @@ onMounted(() => {
 async function loadUsers() {
   usersLoading.value = true
   try {
-    const res = await projectsApi.list({ page: 1, page_size: 1000 })
-    // Fetch all users from user list endpoint
-    const { data } = await import("@/api/auth").then(m => m.authApi.getCurrentUser().catch(() => ({ data: null })))
-    // Load users via a simple fetch
-    const usersRes = await fetch("/api/users?page=1&page_size=1000", {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }
-    }).then(r => r.json()).catch(() => ({ data: { items: [] } }))
-    userList.value = usersRes.data?.items || []
+    const res = await usersApi.list({ page: 1, page_size: 500 })
+    userList.value = res.data?.items || []
   } catch {
     userList.value = []
   } finally {

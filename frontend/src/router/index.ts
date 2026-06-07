@@ -2,6 +2,18 @@ import { createRouter, createWebHashHistory } from "vue-router"
 import type { RouteRecordRaw } from "vue-router"
 import { setupGuard } from "./guard"
 
+/**
+ * Route meta.roles defines which system-level roles can access the route.
+ * [] (empty) means any authenticated user can access.
+ * ["admin"] means only admin users can access.
+ * ["admin", "teacher"] means admin or teacher can access.
+ *
+ * Project-scoped routes (/projects/:id, /tasks/:id) do not use meta.roles
+ * because their permission depends on project_role (fetched at runtime).
+ */
+
+type Role = "admin" | "teacher" | "student_member" | "project_leader"
+
 const routes: RouteRecordRaw[] = [
   {
     path: "/login",
@@ -13,6 +25,12 @@ const routes: RouteRecordRaw[] = [
     path: "/register",
     name: "Register",
     component: () => import("@/pages/register/index.vue"),
+    meta: { hidden: true }
+  },
+  {
+    path: "/403",
+    name: "Forbidden",
+    component: () => import("@/pages/403/index.vue"),
     meta: { hidden: true }
   },
   {
@@ -96,25 +114,25 @@ const routes: RouteRecordRaw[] = [
         path: "models",
         name: "Models",
         component: () => import("@/pages/models/index.vue"),
-        meta: { title: "模型管理" }
+        meta: { title: "模型管理", roles: ["admin"] }
       },
       {
         path: "users",
         name: "Users",
         component: () => import("@/pages/users/index.vue"),
-        meta: { title: "用户管理" }
+        meta: { title: "用户管理", roles: ["admin"] }
       },
       {
         path: "logs/operation",
         name: "OperationLogs",
         component: () => import("@/pages/logs/operation.vue"),
-        meta: { title: "操作日志" }
+        meta: { title: "操作日志", roles: ["admin"] }
       },
       {
         path: "logs/login",
         name: "LoginLogs",
         component: () => import("@/pages/logs/login.vue"),
-        meta: { title: "登录日志" }
+        meta: { title: "登录日志", roles: ["admin"] }
       },
       {
         path: "profile",

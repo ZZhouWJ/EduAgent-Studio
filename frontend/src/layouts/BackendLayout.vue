@@ -2,6 +2,7 @@
 import { computed } from "vue"
 import { useUserStore } from "@/stores/user"
 import { useRouter, useRoute } from "vue-router"
+import { useProjectRoleStore } from "@/stores/projectRole"
 import {
   House,
   Folder,
@@ -21,54 +22,35 @@ import {
   Document,
   Key
 } from "@element-plus/icons-vue"
+import { isAdmin, isTeacher, GLOBAL_ROLE_LABEL } from "@/utils/permission"
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const projectRoleStore = useProjectRoleStore()
 
 const activeMenu = computed(() => route.path)
+const user = computed(() => userStore.userInfo)
 
-const menuGroups = [
-  {
-    title: "项目",
-    items: [
-      { path: "/dashboard", label: "首页", icon: House },
-      { path: "/projects", label: "项目空间", icon: Folder }
-    ]
-  },
-  {
-    title: "任务",
-    items: [
-      { path: "/tasks", label: "任务与版本", icon: List }
-    ]
-  },
-  {
-    title: "AI能力",
-    items: [
-      { path: "/generate", label: "AI 生成", icon: Cpu },
-      { path: "/prompts", label: "提示词管理", icon: Comment },
-      { path: "/invocations", label: "调用审计", icon: Monitor },
-      { path: "/costs", label: "成本统计", icon: Money }
-    ]
-  },
-  {
-    title: "协作",
-    items: [
-      { path: "/reviews", label: "审核中心", icon: CircleCheck },
-      { path: "/artifacts", label: "成果库", icon: Collection }
-    ]
-  },
-  {
-    title: "系统",
-    items: [
-      { path: "/users", label: "用户管理", icon: UserFilled },
-      { path: "/models", label: "模型管理", icon: Tools },
-      { path: "/statistics", label: "统计看板", icon: DataLine },
-      { path: "/logs/operation", label: "操作日志", icon: Document },
-      { path: "/logs/login", label: "登录日志", icon: Key }
-    ]
+/** Current project role badge shown in topbar when viewing a project */
+const currentProjectRole = computed(() => {
+  if (!route.path.startsWith("/projects/")) return null
+  if (!user.value) return null
+  const projectId = Number(route.params.projectId)
+  return projectRoleStore.getCurrentUserProjectRole(projectId, user.value.user_id)
+})
+
+/** Role label for current project role */
+const currentProjectRoleLabel = computed(() => {
+  if (!currentProjectRole.value) return null
+  const map: Record<string, string> = {
+    leader: "项目负责人",
+    teacher: "指导教师",
+    reviewer: "审核员",
+    member: "成员"
   }
-]
+  return map[currentProjectRole.value] ?? currentProjectRole.value
+})
 
 function goTo(path: string) {
   router.push(path)
@@ -82,16 +64,106 @@ function handleCommand(command: string) {
   }
 }
 
-const roleLabelMap: Record<string, string> = {
-  admin: "管理员",
-  teacher: "教师",
-  project_leader: "项目负责人",
-  student_member: "学生成员"
+function formatRole(role: string) {
+  return GLOBAL_ROLE_LABEL[role] ?? role
 }
 
-function formatRole(role: string) {
-  return roleLabelMap[role] || role
-}
+/** Menu items shown to all authenticated users */
+const menuGroups = computed(() => {
+  const roleArr = user.value?.roles ?? []
+  const adminFlag = isAdmin(user.value)
+  const teacherFlag = isTeacher(user.value)
+  const groups = []
+
+  // 项目
+  groups.push({
+    title: "项目",
+    items: [
+      { path: "/dashboard", label: "首页", icon: House },
+      { path: "/projects", label: "项目空间", icon: Folder }
+    ]
+  })
+
+  // 任务
+  groups.push({
+    title: "任务",
+    items: [
+      { path: "/tasks", label: "任务与版本", icon: List }
+    ]
+  })
+
+  // AI能力 — 提示词管理对所有人开放
+  groups.push({
+    title: "AI能力",
+    items: [
+      { path: "/generate", label: "AI 生成", icon: Cpu },
+      { path: "/prompts", label: "提示词管理", icon: Comment }
+    ]
+  })
+
+  // 调用审计 — admin / teacher / project_leader / student_member / reviewer 都可见
+  // 所有已登录用户都属于某个项目角色，所以显示给所有人
+  groups.push({
+    title: "AI能力",
+    items: [
+      { path: "/invocations", label: "调用审计", icon: Monitor }
+    ]
+  })
+
+  // 成本统计 — admin / teacher / project_leader / student_member / reviewer 都可见
+  groups.push({
+    title: "AI能力",
+    items: [
+      { path: "/costs", label: "成本统计", icon: Money }
+    ]
+  })
+
+  // 协作
+  groups.push({
+    title: "协作",
+    items: [
+      { path: "/reviews", label: "审核中心", icon: CircleCheck },
+      { path: "/artifacts", label: "成果库", icon: Collection }
+    ]
+  })
+
+  // 系统管理 — 仅 admin
+  if (adminFlag) {
+    groups.push({
+      title: "系统",
+      items: [
+        { path: "/users", label: "用户管理", icon: UserFilled },
+        { path: "/models", label: "模型管理", icon: Tools },
+        { path: "/statistics", label: "统计看板", icon: DataLine },
+        { path: "/logs/operation", label: "操作日志", icon: Document },
+        { path: "/logs/login", label: "登录日志", icon: Key }
+      ]
+    })
+  } else if (teacherFlag) {
+    // 教师：统计看板
+    groups.push({
+      title: "系统",
+      items: [
+        { path: "/statistics", label: "统计看板", icon: DataLine }
+      ]
+    })
+  }
+
+  return groups
+})
+
+/** Deduplicate menu groups by title, merging items with same title */
+const mergedMenuGroups = computed(() => {
+  const map = new Map<string, { title: string; items: any[] }>()
+  for (const group of menuGroups.value) {
+    if (map.has(group.title)) {
+      map.get(group.title)!.items.push(...group.items)
+    } else {
+      map.set(group.title, { title: group.title, items: [...group.items] })
+    }
+  }
+  return Array.from(map.values())
+})
 </script>
 
 <template>
@@ -110,7 +182,7 @@ function formatRole(role: string) {
         text-color="#b0c4de"
         active-text-color="#ffffff"
       >
-        <template v-for="group in menuGroups" :key="group.title">
+        <template v-for="group in mergedMenuGroups" :key="group.title">
           <el-menu-item-group :title="group.title">
             <el-menu-item
               v-for="item in group.items"
@@ -134,15 +206,21 @@ function formatRole(role: string) {
           <span class="page-title">{{ route.meta.title as string || "" }}</span>
         </div>
         <div class="topbar-right">
+          <!-- 当前项目角色标签（仅在项目详情页显示） -->
+          <div v-if="currentProjectRoleLabel" class="project-role-badge">
+            <el-tag size="small" type="warning">
+              项目角色：{{ currentProjectRoleLabel }}
+            </el-tag>
+          </div>
           <el-dropdown @command="handleCommand">
             <span class="user-info">
               <el-icon><User /></el-icon>
-              <span class="user-name">{{ userStore.userInfo?.real_name || userStore.userInfo?.username || "用户" }}</span>
+              <span class="user-name">{{ user?.real_name || user?.username || "用户" }}</span>
               <el-tag
-                v-for="role in (userStore.userInfo?.roles || [])"
+                v-for="role in (user?.roles || [])"
                 :key="role"
                 size="small"
-                type="info"
+                :type="role === 'admin' ? 'danger' : role === 'teacher' ? 'warning' : 'info'"
                 style="margin-left: 4px; font-size: 11px"
               >
                 {{ formatRole(role) }}
@@ -270,6 +348,13 @@ function formatRole(role: string) {
 .topbar-right {
   display: flex;
   align-items: center;
+  gap: 10px;
+}
+
+.project-role-badge {
+  padding: 4px 8px;
+  background: #fef0e6;
+  border-radius: 4px;
 }
 
 .user-info {

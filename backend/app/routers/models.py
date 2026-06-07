@@ -126,7 +126,7 @@ async def list_models(
     status: Optional[str] = Query(None, max_length=20),
     keyword: Optional[str] = Query(None, max_length=100),
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=500),
 ) -> dict:
     """分页查询 AI 模型列表（已登录用户均可查看）。"""
     token = _extract_token(authorization)
@@ -180,7 +180,7 @@ async def list_api_configs(
     authorization: Optional[str] = Header(None, alias="Authorization"),
     provider_id: Optional[int] = Query(None, gt=0),
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=500),
 ) -> dict:
     """查询 API 配置列表（仅 admin 可查看，不返回加密字段）。"""
     token = _extract_token(authorization)

@@ -170,8 +170,8 @@ function getSeverityType(severity: string) {
         </el-col>
         <el-col :span="4">
           <div class="stat-card">
-            <div class="stat-value success">{{ overview?.artifact_count ?? 0 }}</div>
-            <div class="stat-label">成果总数</div>
+            <div class="stat-value success">{{ overview?.invocation_count ?? 0 }}</div>
+            <div class="stat-label">总调用次数</div>
           </div>
         </el-col>
         <el-col :span="4">
@@ -184,23 +184,29 @@ function getSeverityType(severity: string) {
 
       <el-row :gutter="12" style="margin-bottom: 16px">
         <!-- AI 调用概览 -->
-        <el-col :span="12">
+        <el-col :span="8">
           <el-card>
             <template #header>
               <span style="font-weight: 600">AI 调用概览</span>
             </template>
-            <el-descriptions :column="2" border size="small" v-if="overview">
-              <el-descriptions-item label="总调用次数">{{ overview?.invocation_count ?? 0 }} 次</el-descriptions-item>
+            <el-descriptions :column="1" border size="small" v-if="overview">
+              <el-descriptions-item label="总调用次数">
+                <span style="font-size: 20px; font-weight: 700; color: #409eff">{{ overview?.invocation_count ?? 0 }}</span>
+                <span style="color: #909399; font-size: 12px; margin-left: 4px">次</span>
+              </el-descriptions-item>
               <el-descriptions-item label="成功调用">{{ overview?.success_invocation_count ?? 0 }} 次</el-descriptions-item>
               <el-descriptions-item label="失败调用">{{ overview?.failed_invocation_count ?? 0 }} 次</el-descriptions-item>
-              <el-descriptions-item label="总 Token">{{ overview?.total_tokens ?? 0 }}</el-descriptions-item>
+              <el-descriptions-item label="总 Token">
+                <span style="font-weight: 600">{{ overview?.total_tokens ?? 0 }}</span>
+                <span style="color: #909399; font-size: 12px; margin-left: 4px">Tokens</span>
+              </el-descriptions-item>
             </el-descriptions>
             <el-empty v-else description="暂无数据" />
           </el-card>
         </el-col>
 
         <!-- 成本统计 -->
-        <el-col :span="12">
+        <el-col :span="8">
           <el-card>
             <template #header>
               <span style="font-weight: 600">成本统计</span>
@@ -222,13 +228,38 @@ function getSeverityType(severity: string) {
               style="margin-top: 12px"
             >
               <el-table-column prop="model_name" label="模型" />
-              <el-table-column prop="cost" label="成本">
+              <el-table-column prop="total_cost" label="成本">
                 <template #default="{ row }">
-                  {{ Number(row.cost || 0).toFixed(4) }} 元
+                  {{ Number(row.total_cost || 0).toFixed(4) }} 元
                 </template>
               </el-table-column>
             </el-table>
             <el-empty v-else description="暂无成本数据" />
+          </el-card>
+        </el-col>
+
+        <!-- 模型调用统计 -->
+        <el-col :span="8">
+          <el-card>
+            <template #header>
+              <span style="font-weight: 600">模型调用统计</span>
+            </template>
+            <el-table
+              v-if="modelCalls.length > 0"
+              :data="modelCalls"
+              size="small"
+              max-height="200"
+            >
+              <el-table-column prop="model_name" label="模型" min-width="100" />
+              <el-table-column prop="call_count" label="调用次数" width="80" />
+              <el-table-column prop="success_rate" label="成功率" width="80">
+                <template #default="{ row }">
+                  {{ (row.success_rate || 0).toFixed(1) }}%
+                </template>
+              </el-table-column>
+              <el-table-column prop="total_tokens" label="Token" width="80" />
+            </el-table>
+            <el-empty v-else description="暂无模型调用数据" />
           </el-card>
         </el-col>
       </el-row>

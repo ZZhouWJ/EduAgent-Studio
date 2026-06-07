@@ -200,7 +200,7 @@ async def get_member_contribution_stats(
 async def get_recent_activities(
     authorization: Optional[str] = Header(None, alias="Authorization"),
     project_id: Optional[int] = Query(None, gt=0),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(20, ge=1, le=500),
 ) -> dict:
     """
     最近操作动态。

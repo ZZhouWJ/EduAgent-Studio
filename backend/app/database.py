@@ -98,6 +98,7 @@ def get_db_transaction():
     try:
         conn = get_connection()
         yield conn
+        conn.commit()   # 正常结束时提交事务
     except Exception:
         if conn is not None:
             conn.rollback()

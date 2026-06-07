@@ -29,17 +29,8 @@ const selectedBranch = ref<number | undefined>(undefined)
 const selectedModelIds = ref<number[]>([])
 const inputText = ref("")
 
-const taskTypes = [
-  { label: "需求分析", value: 1 },
-  { label: "数据库设计", value: 2 },
-  { label: "SQL 编写", value: 3 },
-  { label: "摘要润色", value: 4 },
-  { label: "文献综述", value: 5 },
-  { label: "PPT 撰写", value: 6 },
-  { label: "提案修订", value: 7 },
-  { label: "实验总结", value: 8 },
-  { label: "代码注释", value: 9 }
-]
+// 任务类型 — 从 /api/task-types 加载，不硬编码
+const taskTypes = ref<{ label: string; value: number }[]>([])
 
 const step = ref(1)
 const generateResult = ref<any[]>([])
@@ -49,12 +40,25 @@ onMounted(async () => {
   try {
     const res = await projectsApi.list({ page: 1, page_size: 100 })
     projects.value = res.data.items || []
+    await loadTaskTypes()
   } catch {
     projects.value = []
   } finally {
     loading.value = false
   }
 })
+
+async function loadTaskTypes() {
+  try {
+    const res = await modelsApi.getTaskTypes()
+    taskTypes.value = (res.data || []).map((t: any) => ({
+      label: t.type_name,
+      value: t.task_type_id
+    }))
+  } catch {
+    taskTypes.value = []
+  }
+}
 
 async function loadTasks(projectId: number) {
   tasksLoading.value = true

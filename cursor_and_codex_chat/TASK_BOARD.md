@@ -2,7 +2,7 @@
 
 ## 当前总览
 
-项目已完成 Stage-01 到 Stage-17 的分阶段开发、审查、修复复审与最终收尾文档复审，当前进入最终验收准备。
+项目已完成 Stage-01 到 Stage-17 的分阶段开发、审查、修复复审与最终收尾文档复审，以及成熟产品化修复（TASK-MATURE-PRODUCT-FIX），当前进入最终验收准备。
 
 > 注意：远程 Ubuntu / WSL 环境无法直接完成 Windows MySQL 与 Node 前端构建联调；仍需在本地 Windows MySQL + Node 环境补做实际运行截图和联调验证。
 
@@ -25,6 +25,7 @@
 | TASK-015 | Stage-15 | 前端 AI 生成、输出编辑与批注交互页面 | 已通过 Fix 复审 | Cursor | Codex |
 | TASK-016 | Stage-16 | 前端审核中心、成果库与统计看板页面 | 已通过 Fix 复审 | Cursor | Codex |
 | TASK-017 | Stage-17 | 最终润色、运行说明、截图清单与课程报告素材 | 已通过 Fix R2 复审，已移入 done | Cursor | Codex |
+| TASK-MATURE-PRODUCT-FIX | 成熟产品化修复（8个阻塞问题修复） | 已通过复审 | Cursor | Cursor |
 
 ## 当前待办
 

@@ -10,7 +10,7 @@
 | # | 路由 | 页面文件 | 说明 | 主要接口 | 截图建议 |
 |---|------|----------|------|----------|---------|
 | 1 | `/login` | `pages/login/index.vue` | 登录页，支持跳转注册 | `POST /api/auth/login` | 登录页截图 |
-| 2 | `/register` | `pages/register/index.vue` | 注册页，默认分配 student_member 角色 | `POST /api/auth/register` | 注册页截图 |
+| 2 | `/register` | `pages/register/index.vue` | 注册页（confirm_password 校验，默认 student_member 角色，同事务） | `POST /api/auth/register` | 注册页截图 |
 | 3 | `/dashboard` | `pages/dashboard/index.vue` | 首页仪表盘 | 无数据接口（占位） | 首页截图 |
 | 4 | `/projects` | `pages/projects/index.vue` | 项目列表（搜索/状态筛选） | `GET/POST /api/projects` | 项目列表截图 |
 | 5 | `/projects/:projectId` | `pages/projects/ProjectDetail.vue` | 项目详情，7 Tab | 详见下方 | 项目详情各 Tab 截图 |
@@ -188,7 +188,7 @@ frontend/src/router/index.ts
 **功能**: 提示词模板管理（模板列表 + 版本管理）。
 
 **主要接口**:
-- `GET /api/prompt-templates` — 模板列表
+- `GET /api/prompt-templates` — 模板列表（参数：keyword、task_type_id）
 - `POST /api/prompt-templates` — 创建模板
 - `PUT /api/prompt-templates/:id` — 更新模板
 - `DELETE /api/prompt-templates/:id` — 删除模板
@@ -232,10 +232,12 @@ frontend/src/router/index.ts
 
 **页面文件**: `pages/invocations/index.vue`
 
-**功能**: 调用日志（项目/模型/状态/日期筛选）+ 详情对话框（输入/输出预览）。
+**功能**: 调用日志（项目/模型/状态筛选）+ 详情对话框（输入/输出预览）。
+
+> ⚠️ 当前调用审计**不支持日期筛选**。
 
 **主要接口**:
-- `GET /api/invocations` — 调用日志列表
+- `GET /api/invocations` — 调用日志列表（参数：project_id、model_id、status）
 - `GET /api/invocations/:id` — 调用详情
 
 ---
@@ -247,7 +249,7 @@ frontend/src/router/index.ts
 **功能**: 四摘要卡片 + 筛选栏 + 按模型/按项目两 Tab + 可排序列。
 
 **主要接口**:
-- `GET /api/statistics/costs` — 成本统计
+- `GET /api/statistics/costs` — 成本统计（返回字段：total_cost、input_cost、output_cost、total_tokens、cost_by_model、cost_by_project）
 
 ---
 
@@ -313,7 +315,7 @@ frontend/src/router/index.ts
 
 **页面文件**: `pages/logs/login.vue`
 
-**功能**: 登录日志（用户名/状态/日期筛选）+ IP/UA/失败原因。
+**功能**: 登录日志（用户名/状态/日期筛选）+ IP/UA/失败原因（failure_reason 字段）。
 
 **主要接口**:
 - `GET /api/logs/login` — 登录日志列表

@@ -77,9 +77,10 @@ async def list_projects(
     request: Request,
     authorization: Optional[str] = Header(None, alias="Authorization"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=500),
     keyword: Optional[str] = Query(None, max_length=100),
     status: Optional[str] = Query(None),
+    project_type: Optional[str] = Query(None),
 ) -> dict:
     """获取项目列表（分页 + 搜索 + 状态过滤）。"""
     token = _extract_token(authorization)

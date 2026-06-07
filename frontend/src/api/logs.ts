@@ -29,7 +29,7 @@ export interface LoginLog {
   username: string
   real_name: string
   login_status: "success" | "failed"
-  fail_reason?: string
+  failure_reason?: string
   ip_address?: string
   user_agent?: string
   login_time: string
