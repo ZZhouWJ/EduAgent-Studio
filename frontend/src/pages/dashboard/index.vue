@@ -2,9 +2,10 @@
 import { ref, onMounted } from "vue"
 import { useRouter } from "vue-router"
 import { useUserStore } from "@/stores/user"
-import { Connection, ArrowRight, DataLine, Folder, CircleCheck, Collection, Cpu, List } from "@element-plus/icons-vue"
+import { Connection, ArrowRight, DataLine, Folder, CircleCheck, Collection, Cpu, List, UserFilled } from "@element-plus/icons-vue"
 import { ElMessage } from "element-plus"
 import { statisticsApi } from "@/api/statistics"
+import * as Icons from "@element-plus/icons-vue"
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -21,38 +22,42 @@ onMounted(async () => {
     const res = await statisticsApi.overview()
     stats.value = res.data
   } catch {
-    // 接口失败友好提示，不崩溃
     stats.value = {}
   } finally {
     loading.value = false
   }
 })
 
+function getIcon(name: string) {
+  return (Icons as any)[name] || DataLine
+}
+
 const flowSteps = [
-  { index: 1, title: "创建项目", desc: "创建项目空间，添加成员" },
-  { index: 2, title: "创建任务", desc: "制定任务计划，选择类型" },
-  { index: 3, title: "AI 生成", desc: "调用模型生成初稿内容" },
-  { index: 4, title: "人工编辑", desc: "修改完善 AI 生成内容" },
-  { index: 5, title: "提交审核", desc: "提交给负责人或教师审核" },
-  { index: 6, title: "采用归档", desc: "审核通过后进入成果库" }
+  { index: 1, title: "学生画像", desc: "建立学习者画像" },
+  { index: 2, title: "智能体诊断", desc: "分析薄弱知识点" },
+  { index: 3, title: "资源规划", desc: "生成学习路径" },
+  { index: 4, title: "资源生成", desc: "生成学习资源" },
+  { index: 5, title: "教师审核", desc: "质量把关" },
+  { index: 6, title: "学习反馈", desc: "更新画像" },
+  { index: 7, title: "分析看板", desc: "展示效果" }
 ]
 
 const modules = [
-  { name: "项目空间", desc: "管理项目、添加成员、设置角色", icon: "Folder", path: "/projects" },
-  { name: "任务与版本", desc: "查看和管理所有任务及输出版本", icon: "List", path: "/tasks" },
-  { name: "AI 生成", desc: "快速发起 AI 内容生成任务", icon: "Cpu", path: "/generate" },
-  { name: "审核中心", desc: "提交审核、管理审核意见", icon: "CircleCheck", path: "/reviews" },
-  { name: "成果库", desc: "查看已采用的最终成果", icon: "Collection", path: "/artifacts" },
-  { name: "统计看板", desc: "查看项目统计数据和图表", icon: "DataLine", path: "/statistics" }
+  { name: "学生画像", desc: "查看和管理学生画像信息", icon: "UserFilled", path: "/profiles" },
+  { name: "课程空间", desc: "管理课程、发布学习任务", icon: "Folder", path: "/courses" },
+  { name: "智能体工作台", desc: "多智能体协作生成学习资源", icon: "Cpu", path: "/agent-workbench" },
+  { name: "学习资源库", desc: "查看和管理学习资源", icon: "Collection", path: "/resources" },
+  { name: "教师审核中心", desc: "审核学习资源质量", icon: "CircleCheck", path: "/reviews" },
+  { name: "学习分析看板", desc: "学习效果数据分析", icon: "DataLine", path: "/analytics" }
 ]
 
 const statCards = [
-  { key: "project_count", label: "项目总数", suffix: "个" },
-  { key: "task_count", label: "任务总数", suffix: "个" },
-  { key: "pending_review_count", label: "待审核", suffix: "个" },
-  { key: "invocation_count", label: "AI 调用", suffix: "次" },
-  { key: "artifact_count", label: "成果总数", suffix: "个" },
-  { key: "total_tokens", label: "Token 消耗", suffix: "" }
+  { key: "course_count", label: "课程数", suffix: "门" },
+  { key: "student_count", label: "学生数", suffix: "人" },
+  { key: "resource_count", label: "学习资源", suffix: "份" },
+  { key: "invocation_count", label: "智能体调用", suffix: "次" },
+  { key: "avg_mastery", label: "平均掌握度", suffix: "%" },
+  { key: "review_pass_rate", label: "审核通过率", suffix: "%" }
 ]
 
 function getStatVal(key: string) {
@@ -63,7 +68,7 @@ const roleLabelMap: Record<string, string> = {
   admin: "管理员",
   teacher: "教师",
   project_leader: "项目负责人",
-  student_member: "学生成员"
+  student_member: "学生"
 }
 
 function formatRole(role: string) {
@@ -74,7 +79,7 @@ function formatRole(role: string) {
 <template>
   <div class="dashboard page-container">
     <div class="page-header">
-      <h1 class="page-title">欢迎使用智研协作系统</h1>
+      <h1 class="page-title">欢迎使用智学工坊 EduAgent Studio</h1>
       <p class="page-desc">
         您好，
         <span style="font-weight: 600; color: #1e3a5f">
@@ -125,7 +130,7 @@ function formatRole(role: string) {
       <template #header>
         <div class="card-header">
           <el-icon><Connection /></el-icon>
-          <span>核心业务流程</span>
+          <span>个性化学习闭环流程</span>
         </div>
       </template>
       <div class="flow-steps">
@@ -148,7 +153,7 @@ function formatRole(role: string) {
         @click="router.push(m.path)"
       >
         <div class="module-icon">
-          <el-icon :size="28"><component :is="m.icon" /></el-icon>
+          <el-icon :size="28"><component :is="getIcon(m.icon)" /></el-icon>
         </div>
         <div class="module-info">
           <div class="module-name">{{ m.name }}</div>

@@ -177,7 +177,7 @@ function reset() {
 <template>
   <div class="page-container" style="padding: 20px">
     <div class="page-header" style="margin-bottom: 16px">
-      <h1 class="page-title">AI 生成</h1>
+      <h1 class="page-title">智能体生成</h1>
       <p class="page-desc">快速发起 AI 内容生成任务，选择项目、任务并配置模型即可开始生成</p>
     </div>
 

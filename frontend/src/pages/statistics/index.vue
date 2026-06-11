@@ -137,8 +137,8 @@ function getSeverityType(severity: string) {
 <template>
   <div class="page-container" style="padding: 20px">
     <div class="page-header" style="margin-bottom: 16px">
-      <h1 class="page-title">统计看板</h1>
-      <p class="page-desc">系统整体运行数据统计，覆盖项目、任务、审核、成本、成员贡献等多维度</p>
+      <h1 class="page-title">学习分析看板</h1>
+      <p class="page-desc">学习效果数据分析，覆盖掌握度、薄弱点、资源分布、调用趋势、审核率等</p>
     </div>
 
     <div v-loading="loading">
@@ -147,13 +147,13 @@ function getSeverityType(severity: string) {
         <el-col :span="4">
           <div class="stat-card">
             <div class="stat-value primary">{{ overview?.project_count ?? 0 }}</div>
-            <div class="stat-label">项目总数</div>
+            <div class="stat-label">课程数</div>
           </div>
         </el-col>
         <el-col :span="4">
           <div class="stat-card">
             <div class="stat-value primary">{{ overview?.active_project_count ?? 0 }}</div>
-            <div class="stat-label">活跃项目</div>
+            <div class="stat-label">活跃课程</div>
           </div>
         </el-col>
         <el-col :span="4">
@@ -187,7 +187,7 @@ function getSeverityType(severity: string) {
         <el-col :span="8">
           <el-card>
             <template #header>
-              <span style="font-weight: 600">AI 调用概览</span>
+              <span style="font-weight: 600">智能体调用概览</span>
             </template>
             <el-descriptions :column="1" border size="small" v-if="overview">
               <el-descriptions-item label="总调用次数">
@@ -267,10 +267,10 @@ function getSeverityType(severity: string) {
       <!-- 项目统计 -->
       <el-card v-loading="sectionLoading.projects" style="margin-bottom: 16px">
         <template #header>
-          <span style="font-weight: 600">项目统计</span>
+          <span style="font-weight: 600">课程统计</span>
         </template>
         <el-table :data="projectStats" stripe size="small" v-if="projectStats.length > 0">
-          <el-table-column prop="project_name" label="项目名称" min-width="180" />
+          <el-table-column prop="project_name" label="课程名称" min-width="180" />
           <el-table-column prop="member_count" label="成员" width="70" />
           <el-table-column prop="task_count" label="任务" width="70" />
           <el-table-column prop="output_count" label="输出" width="70" />
@@ -283,7 +283,7 @@ function getSeverityType(severity: string) {
             </template>
           </el-table-column>
         </el-table>
-        <el-empty v-else description="暂无项目统计数据" />
+        <el-empty v-else description="暂无课程统计数据" />
       </el-card>
 
       <!-- 审核质量统计 -->
@@ -338,18 +338,18 @@ function getSeverityType(severity: string) {
         <el-col :span="12">
           <el-card v-loading="sectionLoading.members">
             <template #header>
-              <span style="font-weight: 600">成员贡献统计</span>
+              <span style="font-weight: 600">成员学习统计</span>
             </template>
             <el-table :data="memberContribs" stripe size="small">
               <el-table-column prop="real_name" label="成员" width="100" />
-              <el-table-column prop="project_count" label="参与项目" width="80" />
+              <el-table-column prop="project_count" label="参与课程" width="80" />
               <el-table-column prop="task_created_count" label="创建任务" width="80" />
               <el-table-column prop="output_created_count" label="创建输出" width="80" />
               <el-table-column prop="review_count" label="审核次数" width="80" />
-              <el-table-column prop="artifact_adopted_count" label="成果采纳" width="80" />
+              <el-table-column prop="artifact_adopted_count" label="资源采用" width="80" />
               <el-table-column prop="invocation_count" label="AI 调用" width="80" />
             </el-table>
-            <el-empty v-if="memberContribs.length === 0" description="暂无成员贡献数据" />
+            <el-empty v-if="memberContribs.length === 0" description="暂无成员学习数据" />
           </el-card>
         </el-col>
 
@@ -357,7 +357,7 @@ function getSeverityType(severity: string) {
         <el-col :span="12">
           <el-card v-loading="sectionLoading.activities">
             <template #header>
-              <span style="font-weight: 600">最近操作动态</span>
+              <span style="font-weight: 600">学习动态</span>
             </template>
             <div v-if="recentActivities.length > 0" class="activity-list">
               <div v-for="act in recentActivities" :key="act.log_id" class="activity-item">
@@ -371,7 +371,7 @@ function getSeverityType(severity: string) {
                 </div>
               </div>
             </div>
-            <el-empty v-else description="暂无操作动态" />
+            <el-empty v-else description="暂无学习动态" />
           </el-card>
         </el-col>
       </el-row>

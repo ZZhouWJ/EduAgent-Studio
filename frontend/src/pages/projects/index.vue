@@ -24,9 +24,9 @@ const createForm = ref({
 
 const projectTypes = [
   { label: "课程项目", value: "course_project" },
-  { label: "科研项目", value: "research_project" },
+  { label: "科研课题", value: "research_project" },
   { label: "竞赛项目", value: "competition_project" },
-  { label: "企业项目", value: "enterprise_project" }
+  { label: "实习项目", value: "enterprise_project" }
 ]
 
 const statusOptions = [
@@ -102,22 +102,22 @@ function getStatusLabel(status: string) {
 function getTypeLabel(type: string) {
   const map: Record<string, string> = {
     course_project: "课程项目",
-    research_project: "科研项目",
+    research_project: "科研课题",
     competition_project: "竞赛项目",
-    enterprise_project: "企业项目"
+    enterprise_project: "实习项目"
   }
   return map[type] || type
 }
 
 async function handleCreate() {
   if (!createForm.value.project_name.trim()) {
-    ElMessage.warning("请输入项目名称")
+    ElMessage.warning("请输入课程名称")
     return
   }
   createLoading.value = true
   try {
     await projectsApi.create(createForm.value)
-    ElMessage.success("项目创建成功")
+    ElMessage.success("课程创建成功")
     createDialogVisible.value = false
     createForm.value = { project_name: "", project_type: "course_project", description: "" }
     loadProjects()
@@ -141,8 +141,8 @@ function formatDate(dateStr: string) {
 <template>
   <div class="page-container" style="padding: 20px">
     <div class="page-header" style="margin-bottom: 16px">
-      <h1 class="page-title">项目空间</h1>
-      <p class="page-desc">管理所有项目空间，查看成员和任务</p>
+      <h1 class="page-title">课程空间</h1>
+      <p class="page-desc">查看和管理课程</p>
     </div>
 
     <el-card>
@@ -151,7 +151,7 @@ function formatDate(dateStr: string) {
         <div class="toolbar-left">
           <el-input
             v-model="keyword"
-            placeholder="搜索项目名称"
+            placeholder="搜索课程名称"
             style="width: 220px"
             clearable
             @clear="onSearch"
@@ -175,14 +175,14 @@ function formatDate(dateStr: string) {
         </div>
         <div class="toolbar-right">
           <el-button type="primary" @click="openCreateDialog">
-            <el-icon><Plus /></el-icon> 新建项目
+            <el-icon><Plus /></el-icon> 新建课程
           </el-button>
         </div>
       </div>
 
       <!-- 表格 -->
       <el-table v-loading="loading" :data="projects" stripe @row-click="goDetail" style="cursor: pointer; margin-top: 12px">
-        <el-table-column prop="project_name" label="项目名称" min-width="180" />
+        <el-table-column prop="project_name" label="课程名称" min-width="180" />
         <el-table-column prop="project_type" label="类型" width="120">
           <template #default="{ row }">
             <el-tag size="small">{{ getTypeLabel(row.project_type) }}</el-tag>
@@ -211,7 +211,7 @@ function formatDate(dateStr: string) {
         </el-table-column>
       </el-table>
 
-      <el-empty v-if="!loading && projects.length === 0" description="暂无项目数据" />
+      <el-empty v-if="!loading && projects.length === 0" description="暂无课程数据" />
 
       <!-- 分页 -->
       <div class="pagination-wrap" v-if="total > 0">
@@ -228,12 +228,12 @@ function formatDate(dateStr: string) {
     </el-card>
 
     <!-- 新建项目弹窗 -->
-    <el-dialog v-model="createDialogVisible" title="新建项目" width="520px" destroy-on-close>
+    <el-dialog v-model="createDialogVisible" title="新建课程" width="520px" destroy-on-close>
       <el-form :model="createForm" label-width="100px">
-        <el-form-item label="项目名称" required>
-          <el-input v-model="createForm.project_name" placeholder="请输入项目名称" maxlength="100" show-word-limit />
+        <el-form-item label="课程名称" required>
+          <el-input v-model="createForm.project_name" placeholder="请输入课程名称" maxlength="100" show-word-limit />
         </el-form-item>
-        <el-form-item label="项目类型" required>
+        <el-form-item label="课程类型" required>
           <el-select v-model="createForm.project_type" style="width: 100%">
             <el-option
               v-for="t in projectTypes"
@@ -243,12 +243,12 @@ function formatDate(dateStr: string) {
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="项目描述">
+        <el-form-item label="课程描述">
           <el-input
             v-model="createForm.description"
             type="textarea"
             :rows="3"
-            placeholder="请输入项目描述（可选）"
+            placeholder="请输入课程描述（可选）"
             maxlength="500"
             show-word-limit
           />

@@ -39,9 +39,10 @@ function goToRegister() {
   <div class="login-container">
     <div class="login-card">
       <div class="title">
-        <h1>智研协作 AI 项目质量审计系统</h1>
+        <h1>智学工坊</h1>
+        <div class="title-en">EduAgent Studio</div>
       </div>
-      <div class="subtitle">面向高校项目协作的 AI 任务生成、版本管理与质量审核平台</div>
+      <div class="subtitle">基于大模型的个性化学习资源生成与多智能体协作系统</div>
       <el-form :model="loginForm" @submit.prevent="handleLogin">
         <el-form-item>
           <el-input
@@ -75,7 +76,7 @@ function goToRegister() {
       <div class="test-hint">
         <el-alert type="info" :closable="false" show-icon>
           <template #title>
-            测试账号：admin / Admin@123456（管理员）&nbsp;&nbsp; student1 / test123（学生）
+            测试账号：admin / Admin@123456（管理员）&nbsp;&nbsp; teacher01 / Teacher@123（教师）&nbsp;&nbsp; student01 / Student@123（学生）
           </template>
         </el-alert>
       </div>
@@ -111,6 +112,14 @@ function goToRegister() {
   font-size: 22px;
   font-weight: 700;
   color: #1e3a5f;
+  letter-spacing: 1px;
+}
+
+.title-en {
+  font-size: 14px;
+  font-weight: 400;
+  color: #409eff;
+  margin-top: 4px;
   letter-spacing: 1px;
 }
 

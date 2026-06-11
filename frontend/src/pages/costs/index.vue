@@ -226,9 +226,9 @@ function getSortIcon(key: string, currentKey: string | null, order: "asc" | "des
           @change="onFilterChange"
         />
 
-        <el-select
-          v-model="selectedProjectId"
-          placeholder="选择项目"
+          <el-select
+            v-model="selectedProjectId"
+            placeholder="选择课程"
           style="width: 180px"
           clearable
           filterable
@@ -266,7 +266,7 @@ function getSortIcon(key: string, currentKey: string | null, order: "asc" | "des
       <!-- Tabs -->
       <el-tabs v-model="activeTab">
         <el-tab-pane label="按模型统计" name="by_model" />
-        <el-tab-pane label="按项目统计" name="by_project" />
+        <el-tab-pane label="按课程统计" name="by_project" />
       </el-tabs>
 
       <!-- By Model Table -->
@@ -343,7 +343,7 @@ function getSortIcon(key: string, currentKey: string | null, order: "asc" | "des
 
       <!-- By Project Table -->
       <el-table v-loading="loading" :data="projectStats" stripe v-if="activeTab === 'by_project'">
-        <el-table-column prop="project_name" label="项目名称" min-width="200" />
+        <el-table-column prop="project_name" label="课程名称" min-width="200" />
         <el-table-column prop="call_count" label="调用次数" width="110" align="right">
           <template #header>
             <span @click="sortProjectStats('call_count')" class="sortable-header">
@@ -395,7 +395,7 @@ function getSortIcon(key: string, currentKey: string | null, order: "asc" | "des
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="!loading && activeTab === 'by_project' && projectStats.length === 0" description="暂无项目成本数据" />
+      <el-empty v-if="!loading && activeTab === 'by_project' && projectStats.length === 0" description="暂无课程成本数据" />
     </el-card>
   </div>
 </template>

@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     """应用全局配置，来源为环境变量。"""
 
     # --- 应用信息 ---
-    app_name: str = Field(default="AI-Collab-Audit-System", alias="APP_NAME")
+    app_name: str = Field(default="EduAgent Studio", alias="APP_NAME")
     app_env: str = Field(default="development", alias="APP_ENV")
     api_prefix: str = Field(default="/api", alias="API_PREFIX")
 
@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     db_user: str = Field(default="root", alias="DB_USER")
     db_password: str = Field(default="", alias="DB_PASSWORD")
     db_name: str = Field(default="ai_collab_audit_system", alias="DB_NAME")
+
+    # --- Redis 配置 ---
+    redis_url: str = Field(default="redis://127.0.0.1:6379/0", alias="REDIS_URL")
 
     # --- 服务器配置 ---
     server_host: str = Field(default="0.0.0.0", alias="SERVER_HOST")

@@ -214,3 +214,79 @@ async def get_recent_activities(
         limit=limit,
     )
     return success_response(data=result)
+
+
+# =============================================================================
+# A3 学习分析统计
+# GET /api/statistics/learning-overview
+# GET /api/statistics/mastery-distribution
+# GET /api/statistics/weak-knowledge-points
+# GET /api/statistics/resource-type-distribution
+# GET /api/statistics/invocation-trend
+# GET /api/statistics/review-rate-by-course
+# GET /api/statistics/cost-distribution
+# =============================================================================
+
+@router.get("/api/statistics/learning-overview")
+async def get_learning_overview(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+) -> dict:
+    token = _extract_token(authorization) if authorization else None
+    result = statistics_service.get_learning_overview(token or "")
+    return success_response(data=result)
+
+
+@router.get("/api/statistics/mastery-distribution")
+async def get_mastery_distribution(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+) -> dict:
+    token = _extract_token(authorization) if authorization else None
+    result = statistics_service.get_mastery_distribution(token or "")
+    return success_response(data=result)
+
+
+@router.get("/api/statistics/weak-knowledge-points")
+async def get_weak_knowledge_points(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    top_n: int = Query(10, ge=1, le=50),
+) -> dict:
+    token = _extract_token(authorization) if authorization else None
+    result = statistics_service.get_weak_knowledge_points(token or "", top_n)
+    return success_response(data=result)
+
+
+@router.get("/api/statistics/resource-type-distribution")
+async def get_resource_type_distribution(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+) -> dict:
+    token = _extract_token(authorization) if authorization else None
+    result = statistics_service.get_resource_type_distribution(token or "")
+    return success_response(data=result)
+
+
+@router.get("/api/statistics/invocation-trend")
+async def get_invocation_trend(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    days: int = Query(14, ge=7, le=30),
+) -> dict:
+    token = _extract_token(authorization) if authorization else None
+    result = statistics_service.get_invocation_trend(token or "", days)
+    return success_response(data=result)
+
+
+@router.get("/api/statistics/review-rate-by-course")
+async def get_review_rate_by_course(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+) -> dict:
+    token = _extract_token(authorization) if authorization else None
+    result = statistics_service.get_review_rate_by_course(token or "")
+    return success_response(data=result)
+
+
+@router.get("/api/statistics/cost-distribution")
+async def get_cost_distribution(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+) -> dict:
+    token = _extract_token(authorization) if authorization else None
+    result = statistics_service.get_cost_distribution(token or "")
+    return success_response(data=result)
