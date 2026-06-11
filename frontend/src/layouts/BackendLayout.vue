@@ -44,10 +44,10 @@ const currentProjectRole = computed(() => {
 const currentProjectRoleLabel = computed(() => {
   if (!currentProjectRole.value) return null
   const map: Record<string, string> = {
-    leader: "项目负责人",
+    leader: "课程创建者",
     teacher: "指导教师",
     reviewer: "审核员",
-    member: "成员"
+    member: "学生"
   }
   return map[currentProjectRole.value] ?? currentProjectRole.value
 })
@@ -70,60 +70,53 @@ function formatRole(role: string) {
 
 /** Menu items shown to all authenticated users */
 const menuGroups = computed(() => {
-  const roleArr = user.value?.roles ?? []
   const adminFlag = isAdmin(user.value)
   const teacherFlag = isTeacher(user.value)
   const groups = []
 
-  // 项目
+  // 学习
   groups.push({
-    title: "项目",
+    title: "学习",
     items: [
       { path: "/dashboard", label: "首页", icon: House },
-      { path: "/projects", label: "项目空间", icon: Folder }
+      { path: "/courses", label: "课程空间", icon: Folder },
+      { path: "/tasks", label: "学习任务", icon: List }
     ]
   })
 
-  // 任务
+  // 智能体
   groups.push({
-    title: "任务",
+    title: "智能体",
     items: [
-      { path: "/tasks", label: "任务与版本", icon: List }
+      { path: "/agent-workbench", label: "智能体工作台", icon: Cpu },
+      { path: "/profiles", label: "学生画像", icon: UserFilled }
     ]
   })
 
-  // AI能力 — 提示词管理对所有人开放
+  // 资源与审核
   groups.push({
-    title: "AI能力",
+    title: "资源与审核",
     items: [
-      { path: "/generate", label: "AI 生成", icon: Cpu },
-      { path: "/prompts", label: "提示词管理", icon: Comment }
+      { path: "/resources", label: "学习资源库", icon: Collection },
+      { path: "/reviews", label: "教师审核中心", icon: CircleCheck }
     ]
   })
 
-  // 调用审计 — admin / teacher / project_leader / student_member / reviewer 都可见
-  // 所有已登录用户都属于某个项目角色，所以显示给所有人
-  groups.push({
-    title: "AI能力",
-    items: [
-      { path: "/invocations", label: "调用审计", icon: Monitor }
-    ]
-  })
-
-  // 成本统计 — admin / teacher / project_leader / student_member / reviewer 都可见
+  // AI能力
   groups.push({
     title: "AI能力",
     items: [
-      { path: "/costs", label: "成本统计", icon: Money }
+      { path: "/invocations", label: "调用审计", icon: Monitor },
+      { path: "/costs", label: "成本统计", icon: Money },
+      { path: "/prompts", label: "提示词模板", icon: Comment }
     ]
   })
 
-  // 协作
+  // 分析
   groups.push({
-    title: "协作",
+    title: "分析",
     items: [
-      { path: "/reviews", label: "审核中心", icon: CircleCheck },
-      { path: "/artifacts", label: "成果库", icon: Collection }
+      { path: "/analytics", label: "学习分析看板", icon: DataLine }
     ]
   })
 
@@ -133,18 +126,16 @@ const menuGroups = computed(() => {
       title: "系统",
       items: [
         { path: "/users", label: "用户管理", icon: UserFilled },
-        { path: "/models", label: "模型管理", icon: Tools },
-        { path: "/statistics", label: "统计看板", icon: DataLine },
+        { path: "/models", label: "模型与智能体配置", icon: Tools },
         { path: "/logs/operation", label: "操作日志", icon: Document },
         { path: "/logs/login", label: "登录日志", icon: Key }
       ]
     })
   } else if (teacherFlag) {
-    // 教师：统计看板
     groups.push({
       title: "系统",
       items: [
-        { path: "/statistics", label: "统计看板", icon: DataLine }
+        { path: "/models", label: "模型与智能体配置", icon: Tools }
       ]
     })
   }
@@ -171,8 +162,8 @@ const mergedMenuGroups = computed(() => {
     <!-- 左侧导航 -->
     <aside class="sidebar">
       <div class="logo">
-        <div class="logo-title">智研协作</div>
-        <div class="logo-subtitle">AI 项目质量审计系统</div>
+        <div class="logo-title">智学工坊</div>
+        <div class="logo-subtitle">EduAgent Studio</div>
       </div>
       <el-menu
         :default-active="activeMenu"

@@ -2,17 +2,7 @@ import { createRouter, createWebHashHistory } from "vue-router"
 import type { RouteRecordRaw } from "vue-router"
 import { setupGuard } from "./guard"
 
-/**
- * Route meta.roles defines which system-level roles can access the route.
- * [] (empty) means any authenticated user can access.
- * ["admin"] means only admin users can access.
- * ["admin", "teacher"] means admin or teacher can access.
- *
- * Project-scoped routes (/projects/:id, /tasks/:id) do not use meta.roles
- * because their permission depends on project_role (fetched at runtime).
- */
-
-type Role = "admin" | "teacher" | "student_member" | "project_leader"
+type Role = "admin" | "teacher" | "student" | "project_leader"
 
 const routes: RouteRecordRaw[] = [
   {
@@ -45,22 +35,22 @@ const routes: RouteRecordRaw[] = [
         meta: { title: "首页" }
       },
       {
-        path: "projects",
-        name: "Projects",
-        component: () => import("@/pages/projects/index.vue"),
-        meta: { title: "项目空间" }
+        path: "courses",
+        name: "Courses",
+        component: () => import("@/pages/courses/index.vue"),
+        meta: { title: "课程空间" }
       },
       {
-        path: "projects/:projectId",
-        name: "ProjectDetail",
-        component: () => import("@/pages/projects/ProjectDetail.vue"),
-        meta: { title: "项目详情", hidden: true }
+        path: "courses/:courseId",
+        name: "CourseDetail",
+        component: () => import("@/pages/courses/CourseDetail.vue"),
+        meta: { title: "课程详情", hidden: true }
       },
       {
         path: "tasks",
         name: "Tasks",
         component: () => import("@/pages/tasks/index.vue"),
-        meta: { title: "任务与版本" }
+        meta: { title: "学习任务" }
       },
       {
         path: "tasks/:taskId",
@@ -69,34 +59,52 @@ const routes: RouteRecordRaw[] = [
         meta: { title: "任务详情", hidden: true }
       },
       {
-        path: "generate",
-        name: "Generate",
-        component: () => import("@/pages/generate/index.vue"),
-        meta: { title: "AI 生成" }
+        path: "profiles",
+        name: "Profiles",
+        component: () => import("@/pages/profiles/index.vue"),
+        meta: { title: "学生画像" }
       },
       {
-        path: "prompts",
-        name: "Prompts",
-        component: () => import("@/pages/prompts/index.vue"),
-        meta: { title: "提示词管理" }
+        path: "profiles/:profileId",
+        name: "ProfileDetail",
+        component: () => import("@/pages/profiles/ProfileDetail.vue"),
+        meta: { title: "画像详情", hidden: true }
+      },
+      {
+        path: "agent-workbench",
+        name: "AgentWorkbench",
+        component: () => import("@/pages/agent-workbench/index.vue"),
+        meta: { title: "智能体工作台" }
+      },
+      {
+        path: "resources",
+        name: "Resources",
+        component: () => import("@/pages/resources/index.vue"),
+        meta: { title: "学习资源库" }
+      },
+      {
+        path: "resources/:resourceId",
+        name: "ResourceDetail",
+        component: () => import("@/pages/resources/ResourceDetail.vue"),
+        meta: { title: "资源详情", hidden: true }
       },
       {
         path: "reviews",
         name: "Reviews",
         component: () => import("@/pages/reviews/index.vue"),
-        meta: { title: "审核中心" }
+        meta: { title: "教师审核中心" }
       },
       {
-        path: "artifacts",
-        name: "Artifacts",
-        component: () => import("@/pages/artifacts/index.vue"),
-        meta: { title: "成果库" }
+        path: "analytics",
+        name: "Analytics",
+        component: () => import("@/pages/analytics/index.vue"),
+        meta: { title: "学习分析看板" }
       },
       {
         path: "invocations",
         name: "Invocations",
         component: () => import("@/pages/invocations/index.vue"),
-        meta: { title: "调用审计" }
+        meta: { title: "智能体调用审计" }
       },
       {
         path: "costs",
@@ -105,16 +113,16 @@ const routes: RouteRecordRaw[] = [
         meta: { title: "成本统计" }
       },
       {
-        path: "statistics",
-        name: "Statistics",
-        component: () => import("@/pages/statistics/index.vue"),
-        meta: { title: "统计看板" }
-      },
-      {
         path: "models",
         name: "Models",
         component: () => import("@/pages/models/index.vue"),
-        meta: { title: "模型管理", roles: ["admin"] }
+        meta: { title: "模型与智能体配置", roles: ["admin"] }
+      },
+      {
+        path: "prompts",
+        name: "Prompts",
+        component: () => import("@/pages/prompts/index.vue"),
+        meta: { title: "提示词模板" }
       },
       {
         path: "users",

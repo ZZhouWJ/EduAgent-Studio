@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     """应用全局配置，来源为环境变量。"""
 
     # --- 应用信息 ---
-    app_name: str = Field(default="AI-Collab-Audit-System", alias="APP_NAME")
+    app_name: str = Field(default="EduAgent Studio", alias="APP_NAME")
     app_env: str = Field(default="development", alias="APP_ENV")
     api_prefix: str = Field(default="/api", alias="API_PREFIX")
 

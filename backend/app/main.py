@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import test_connection
-from app.routers import auth, users, projects, tasks, prompts, models, invocations, reviews, artifacts, statistics, logs
+from app.routers import auth, users, projects, tasks, prompts, models, invocations, reviews, artifacts, statistics, logs, profiles, agents, learning
 from app.utils.exceptions import register_exception_handlers
 from app.utils.response import error_response, success_response
 
@@ -32,8 +32,8 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title=settings.app_name,
-        description="智研协作：面向高校项目协作的 AI 任务生成与质量审计管理系统",
+        title="EduAgent Studio",
+        description="智学工坊：基于大模型的个性化学习资源生成与多智能体协作系统",
         version="1.0.0",
         docs_url="/docs" if not settings.is_production else None,
         redoc_url="/redoc" if not settings.is_production else None,
@@ -59,6 +59,9 @@ def create_app() -> FastAPI:
     app.include_router(artifacts.router)
     app.include_router(statistics.router)
     app.include_router(logs.router)
+    app.include_router(profiles.router)
+    app.include_router(agents.router)
+    app.include_router(learning.router)
 
     @app.get("/")
     async def root() -> dict:

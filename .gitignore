@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Node
+node_modules/
+.env
+dist/
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Backend
+backend/__pycache__/
+backend/*.pyc
+backend/.env
+frontend/.env
+
+# Uploads
+uploads/
+
+# MinIO data
+minio-data/
+
+# Temporary files
+*.tmp
+*.bak
