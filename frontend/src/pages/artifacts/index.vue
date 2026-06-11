@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue"
+import { useRouter } from "vue-router"
 import { View, Download } from "@element-plus/icons-vue"
 import { ElMessage } from "element-plus"
 import { artifactsApi } from "@/api/artifacts"
@@ -8,6 +9,7 @@ import { useUserStore } from "@/stores/user"
 import { useProjectRoleStore } from "@/stores/projectRole"
 import { isAdmin } from "@/utils/permission"
 
+const router = useRouter()
 const userStore = useUserStore()
 const projectRoleStore = useProjectRoleStore()
 
@@ -209,15 +211,15 @@ const filteredArtifacts = computed(() => {
 <template>
   <div class="page-container" style="padding: 20px">
     <div class="page-header" style="margin-bottom: 16px">
-      <h1 class="page-title">成果库</h1>
-      <p class="page-desc">查看所有已审核通过并采用的 AI 协作成果，支持导出 Markdown 文件</p>
+      <h1 class="page-title">学习资源库</h1>
+      <p class="page-desc">查看和管理智能体生成的学习资源，支持导出 Markdown 文件</p>
     </div>
 
     <!-- Filter bar -->
     <el-card style="margin-bottom: 16px" body-style="padding: 12px 16px">
       <el-row :gutter="12" align="middle">
         <el-col :span="6">
-          <el-select v-model="filterProjectId" placeholder="按项目筛选" clearable
+          <el-select v-model="filterProjectId" placeholder="按课程筛选" clearable
             @change="onFilterChange" style="width: 100%">
             <el-option v-for="p in projectOptions" :key="p.project_id"
               :label="p.project_name" :value="p.project_id" />
@@ -231,13 +233,13 @@ const filteredArtifacts = computed(() => {
           </el-select>
         </el-col>
         <el-col :span="5">
-          <el-input v-model="searchKeyword" placeholder="搜索成果标题 / 项目 / 任务" clearable
+          <el-input v-model="searchKeyword" placeholder="搜索资源标题 / 课程 / 任务" clearable
             @change="onFilterChange" />
         </el-col>
         <el-col :span="8" style="text-align: right">
           <el-button @click="resetFilters">重置筛选</el-button>
           <span style="margin-left: 12px; color: #909399; font-size: 13px">
-            共 {{ total }} 条成果
+            共 {{ total }} 条资源
           </span>
         </el-col>
       </el-row>
@@ -247,10 +249,10 @@ const filteredArtifacts = computed(() => {
     <el-card>
       <el-table v-loading="loading" :data="filteredArtifacts" stripe>
         <el-table-column prop="adopted_id" label="ID" width="70" />
-        <el-table-column prop="artifact_title" label="成果标题" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="project_name" label="所属项目" min-width="140" show-overflow-tooltip />
-        <el-table-column prop="task_title" label="来源任务" min-width="160" show-overflow-tooltip />
-        <el-table-column label="成果类型" width="110">
+        <el-table-column prop="artifact_title" label="资源标题" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="project_name" label="所属课程" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="task_title" label="关联任务" min-width="160" show-overflow-tooltip />
+        <el-table-column label="资源类型" width="110">
           <template #default="{ row }">
             <el-tag size="small">{{ artifactTypeMap[row.artifact_type] || row.artifact_type }}</el-tag>
           </template>
@@ -266,7 +268,7 @@ const filteredArtifacts = computed(() => {
         </el-table-column>
         <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" link @click="viewArtifact(row.adopted_id)">
+            <el-button type="primary" size="small" link @click="router.push('/resources/' + row.adopted_id)">
               <el-icon><View /></el-icon> 详情
             </el-button>
             <el-button type="success" size="small" link @click="exportArtifact(row)">
@@ -276,7 +278,7 @@ const filteredArtifacts = computed(() => {
         </el-table-column>
       </el-table>
       <el-empty v-if="!loading && artifacts.length === 0"
-        description="暂无成果数据，请先完成任务 → 提交审核 → 通过审核后采用" />
+        description="暂无学习资源，请先完成任务 → 提交审核 → 通过审核后采用" />
 
       <div class="pagination-wrap" v-if="total > 0">
         <el-pagination
@@ -287,17 +289,17 @@ const filteredArtifacts = computed(() => {
     </el-card>
 
     <!-- 成果详情抽屉 -->
-    <el-drawer v-model="detailDrawerVisible" title="成果详情" size="720px" direction="rtl" destroy-on-close>
+    <el-drawer v-model="detailDrawerVisible" title="资源详情" size="720px" direction="rtl" destroy-on-close>
       <div v-loading="detailLoading">
         <template v-if="currentArtifact">
           <el-descriptions :column="2" border size="small" style="margin-bottom: 16px">
-            <el-descriptions-item label="成果ID">{{ currentArtifact.adopted_id }}</el-descriptions-item>
-            <el-descriptions-item label="成果类型">
+            <el-descriptions-item label="资源ID">{{ currentArtifact.adopted_id }}</el-descriptions-item>
+            <el-descriptions-item label="资源类型">
               <el-tag size="small">{{ artifactTypeMap[currentArtifact.artifact_type] || currentArtifact.artifact_type }}</el-tag>
             </el-descriptions-item>
-            <el-descriptions-item label="成果标题" :span="2">{{ currentArtifact.artifact_title }}</el-descriptions-item>
-            <el-descriptions-item label="所属项目">{{ currentArtifact.project_name }}</el-descriptions-item>
-            <el-descriptions-item label="来源任务">{{ currentArtifact.task_title }}</el-descriptions-item>
+            <el-descriptions-item label="资源标题" :span="2">{{ currentArtifact.artifact_title }}</el-descriptions-item>
+            <el-descriptions-item label="所属课程">{{ currentArtifact.project_name }}</el-descriptions-item>
+            <el-descriptions-item label="关联任务">{{ currentArtifact.task_title }}</el-descriptions-item>
             <el-descriptions-item label="输出版本">v{{ currentArtifact.version_no }}</el-descriptions-item>
             <el-descriptions-item label="发布版本">{{ currentArtifact.release_version || "-" }}</el-descriptions-item>
             <el-descriptions-item label="采用人">{{ currentArtifact.adopted_by_name }}</el-descriptions-item>
@@ -316,7 +318,7 @@ const filteredArtifacts = computed(() => {
 
           <!-- Content -->
           <el-card shadow="never" body-style="padding: 0">
-            <template #header><span style="font-weight: 600">成果正文</span></template>
+            <template #header><span style="font-weight: 600">资源正文</span></template>
             <div class="artifact-content">{{ currentArtifact.output_content || "（无内容）" }}</div>
           </el-card>
         </template>

@@ -53,6 +53,27 @@ services:
       timeout: 20s
       retries: 3
 
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.celery
+    container_name: eduagent-celery
+    command: celery -A app.celery_app worker --loglevel=info -P solo
+    volumes:
+      - ./backend:/app
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DB_TYPE=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=your_mysql_password
+      - DB_NAME=ai_collab_audit_system
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   pgdata:
   redisdata:

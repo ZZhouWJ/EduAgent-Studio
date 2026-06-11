@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     db_password: str = Field(default="", alias="DB_PASSWORD")
     db_name: str = Field(default="ai_collab_audit_system", alias="DB_NAME")
 
+    # --- Redis 配置 ---
+    redis_url: str = Field(default="redis://127.0.0.1:6379/0", alias="REDIS_URL")
+
     # --- 服务器配置 ---
     server_host: str = Field(default="0.0.0.0", alias="SERVER_HOST")
     server_port: int = Field(default=8000, alias="SERVER_PORT")

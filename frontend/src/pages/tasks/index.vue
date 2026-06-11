@@ -85,18 +85,18 @@ function formatDate(dateStr: string) {
 <template>
   <div class="page-container" style="padding: 20px">
     <div class="page-header" style="margin-bottom: 16px">
-      <h1 class="page-title">任务与版本</h1>
-      <p class="page-desc">请从「项目空间」选择项目后，查看该项目的任务列表，点击任务进入详情页</p>
+      <h1 class="page-title">学习任务</h1>
+      <p class="page-desc">管理课程学习任务，查看任务进度和详情</p>
     </div>
 
     <el-card>
       <template #header>
         <div class="toolbar">
           <div style="display: flex; align-items: center; gap: 8px">
-            <span style="font-weight: 600">选择项目</span>
+            <span style="font-weight: 600">选择课程</span>
             <el-select
               v-model="selectedProjectId"
-              placeholder="请选择项目"
+              placeholder="请选择课程"
               style="width: 300px"
               clearable
               filterable
@@ -120,8 +120,8 @@ function formatDate(dateStr: string) {
       <!-- 无项目时 -->
       <div v-if="!selectedProjectId" class="empty-tip">
         <el-icon :size="40" color="#c0c4cc"><FolderOpened /></el-icon>
-        <p>请在上方选择一个项目，查看该项目的任务列表</p>
-        <el-button type="primary" size="small" @click="router.push('/projects')">前往项目空间</el-button>
+        <p>请在上方选择一个课程，查看该课程的学习任务列表</p>
+        <el-button type="primary" size="small" @click="router.push('/courses')">前往课程空间</el-button>
       </div>
 
       <!-- 任务表格 -->
@@ -152,7 +152,7 @@ function formatDate(dateStr: string) {
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="selectedProjectId && !tasksLoading && tasks.length === 0" description="该项目暂无任务" />
+      <el-empty v-if="selectedProjectId && !tasksLoading && tasks.length === 0" description="该课程暂无学习任务" />
     </el-card>
   </div>
 </template>

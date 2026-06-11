@@ -101,6 +101,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: "学习分析看板" }
       },
       {
+        path: "feedback",
+        name: "Feedback",
+        component: () => import("@/pages/feedback/index.vue"),
+        meta: { title: "学习反馈" }
+      },
+      {
         path: "invocations",
         name: "Invocations",
         component: () => import("@/pages/invocations/index.vue"),

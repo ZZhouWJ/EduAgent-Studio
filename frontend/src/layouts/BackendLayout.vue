@@ -20,7 +20,8 @@ import {
   Monitor,
   Money,
   Document,
-  Key
+  Key,
+  ChatDotRound
 } from "@element-plus/icons-vue"
 import { isAdmin, isTeacher, GLOBAL_ROLE_LABEL } from "@/utils/permission"
 
@@ -80,7 +81,8 @@ const menuGroups = computed(() => {
     items: [
       { path: "/dashboard", label: "首页", icon: House },
       { path: "/courses", label: "课程空间", icon: Folder },
-      { path: "/tasks", label: "学习任务", icon: List }
+      { path: "/tasks", label: "学习任务", icon: List },
+      { path: "/feedback", label: "学习反馈", icon: ChatDotRound }
     ]
   })
 

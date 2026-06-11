@@ -312,8 +312,8 @@ function computeAvgScore(review: any) {
 <template>
   <div class="page-container" style="padding: 20px">
     <div class="page-header" style="margin-bottom: 16px">
-      <h1 class="page-title">审核中心</h1>
-      <p class="page-desc">管理 AI 输出审核请求，进行质量评分和问题标注</p>
+      <h1 class="page-title">教师审核中心</h1>
+      <p class="page-desc">审核智能体生成的学习资源，进行质量评分和问题标注</p>
     </div>
 
     <!-- Stats cards -->
@@ -366,7 +366,7 @@ function computeAvgScore(review: any) {
             <span>待审核 <el-badge :value="reviewStats?.pending_count || 0" :max="99" /></span>
           </template>
         </el-tab-pane>
-        <el-tab-pane label="我提交的" name="submitted" />
+        <el-tab-pane label="我待审核的" name="submitted" />
         <el-tab-pane label="审核历史" name="history" />
       </el-tabs>
 
