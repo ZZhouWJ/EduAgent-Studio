@@ -1,0 +1,38 @@
+-- =============================================================================
+-- 提示词模板初始化数据
+-- database/08_insert_prompt_templates.sql
+--
+-- 业务场景：高校项目协作 + AI 任务生成 + 质量审计
+-- 来源说明：
+--   所有模板均为本项目根据业务场景自主设计改写，未整段复制任何第三方仓库原文。
+--   少量模板的设计思路参考了以下开源项目的分类方式和结构，
+--   属公开知识，无需许可即可参考：
+--     - dair-ai/Prompt-Engineering-Guide (MIT License)
+--     - yaojingang/yao-open-prompts (MIT License)
+--
+-- 使用说明：
+--   1. 执行方式（重要）：
+--      由于 MySQL 8.x 在 Windows 环境下通过 mysql.exe CLI 导入 UTF-8 多行内容
+--      时存在编码问题（UnicodeDecodeError / Incorrect string value），
+--      请使用 Python + PyMySQL 执行导入：
+--
+--        python import_prompts.py
+--
+--      import_prompts.py 从本文件的 TEMPLATES 列表中读取数据（见文件末尾），
+--      通过 PyMySQL 的 utf8mb4 编码连接直接写入数据库，确保中文字符正确存储。
+--
+--   2. 幂等性：
+--      import_prompts.py 内含幂等逻辑（DELETE 旧数据后重新 INSERT），
+--      可重复执行以同步最新模板。
+--
+--   3. 默认设置：
+--      所有模板 is_active = 1，current_version_id 指向 v1 版本。
+--
+--   4. 执行前提：
+--      确保 database/04_insert_initial_data.sql 已执行完毕。
+--
+--   5. 变量占位符：
+--      所有 prompt_content 中的 {{variable}} 为运行时变量占位符，
+--      由前端 AI 生成流程在调用时动态替换。
+--
+-- =============================================================================

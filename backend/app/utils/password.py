@@ -4,9 +4,7 @@
 使用 bcrypt 对密码进行哈希和校验，不允许明文比对。
 """
 
-from passlib.context import CryptContext
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import bcrypt
 
 
 def hash_password(plain_password: str) -> str:
@@ -19,7 +17,7 @@ def hash_password(plain_password: str) -> str:
     Returns:
         bcrypt 哈希后的密码字符串
     """
-    return pwd_context.hash(plain_password)
+    return bcrypt.hashpw(plain_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -33,4 +31,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Returns:
         匹配返回 True，否则返回 False
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    except Exception:
+        return False
