@@ -38,3 +38,4 @@ minio-data/
 # Temporary files
 *.tmp
 *.bak
+backend/data/
