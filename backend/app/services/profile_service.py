@@ -11,10 +11,6 @@ class ProfileService:
     def __init__(self):
         self._repo = ProfileRepository()
 
-    # ------------------------------------------------------------------
-    # list_profiles
-    # ------------------------------------------------------------------
-
     def list_profiles(
         self,
         user: Any,
@@ -60,20 +56,9 @@ class ProfileService:
                 "data": None,
             }
 
-    # ------------------------------------------------------------------
-    # get_profile
-    # ------------------------------------------------------------------
-
     def get_profile(self, profile_id: int, user: Any) -> Dict[str, Any]:
         """
         获取单个学生画像详情。
-
-        Args:
-            profile_id: 画像 ID
-            user: 当前登录用户（FastAPI Depends 注入，当前未使用）
-
-        Returns:
-            标准响应 dict：{code, message, data: profile_dict 或 None}
         """
         try:
             profile = self._repo.get_profile(profile_id)
@@ -83,27 +68,11 @@ class ProfileService:
         except Exception as e:
             return {"code": 500, "message": f"查询失败: {e}", "data": None}
 
-    # ------------------------------------------------------------------
-    # update_profile
-    # ------------------------------------------------------------------
-
     def update_profile(
         self, profile_id: int, data: Dict[str, Any], user: Any
     ) -> Dict[str, Any]:
         """
         更新学生画像字段。
-
-        支持更新的字段：
-            learning_goal, current_level, interests,
-            resource_preferences, weekly_hours, mastery_score
-
-        Args:
-            profile_id: 画像 ID
-            data: 要更新的字段字典
-            user: 当前登录用户（FastAPI Depends 注入，当前未使用）
-
-        Returns:
-            标准响应 dict：{code, message, data: 更新后的 profile_dict 或 None}
         """
         try:
             updated = self._repo.update_profile(profile_id, data)
@@ -113,28 +82,11 @@ class ProfileService:
         except Exception as e:
             return {"code": 500, "message": f"更新失败: {e}", "data": None}
 
-    # ------------------------------------------------------------------
-    # update_mastery
-    # ------------------------------------------------------------------
-
     def update_mastery(
         self, profile_id: int, data: Dict[str, Any], user: Any
     ) -> Dict[str, Any]:
         """
         更新或插入知识点掌握度记录。
-
-        请求 data 应包含：
-            kp_id: int           - 知识点 ID
-            mastery: float       - 掌握度（0~1）
-            update_reason: str   - 更新原因（可选）
-
-        Args:
-            profile_id: 画像 ID
-            data: 包含 kp_id 和 mastery 的字典
-            user: 当前登录用户（FastAPI Depends 注入，当前未使用）
-
-        Returns:
-            标准响应 dict：{code, message, data: {kp_id, new_mastery} 或 None}
         """
         try:
             kp_id = data.get("kp_id")

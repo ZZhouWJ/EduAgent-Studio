@@ -18,7 +18,6 @@ const reviewForm = ref({
 })
 const submittingReview = ref(false)
 
-// 配置 marked：代码高亮、表格支持
 marked.setOptions({
   breaks: true,
   gfm: true,
@@ -115,7 +114,6 @@ async function submitReview() {
     <el-page-header @back="router.push('/resources')" content="资源详情" />
 
     <div v-if="resource" style="margin-top: 20px">
-      <!-- 基础信息 -->
       <el-card style="margin-bottom: 16px">
         <el-descriptions :column="3" border>
           <el-descriptions-item label="资源标题" :span="2">{{ resource.resource_title }}</el-descriptions-item>
@@ -142,7 +140,6 @@ async function submitReview() {
           <el-descriptions-item label="创建时间">{{ formatDate(resource.created_at) }}</el-descriptions-item>
         </el-descriptions>
 
-        <!-- 操作按钮 -->
         <div style="margin-top: 12px; display: flex; gap: 8px">
           <el-button
             v-if="resource.status === 'pending_review'"
@@ -171,7 +168,6 @@ async function submitReview() {
         </div>
       </el-card>
 
-      <!-- 资源正文 -->
       <el-card>
         <template #header>
           <div style="display:flex;justify-content:space-between;align-items:center">
@@ -186,7 +182,6 @@ async function submitReview() {
       </el-card>
     </div>
 
-    <!-- 审核对话框 -->
     <el-dialog v-model="reviewDialogVisible" title="教师审核" width="480px" destroy-on-close>
       <el-form :model="reviewForm" label-width="90px">
         <el-form-item label="审核结果" required>
@@ -225,7 +220,6 @@ async function submitReview() {
   color: #303133;
   padding: 8px 4px;
 }
-/* Markdown rendered content styles */
 .resource-content :deep(h1) {
   font-size: 20px;
   font-weight: 700;

@@ -82,7 +82,6 @@ class DiagnosisAgent:
             for t in recent_tasks[:5]
         ) or "（暂无学习任务记录）"
 
-        # 检索 RAG 上下文（混合向量+关键词检索）
         rag_context = self._retrieve_rag_context(student_profile, knowledge_points)
 
         messages = [
@@ -113,17 +112,10 @@ class DiagnosisAgent:
         student_profile: Dict[str, Any],
         knowledge_points: List[Dict[str, Any]],
     ) -> str:
-        """
-        从 RAG 服务检索相关知识点上下文。
-
-        若 pgvector 不可用（RAG 服务抛异常），静默回退到空字符串，
-        不影响诊断主流程。
-        """
         try:
             from app.services.rag_service import get_context_for_agent
 
             course_id = student_profile.get("course_id")
-            # 用学生薄弱知识点名称拼接检索 query
             weak_names = [
                 kp.get("name", "") for kp in knowledge_points
                 if kp.get("mastery_level", 1.0) < 0.5
@@ -166,7 +158,7 @@ class DiagnosisAgent:
             logger.info(f"[{self.AGENT_NAME}] LLM 诊断完成: {len(data.get('weak_points', []))} 个薄弱点")
             return data
         except json.JSONDecodeError as e:
-            logger.error(f"[{self.AGENT_NAME}] LLM 返回 JSON 解析失败: {e}, 内容: {llm_result.content[:200] if llm_result else 'N/A'}")
+            logger.error(f"[{self.AGENT_NAME}] LLM 返回 JSON 解析失败: {e}")
         except Exception as e:
             logger.error(f"[{self.AGENT_NAME}] LLM 调用异常: {e}")
         return None
@@ -174,6 +166,7 @@ class DiagnosisAgent:
     def _fallback(self, knowledge_points: List[Dict[str, Any]]) -> Dict[str, Any]:
         weak_points = []
         strong_points = []
+
         for kp in knowledge_points:
             mastery = kp.get("mastery_level", kp.get("mastery", 0.5))
             if mastery < 0.5:
@@ -189,6 +182,7 @@ class DiagnosisAgent:
                     "name": kp.get("name", ""),
                     "mastery_level": mastery
                 })
+
         return {
             "diagnosis_id": f"diag-{uuid.uuid4().hex[:8]}",
             "weak_points": weak_points,

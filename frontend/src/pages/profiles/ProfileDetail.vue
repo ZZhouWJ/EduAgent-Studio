@@ -9,7 +9,6 @@ const router = useRouter()
 const loading = ref(false)
 const detail = ref<ProfileDetail | null>(null)
 
-// 编辑对话框
 const editDialogVisible = ref(false)
 const editForm = ref({
   learning_goal: "",
@@ -83,7 +82,6 @@ onMounted(() => {
 
     <div v-if="detail">
       <el-row :gutter="20" class="mt-20">
-        <!-- 基础信息 -->
         <el-col :span="12">
           <el-card>
             <template #header>
@@ -104,7 +102,6 @@ onMounted(() => {
           </el-card>
         </el-col>
 
-        <!-- AI 诊断建议 -->
         <el-col :span="12">
           <el-card>
             <template #header>AI 诊断建议</template>
@@ -116,7 +113,6 @@ onMounted(() => {
       </el-row>
 
       <el-row :gutter="20" class="mt-20">
-        <!-- 薄弱知识点 -->
         <el-col :span="12">
           <el-card>
             <template #header>薄弱知识点</template>
@@ -126,8 +122,8 @@ onMounted(() => {
               <el-table-column label="掌握度" width="180">
                 <template #default="{ row }">
                   <el-progress
-                    :percentage="Math.round(row.mastery * 100)"
-                    :color="masteryColor(row.mastery)"
+                    :percentage="Math.round((row.mastery || row.mastery_level || 0) * 100)"
+                    :color="masteryColor(row.mastery || row.mastery_level || 0)"
                     :stroke-width="10"
                   />
                 </template>
@@ -137,7 +133,6 @@ onMounted(() => {
           </el-card>
         </el-col>
 
-        <!-- 优势知识点 -->
         <el-col :span="12">
           <el-card>
             <template #header>优势知识点</template>
@@ -147,8 +142,8 @@ onMounted(() => {
               <el-table-column label="掌握度" width="180">
                 <template #default="{ row }">
                   <el-progress
-                    :percentage="Math.round(row.mastery * 100)"
-                    :color="masteryColor(row.mastery)"
+                    :percentage="Math.round((row.mastery || row.mastery_level || 0) * 100)"
+                    :color="masteryColor(row.mastery || row.mastery_level || 0)"
                     :stroke-width="10"
                   />
                 </template>
@@ -159,7 +154,6 @@ onMounted(() => {
       </el-row>
 
       <el-row :gutter="20" class="mt-20">
-        <!-- 最近学习任务 -->
         <el-col :span="12">
           <el-card>
             <template #header>最近学习任务</template>
@@ -181,7 +175,6 @@ onMounted(() => {
           </el-card>
         </el-col>
 
-        <!-- 最近测验 -->
         <el-col :span="12">
           <el-card>
             <template #header>最近测验</template>
@@ -191,8 +184,8 @@ onMounted(() => {
               <el-table-column label="正确率" width="120">
                 <template #default="{ row }">
                   <el-progress
-                    :percentage="Math.round(row.accuracy * 100)"
-                    :color="masteryColor(row.accuracy)"
+                    :percentage="Math.round((row.accuracy || 0) * 100)"
+                    :color="masteryColor(row.accuracy || 0)"
                     :stroke-width="10"
                   />
                 </template>
@@ -204,7 +197,6 @@ onMounted(() => {
 
     </div>
 
-    <!-- 编辑画像对话框 -->
     <el-dialog v-model="editDialogVisible" title="编辑学生画像" width="580px" destroy-on-close>
       <el-form :model="editForm" label-width="110px">
         <el-form-item label="学习目标" required>

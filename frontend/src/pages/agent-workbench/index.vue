@@ -54,7 +54,6 @@ onMounted(async () => {
     }))
     courses.value = coursesRes.data.data || []
 
-    // Auto-select from URL query params
     const queryCourse = route.query.course
     const queryKp = route.query.kp
     if (queryCourse) {
@@ -192,7 +191,6 @@ async function handleGenerate() {
             }
             if (event.type === "done") break
 
-            // Map event node name to step id
             const nodeToStep: Record<string, string> = {
               diagnosis: "diagnosis",
               planning: "planning",
@@ -202,7 +200,6 @@ async function handleGenerate() {
             }
             const stepId = nodeToStep[event.node] || event.step
 
-            // Update running step
             if (stepId && stepId !== "completed") {
               const logEntry = executionLog.value.find(l => l.step === stepId)
               if (logEntry && logEntry.status === "pending") {
@@ -212,7 +209,6 @@ async function handleGenerate() {
               }
             }
 
-            // Mark completed steps
             const hasFlags = [
               { flag: "has_diagnosis", step: "diagnosis" },
               { flag: "has_plan", step: "planning" },
@@ -237,7 +233,6 @@ async function handleGenerate() {
       }
     }
 
-    // Fetch full result
     const fullRes = await agentsApi.generate({
       student_id: form.value.student_id,
       course_id: form.value.course_id,
@@ -248,7 +243,6 @@ async function handleGenerate() {
     result.value = fullRes.data.data
     activeTab.value = "resource"
 
-    // Mark review as success if not already
     const reviewEntry = executionLog.value.find(l => l.step === "review")
     if (reviewEntry && reviewEntry.status !== "success") {
       reviewEntry.status = "success"
@@ -365,7 +359,6 @@ function accuracyPercent(assessment: WorkflowResult["assessment"]) {
           </el-form>
         </el-card>
 
-        <!-- 协作智能体 -->
         <el-card class="mt-16">
           <template #header>
             <span style="font-weight:600">协作智能体</span>
@@ -404,7 +397,6 @@ function accuracyPercent(assessment: WorkflowResult["assessment"]) {
           </div>
         </el-card>
 
-        <!-- 执行详情 -->
         <el-card style="margin-top:12px">
           <template #header>
             <span style="font-weight:600">执行详情</span>
@@ -451,7 +443,6 @@ function accuracyPercent(assessment: WorkflowResult["assessment"]) {
           </template>
 
           <el-tabs v-model="activeTab">
-            <!-- 诊断结果 -->
             <el-tab-pane label="诊断结果" name="diagnosis">
               <el-descriptions :column="1" border size="small">
                 <el-descriptions-item label="薄弱知识点">
@@ -487,7 +478,6 @@ function accuracyPercent(assessment: WorkflowResult["assessment"]) {
               </el-descriptions>
             </el-tab-pane>
 
-            <!-- 学习规划 -->
             <el-tab-pane label="学习规划" name="plan">
               <el-descriptions :column="2" border size="small" v-if="result.plan">
                 <el-descriptions-item label="学习策略" :span="2">
@@ -511,7 +501,6 @@ function accuracyPercent(assessment: WorkflowResult["assessment"]) {
               <el-empty v-else description="暂无学习规划" />
             </el-tab-pane>
 
-            <!-- 生成资源 -->
             <el-tab-pane label="生成资源" name="resource">
               <div v-if="result.resource">
                 <h3 style="margin:0 0 8px;font-size:16px">{{ result.resource.title }}</h3>
@@ -522,7 +511,6 @@ function accuracyPercent(assessment: WorkflowResult["assessment"]) {
               </div>
             </el-tab-pane>
 
-            <!-- 评测反馈 -->
             <el-tab-pane label="评测反馈" name="assessment">
               <div v-if="result.assessment">
                 <div style="display:flex;align-items:center;gap:24px;margin-bottom:16px">
@@ -547,7 +535,6 @@ function accuracyPercent(assessment: WorkflowResult["assessment"]) {
               <el-empty v-else description="暂无评测数据" />
             </el-tab-pane>
 
-            <!-- 审核建议 -->
             <el-tab-pane label="审核建议" name="review">
               <div v-if="result.teacher_review_suggestion">
                 <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
@@ -590,7 +577,6 @@ function accuracyPercent(assessment: WorkflowResult["assessment"]) {
       </el-col>
     </el-row>
 
-    <!-- 保存对话框 -->
     <el-dialog v-model="saveDialogVisible" title="保存到学习资源库" width="420">
       <el-form>
         <el-form-item label="资源标题" required>

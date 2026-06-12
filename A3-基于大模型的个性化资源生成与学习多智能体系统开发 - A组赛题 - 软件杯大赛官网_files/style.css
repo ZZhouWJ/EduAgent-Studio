@@ -1,0 +1,57 @@
+/*
+	 Organic Tabs
+	 by Chris Coyier
+	 http://css-tricks.com
+*/
+
+* { margin: 0; padding: 0;  font-family:"Microsoft YaHei";font-family:"微软雅黑";}
+
+#page-wrap { width: 840px; }
+}
+
+/* Generic Utility */
+.hide { position: absolute; top: -9999px; left: -9999px; }
+
+
+/* Specific to example one */
+
+#example-one { background: #eee; padding: 10px; margin: 0 0 20px 0; -moz-box-shadow: 0 0 5px #666; -webkit-box-shadow: 0 0 5px #666; }
+
+#example-one .nav { overflow: hidden; margin: 0 0 10px 0; }
+#example-one .nav li { width: 420px; float: left; margin: 0 10px 0 0; }
+#example-one .nav li.last { margin-right: 0; }
+#example-one .nav li a { display: block; padding: 5px; background: #959290; font-size: 10px; text-align: center; border: 0; }
+#example-one .nav li a:hover { }
+
+#example-one ul { list-style: none; }
+#example-one ul li a { display: block;  padding: 4px; color: #fff; }
+#example-one ul li a:hover { background: #fe4902; }
+#example-one ul li:last-child a { border: none; }
+
+#example-one ul li.nav-one a.current, #example-one ul#featured li a:hover { background-color: #0575f4;  }
+#example-one ul li.nav-two a.current, #example-one ul#core li a:hover { background-color: #d30000;  }
+#example-one ul li.nav-three a.current, #example-one ul#jquerytuts li a:hover { background-color: #8d01b0; }
+#example-one ul li.nav-four a.current, #example-one ul#classics li a:hover { background-color: #FE4902;  }
+
+
+
+/* Specific to example two */
+
+#example-two .list-wrap {  padding: 10px; margin: 0 0 15px 0; }
+
+#example-two ul { list-style: none; }
+#example-two ul li a { display: block; padding: 4px; color: #fff; }
+#example-two ul li a:hover {  color: white; }
+#example-two ul li:last-child a { border: none; }
+
+#example-two .nav { overflow: hidden; }
+#example-two .nav li { width: 420px; float: left; margin: 0 0px 0 0; }
+#example-two .nav li.last { margin-right: 0; }
+#example-two .nav li a { background:url(../../images/images/tiaotiao1.jpg) top left; padding: 5px;  color: white; font-size: 24px; text-align: center; border: 0; line-height:40PX;}
+
+#example-two li a.current,#example-two li a.current:hover { background:#12aedd ; color: fff; }
+#example-two .nav li a:hover, #example-two .nav li a:focus { background:url(../../images/images/tiaotiao.jpg) top left;}
+
+
+
+.ff { color:fff !important;}

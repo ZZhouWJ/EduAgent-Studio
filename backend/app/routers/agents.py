@@ -14,10 +14,6 @@ router = APIRouter(prefix="/agents", tags=["智能体工作台"])
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Request / Response 模型
-# ---------------------------------------------------------------------------
-
 class GenerateRequest(BaseModel):
     student_id: int
     course_id: int
@@ -31,10 +27,6 @@ class SaveResourceRequest(BaseModel):
     title: str
     course_id: int
 
-
-# ---------------------------------------------------------------------------
-# 端点
-# ---------------------------------------------------------------------------
 
 @router.get("/list")
 async def list_agents(token: str = Depends(get_current_user)):

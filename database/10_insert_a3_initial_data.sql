@@ -11,14 +11,14 @@ USE `ai_collab_audit_system`;
 INSERT INTO `courses` (`course_name`, `course_code`, `description`, `teacher_id`, `status`) VALUES
     ('数据库系统原理', 'CS301', '系统学习数据库系统的基本概念、关系模型、SQL语言、事务与并发控制、数据库设计等内容', 1, 'active'),
     ('Python程序设计', 'CS201', 'Python编程语言基础、函数、模块、面向对象、异常处理等核心内容', 1, 'active'),
-    ('软件工程实践', 'CS401', '软件工程方法论、需求分析、系统设计、项目管理、敏捷开发等内容', 1, 'active');
+    ('软件工程实践', 'CS401', '软件工程方法论、需求分析、系统设计，项目管理、敏捷开发等内容', 1, 'active');
 
 -- ============================================================
 -- 插入知识点数据
 -- ============================================================
 INSERT INTO `knowledge_points` (`course_id`, `kp_name`, `kp_code`, `difficulty_level`, `description`, `estimated_hours`) VALUES
     -- 数据库系统原理
-    (1, '关系模型基础', 'DB001', 'basic', '关系模型的核心概念：关系、元组、属性、键', 2.0),
+    (1, '关系模型基础', 'DB001', 'basic', '关系模型的核心概念：关系，元组、属性、键', 2.0),
     (1, 'SQL基本查询', 'DB002', 'basic', 'SELECT/FROM/WHERE/ORDER BY等基本查询语法', 3.0),
     (1, '数据定义DDL', 'DB003', 'basic', 'CREATE/ALTER/DROP TABLE等DDL语句', 2.0),
     (1, 'SQL多表连接', 'DB005', 'intermediate', 'INNER JOIN/LEFT JOIN/RIGHT JOIN/FULL OUTER JOIN等', 4.0),
@@ -30,10 +30,10 @@ INSERT INTO `knowledge_points` (`course_id`, `kp_name`, `kp_code`, `difficulty_l
     (2, 'Python基础语法', 'PY001', 'basic', '变量、数据类型、运算符、流程控制', 3.0),
     (2, '函数参数传递', 'PY002', 'intermediate', '位置参数、关键字参数、默认参数、*args/**kwargs', 2.5),
     (2, '模块导入', 'PY003', 'intermediate', 'import/from...import、模块搜索路径、包管理', 2.0),
-    (2, '异常处理', 'PY004', 'intermediate', 'try/except/finally、自定义异常', 2.0),
+    (2, '异常处理', 'PY004', 'intermediate', 'try/except/finally，自定义异常', 2.0),
     -- 软件工程实践
     (3, '需求分析', 'SE001', 'basic', '需求获取、需求建模、需求规格说明', 3.0),
-    (3, 'UML建模', 'SE002', 'intermediate', '用例图、类图、时序图、活动图等', 4.0);
+    (3, 'UML建模', 'SE002', 'intermediate', '用例图、类图、时序图，活动图等', 4.0);
 
 -- ============================================================
 -- 插入学习任务数据
@@ -57,16 +57,10 @@ INSERT INTO `task_types` (`type_name`, `type_code`, `description`, `status`) VAL
     ('阶段测验生成', 'test_generation', '根据学习进度生成阶段测验题目', 'active');
 
 -- ============================================================
--- A3 补充数据：学生画像、知识点掌握度、学习反馈
--- 主场景：数据库系统原理与 Web 项目实践
--- 示例教师：张老师（user_id=2）
--- 示例学生：李明（user_id=3）/ 王悦（user_id=4）/ 陈思雨（user_id=5）
+-- A3 补充数据：学生画像、知识点掌握度，学习反馈
 -- ============================================================
 
--- --------------------------------------------------
 -- 插入学生画像（student_profiles）
--- course_id=1：数据库系统原理
--- --------------------------------------------------
 INSERT INTO `student_profiles` (`student_id`, `course_id`, `learning_goal`, `current_level`, `interests`, `resource_preferences`, `weekly_hours`, `mastery_score`) VALUES
     -- 李明：掌握度 42%，薄弱：多表连接、事务隔离级别
     (3, 1,
@@ -90,12 +84,9 @@ INSERT INTO `student_profiles` (`student_id`, `course_id`, `learning_goal`, `cur
      '视频教程,代码示例,项目驱动',
      6, 0.35);
 
--- --------------------------------------------------
 -- 插入知识点掌握度（student_knowledge_mastery）
--- 李明的掌握度数据
--- --------------------------------------------------
 INSERT INTO `student_knowledge_mastery` (`profile_id`, `kp_id`, `mastery_level`, `last_test_score`, `last_test_date`, `update_reason`) VALUES
-    -- 李明（profile_id=1）：数据库系统原理
+    -- 李明（profile_id=1）
     (1, 1, 0.80, 0.85, '2026-05-15', '第三次测验准确率 85%'),
     (1, 2, 0.90, 0.92, '2026-05-20', '第四次测验准确率 92%，已熟练掌握'),
     (1, 3, 0.75, 0.78, '2026-05-18', '课堂练习完成较好'),
@@ -103,32 +94,27 @@ INSERT INTO `student_knowledge_mastery` (`profile_id`, `kp_id`, `mastery_level`,
     (1, 8, 0.20, 0.20, '2026-06-01', '从未正确解答事务隔离级别题目'),
     (1, 12, 0.40, 0.40, '2026-05-25', '范式理解停留在概念层面'),
     (1, 15, 0.45, 0.45, '2026-05-28', '索引设计原则有所了解但不会应用'),
-    -- 王悦（profile_id=2）：数据库系统原理
+    -- 王悦（profile_id=2）
     (2, 1, 0.85, 0.88, '2026-05-10', '基础概念掌握良好'),
     (2, 2, 0.90, 0.95, '2026-05-15', '复杂查询掌握较好'),
     (2, 5, 0.60, 0.65, '2026-06-01', '多表连接基本正确，复杂场景仍有问题'),
     (2, 8, 0.55, 0.55, '2026-05-30', '事务隔离级别理解不深'),
     (2, 12, 0.72, 0.75, '2026-05-20', '范式应用基本正确'),
     (2, 15, 0.30, 0.30, '2026-06-01', '索引优化缺乏实战经验，需要专项练习'),
-    -- 陈思雨（profile_id=3）：Python程序设计
+    -- 陈思雨（profile_id=3）
     (3, 20, 0.75, 0.80, '2026-05-15', '基础语法掌握良好'),
     (3, 21, 0.30, 0.30, '2026-06-01', '函数参数传递混淆不清'),
     (3, 22, 0.25, 0.25, '2026-06-01', '模块导入机制不理解'),
     (3, 23, 0.40, 0.40, '2026-05-28', '异常处理概念了解但不会用');
 
--- --------------------------------------------------
 -- 插入学习反馈示例（learning_feedbacks）
--- --------------------------------------------------
 INSERT INTO `learning_feedbacks` (`profile_id`, `resource_id`, `course_id`, `feedback_type`, `content`, `quiz_score`, `self_mastery`, `difficulty_rating`) VALUES
-    -- 李明：提交 SQL 多表连接讲义的反馈
     (1, NULL, 1, 'self_report',
      '讲义内容清晰，特别是 INNER JOIN 和 LEFT JOIN 的区别讲得很清楚。案例也很实用，但练习题偏少，希望能增加更多实战练习。',
      NULL, 0.55, 'appropriate'),
-    -- 李明：提交事务隔离级别测验结果
     (1, NULL, 1, 'quiz_result',
      '测验有一定难度，对隔离级别理解更深了，但还是会在脏读和不可重复读之间混淆。',
      0.30, NULL, 'too_hard'),
-    -- 王悦：提交索引优化资源反馈
     (2, NULL, 1, 'self_report',
      '索引设计原则讲解透彻，对 B+ 树有了直观理解，但实战案例偏少。',
      NULL, 0.65, 'appropriate');

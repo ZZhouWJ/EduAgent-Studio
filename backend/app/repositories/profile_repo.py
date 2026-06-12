@@ -9,28 +9,14 @@ from app.database import get_db_cursor
 def _serialize_profile(raw: Dict[str, Any]) -> Dict[str, Any]:
     """
     将数据库原始行转换为前端期望的 profile 字典结构。
-
-    处理逻辑：
-    - resource_preferences / interests：逗号分隔字符串 → 列表
-    - weak_points：子查询返回的 kp_name 列表（mastery < 0.5）
-    - strong_points：子查询返回的 {"kp_id", "kp_name", "mastery"} 列表
-    - recent_tasks：子查询返回的任务列表
-    - recent_tests：子查询返回的反馈/测验列表
-    - last_updated：取 updated_at 或 created_at 的日期部分
-    - mastery_score：直接取 mastery_score 字段（0~1）
     """
-    # 解析逗号分隔字段
     resource_prefs = _split_field(raw.get("resource_preferences"))
     interests = _split_field(raw.get("interests"))
-
-    # weak_points / strong_points 在外层查询时已作为 JSON 字符串拼好
-    # 直接从 raw 取，fallback 为空列表
     weak_points = _parse_json_list(raw.get("weak_points"))
     strong_points = _parse_json_list(raw.get("strong_points"))
     recent_tasks = _parse_json_list(raw.get("recent_tasks"))
     recent_tests = _parse_json_list(raw.get("recent_tests"))
 
-    # last_updated：优先取 updated_at，否则 created_at
     updated_at = raw.get("updated_at") or raw.get("created_at")
     if isinstance(updated_at, datetime):
         last_updated = updated_at.strftime("%Y-%m-%d")
@@ -55,7 +41,7 @@ def _serialize_profile(raw: Dict[str, Any]) -> Dict[str, Any]:
         "interests": interests,
         "resource_preferences": resource_prefs,
         "weekly_hours": raw.get("weekly_hours") or 0,
-        "ai_suggestions": "建议根据个人学习情况，合理规划复习时间。",  # placeholder
+        "ai_suggestions": "建议根据个人学习情况，合理规划复习时间。",
         "strong_points": strong_points,
         "recent_tasks": recent_tasks,
         "recent_tests": recent_tests,
@@ -63,17 +49,12 @@ def _serialize_profile(raw: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _split_field(value: Any) -> List[str]:
-    """将逗号分隔的字符串拆分为列表，忽略空白。"""
     if not value:
         return []
     return [v.strip() for v in str(value).split(",") if v.strip()]
 
 
 def _parse_json_list(value: Any) -> List[Any]:
-    """
-    解析 JSON 数组字符串为 Python 列表。
-    如果已经是 list 或 None，则直接返回空列表或原值。
-    """
     if isinstance(value, list):
         return value
     if not value:
@@ -89,10 +70,6 @@ def _parse_json_list(value: Any) -> List[Any]:
 class ProfileRepository:
     """学生画像数据访问层。"""
 
-    # ------------------------------------------------------------------
-    # list_profiles
-    # ------------------------------------------------------------------
-
     def list_profiles(
         self,
         page: int = 1,
@@ -100,15 +77,8 @@ class ProfileRepository:
         course_id: Optional[int] = None,
         keyword: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], int]:
-        """
-        分页查询学生画像列表。
-
-        Returns:
-            (profile 列表, 总数)
-        """
         offset = (page - 1) * page_size
 
-        # ---------- 统计 COUNT ----------
         count_sql = """
             SELECT COUNT(*) AS total
             FROM student_profiles sp
@@ -127,9 +97,6 @@ class ProfileRepository:
             like = f"%{keyword}%"
             count_params.extend([like, like])
 
-        # ---------- 主数据查询 ----------
-        # weak_points（mastery < 0.5）和 strong_points 用子查询聚合为 JSON
-        # recent_tasks / recent_tests 用 LEFT JOIN + 子查询
         data_sql = f"""
             SELECT
                 sp.profile_id,
@@ -147,7 +114,6 @@ class ProfileRepository:
                 sp.resource_preferences,
                 sp.weekly_hours,
 
-                -- 薄弱知识点：mastery < 0.5
                 (
                     SELECT JSON_ARRAYAGG(kp.kp_name)
                     FROM student_knowledge_mastery skm
@@ -158,7 +124,6 @@ class ProfileRepository:
                       AND skm.mastery_level < 0.5
                 ) AS weak_points,
 
-                -- 强项知识点：mastery >= 0.5
                 (
                     SELECT JSON_ARRAYAGG(
                         JSON_OBJECT('kp_id', kp.kp_id,
@@ -173,7 +138,6 @@ class ProfileRepository:
                       AND skm.mastery_level >= 0.5
                 ) AS strong_points,
 
-                -- 最近学习任务（最近 3 条）
                 (
                     SELECT JSON_ARRAYAGG(
                         JSON_OBJECT(
@@ -192,7 +156,6 @@ class ProfileRepository:
                     LIMIT 3
                 ) AS recent_tasks,
 
-                -- 最近测验（最近 3 条，来自 learning_feedbacks）
                 (
                     SELECT JSON_ARRAYAGG(
                         JSON_OBJECT(
@@ -242,17 +205,7 @@ class ProfileRepository:
         profiles = [_serialize_profile(row) for row in rows]
         return profiles, total
 
-    # ------------------------------------------------------------------
-    # get_profile
-    # ------------------------------------------------------------------
-
     def get_profile(self, profile_id: int) -> Optional[Dict[str, Any]]:
-        """
-        按 profile_id 查询单个学生画像。
-
-        Returns:
-            profile 字典或 None（不存在或已软删除）
-        """
         sql = """
             SELECT
                 sp.profile_id,
@@ -342,12 +295,6 @@ class ProfileRepository:
         return _serialize_profile(row)
 
     def get_profile_by_student_id(self, student_id: int) -> Optional[Dict[str, Any]]:
-        """
-        按 student_id 查询学生的第一个画像。
-
-        Returns:
-            profile 字典或 None（不存在或已软删除）
-        """
         with get_db_cursor() as cursor:
             cursor.execute(
                 "SELECT profile_id FROM student_profiles WHERE student_id = %s AND is_deleted = 0 LIMIT 1",
@@ -358,21 +305,7 @@ class ProfileRepository:
             return None
         return self.get_profile(row["profile_id"])
 
-    # ------------------------------------------------------------------
-    # update_profile
-    # ------------------------------------------------------------------
-
     def update_profile(self, profile_id: int, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """
-        更新 student_profiles 字段（仅更新传入的非 None 字段）。
-
-        支持更新的字段：
-            learning_goal, current_level, interests,
-            resource_preferences, weekly_hours, mastery_score
-
-        Returns:
-            更新后的 profile 字典或 None
-        """
         allowed_fields = {
             "learning_goal",
             "current_level",
@@ -403,13 +336,8 @@ class ProfileRepository:
         """
         with get_db_cursor() as cursor:
             cursor.execute(sql, params)
-            # 不检查 rowcount，因为可能值未变
 
         return self.get_profile(profile_id)
-
-    # ------------------------------------------------------------------
-    # update_mastery
-    # ------------------------------------------------------------------
 
     def update_mastery(
         self,
@@ -418,17 +346,8 @@ class ProfileRepository:
         mastery_level: float,
         update_reason: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
-        """
-        插入或更新 student_knowledge_mastery 记录。
-
-        若该 (profile_id, kp_id) 记录已存在则 UPDATE，不存在则 INSERT。
-
-        Returns:
-            更新/插入后的 mastery 记录字典（含 kp_name）或 None
-        """
         now = datetime.now()
 
-        # 先尝试 UPDATE
         update_sql = """
             UPDATE student_knowledge_mastery
             SET mastery_level = %s,
@@ -446,7 +365,6 @@ class ProfileRepository:
             updated = cursor.rowcount
 
         if updated == 0:
-            # INSERT
             insert_sql = """
                 INSERT INTO student_knowledge_mastery
                     (profile_id, kp_id, mastery_level, last_test_score,
@@ -463,7 +381,6 @@ class ProfileRepository:
                     ),
                 )
 
-        # 同时更新主表的 mastery_score（取所有知识点的平均）
         avg_sql = """
             UPDATE student_profiles
             SET mastery_score = (
@@ -477,7 +394,6 @@ class ProfileRepository:
         with get_db_cursor() as cursor:
             cursor.execute(avg_sql, (profile_id, now, profile_id))
 
-        # 返回更新后的 mastery 记录
         result_sql = """
             SELECT skm.mastery_id, skm.profile_id, skm.kp_id,
                    skm.mastery_level, skm.last_test_score,

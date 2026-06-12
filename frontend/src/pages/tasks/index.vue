@@ -204,14 +204,12 @@ function formatDate(dateStr: string) {
         </div>
       </template>
 
-      <!-- 无课程时 -->
       <div v-if="!selectedCourseId && !loading" class="empty-tip">
         <el-icon :size="40" color="#c0c4cc"><FolderOpened /></el-icon>
         <p>请在上方选择一个课程，查看该课程的学习任务列表</p>
         <el-button type="primary" size="small" @click="router.push('/courses')">前往课程空间</el-button>
       </div>
 
-      <!-- 任务表格 -->
       <el-table
         v-else
         v-loading="tasksLoading"

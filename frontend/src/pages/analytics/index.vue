@@ -7,7 +7,6 @@ import type { EChartsOption } from "echarts"
 
 const loading = ref(false)
 
-// 6 个图表 DOM ref
 const masteryChartRef = ref<HTMLDivElement>()
 const weakPointsChartRef = ref<HTMLDivElement>()
 const resourceTypeChartRef = ref<HTMLDivElement>()
@@ -22,7 +21,6 @@ let invocationTrendChart: echarts.ECharts | null = null
 let reviewRateChart: echarts.ECharts | null = null
 let costChart: echarts.ECharts | null = null
 
-// 统计数据
 const stats = ref({
   course_count: 0,
   student_count: 0,
@@ -32,7 +30,6 @@ const stats = ref({
   review_pass_rate: 0,
 })
 
-// 图表原始数据（用于渲染）
 let masteryDistData: Array<{ range: string; count: number }> = []
 let weakPointsData: Array<{ name: string; mastery: number }> = []
 let resourceTypeData: Array<{ name: string; value: number }> = []
@@ -73,7 +70,6 @@ function initCharts() {
 }
 
 async function loadData() {
-  // 并行加载所有数据
   const [overviewRes, modelCallsRes, costsRes, reviewsRes, learningRes] = await Promise.allSettled([
     statisticsApi.overview(),
     statisticsApi.modelCalls(),
@@ -82,9 +78,8 @@ async function loadData() {
     statisticsApi.learningOverview(),
   ])
 
-  // 处理 A3 学习概览（优先使用，精确映射）
   if (learningRes.status === "fulfilled" && learningRes.value?.data) {
-    const d = learningRes.value.data
+    const d = learningRes.value.data.data
     stats.value = {
       course_count: d.course_count,
       student_count: d.student_count,
@@ -94,8 +89,7 @@ async function loadData() {
       review_pass_rate: d.review_pass_rate,
     }
   } else if (overviewRes.status === "fulfilled" && overviewRes.value?.data) {
-    // 降级：仅当 A3 接口不可用时才使用原有业务统计
-    const d = overviewRes.value.data
+    const d = overviewRes.value.data.data
     stats.value = {
       course_count: 0,
       student_count: 0,
@@ -106,10 +100,8 @@ async function loadData() {
     }
   }
 
-  // 生成默认日期数据（用于空数据展示）
   const defaultDates = generateLast14Days().map(date => ({ date, calls: 0, tokens: 0 }))
 
-  // 并行加载 A3 图表数据
   const [masteryRes, weakPointsRes, resourceTypeRes, invocationTrendRes, reviewRateRes, costDistRes] =
     await Promise.allSettled([
       statisticsApi.masteryDistribution(),
@@ -162,9 +154,7 @@ async function loadData() {
     }))
   }
 
-  // 降级覆盖：A3 接口无数据时使用原有业务 API
   if (learningRes.status !== "fulfilled" || !learningRes.value?.data) {
-    // 仅当 A3 调用趋势无数据时降级
     if (modelCallsRes.status === "fulfilled" && modelCallsRes.value?.data && !invocationTrendData.length) {
       invocationTrendData = defaultDates
     }
@@ -195,10 +185,6 @@ async function loadData() {
   renderReviewRateChart()
   renderCostChart()
 }
-
-// ---------------------------------------------------------------------------
-// 各图表渲染函数
-// ---------------------------------------------------------------------------
 
 function renderMasteryChart() {
   if (!masteryChart) return
@@ -385,7 +371,6 @@ function generateLast14Days(): string[] {
   <div class="analytics-page page-container" v-loading="loading">
     <h1 class="page-title">学习分析看板</h1>
 
-    <!-- 统计卡片 -->
     <el-row :gutter="16" class="stat-cards">
       <el-col :span="4">
         <div class="stat-card">
@@ -429,7 +414,6 @@ function generateLast14Days(): string[] {
       </el-col>
     </el-row>
 
-    <!-- 图表区域 -->
     <el-row :gutter="16" style="margin-top: 16px">
       <el-col :span="8">
         <el-card>

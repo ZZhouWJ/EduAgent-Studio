@@ -46,11 +46,6 @@ async def submit_feedback(
 ):
     """
     提交学习反馈，并自动更新知识点掌握度和学生画像。
-
-    规则：
-    - 如果有 quiz_score → 用它更新知识点掌握度
-    - 如果有 self_mastery → 用它更新
-    - 取 resource_id 关联的 target_kp_ids 中第一个作为本次学习知识点
     """
     from app.services.auth_service import get_current_user as get_user
     from app.database import get_db_cursor
@@ -62,7 +57,6 @@ async def submit_feedback(
         from app.utils.response import error_response
         return error_response(message="用户未认证", code=401)
 
-    # 获取用户的 profile_id（必须有有效的画像才能提交反馈）
     profile_id = None
     try:
         with get_db_cursor() as cursor:
@@ -82,8 +76,6 @@ async def submit_feedback(
 
     entry = _repo.create_feedback(data=data.model_dump(), profile_id=profile_id, user_id=user_id)
 
-    # === 画像更新闭环 ===
-    # 1. 解析本次学习的知识点 ID
     target_kp_ids: list[int] = []
     if data.resource_id:
         try:
@@ -98,10 +90,8 @@ async def submit_feedback(
         except Exception:
             pass
 
-    # 2. 确定新掌握度
     new_mastery = data.quiz_score if data.quiz_score is not None else data.self_mastery
 
-    # 3. 更新 / 插入知识点掌握度
     if new_mastery is not None and target_kp_ids:
         primary_kp_id = target_kp_ids[0]
         update_reason = (
@@ -111,7 +101,6 @@ async def submit_feedback(
         )
         try:
             with get_db_cursor() as cursor:
-                # UPSERT：存在则更新，不存在则插入
                 cursor.execute("""
                     INSERT INTO student_knowledge_mastery
                         (profile_id, kp_id, mastery_level, last_test_score, last_test_date, update_reason, is_deleted, created_at, updated_at)
@@ -132,7 +121,6 @@ async def submit_feedback(
         except Exception:
             pass
 
-        # 4. 重算综合掌握度 AVG(all_kp_mastery)
         try:
             with get_db_cursor() as cursor:
                 cursor.execute("""

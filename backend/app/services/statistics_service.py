@@ -20,10 +20,6 @@ from app.repositories import statistics_repo
 from app.utils.exceptions import ForbiddenException, ValidationException
 
 
-# =============================================================================
-# 权限辅助
-# =============================================================================
-
 def _require_auth(token: str) -> Dict[str, Any]:
     """解析 Token，获取当前用户。"""
     from app.services.auth_service import get_current_user
@@ -37,42 +33,18 @@ def _is_admin(user: Dict[str, Any]) -> bool:
     return "admin" in user.get("roles", [])
 
 
-# =============================================================================
-# 首页统计概览
-# GET /api/statistics/overview
-# =============================================================================
-
 def get_overview(token: str) -> Dict[str, Any]:
-    """
-    首页统计概览。
-
-    - admin 返回全局统计
-    - 非 admin 返回用户参与项目的范围内统计
-    """
     user = _require_auth(token)
     is_admin = _is_admin(user)
     user_id = user["user_id"]
-
     stats = statistics_repo.get_overview_stats(is_admin, user_id)
     return stats
 
-
-# =============================================================================
-# 项目统计
-# GET /api/statistics/projects
-# =============================================================================
 
 def list_project_stats(
     token: str,
     project_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
-    """
-    项目维度统计列表。
-
-    - admin 可查看所有项目
-    - 非 admin 只能查看自己参与的项目
-    - 如指定 project_id，需校验访问权限
-    """
     user = _require_auth(token)
     is_admin = _is_admin(user)
     user_id = user["user_id"]
@@ -86,24 +58,12 @@ def list_project_stats(
     return statistics_repo.list_project_stats(is_admin, user_id)
 
 
-# =============================================================================
-# 模型调用统计
-# GET /api/statistics/model-calls
-# =============================================================================
-
 def get_model_call_stats(
     token: str,
     project_id: Optional[int] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """
-    模型调用统计。
-
-    - admin 可查看全部
-    - 非 admin 只能查看自己参与项目
-    - 如指定 project_id，需校验访问权限
-    """
     user = _require_auth(token)
     is_admin = _is_admin(user)
     user_id = user["user_id"]
@@ -127,24 +87,12 @@ def get_model_call_stats(
     )
 
 
-# =============================================================================
-# 成本统计
-# GET /api/statistics/costs
-# =============================================================================
-
 def get_cost_stats(
     token: str,
     project_id: Optional[int] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """
-    成本统计。
-
-    - admin 可查看全部
-    - 非 admin 只能查看自己参与项目
-    - 如指定 project_id，需校验访问权限
-    """
     user = _require_auth(token)
     is_admin = _is_admin(user)
     user_id = user["user_id"]
@@ -168,22 +116,10 @@ def get_cost_stats(
     )
 
 
-# =============================================================================
-# 审核质量统计
-# GET /api/statistics/reviews
-# =============================================================================
-
 def get_review_stats(
     token: str,
     project_id: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """
-    审核质量统计。
-
-    - admin 可查看全部
-    - 非 admin 只能查看自己参与项目
-    - 如指定 project_id，需校验访问权限
-    """
     user = _require_auth(token)
     is_admin = _is_admin(user)
     user_id = user["user_id"]
@@ -200,22 +136,10 @@ def get_review_stats(
     )
 
 
-# =============================================================================
-# 成员贡献统计
-# GET /api/statistics/member-contributions
-# =============================================================================
-
 def get_member_contribution_stats(
     token: str,
     project_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
-    """
-    成员贡献统计。
-
-    - admin 可查看全部
-    - 非 admin 只能查看自己参与项目的成员贡献
-    - 如指定 project_id，需校验访问权限
-    """
     user = _require_auth(token)
     is_admin = _is_admin(user)
     user_id = user["user_id"]
@@ -232,24 +156,11 @@ def get_member_contribution_stats(
     )
 
 
-# =============================================================================
-# 最近操作动态
-# GET /api/statistics/recent-activities
-# =============================================================================
-
 def get_recent_activities(
     token: str,
     project_id: Optional[int] = None,
     limit: int = 20,
 ) -> List[Dict[str, Any]]:
-    """
-    最近操作动态。
-
-    - admin 可查看全部
-    - 非 admin 只能查看自己参与项目
-    - 如指定 project_id，需校验访问权限
-    - limit 最大 100
-    """
     user = _require_auth(token)
     is_admin = _is_admin(user)
     user_id = user["user_id"]
@@ -272,12 +183,7 @@ def get_recent_activities(
     )
 
 
-# =============================================================================
-# 参数校验
-# =============================================================================
-
 def _validate_date(date_str: str, field_name: str) -> None:
-    """校验日期格式是否为 YYYY-MM-DD。"""
     try:
         datetime.strptime(date_str, "%Y-%m-%d")
     except ValueError:
@@ -302,49 +208,28 @@ def _get_learning_repo():
 
 
 def get_learning_overview(user_token: str) -> dict:
-    """
-    A3 学习分析概览。
-    """
     return _get_learning_repo().get_overview()
 
 
 def get_mastery_distribution(user_token: str) -> list[dict]:
-    """
-    学生掌握度分布。
-    """
     return _get_learning_repo().get_mastery_distribution()
 
 
 def get_weak_knowledge_points(user_token: str, top_n: int = 10) -> list[dict]:
-    """
-    薄弱知识点 TOP N。
-    """
     return _get_learning_repo().get_weak_knowledge_points(top_n)
 
 
 def get_resource_type_distribution(user_token: str) -> list[dict]:
-    """
-    学习资源类型分布。
-    """
     return _get_learning_repo().get_resource_type_distribution()
 
 
 def get_invocation_trend(user_token: str, days: int = 14) -> list[dict]:
-    """
-    智能体调用趋势（近N天）。
-    """
     return _get_learning_repo().get_invocation_trend(days)
 
 
 def get_review_rate_by_course(user_token: str) -> list[dict]:
-    """
-    各课程审核通过率。
-    """
     return _get_learning_repo().get_review_rate_by_course()
 
 
 def get_cost_distribution(user_token: str) -> list[dict]:
-    """
-    Token 消耗占比（按智能体分类）。
-    """
     return _get_learning_repo().get_cost_distribution()

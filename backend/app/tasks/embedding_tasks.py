@@ -15,22 +15,16 @@ logger = logging.getLogger(__name__)
 
 
 def _chunk_knowledge_point(kp: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """
-    将单个知识点拆分为多个文本块。
-    每个知识点生成 1-2 个块。
-    """
     chunks = []
     name = kp.get("kp_name", "")
     desc = kp.get("description") or ""
     difficulty = kp.get("difficulty_level") or ""
 
-    # 块1：知识点名称和难度
     chunk1 = f"知识点「{name}」，难度{difficulty}。"
     if desc:
         chunk1 += f" 简介：{desc[:200]}"
     chunks.append({"content_chunk": chunk1, "chunk_index": 0})
 
-    # 块2：父知识点名称（如果有）
     parent_name = kp.get("parent_kp_name") or ""
     if parent_name:
         chunk2 = f"前置知识点「{parent_name}」是「{name}」的基础概念。"
@@ -52,7 +46,6 @@ def compute_knowledge_point_embeddings(self, course_id: int) -> dict:
 
     logger.info(f"[Embedding] 开始计算课程 {course_id} 的知识点 embedding")
     try:
-        # 从 MySQL 读取知识点
         with get_db_cursor() as cursor:
             cursor.execute("""
                 SELECT
@@ -114,7 +107,6 @@ def compute_resource_embedding(self, resource_id: int) -> dict:
 
     logger.info(f"[Embedding] 计算资源 {resource_id} 的 embedding")
     try:
-        # 从 MySQL 读取资源内容
         with get_db_cursor() as cursor:
             cursor.execute(
                 "SELECT content FROM learning_resources "
