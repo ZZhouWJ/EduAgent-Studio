@@ -58,8 +58,12 @@ async def submit_feedback(
     user = get_user(token)
     user_id = user.get("user_id", 0) if user else 0
 
-    # 获取用户的 profile_id
-    profile_id = 1
+    if not user_id:
+        from app.utils.response import error_response
+        return error_response(message="用户未认证", code=401)
+
+    # 获取用户的 profile_id（必须有有效的画像才能提交反馈）
+    profile_id = None
     try:
         with get_db_cursor() as cursor:
             cursor.execute(
@@ -71,6 +75,10 @@ async def submit_feedback(
                 profile_id = row["profile_id"]
     except Exception:
         pass
+
+    if profile_id is None:
+        from app.utils.response import error_response
+        return error_response(message="未找到该学生的画像，请先创建学生画像", code=404)
 
     entry = _repo.create_feedback(data=data.model_dump(), profile_id=profile_id, user_id=user_id)
 

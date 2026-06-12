@@ -148,11 +148,13 @@ class ResourceGenerationAgent:
             content = self._generate_content(kp_name, resource_type, difficulty)
 
         kp_ids = [p.get("kp_id", 0) for p in learning_path]
+        kp_id_str = ",".join(str(kid) for kid in kp_ids if kid) if kp_ids else ""
 
         return {
             "resource_id": f"res-{uuid.uuid4().hex[:8]}",
             "title": f"{kp_name}专题{RESOURCE_TYPE_TITLES.get(resource_type, '资源')}",
             "type": RESOURCE_TYPE_TITLES.get(resource_type, "学习资源"),
+            "target_kp_ids": kp_id_str,
             "knowledge_points": kp_ids,
             "difficulty": difficulty,
             "content": content,

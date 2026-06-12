@@ -165,13 +165,10 @@ class LearningRepository:
         knowledge_points = [
             {
                 "id": row["kp_id"],
-                "kp_id": row["kp_id"],
                 "name": row["kp_name"],
-                "kp_name": row["kp_name"],
                 "mastery_level": row["mastery_level"],
                 "mastery_avg": row["mastery_level"],
                 "difficulty": _map_difficulty(row["difficulty_level"]),
-                "difficulty_level": row["difficulty_level"],
             }
             for row in kp_rows
         ]

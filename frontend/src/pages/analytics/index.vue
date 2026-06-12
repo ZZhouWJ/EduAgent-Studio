@@ -82,22 +82,7 @@ async function loadData() {
     statisticsApi.learningOverview(),
   ])
 
-  // 处理 overview（原有业务统计）
-  if (overviewRes.status === "fulfilled" && overviewRes.value?.data) {
-    const d = overviewRes.value.data
-    stats.value = {
-      course_count: d.project_count || 0,
-      student_count: d.artifact_count || 0,
-      resource_count: d.artifact_count || 0,
-      invocation_count: d.invocation_count || 0,
-      avg_mastery: 0,
-      review_pass_rate: d.success_invocation_count > 0
-        ? d.success_invocation_count / d.invocation_count
-        : 0,
-    }
-  }
-
-  // 处理 A3 学习概览
+  // 处理 A3 学习概览（优先使用，精确映射）
   if (learningRes.status === "fulfilled" && learningRes.value?.data) {
     const d = learningRes.value.data
     stats.value = {
@@ -108,7 +93,21 @@ async function loadData() {
       avg_mastery: d.avg_mastery,
       review_pass_rate: d.review_pass_rate,
     }
+  } else if (overviewRes.status === "fulfilled" && overviewRes.value?.data) {
+    // 降级：仅当 A3 接口不可用时才使用原有业务统计
+    const d = overviewRes.value.data
+    stats.value = {
+      course_count: 0,
+      student_count: 0,
+      resource_count: d.artifact_count || 0,
+      invocation_count: d.invocation_count || 0,
+      avg_mastery: 0,
+      review_pass_rate: 0,
+    }
   }
+
+  // 生成默认日期数据（用于空数据展示）
+  const defaultDates = generateLast14Days().map(date => ({ date, calls: 0, tokens: 0 }))
 
   // 并行加载 A3 图表数据
   const [masteryRes, weakPointsRes, resourceTypeRes, invocationTrendRes, reviewRateRes, costDistRes] =
@@ -146,12 +145,7 @@ async function loadData() {
       tokens: d.total_tokens,
     }))
   } else {
-    const dates = generateLast14Days()
-    invocationTrendData = dates.map((date, i) => ({
-      date,
-      calls: 0,
-      tokens: 0,
-    }))
+    invocationTrendData = defaultDates
   }
 
   if (reviewRateRes.status === "fulfilled" && reviewRateRes.value?.data) {
@@ -168,32 +162,30 @@ async function loadData() {
     }))
   }
 
-  // 处理原有 API（降级覆盖）
-  if (modelCallsRes.status === "fulfilled" && modelCallsRes.value?.data && !invocationTrendData.length) {
-    const dates = generateLast14Days()
-    invocationTrendData = dates.map((date, i) => ({
-      date,
-      calls: 0,
-      tokens: 0,
-    }))
-  }
+  // 降级覆盖：A3 接口无数据时使用原有业务 API
+  if (learningRes.status !== "fulfilled" || !learningRes.value?.data) {
+    // 仅当 A3 调用趋势无数据时降级
+    if (modelCallsRes.status === "fulfilled" && modelCallsRes.value?.data && !invocationTrendData.length) {
+      invocationTrendData = defaultDates
+    }
 
-  if (costsRes.status === "fulfilled" && costsRes.value?.data && !costData.length) {
-    costData = (costsRes.value.data.data.cost_by_model || []).map((m: any) => ({
-      name: m.model_name,
-      value: Math.round(m.cost * 1000000),
-    }))
-  }
+    if (costsRes.status === "fulfilled" && costsRes.value?.data && !costData.length) {
+      costData = (costsRes.value.data.data.cost_by_model || []).map((m: any) => ({
+        name: m.model_name,
+        value: Math.round(m.cost * 1000000),
+      }))
+    }
 
-  if (reviewsRes.status === "fulfilled" && reviewsRes.value?.data && !reviewRateData.length) {
-    const r = reviewsRes.value.data.data
-    reviewRateData = [
-      { name: "准确性", rate: Math.round((r.avg_accuracy_score || 0) * 100) },
-      { name: "完整性", rate: Math.round((r.avg_completeness_score || 0) * 100) },
-      { name: "逻辑性", rate: Math.round((r.avg_logic_score || 0) * 100) },
-      { name: "规范性", rate: Math.round((r.avg_format_score || 0) * 100) },
-      { name: "可用性", rate: Math.round((r.avg_usability_score || 0) * 100) },
-    ]
+    if (reviewsRes.status === "fulfilled" && reviewsRes.value?.data && !reviewRateData.length) {
+      const r = reviewsRes.value.data.data
+      reviewRateData = [
+        { name: "准确性", rate: Math.round((r.avg_accuracy_score || 0) * 100) },
+        { name: "完整性", rate: Math.round((r.avg_completeness_score || 0) * 100) },
+        { name: "逻辑性", rate: Math.round((r.avg_logic_score || 0) * 100) },
+        { name: "规范性", rate: Math.round((r.avg_format_score || 0) * 100) },
+        { name: "可用性", rate: Math.round((r.avg_usability_score || 0) * 100) },
+      ]
+    }
   }
 
   renderMasteryChart()

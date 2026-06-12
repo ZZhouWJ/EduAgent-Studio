@@ -341,6 +341,23 @@ class ProfileRepository:
             return None
         return _serialize_profile(row)
 
+    def get_profile_by_student_id(self, student_id: int) -> Optional[Dict[str, Any]]:
+        """
+        按 student_id 查询学生的第一个画像。
+
+        Returns:
+            profile 字典或 None（不存在或已软删除）
+        """
+        with get_db_cursor() as cursor:
+            cursor.execute(
+                "SELECT profile_id FROM student_profiles WHERE student_id = %s AND is_deleted = 0 LIMIT 1",
+                (student_id,),
+            )
+            row = cursor.fetchone()
+        if not row:
+            return None
+        return self.get_profile(row["profile_id"])
+
     # ------------------------------------------------------------------
     # update_profile
     # ------------------------------------------------------------------

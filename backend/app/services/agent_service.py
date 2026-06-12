@@ -136,12 +136,9 @@ class AgentService:
         try:
             from app.repositories.profile_repo import ProfileRepository
             repo = ProfileRepository()
-            items, _ = repo.list_profiles(page=1, page_size=200)
-            matched = next((p for p in items if p.get("student_id") == student_id), None)
-            if matched:
-                profile_id = matched.get("profile_id")
-                profile_detail = repo.get_profile(profile_id)
-                return profile_id, profile_detail
+            profile = repo.get_profile_by_student_id(student_id)
+            if profile:
+                return profile.get("profile_id"), profile
             return student_id, None
         except Exception as e:
             logger.warning(f"解析 profile 失败: {e}")
@@ -214,6 +211,7 @@ class AgentService:
             metadata={
                 "difficulty": resource.get("difficulty"),
                 "knowledge_points": resource.get("knowledge_points", []),
+                "target_kp_ids": resource.get("target_kp_ids", ""),
                 "generation_model": resource.get("generation_metadata", {}).get("model"),
                 "quality_score": raw.get("quality_score"),
                 "step_history": raw.get("step_history", []),

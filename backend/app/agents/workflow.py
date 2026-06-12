@@ -363,7 +363,7 @@ def _supervisor_router(state: WorkflowState) -> Literal[
     if any(metadata.get(f"{k}_error") for k in
            ["diagnosis_error", "planning_error", "generation_error",
             "assessment_error", "review_error"]):
-        return "completed"
+        return WorkflowStep.FAILED.value
 
     if step == WorkflowStep.INIT.value:
         return "diagnosis"

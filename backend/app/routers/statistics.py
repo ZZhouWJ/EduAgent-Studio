@@ -28,22 +28,19 @@ from typing import Optional
 from fastapi import APIRouter, Header, Path, Query, Request
 from pydantic import BaseModel, Field
 
+from app.services.auth_service import _extract_token_from_header as _extract_token_from_auth
 from app.services import statistics_service
+from app.utils.exceptions import UnauthorizedException
 from app.utils.response import success_response
 
-router = APIRouter(tags=["统计看板"])
-
-
-def _extract_token(authorization: Optional[str]) -> str:
-    """从 Authorization 头解析 Bearer token。"""
-    if not authorization:
-        from app.utils.exceptions import UnauthorizedException
+def _extract_token(authorization):
+    """从 Authorization 头解析 token（兼容旧代码行为）。"""
+    result = _extract_token_from_auth(authorization)
+    if not result:
         raise UnauthorizedException(message="未登录")
-    parts = authorization.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        from app.utils.exceptions import UnauthorizedException
-        raise UnauthorizedException(message="认证信息格式错误")
-    return parts[1]
+    return result
+
+router = APIRouter(tags=["统计看板"])
 
 
 # =============================================================================
