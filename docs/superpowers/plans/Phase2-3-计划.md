@@ -2,7 +2,7 @@
 
 > **创建时间**：2026-06-12
 > **创建人**：Cursor Agent
-> **背景**：Phase 1 + Phase 2 已交付，Superpowers 流程已启用，撰写后续开发计划
+> **背景**：Phase 1 + Phase 2 已交付，Phase 3 持续推进中
 
 ---
 
@@ -19,8 +19,55 @@
 
 ### Phase 2 尚未覆盖
 
-- [ ] 前后端接口真实联调（大部分后端仍为 Mock 数据）
-- [ ] 演示脚本完善（本计划完成后）
+- [ ] 前后端接口真实联调（大部分后端仍为 Mock 数据）— ⚠️ 部分完成
+- [ ] 演示脚本完善（本计划完成后）— ✅ 已完成
+
+---
+
+## Phase 3 执行记录
+
+### ✅ 已完成
+
+| 提交 | 时间 | 内容 |
+|------|------|------|
+| `ceee55e` | 12:23 | LangGraph 标准版 + 对象存储 + 前端完整联调 |
+| `e1cb659` | 12:46 | 学习任务/课程模块完善 + PostgreSQL 迁移脚本 |
+
+#### 完成详情
+
+**LangGraph StateGraph 标准版**：
+- Supervisor 条件路由（非线性执行路径）
+- 自动返工循环（质量 < 7.0 → 最多 3 次）
+- SQLite Checkpoint 持久化（断点暂停/恢复）
+- SSE 流式推送（前端实时显示每个节点执行状态）
+- `_map_workflow_result()` 字段映射（learning_plan→plan 等）
+
+**对象存储**：
+- `storage_router`：`GET /api/storage/{file_id}` 文件下载
+- `storage_service`：修复相对路径问题，文件存储到 `backend/data/storage/`
+- `save_resource()` 对接 `storage_service`，统一持久化
+
+**前端完整联调**：
+- `agents.ts`：重写 `WorkflowResult` 接口 + 完整字段定义
+- `agent-workbench`：SSE 流式执行链路 + 5 个 Tab 完整展示 + 保存后下载按钮
+- `analytics`：6 个图表全部接 `statisticsApi` + `Promise.allSettled` 容错
+- `ResourceDetail.vue`：`onMounted` 调用 `resourcesApi.getById()`
+- `resources/index.vue`：新建资源列表页
+
+**课程模块**：
+- `backend/app/services/learning_service.py`：3 门课程 + 14 知识点 + 10 学习任务
+- `backend/app/routers/learning.py`：4 个端点（courses list/get、tasks list/get）
+- `frontend/src/api/learning.ts`：完整 TypeScript 接口定义
+- `frontend/src/pages/courses/index.vue`：课程卡片网格 + 知识点标签 + 统计概览
+- `frontend/src/pages/courses/CourseDetail.vue`：课程详情 + 知识点表格 + 平均掌握度
+
+**学习任务模块**：
+- 重写 `frontend/src/pages/tasks/index.vue`：projectsApi → learningApi 真实调用
+- 新增课程选择器 + 状态筛选 + 完成率进度条 + 逾期提醒
+
+**PostgreSQL 迁移**：
+- `database/11_postgresql_migration.sql`：7 张 A3 业务表 schema + 种子数据
+- `database/README_A3.md`：更新 Phase 3 执行说明
 
 ---
 
@@ -28,33 +75,31 @@
 
 ### P0 — 必须完成（演示/提交前）
 
-- [ ] **真实智能体逻辑**：将 5 个智能体从 Mock 返回替换为 LangGraph + LLM 调用
-- [ ] **真实 LLM 接入**：配置真实 API Key（推荐 Qwen-Max 或 DeepSeek-V3）
+- [x] **真实智能体逻辑**（LangGraph + LLM）— ✅ 已完成
+- [ ] **真实 LLM 接入**：配置 `.env` 中 API Key（推荐 DeepSeek-V3）
 - [ ] **前后端联调**：确保所有 Mock 接口改为真实后端调用
-- [ ] **演示脚本录制**：按 docs/演示脚本.md 完成视频录制
+- [ ] **演示脚本录制**：按 `docs/演示脚本.md` 完成视频录制
 
 ### P1 — 重要（提交前建议完成）
 
-- [ ] **对象存储**：实现 MinIO 或本地 `storage/` 目录保存生成的文件
-- [ ] **数据库迁移**：将 A3 业务表从 MySQL 迁移至 PostgreSQL（`courses`、`knowledge_points`、`student_profiles` 等）
-- [ ] **学习任务模块完善**：前端 `/tasks` 页面接入 `/api/learning/tasks` 接口
-- [ ] **课程模块完善**：前端 `/courses` 页面接入 `/api/learning/courses` 接口
+- [x] **对象存储** — ✅ 已完成
+- [x] **PostgreSQL 迁移脚本** — ✅ schema 已完成，数据迁移需手动执行
+- [x] **学习任务模块完善** — ✅ 已完成
+- [x] **课程模块完善** — ✅ 已完成
 
 ### P2 — 优化（有余力时完成）
 
-- [ ] **智能体重试机制**：LLM 调用失败时自动重试 2-3 次
-- [ ] **调用限流**：防止 LLM API 调用超过 QPM 限制
+- [ ] **LLM 重试机制**：调用失败时自动重试 2-3 次
+- [ ] **调用限流**：防止 LLM API 超过 QPM 限制
 - [ ] **详细调用日志**：每个智能体调用的 prompt/response 存入数据库
 - [ ] **提示词模板管理**：将提示词从代码中抽取到数据库，支持在线编辑
-- [ ] **教师审核通知**：资源审核完成后，通知相关学生（邮件/站内信）
+- [ ] **教师审核通知**：资源审核完成后，通知相关学生（站内信）
 
 ---
 
 ## Superpowers 流程回顾
 
 ### 已启用的 Superpowers Skills
-
-根据 `~/.cursor/skills-cursor/` 中的 17 个 skill，以下技能已自动生效：
 
 | Skill | 触发场景 | 状态 |
 |-------|---------|------|
@@ -78,41 +123,9 @@
 
 ### 未启用的流程
 
-- **PR 流程**：`cursor/` 分支尚未合并到 `main`，建议开发完成后用 `split-to-prs` 拆分
-- **代码审查**：`cursor/phase1-2-a3-migration` 分支未提交 PR，建议用 `requesting-code-review` 审查后再合并
+- **PR 流程**：`cursor/phase1-2-a3-migration` 持续 commit，建议开发完成后用 `split-to-prs` 拆分
+- **代码审查**：建议用 `requesting-code-review` 审查后再合并到 `main`
 - **Worktree 隔离**：后续开发建议用 `using-git-worktrees` 隔离工作区
-
----
-
-## Phase 3 建议开发顺序
-
-```
-Phase 3 建议顺序（按依赖排序）：
-
-1. 前后端联调（无依赖，最快出效果）
-   → 确认所有 Mock 接口已接入
-   → 确认 dashboard / profiles / agent-workbench 真实调用
-
-2. 演示脚本录制（无依赖，独立完成）
-   → 按 docs/演示脚本.md 操作
-   → 录制 15 分钟演示视频
-
-3. 真实 LLM 接入（依赖联调结果）
-   → 配置 .env 中 LLM_API_KEY
-   → 将 MockProvider 替换为 OpenAICompatibleProvider
-
-4. 真实智能体逻辑（依赖真实 LLM）
-   → 替换 5 个智能体的 generate_* 方法
-   → 接入 LangGraph workflow 真实调用
-
-5. 数据库迁移（可并行）
-   → 执行 database/09_create_a3_tables.sql
-   → 迁移 MySQL 数据到 PostgreSQL
-
-6. 对象存储（可并行）
-   → 配置 MinIO 或创建 storage/ 目录
-   → 实现文件上传/下载 API
-```
 
 ---
 
