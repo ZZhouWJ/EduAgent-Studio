@@ -42,10 +42,7 @@ class LearningRepository:
     """学习模块数据访问层。"""
 
     def list_courses(self) -> List[Dict[str, Any]]:
-        """
-        Returns list of course dicts with knowledge_points embedded.
-        Shape matches _MOCK_COURSES exactly.
-        """
+        """Returns list of course dicts with knowledge_points embedded."""
         sql = """
             SELECT
                 c.course_id,
@@ -123,8 +120,13 @@ class LearningRepository:
 
         return result
 
-    def get_course(self, course_id: int) -> Optional[Dict[str, Any]]:
-        """Returns single course dict with full knowledge_points list."""
+    def get_course(self, course_id: int, profile_id: int = None) -> Optional[Dict[str, Any]]:
+        """Returns single course dict with full knowledge_points list.
+        
+        Args:
+            course_id: 课程 ID
+            profile_id: 学生画像 ID（用于查询该学生的知识点掌握度）
+        """
         sql = """
             SELECT
                 c.course_id,
@@ -145,19 +147,31 @@ class LearningRepository:
             return None
 
         kp_sql = """
-            SELECT kp_id, kp_name, difficulty_level
-            FROM knowledge_points
-            WHERE course_id = %s AND is_deleted = 0
-            ORDER BY kp_id ASC
+            SELECT
+                kp.kp_id,
+                kp.kp_name,
+                kp.difficulty_level,
+                COALESCE(skm.mastery_level, 0.5) AS mastery_level
+            FROM knowledge_points kp
+            LEFT JOIN student_knowledge_mastery skm
+                ON kp.kp_id = skm.kp_id
+                AND skm.profile_id = %s
+                AND skm.is_deleted = 0
+            WHERE kp.course_id = %s AND kp.is_deleted = 0
+            ORDER BY kp.kp_id ASC
         """
-        cursor.execute(kp_sql, (course_id,))
+        cursor.execute(kp_sql, (profile_id, course_id))
         kp_rows = cursor.fetchall()
         knowledge_points = [
             {
                 "id": row["kp_id"],
+                "kp_id": row["kp_id"],
                 "name": row["kp_name"],
-                "mastery_avg": 0.5,
+                "kp_name": row["kp_name"],
+                "mastery_level": row["mastery_level"],
+                "mastery_avg": row["mastery_level"],
                 "difficulty": _map_difficulty(row["difficulty_level"]),
+                "difficulty_level": row["difficulty_level"],
             }
             for row in kp_rows
         ]
@@ -356,3 +370,115 @@ class LearningRepository:
         if delta_days < 14:
             return "medium"
         return "low"
+
+    def get_learning_path(self, course_id: int, profile_id: Optional[int] = None) -> Dict[str, Any]:
+        """
+        构建课程知识点学习路径图谱（用于 ECharts graph 可视化）。
+
+        图谱结构：
+        - nodes: 知识点节点，含 mastery_level / difficulty_level
+        - edges: 依赖关系（parent_kp_id → child kp_id）
+        - summary: 整体统计
+
+        若传入 profile_id，则查询该学生的掌握度；否则只返回课程知识点结构。
+        """
+        with get_db_cursor() as cursor:
+            # 查询课程所有知识点（按 parent 层级排序）
+            cursor.execute("""
+                SELECT
+                    kp.kp_id,
+                    kp.kp_name,
+                    kp.kp_code,
+                    kp.parent_kp_id,
+                    kp.difficulty_level,
+                    kp.description,
+                    kp.estimated_hours,
+                    COALESCE(skm.mastery_level, 0.5) AS mastery_level,
+                    skm.last_test_score,
+                    skm.last_test_date
+                FROM knowledge_points kp
+                LEFT JOIN student_knowledge_mastery skm
+                    ON kp.kp_id = skm.kp_id
+                    AND skm.profile_id = %s
+                    AND skm.is_deleted = 0
+                WHERE kp.course_id = %s AND kp.is_deleted = 0
+                ORDER BY kp.parent_kp_id ASC, kp.kp_id ASC
+            """, (profile_id, course_id))
+            rows = cursor.fetchall()
+
+        if not rows:
+            return {"nodes": [], "edges": [], "summary": {"total": 0, "mastered": 0, "weak": 0}}
+
+        # 构建节点和边
+        nodes = []
+        edges = []
+        mastered = 0
+        weak = 0
+
+        for row in rows:
+            mastery = float(row["mastery_level"])
+            if mastery >= 0.7:
+                mastered += 1
+            elif mastery < 0.5:
+                weak += 1
+
+            # 节点颜色：掌握（绿）/ 薄弱（红）/ 一般（橙）
+            if mastery >= 0.7:
+                node_color = "#67c23a"  # 绿色
+                status_label = "已掌握"
+            elif mastery < 0.4:
+                node_color = "#f56c6c"  # 红色
+                status_label = "薄弱"
+            elif mastery < 0.7:
+                node_color = "#e6a23c"  # 橙色
+                status_label = "学习中"
+            else:
+                node_color = "#909399"
+                status_label = "未学习"
+
+            # 节点大小按难度和掌握度调整
+            size_base = 60
+            node_size = size_base + int(row["difficulty_level"] or 1) * 10
+
+            nodes.append({
+                "id": row["kp_id"],
+                "kp_id": row["kp_id"],
+                "name": row["kp_name"],
+                "kp_name": row["kp_name"],
+                "kp_code": row["kp_code"],
+                "difficulty_level": row["difficulty_level"],
+                "description": row["description"],
+                "estimated_hours": row["estimated_hours"],
+                "mastery_level": mastery,
+                "last_test_score": row["last_test_score"],
+                "last_test_date": str(row["last_test_date"]) if row["last_test_date"] else None,
+                "status_label": status_label,
+                "color": node_color,
+                "size": node_size,
+            })
+
+            # 边（依赖关系）
+            parent_id = row["parent_kp_id"]
+            if parent_id:
+                edges.append({
+                    "source": parent_id,
+                    "target": row["kp_id"],
+                    "label": "前置",
+                })
+
+        # 计算平均掌握度
+        avg_mastery = sum(n["mastery_level"] for n in nodes) / len(nodes) if nodes else 0
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "summary": {
+                "total": len(nodes),
+                "mastered": mastered,
+                "weak": weak,
+                "avg_mastery": round(avg_mastery, 3),
+                "profile_id": profile_id,
+                "course_id": course_id,
+            },
+        }
+

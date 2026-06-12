@@ -64,5 +64,49 @@ export const learningApi = {
 
   getTask(taskId: number) {
     return request.get<{ data: LearningTask }>(`/api/learning/tasks/${taskId}`)
+  },
+
+  getLearningPath(courseId: number, profileId?: number) {
+    return request.get<{ data: LearningPathGraph }>(`/api/learning/courses/${courseId}/learning-path`, {
+      params: profileId ? { profile_id: profileId } : undefined,
+    })
   }
+}
+
+export interface LearningPathNode {
+  id: number
+  kp_id: number
+  name: string
+  kp_name: string
+  kp_code: string
+  difficulty_level: number
+  description: string
+  estimated_hours: number
+  mastery_level: number
+  last_test_score: number | null
+  last_test_date: string | null
+  status_label: string
+  color: string
+  size: number
+}
+
+export interface LearningPathEdge {
+  source: number
+  target: number
+  label: string
+}
+
+export interface LearningPathSummary {
+  total: number
+  mastered: number
+  weak: number
+  avg_mastery: number
+  profile_id: number | null
+  course_id: number
+}
+
+export interface LearningPathGraph {
+  nodes: LearningPathNode[]
+  edges: LearningPathEdge[]
+  summary: LearningPathSummary
 }

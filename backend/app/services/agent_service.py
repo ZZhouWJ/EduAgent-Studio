@@ -1,7 +1,10 @@
 """智能体工作台 Service — LangGraph 标准版"""
+import logging
 import os
 from datetime import datetime
 from typing import Any, Dict, List
+
+logger = logging.getLogger(__name__)
 
 from app.config import get_settings
 from app.llm.mock_provider import MockProvider
@@ -33,34 +36,13 @@ if not _llm_registered:
 
 from app.agents.workflow import run_workflow, stream_workflow, get_compiled_graph
 
-_MOCK_AGENTS = [
+_AGENTS = [
     {"id": "diagnosis_agent", "name": "学习诊断智能体", "description": "分析学生薄弱知识点", "type": "diagnosis"},
     {"id": "planning_agent", "name": "资源规划智能体", "description": "生成个性化学习路径", "type": "planning"},
     {"id": "resource_generation_agent", "name": "资源生成智能体", "description": "生成学习资源", "type": "generation"},
     {"id": "assessment_agent", "name": "评测反馈智能体", "description": "分析学习效果", "type": "assessment"},
     {"id": "teacher_review_agent", "name": "教师审核辅助智能体", "description": "生成资源质量建议", "type": "review"},
 ]
-
-_MOCK_KNOWLEDGE_POINTS = {
-    1: [
-        {"id": 1, "name": "关系模型基础", "mastery_level": 0.75},
-        {"id": 2, "name": "SQL基本查询", "mastery_level": 0.85},
-        {"id": 3, "name": "数据定义DDL", "mastery_level": 0.78},
-        {"id": 5, "name": "SQL多表连接", "mastery_level": 0.30},
-        {"id": 8, "name": "事务隔离级别", "mastery_level": 0.20},
-        {"id": 12, "name": "数据库范式", "mastery_level": 0.40},
-    ],
-    2: [
-        {"id": 20, "name": "Python基础语法", "mastery_level": 0.72},
-        {"id": 21, "name": "函数参数传递", "mastery_level": 0.45},
-        {"id": 22, "name": "模块导入", "mastery_level": 0.38},
-        {"id": 23, "name": "异常处理", "mastery_level": 0.42},
-    ],
-    3: [
-        {"id": 30, "name": "需求分析", "mastery_level": 0.60},
-        {"id": 31, "name": "UML建模", "mastery_level": 0.55},
-    ]
-}
 
 
 # ---------------------------------------------------------------------------
@@ -109,20 +91,67 @@ class AgentService:
     """智能体工作台 Service — LangGraph 驱动"""
 
     def list_agents(self) -> Dict[str, Any]:
-        return {"code": 0, "message": "success", "data": _MOCK_AGENTS}
+        return {"code": 0, "message": "success", "data": _AGENTS}
+
+    def _load_knowledge_points(self, course_id: int, kp_ids: List[int], profile_id: int = None) -> List[Dict[str, Any]]:
+        """从数据库加载知识点（含掌握度），用于工作流。"""
+        try:
+            from app.repositories.learning_repo import LearningRepository
+            repo = LearningRepository()
+            course = repo.get_course(course_id, profile_id=profile_id)
+            if not course:
+                return []
+            all_kps = course.get("knowledge_points") or []
+            selected = [kp for kp in all_kps if kp.get("id") in kp_ids]
+            return selected
+        except Exception as e:
+            logger.warning(f"加载知识点失败，使用空列表: {e}")
+            return []
+
+    def _load_learning_history(self, student_id: int) -> List[Dict[str, Any]]:
+        """从数据库加载学生学习历史（测验/反馈），用于诊断 Agent。"""
+        try:
+            from app.repositories.learning_feedback_repo import LearningFeedbackRepository
+            repo = LearningFeedbackRepository()
+            result = repo.list_feedbacks(page=1, page_size=10)
+            items = result.get("items") or []
+            history = []
+            for item in items:
+                entry = {
+                    "feedback_id": item.get("feedback_id"),
+                    "resource_title": item.get("resource_title") or "自主学习",
+                    "feedback_type": item.get("feedback_type", "self_report"),
+                    "quiz_score": item.get("quiz_score"),
+                    "self_mastery": item.get("self_mastery"),
+                    "created_at": item.get("created_at", ""),
+                }
+                history.append(entry)
+            return history
+        except Exception as e:
+            logger.warning(f"加载学习历史失败，使用空列表: {e}")
+            return []
+
+    def _resolve_profile(self, student_id: int):
+        """解析 student_id → profile_id + student_profile（直接查 repo，避免 FastAPI 依赖）。"""
+        try:
+            from app.repositories.profile_repo import ProfileRepository
+            repo = ProfileRepository()
+            items, _ = repo.list_profiles(page=1, page_size=200)
+            matched = next((p for p in items if p.get("student_id") == student_id), None)
+            if matched:
+                profile_id = matched.get("profile_id")
+                profile_detail = repo.get_profile(profile_id)
+                return profile_id, profile_detail
+            return student_id, None
+        except Exception as e:
+            logger.warning(f"解析 profile 失败: {e}")
+            return student_id, None
 
     def generate(self, req: Any, checkpoint_id: str = None) -> Dict[str, Any]:
         """执行多智能体工作流（LangGraph 标准版）"""
-        from app.services.profile_service import _MOCK_PROFILES as _PROFILES
-
-        student_profile = None
-        for p in _PROFILES:
-            if p["student_id"] == req.student_id:
-                student_profile = p
-                break
-
-        knowledge_points = _MOCK_KNOWLEDGE_POINTS.get(req.course_id, [])
-        selected_kps = [kp for kp in knowledge_points if kp["id"] in req.knowledge_point_ids]
+        profile_id, student_profile = self._resolve_profile(req.student_id)
+        selected_kps = self._load_knowledge_points(req.course_id, req.knowledge_point_ids, profile_id)
+        learning_history = self._load_learning_history(req.student_id)
 
         raw = run_workflow(
             student_id=req.student_id,
@@ -132,7 +161,7 @@ class AgentService:
             difficulty=req.difficulty,
             student_profile=student_profile,
             knowledge_points=selected_kps,
-            learning_history=None,
+            learning_history=learning_history,
             run_id=None,
             checkpoint_id=checkpoint_id,
         )
@@ -141,16 +170,9 @@ class AgentService:
 
     def generate_stream(self, req: Any):
         """流式执行工作流，yield 每个步骤的中间结果（SSE 推送）"""
-        from app.services.profile_service import _MOCK_PROFILES as _PROFILES
-
-        student_profile = None
-        for p in _PROFILES:
-            if p["student_id"] == req.student_id:
-                student_profile = p
-                break
-
-        knowledge_points = _MOCK_KNOWLEDGE_POINTS.get(req.course_id, [])
-        selected_kps = [kp for kp in knowledge_points if kp["id"] in req.knowledge_point_ids]
+        profile_id, student_profile = self._resolve_profile(req.student_id)
+        selected_kps = self._load_knowledge_points(req.course_id, req.knowledge_point_ids, profile_id)
+        learning_history = self._load_learning_history(req.student_id)
 
         return stream_workflow(
             student_id=req.student_id,
@@ -160,7 +182,7 @@ class AgentService:
             difficulty=req.difficulty,
             student_profile=student_profile,
             knowledge_points=selected_kps,
-            learning_history=None,
+            learning_history=learning_history,
         )
 
     def get_workflow_status(self, run_id: str) -> Dict[str, Any]:

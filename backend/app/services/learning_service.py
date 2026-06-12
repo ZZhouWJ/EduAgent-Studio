@@ -38,3 +38,11 @@ class LearningService:
         if task is None:
             return {"code": 404, "message": "任务不存在", "data": None}
         return {"code": 0, "message": "success", "data": task}
+
+    def get_learning_path(self, course_id: int, profile_id: Optional[int] = None) -> Dict[str, Any]:
+        """获取课程知识点学习路径图谱（含掌握度）。"""
+        try:
+            path_data = self._repo.get_learning_path(course_id, profile_id=profile_id)
+            return {"code": 0, "message": "success", "data": path_data}
+        except Exception as e:
+            return {"code": 500, "message": f"获取学习路径失败: {e}", "data": None}

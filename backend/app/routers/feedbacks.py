@@ -1,57 +1,24 @@
 """学习反馈 API"""
-from fastapi import APIRouter, Depends, Query
 from typing import Optional
+
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
+
+from app.repositories.learning_feedback_repo import LearningFeedbackRepository
 from app.services.auth_service import get_current_user_dependency as get_current_user
+from app.utils.response import success_response
 
 router = APIRouter(prefix="/learning", tags=["学习反馈"])
+_repo = LearningFeedbackRepository()
 
-_MOCK_FEEDBACKS = [
-    {
-        "feedback_id": 1,
-        "profile_id": 1,
-        "student_name": "李明",
-        "resource_id": 1,
-        "resource_title": "SQL多表连接专题讲义",
-        "course_id": 1,
-        "course_name": "数据库系统原理",
-        "feedback_type": "self_report",
-        "content": "讲义内容清晰，案例丰富，但练习题偏少",
-        "quiz_score": None,
-        "self_mastery": 0.55,
-        "difficulty_rating": "appropriate",
-        "created_at": "2026-06-10T15:30:00"
-    },
-    {
-        "feedback_id": 2,
-        "profile_id": 1,
-        "student_name": "李明",
-        "resource_id": 2,
-        "resource_title": "事务隔离级别测验",
-        "course_id": 1,
-        "course_name": "数据库系统原理",
-        "feedback_type": "quiz_result",
-        "content": "测验有一定难度，对隔离级别理解更深了",
-        "quiz_score": 0.70,
-        "self_mastery": None,
-        "difficulty_rating": "appropriate",
-        "created_at": "2026-06-09T10:00:00"
-    },
-    {
-        "feedback_id": 3,
-        "profile_id": 2,
-        "student_name": "王悦",
-        "resource_id": None,
-        "resource_title": None,
-        "course_id": 1,
-        "course_name": "数据库系统原理",
-        "feedback_type": "self_report",
-        "content": "索引优化部分讲得很透彻",
-        "quiz_score": None,
-        "self_mastery": 0.68,
-        "difficulty_rating": "too_easy",
-        "created_at": "2026-06-08T14:20:00"
-    }
-]
+
+class SubmitFeedbackRequest(BaseModel):
+    resource_id: Optional[int] = None
+    feedback_type: str = "self_report"
+    content: Optional[str] = None
+    quiz_score: Optional[float] = None
+    self_mastery: Optional[float] = None
+    difficulty_rating: Optional[str] = None
 
 
 @router.get("/feedbacks")
@@ -63,38 +30,116 @@ async def list_feedbacks(
     token: str = Depends(get_current_user),
 ):
     """获取学习反馈列表"""
-    items = _MOCK_FEEDBACKS.copy()
-    if course_id:
-        items = [f for f in items if f["course_id"] == course_id]
-    if feedback_type:
-        items = [f for f in items if f["feedback_type"] == feedback_type]
-    total = len(items)
-    start = (page - 1) * page_size
-    end = start + page_size
-    return {"code": 0, "message": "success", "data": {"items": items[start:end], "total": total}}
+    result = _repo.list_feedbacks(
+        page=page,
+        page_size=page_size,
+        course_id=course_id,
+        feedback_type=feedback_type,
+    )
+    return success_response(data=result)
 
 
 @router.post("/feedbacks")
 async def submit_feedback(
-    data: dict,
+    data: SubmitFeedbackRequest,
     token: str = Depends(get_current_user),
 ):
-    """提交学习反馈"""
-    new_id = max(f["feedback_id"] for f in _MOCK_FEEDBACKS) + 1
-    entry = {
-        "feedback_id": new_id,
-        "profile_id": 1,
-        "student_name": "当前学生",
-        "resource_id": data.get("resource_id"),
-        "resource_title": None,
-        "course_id": 1,
-        "course_name": "数据库系统原理",
-        "feedback_type": data.get("feedback_type", "self_report"),
-        "content": data.get("content"),
-        "quiz_score": data.get("quiz_score"),
-        "self_mastery": data.get("self_mastery"),
-        "difficulty_rating": data.get("difficulty_rating"),
-        "created_at": "2026-06-11T20:00:00"
-    }
-    _MOCK_FEEDBACKS.insert(0, entry)
-    return {"code": 0, "message": "反馈提交成功", "data": entry}
+    """
+    提交学习反馈，并自动更新知识点掌握度和学生画像。
+
+    规则：
+    - 如果有 quiz_score → 用它更新知识点掌握度
+    - 如果有 self_mastery → 用它更新
+    - 取 resource_id 关联的 target_kp_ids 中第一个作为本次学习知识点
+    """
+    from app.services.auth_service import get_current_user as get_user
+    from app.database import get_db_cursor
+
+    user = get_user(token)
+    user_id = user.get("user_id", 0) if user else 0
+
+    # 获取用户的 profile_id
+    profile_id = 1
+    try:
+        with get_db_cursor() as cursor:
+            cursor.execute(
+                "SELECT profile_id FROM student_profiles WHERE student_id = %s AND is_deleted = 0 LIMIT 1",
+                (user_id,)
+            )
+            row = cursor.fetchone()
+            if row:
+                profile_id = row["profile_id"]
+    except Exception:
+        pass
+
+    entry = _repo.create_feedback(data=data.model_dump(), profile_id=profile_id, user_id=user_id)
+
+    # === 画像更新闭环 ===
+    # 1. 解析本次学习的知识点 ID
+    target_kp_ids: list[int] = []
+    if data.resource_id:
+        try:
+            with get_db_cursor() as cursor:
+                cursor.execute(
+                    "SELECT target_kp_ids FROM learning_resources WHERE resource_id = %s AND is_deleted = 0",
+                    (data.resource_id,)
+                )
+                row = cursor.fetchone()
+                if row and row["target_kp_ids"]:
+                    target_kp_ids = [int(x.strip()) for x in row["target_kp_ids"].split(",") if x.strip()]
+        except Exception:
+            pass
+
+    # 2. 确定新掌握度
+    new_mastery = data.quiz_score if data.quiz_score is not None else data.self_mastery
+
+    # 3. 更新 / 插入知识点掌握度
+    if new_mastery is not None and target_kp_ids:
+        primary_kp_id = target_kp_ids[0]
+        update_reason = (
+            f"测验得分 {data.quiz_score * 100:.0f}%" if data.quiz_score is not None
+            else f"自评掌握度 {data.self_mastery * 100:.0f}%" if data.self_mastery is not None
+            else "学习反馈更新"
+        )
+        try:
+            with get_db_cursor() as cursor:
+                # UPSERT：存在则更新，不存在则插入
+                cursor.execute("""
+                    INSERT INTO student_knowledge_mastery
+                        (profile_id, kp_id, mastery_level, last_test_score, last_test_date, update_reason, is_deleted, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, CURDATE(), %s, 0, NOW(), NOW())
+                    ON DUPLICATE KEY UPDATE
+                        mastery_level = VALUES(mastery_level),
+                        last_test_score = VALUES(last_test_score),
+                        last_test_date = CURDATE(),
+                        update_reason = VALUES(update_reason),
+                        updated_at = NOW()
+                """, (
+                    profile_id,
+                    primary_kp_id,
+                    new_mastery,
+                    data.quiz_score if data.quiz_score is not None else data.self_mastery,
+                    update_reason,
+                ))
+        except Exception:
+            pass
+
+        # 4. 重算综合掌握度 AVG(all_kp_mastery)
+        try:
+            with get_db_cursor() as cursor:
+                cursor.execute("""
+                    SELECT AVG(mastery_level) AS avg_mastery
+                    FROM student_knowledge_mastery
+                    WHERE profile_id = %s AND is_deleted = 0
+                """, (profile_id,))
+                row = cursor.fetchone()
+                if row and row["avg_mastery"] is not None:
+                    cursor.execute("""
+                        UPDATE student_profiles
+                        SET mastery_score = %s, updated_at = NOW()
+                        WHERE profile_id = %s AND is_deleted = 0
+                    """, (row["avg_mastery"], profile_id))
+        except Exception:
+            pass
+
+    return success_response(data=entry, message="反馈提交成功，画像已更新")

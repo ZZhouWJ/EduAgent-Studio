@@ -9,6 +9,17 @@ const router = useRouter()
 const loading = ref(false)
 const detail = ref<ProfileDetail | null>(null)
 
+// 编辑对话框
+const editDialogVisible = ref(false)
+const editForm = ref({
+  learning_goal: "",
+  current_level: "",
+  interests: [] as string[],
+  resource_preferences: [] as string[],
+  weekly_hours: 0,
+})
+const submittingEdit = ref(false)
+
 function masteryColor(score: number) {
   if (score >= 0.7) return "#67c23a"
   if (score >= 0.4) return "#e6a23c"
@@ -28,6 +39,39 @@ async function loadDetail() {
   }
 }
 
+function openEditDialog() {
+  if (!detail.value) return
+  editForm.value = {
+    learning_goal: detail.value.learning_goal || "",
+    current_level: detail.value.current_level || "",
+    interests: [...(detail.value.interests || [])],
+    resource_preferences: [...(detail.value.resource_preferences || [])],
+    weekly_hours: detail.value.weekly_hours || 0,
+  }
+  editDialogVisible.value = true
+}
+
+async function submitEdit() {
+  if (!detail.value) return
+  submittingEdit.value = true
+  try {
+    await profilesApi.update(detail.value.profile_id, {
+      learning_goal: editForm.value.learning_goal,
+      current_level: editForm.value.current_level,
+      interests: editForm.value.interests,
+      resource_preferences: editForm.value.resource_preferences,
+      weekly_hours: editForm.value.weekly_hours,
+    } as any)
+    ElMessage.success("画像更新成功")
+    editDialogVisible.value = false
+    await loadDetail()
+  } catch {
+    ElMessage.error("更新失败")
+  } finally {
+    submittingEdit.value = false
+  }
+}
+
 onMounted(() => {
   loadDetail()
 })
@@ -42,7 +86,12 @@ onMounted(() => {
         <!-- 基础信息 -->
         <el-col :span="12">
           <el-card>
-            <template #header>基础信息</template>
+            <template #header>
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span>基础信息</span>
+                <el-button type="primary" size="small" @click="openEditDialog">编辑画像</el-button>
+              </div>
+            </template>
             <el-descriptions :column="1" border>
               <el-descriptions-item label="学生姓名">{{ detail.student_name }}</el-descriptions-item>
               <el-descriptions-item label="学号">{{ detail.student_no }}</el-descriptions-item>
@@ -152,7 +201,79 @@ onMounted(() => {
           </el-card>
         </el-col>
       </el-row>
+
     </div>
+
+    <!-- 编辑画像对话框 -->
+    <el-dialog v-model="editDialogVisible" title="编辑学生画像" width="580px" destroy-on-close>
+      <el-form :model="editForm" label-width="110px">
+        <el-form-item label="学习目标" required>
+          <el-input
+            v-model="editForm.learning_goal"
+            type="textarea"
+            :rows="2"
+            placeholder="请输入学生的学习目标，如：掌握数据库系统原理，能够独立完成数据库设计..."
+          />
+        </el-form-item>
+        <el-form-item label="当前基础" required>
+          <el-input
+            v-model="editForm.current_level"
+            type="textarea"
+            :rows="2"
+            placeholder="请描述学生的当前基础，如：已掌握SQL基本查询，多表连接和事务管理薄弱..."
+          />
+        </el-form-item>
+        <el-form-item label="兴趣方向">
+          <el-select
+            v-model="editForm.interests"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            placeholder="输入或选择兴趣方向"
+            style="width:100%"
+          >
+            <el-option label="数据库实践" value="数据库实践" />
+            <el-option label="Web开发" value="Web开发" />
+            <el-option label="项目实战" value="项目实战" />
+            <el-option label="数据分析" value="数据分析" />
+            <el-option label="算法竞赛" value="算法竞赛" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="资源偏好">
+          <el-select
+            v-model="editForm.resource_preferences"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            placeholder="输入或选择资源偏好"
+            style="width:100%"
+          >
+            <el-option label="案例讲解" value="案例讲解" />
+            <el-option label="图解说明" value="图解说明" />
+            <el-option label="代码实操" value="代码实操" />
+            <el-option label="视频教程" value="视频教程" />
+            <el-option label="理论讲解" value="理论讲解" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="每周学习时间">
+          <el-slider
+            v-model="editForm.weekly_hours"
+            :min="1"
+            :max="40"
+            :step="1"
+            show-stops
+            :marks="{ 5: '5h', 10: '10h', 20: '20h', 40: '40h' }"
+          />
+          <span style="margin-left:8px;color:#606266">{{ editForm.weekly_hours }} 小时/周</span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="submittingEdit" @click="submitEdit">保存修改</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 

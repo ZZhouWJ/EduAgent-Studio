@@ -91,6 +91,57 @@ export interface RecentActivity {
   created_at: string
 }
 
+export interface LearningOverview {
+  course_count: number
+  student_count: number
+  resource_count: number
+  invocation_count: number
+  avg_mastery: number
+  review_pass_rate: number
+  feedback_count: number
+  active_tasks: number
+}
+
+export interface MasteryDist {
+  range: string
+  count: number
+}
+
+export interface WeakKnowledgePoint {
+  kp_id: number
+  kp_name: string
+  course_id: number
+  avg_mastery: number
+}
+
+export interface ResourceTypeDist {
+  resource_type: string
+  type_name: string
+  count: number
+}
+
+export interface InvocationTrend {
+  date: string
+  invocation_count: number
+  total_tokens: number
+  total_cost: number
+}
+
+export interface ReviewRateByCourse {
+  course_id: number
+  course_name: string
+  total: number
+  approved: number
+  pass_rate: number
+}
+
+export interface CostDistribution {
+  agent: string
+  agent_name: string
+  tokens: number
+  ratio: number
+}
+
 export const statisticsApi = {
   overview() {
     return request.get<{ data: StatisticsOverview }>("/api/statistics/overview")
@@ -118,5 +169,38 @@ export const statisticsApi = {
 
   recentActivities(params?: { project_id?: number; limit?: number }) {
     return request.get<{ data: RecentActivity[] }>("/api/statistics/recent-activities", { params })
-  }
+  },
+
+  // A3 学习分析
+  learningOverview() {
+    return request.get<{ data: LearningOverview }>("/api/statistics/learning-overview")
+  },
+
+  masteryDistribution() {
+    return request.get<{ data: MasteryDist[] }>("/api/statistics/mastery-distribution")
+  },
+
+  weakKnowledgePoints(top_n = 10) {
+    return request.get<{ data: WeakKnowledgePoint[] }>("/api/statistics/weak-knowledge-points", {
+      params: { top_n },
+    })
+  },
+
+  resourceTypeDistribution() {
+    return request.get<{ data: ResourceTypeDist[] }>("/api/statistics/resource-type-distribution")
+  },
+
+  invocationTrend(days = 14) {
+    return request.get<{ data: InvocationTrend[] }>("/api/statistics/invocation-trend", {
+      params: { days },
+    })
+  },
+
+  reviewRateByCourse() {
+    return request.get<{ data: ReviewRateByCourse[] }>("/api/statistics/review-rate-by-course")
+  },
+
+  costDistribution() {
+    return request.get<{ data: CostDistribution[] }>("/api/statistics/cost-distribution")
+  },
 }

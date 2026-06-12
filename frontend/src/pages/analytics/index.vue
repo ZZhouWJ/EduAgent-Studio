@@ -74,19 +74,20 @@ function initCharts() {
 
 async function loadData() {
   // 并行加载所有数据
-  const [overviewRes, modelCallsRes, costsRes, reviewsRes] = await Promise.allSettled([
+  const [overviewRes, modelCallsRes, costsRes, reviewsRes, learningRes] = await Promise.allSettled([
     statisticsApi.overview(),
     statisticsApi.modelCalls(),
     statisticsApi.costs(),
     statisticsApi.reviews(),
+    statisticsApi.learningOverview(),
   ])
 
-  // 处理 overview
+  // 处理 overview（原有业务统计）
   if (overviewRes.status === "fulfilled" && overviewRes.value?.data) {
     const d = overviewRes.value.data
     stats.value = {
       course_count: d.project_count || 0,
-      student_count: 0,
+      student_count: d.artifact_count || 0,
       resource_count: d.artifact_count || 0,
       invocation_count: d.invocation_count || 0,
       avg_mastery: 0,
@@ -94,114 +95,107 @@ async function loadData() {
         ? d.success_invocation_count / d.invocation_count
         : 0,
     }
-  } else {
-    ElMessage.warning("概览数据加载失败，使用模拟数据")
   }
 
-  // 处理模型调用趋势
-  if (modelCallsRes.status === "fulfilled" && modelCallsRes.value?.data) {
-    const calls = modelCallsRes.value.data
-    const last14 = generateLast14Days()
-    invocationTrendData = last14.map((date, i) => {
-      const baseCalls = Math.floor(50 / 14)
-      return {
-        date,
-        calls: baseCalls + Math.floor(Math.random() * 20) + i * 2,
-        tokens: Math.floor((baseCalls + Math.floor(Math.random() * 20)) * 5.5),
-      }
-    })
+  // 处理 A3 学习概览
+  if (learningRes.status === "fulfilled" && learningRes.value?.data) {
+    const d = learningRes.value.data
+    stats.value = {
+      course_count: d.course_count,
+      student_count: d.student_count,
+      resource_count: d.resource_count,
+      invocation_count: d.invocation_count,
+      avg_mastery: d.avg_mastery,
+      review_pass_rate: d.review_pass_rate,
+    }
   }
 
-  // 处理成本数据 → Token 消耗占比
-  if (costsRes.status === "fulfilled" && costsRes.value?.data) {
-    const costs = costsRes.value.data
-    costData = (costs.cost_by_model || []).map((m: any) => ({
-      name: m.model_name,
-      value: m.cost,
+  // 并行加载 A3 图表数据
+  const [masteryRes, weakPointsRes, resourceTypeRes, invocationTrendRes, reviewRateRes, costDistRes] =
+    await Promise.allSettled([
+      statisticsApi.masteryDistribution(),
+      statisticsApi.weakKnowledgePoints(10),
+      statisticsApi.resourceTypeDistribution(),
+      statisticsApi.invocationTrend(14),
+      statisticsApi.reviewRateByCourse(),
+      statisticsApi.costDistribution(),
+    ])
+
+  if (masteryRes.status === "fulfilled" && masteryRes.value?.data) {
+    masteryDistData = masteryRes.value.data.data || []
+  }
+
+  if (weakPointsRes.status === "fulfilled" && weakPointsRes.value?.data) {
+    weakPointsData = (weakPointsRes.value.data.data || []).map((d: any) => ({
+      name: d.kp_name,
+      mastery: d.avg_mastery,
     }))
   }
 
-  // 处理审核数据 → 审核通过率
-  if (reviewsRes.status === "fulfilled" && reviewsRes.value?.data) {
-    const r = reviewsRes.value.data
-    reviewRateData = [
-      { name: "准确性", rate: r.avg_accuracy_score || 0 },
-      { name: "完整性", rate: r.avg_completeness_score || 0 },
-      { name: "逻辑性", rate: r.avg_logic_score || 0 },
-      { name: "规范性", rate: r.avg_format_score || 0 },
-      { name: "可用性", rate: r.avg_usability_score || 0 },
-    ]
+  if (resourceTypeRes.status === "fulfilled" && resourceTypeRes.value?.data) {
+    resourceTypeData = (resourceTypeRes.value.data.data || []).map((d: any) => ({
+      name: d.type_name,
+      value: d.count,
+    }))
   }
 
-  // 补充模拟数据（当 API 数据不足时作为降级）
-  if (!masteryDistData.length) {
-    masteryDistData = [
-      { range: "0-20%", count: 1 },
-      { range: "20-40%", count: 3 },
-      { range: "40-60%", count: 4 },
-      { range: "60-80%", count: 3 },
-      { range: "80-100%", count: 1 },
-    ]
-    stats.value.student_count = 12
-    stats.value.avg_mastery = 0.52
-  }
-
-  if (!weakPointsData.length) {
-    weakPointsData = [
-      { name: "事务隔离级别", mastery: 0.20 },
-      { name: "数据库范式", mastery: 0.28 },
-      { name: "索引与优化", mastery: 0.30 },
-      { name: "函数参数传递", mastery: 0.35 },
-      { name: "模块导入", mastery: 0.38 },
-      { name: "UML建模", mastery: 0.42 },
-      { name: "异常处理", mastery: 0.45 },
-      { name: "SQL多表连接", mastery: 0.48 },
-      { name: "需求分析", mastery: 0.52 },
-      { name: "视图操作", mastery: 0.55 },
-    ]
-  }
-
-  if (!resourceTypeData.length) {
-    resourceTypeData = [
-      { name: "知识点讲义", value: 18 },
-      { name: "PPT大纲", value: 8 },
-      { name: "习题与答案", value: 12 },
-      { name: "案例材料", value: 5 },
-      { name: "复习计划", value: 3 },
-      { name: "阶段测验", value: 1 },
-    ]
-  }
-
-  if (!invocationTrendData.length) {
+  if (invocationTrendRes.status === "fulfilled" && invocationTrendRes.value?.data) {
+    invocationTrendData = (invocationTrendRes.value.data.data || []).map((d: any) => ({
+      date: d.date.slice(5),
+      calls: d.invocation_count,
+      tokens: d.total_tokens,
+    }))
+  } else {
     const dates = generateLast14Days()
     invocationTrendData = dates.map((date, i) => ({
       date,
-      calls: 8 + Math.floor(Math.random() * 20) + i * 2,
-      tokens: Math.floor((8 + Math.floor(Math.random() * 20)) * 5.5),
+      calls: 0,
+      tokens: 0,
     }))
   }
 
-  if (!reviewRateData.length) {
+  if (reviewRateRes.status === "fulfilled" && reviewRateRes.value?.data) {
+    reviewRateData = (reviewRateRes.value.data.data || []).map((d: any) => ({
+      name: d.course_name,
+      rate: Math.round((d.pass_rate || 0) * 100),
+    }))
+  }
+
+  if (costDistRes.status === "fulfilled" && costDistRes.value?.data) {
+    costData = (costDistRes.value.data.data || []).map((d: any) => ({
+      name: d.agent_name,
+      value: d.tokens,
+    }))
+  }
+
+  // 处理原有 API（降级覆盖）
+  if (modelCallsRes.status === "fulfilled" && modelCallsRes.value?.data && !invocationTrendData.length) {
+    const dates = generateLast14Days()
+    invocationTrendData = dates.map((date, i) => ({
+      date,
+      calls: 0,
+      tokens: 0,
+    }))
+  }
+
+  if (costsRes.status === "fulfilled" && costsRes.value?.data && !costData.length) {
+    costData = (costsRes.value.data.data.cost_by_model || []).map((m: any) => ({
+      name: m.model_name,
+      value: Math.round(m.cost * 1000000),
+    }))
+  }
+
+  if (reviewsRes.status === "fulfilled" && reviewsRes.value?.data && !reviewRateData.length) {
+    const r = reviewsRes.value.data.data
     reviewRateData = [
-      { name: "准确性", rate: 85 },
-      { name: "完整性", rate: 80 },
-      { name: "逻辑性", rate: 88 },
-      { name: "规范性", rate: 82 },
-      { name: "可用性", rate: 78 },
+      { name: "准确性", rate: Math.round((r.avg_accuracy_score || 0) * 100) },
+      { name: "完整性", rate: Math.round((r.avg_completeness_score || 0) * 100) },
+      { name: "逻辑性", rate: Math.round((r.avg_logic_score || 0) * 100) },
+      { name: "规范性", rate: Math.round((r.avg_format_score || 0) * 100) },
+      { name: "可用性", rate: Math.round((r.avg_usability_score || 0) * 100) },
     ]
   }
 
-  if (!costData.length) {
-    costData = [
-      { name: "资源生成", value: 45 },
-      { name: "学习诊断", value: 25 },
-      { name: "资源规划", value: 15 },
-      { name: "评测反馈", value: 10 },
-      { name: "审核建议", value: 5 },
-    ]
-  }
-
-  // 渲染所有图表
   renderMasteryChart()
   renderWeakPointsChart()
   renderResourceTypeChart()
@@ -325,16 +319,16 @@ function renderInvocationTrendChart() {
 
 function renderReviewRateChart() {
   if (!reviewRateChart) return
-  const colors = ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de"]
+  const colors = ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de", "#3ba272"]
   reviewRateChart.setOption({
-    title: { text: "审核评分维度", left: "center", textStyle: { fontSize: 14, fontWeight: 600 } },
-    tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
-    grid: { left: 80, right: 20, top: 40, bottom: 30 },
-    xAxis: { type: "value", max: 100, name: "评分", axisLabel: { fontSize: 10, formatter: "{value}" } },
+    title: { text: "各课程审核通过率", left: "center", textStyle: { fontSize: 14, fontWeight: 600 } },
+    tooltip: { trigger: "axis", axisPointer: { type: "shadow" }, formatter: "{b}: {c}%" },
+    grid: { left: 100, right: 20, top: 40, bottom: 30 },
+    xAxis: { type: "value", max: 100, name: "通过率%", axisLabel: { fontSize: 10, formatter: "{value}%" } },
     yAxis: {
       type: "category",
       data: reviewRateData.map(d => d.name).reverse(),
-      axisLabel: { fontSize: 11 },
+      axisLabel: { fontSize: 10 },
     },
     series: [{
       type: "bar",
@@ -343,7 +337,7 @@ function renderReviewRateChart() {
         itemStyle: { color: colors[i % colors.length], borderRadius: [0, 4, 4, 0] },
       })).reverse(),
       barRadius: [0, 4, 4, 0],
-      label: { show: true, position: "right", fontSize: 11, formatter: "{c}分" },
+      label: { show: true, position: "right", fontSize: 11, formatter: "{c}%" },
     }],
   } as EChartsOption)
 }

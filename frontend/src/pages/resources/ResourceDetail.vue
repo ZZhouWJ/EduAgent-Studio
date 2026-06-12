@@ -2,6 +2,7 @@
 import { ref, onMounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { ElMessage } from "element-plus"
+import { marked } from "marked"
 import { resourcesApi } from "@/api/resources"
 
 const route = useRoute()
@@ -16,6 +17,12 @@ const reviewForm = ref({
   review_comment: ""
 })
 const submittingReview = ref(false)
+
+// 配置 marked：代码高亮、表格支持
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+})
 
 onMounted(async () => {
   loading.value = true
@@ -69,16 +76,13 @@ function getTypeLabel(type: string) {
   return map[type] || type
 }
 
-function renderMarkdown(content: string) {
-  return content
-    .replace(/^# /gm, '<h2 style="margin-top:16px;font-size:18px;font-weight:600;color:#303133;border-bottom:1px solid #e4e7ed;padding-bottom:8px">')
-    .replace(/^## /gm, '<h3 style="margin-top:14px;font-size:15px;font-weight:600;color:#303133">')
-    .replace(/^### /gm, '<h4 style="margin-top:12px;font-size:14px;font-weight:600;color:#606266">')
-    .replace(/\n\n/g, '<br>')
-    .replace(/\n/g, '<br>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/`(.+?)`/g, '<code style="background:#f5f5f5;padding:2px 6px;border-radius:4px;font-size:13px;font-family:monospace;color:#e6a23c">$1</code>')
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre style="background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:6px;overflow-x:auto;font-size:13px;line-height:1.6"><code>$2</code></pre>')
+function renderMarkdown(content: string): string {
+  if (!content) return "<p style='color:#909399'>暂无内容</p>"
+  try {
+    return marked.parse(content) as string
+  } catch {
+    return `<pre>${content}</pre>`
+  }
 }
 
 function formatDate(dateStr: string) {
@@ -217,19 +221,104 @@ async function submitReview() {
 }
 .resource-content {
   font-size: 14px;
-  line-height: 2;
+  line-height: 1.8;
   color: #303133;
   padding: 8px 4px;
 }
+/* Markdown rendered content styles */
+.resource-content :deep(h1) {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e3a5f;
+  margin: 20px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e4e7ed;
+}
 .resource-content :deep(h2) {
-  margin-top: 20px;
-  font-size: 18px;
+  font-size: 17px;
+  font-weight: 600;
+  color: #303133;
+  margin: 18px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e4e7ed;
 }
 .resource-content :deep(h3) {
-  margin-top: 16px;
   font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  margin: 14px 0 8px;
+}
+.resource-content :deep(h4) {
+  font-size: 14px;
+  font-weight: 600;
+  color: #606266;
+  margin: 12px 0 6px;
+}
+.resource-content :deep(p) {
+  margin: 8px 0;
+}
+.resource-content :deep(code) {
+  background: #f5f7fa;
+  color: #e6a23c;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: 'Fira Code', 'Courier New', monospace;
 }
 .resource-content :deep(pre) {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 14px;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.6;
   margin: 12px 0;
+}
+.resource-content :deep(pre code) {
+  background: none;
+  color: inherit;
+  padding: 0;
+  font-size: inherit;
+}
+.resource-content :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 13px;
+}
+.resource-content :deep(th) {
+  background: #f5f7fa;
+  font-weight: 600;
+  text-align: left;
+  padding: 8px 12px;
+  border: 1px solid #e4e7ed;
+}
+.resource-content :deep(td) {
+  padding: 8px 12px;
+  border: 1px solid #e4e7ed;
+}
+.resource-content :deep(ul),
+.resource-content :deep(ol) {
+  padding-left: 24px;
+  margin: 8px 0;
+}
+.resource-content :deep(li) {
+  margin: 4px 0;
+}
+.resource-content :deep(blockquote) {
+  border-left: 4px solid #409eff;
+  padding: 8px 16px;
+  margin: 12px 0;
+  background: #f0f7ff;
+  color: #606266;
+  border-radius: 0 4px 4px 0;
+}
+.resource-content :deep(strong) {
+  font-weight: 600;
+  color: #303133;
+}
+.resource-content :deep(a) {
+  color: #409eff;
 }
 </style>

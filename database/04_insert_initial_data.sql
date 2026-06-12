@@ -1,6 +1,6 @@
 -- ============================================================
 -- 04_insert_initial_data.sql
--- AI-Collab-Audit-System - 初始化数据脚本
+-- EduAgent Studio - 初始化数据脚本
 -- 包括角色、权限、用户、任务类型、问题标签、模型供应商、模型
 -- ============================================================
 
@@ -157,6 +157,37 @@ INSERT INTO `users` (
 );
 
 -- ============================================================
+-- 4b. 插入教师用户（张老师）
+-- 密码 bcrypt("Teacher@123")
+-- ============================================================
+INSERT INTO `users` (
+    `username`, `password_hash`, `real_name`, `student_no`,
+    `email`, `phone`, `status`, `last_login_at`, `created_by`
+) VALUES (
+    'teacher01',
+    '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4qITKZYeLq89mNMS',
+    '张老师',
+    NULL,
+    'teacher01@example.com',
+    '13800000001',
+    'active',
+    NULL,
+    NULL
+);
+
+-- ============================================================
+-- 4c. 插入学生用户（李明、王悦、陈思雨）
+-- 密码 bcrypt("Student@123")
+-- ============================================================
+INSERT INTO `users` (
+    `username`, `password_hash`, `real_name`, `student_no`,
+    `email`, `phone`, `status`, `last_login_at`, `created_by`
+) VALUES
+    ('student01', '$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', '李明', 'S2023001', 'liming@example.com', '13800000002', 'active', NULL, NULL),
+    ('student02', '$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', '王悦', 'S2023002', 'wangyue@example.com', '13800000003', 'active', NULL, NULL),
+    ('student03', '$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', '陈思雨', 'S2023003', 'chensiyu@example.com', '13800000004', 'active', NULL, NULL);
+
+-- ============================================================
 -- 5. 为管理员分配 admin 角色
 -- ============================================================
 
@@ -164,6 +195,22 @@ INSERT INTO `user_roles` (`user_id`, `role_id`, `assigned_by`)
 SELECT u.user_id, r.role_id, NULL
 FROM `users` u, `roles` r
 WHERE u.username = 'admin' AND r.role_code = 'admin';
+
+-- ============================================================
+-- 5b. 为教师分配 teacher 角色
+-- ============================================================
+INSERT INTO `user_roles` (`user_id`, `role_id`, `assigned_by`)
+SELECT u.user_id, r.role_id, NULL
+FROM `users` u, `roles` r
+WHERE u.username = 'teacher01' AND r.role_code = 'teacher';
+
+-- ============================================================
+-- 5c. 为学生分配 student_member 角色
+-- ============================================================
+INSERT INTO `user_roles` (`user_id`, `role_id`, `assigned_by`)
+SELECT u.user_id, r.role_id, NULL
+FROM `users` u, `roles` r
+WHERE u.username IN ('student01', 'student02', 'student03') AND r.role_code = 'student_member';
 
 -- ============================================================
 -- 6. 插入任务类型数据（9个常用任务类型）

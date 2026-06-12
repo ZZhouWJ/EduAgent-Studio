@@ -47,6 +47,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: "课程详情", hidden: true }
       },
       {
+        path: "learning-path/:courseId",
+        name: "LearningPath",
+        component: () => import("@/pages/learning-path/index.vue"),
+        meta: { title: "学习路径图谱", hidden: true }
+      },
+      {
         path: "tasks",
         name: "Tasks",
         component: () => import("@/pages/tasks/index.vue"),

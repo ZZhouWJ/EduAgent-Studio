@@ -3,9 +3,17 @@ import vue from "@vitejs/plugin-vue"
 import { defineConfig, loadEnv } from "vite"
 
 export default defineConfig(({ mode }) => {
-  const { VITE_PUBLIC_PATH } = loadEnv(mode, process.cwd(), "") as ImportMetaEnv
+  const env = loadEnv(mode, process.cwd(), "") as ImportMetaEnv
+  const {
+    VITE_PUBLIC_PATH,
+    VITE_API_BASE_URL,
+    VITE_API_PROXY_TARGET,
+  } = env
+
+  const proxyTarget = VITE_API_PROXY_TARGET || VITE_API_BASE_URL || "http://127.0.0.1:8000"
+
   return {
-    base: VITE_PUBLIC_PATH,
+    base: VITE_PUBLIC_PATH || "/",
     resolve: {
       alias: {
         "@": resolve(__dirname, "src")
@@ -19,7 +27,7 @@ export default defineConfig(({ mode }) => {
       cors: true,
       proxy: {
         "/api": {
-          target: "http://127.0.0.1:8000",
+          target: proxyTarget,
           changeOrigin: true
         }
       }

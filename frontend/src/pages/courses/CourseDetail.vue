@@ -96,10 +96,22 @@ onMounted(async () => {
       <!-- 知识点列表 -->
       <el-card>
         <template #header>
-          <span style="font-weight: 600">课程知识点</span>
-          <span style="float: right; font-size: 12px; color: #909399; font-weight: normal">
-            共 {{ course.knowledge_points?.length || 0 }} 个知识点
-          </span>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight: 600">课程知识点</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="font-size: 12px; color: #909399; font-weight: normal">
+                共 {{ course.knowledge_points?.length || 0 }} 个知识点
+              </span>
+              <el-button
+                type="primary"
+                size="small"
+                plain
+                @click="router.push(`/learning-path/${courseId}`)"
+              >
+                查看学习路径图谱
+              </el-button>
+            </div>
+          </div>
         </template>
 
         <el-table

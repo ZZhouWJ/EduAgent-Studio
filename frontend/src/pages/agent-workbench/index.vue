@@ -4,8 +4,11 @@ import { useRoute } from "vue-router"
 import { agentsApi, type WorkflowResult } from "@/api/agents"
 import { profilesApi } from "@/api/profiles"
 import { learningApi } from "@/api/learning"
+import { marked } from "marked"
 import { ElMessage } from "element-plus"
 import * as Icons from "@element-plus/icons-vue"
+
+marked.setOptions({ breaks: true, gfm: true })
 
 const generating = ref(false)
 const result = ref<WorkflowResult | null>(null)
@@ -297,15 +300,13 @@ function downloadResource() {
   window.open(url, "_blank")
 }
 
-function renderMarkdown(content: string) {
-  return content
-    .replace(/^# /gm, '<h2 style="margin-top:12px;font-size:16px;font-weight:600">')
-    .replace(/^## /gm, '<h3 style="margin-top:10px;font-size:14px;font-weight:600">')
-    .replace(/^### /gm, '<h4 style="margin-top:8px;font-size:13px;font-weight:600">')
-    .replace(/\n/g, "<br>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/`(.+?)`/g, '<code style="background:#f5f5f5;padding:2px 4px;border-radius:3px;font-size:12px">$1</code>')
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre style="background:#1e1e1e;color:#d4d4d4;padding:10px;border-radius:6px;font-size:12px;line-height:1.5;overflow-x:auto"><code>$2</code></pre>')
+function renderMarkdown(content: string): string {
+  if (!content) return ""
+  try {
+    return marked.parse(content) as string
+  } catch {
+    return `<pre>${content}</pre>`
+  }
 }
 
 function accuracyPercent(assessment: WorkflowResult["assessment"]) {

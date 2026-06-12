@@ -1,4 +1,4 @@
-"""学习任务 API — 课程、知识点、学习任务"""
+"""学习任务 API — 课程、知识点、学习任务、学习路径"""
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Path, Query
@@ -45,3 +45,26 @@ async def get_learning_task(
 ):
     """获取学习任务详情"""
     return learning_service.LearningService().get_task(task_id)
+
+
+# =============================================================================
+# 学习路径图谱
+# =============================================================================
+
+@router.get("/courses/{course_id}/learning-path")
+async def get_learning_path(
+    course_id: int = Path(..., gt=0),
+    profile_id: Optional[int] = None,
+    token: str = Depends(get_current_user),
+):
+    """
+    获取课程知识点学习路径图谱。
+
+    - 包含知识点依赖关系（parent_kp_id）
+    - 包含学生掌握度数据（若传入 profile_id）
+    - 适合用 ECharts graph 渲染
+
+    Returns:
+        { nodes: [...], edges: [...], summary: {...} }
+    """
+    return learning_service.LearningService().get_learning_path(course_id, profile_id)
