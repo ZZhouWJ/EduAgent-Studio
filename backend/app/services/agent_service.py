@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 from app.config import get_settings
 from app.llm.mock_provider import MockProvider
 from app.llm.openai_compatible_provider import OpenAICompatibleProvider
+from app.llm.minimax_provider import MiniMaxProvider
 from app.llm.gateway import llm_gateway
 from app.services.storage_service import (
     save_resource_content,
@@ -19,6 +20,11 @@ _llm_registered = False
 if not _llm_registered:
     llm_gateway.register_provider("mock", MockProvider())
     llm_gateway.register_provider("openai_compatible", OpenAICompatibleProvider(
+        model_name=settings.llm_model,
+        base_url=settings.llm_base_url,
+        api_key=settings.llm_api_key,
+    ))
+    llm_gateway.register_provider("minimax", MiniMaxProvider(
         model_name=settings.llm_model,
         base_url=settings.llm_base_url,
         api_key=settings.llm_api_key,

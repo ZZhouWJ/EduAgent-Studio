@@ -1,84 +1,19 @@
 """学生画像 Service"""
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-_MOCK_PROFILES = [
-    {
-        "profile_id": 1,
-        "student_id": 101,
-        "student_name": "李明",
-        "course_id": 1,
-        "course_name": "数据库系统原理",
-        "learning_goal": "掌握数据库系统原理，能够独立完成数据库设计",
-        "current_level": "大二计算机专业，已学习SQL基础",
-        "weak_points": ["SQL多表连接", "事务隔离级别", "数据库范式"],
-        "preferences": ["图文讲义", "案例分析"],
-        "mastery_score": 0.42,
-        "last_updated": "2026-06-10",
-        "student_no": "2023001234",
-        "interests": ["后端开发", "数据工程"],
-        "resource_preferences": ["讲义", "案例"],
-        "weekly_hours": 8,
-        "ai_suggestions": "建议优先攻克SQL多表连接，可通过教务系统真实数据练习",
-        "strong_points": [
-            {"kp_id": 2, "kp_name": "SQL基本查询", "mastery": 0.85},
-            {"kp_id": 3, "kp_name": "数据定义DDL", "mastery": 0.78}
-        ],
-        "recent_tasks": [
-            {"task_id": 10, "title": "数据库事务与并发控制", "status": "completed", "completed_at": "2026-06-09"},
-            {"task_id": 11, "title": "SQL多表连接练习", "status": "in_progress", "completed_at": ""}
-        ],
-        "recent_tests": [
-            {"test_id": 5, "accuracy": 0.70, "date": "2026-06-08"},
-            {"test_id": 4, "accuracy": 0.65, "date": "2026-06-05"}
-        ]
-    },
-    {
-        "profile_id": 2,
-        "student_id": 102,
-        "student_name": "王悦",
-        "course_id": 1,
-        "course_name": "数据库系统原理",
-        "learning_goal": "深入理解数据库内核机制",
-        "current_level": "大三学生，有一定数据库基础",
-        "weak_points": ["索引优化", "查询计划分析"],
-        "preferences": ["深度技术文章", "源码分析"],
-        "mastery_score": 0.68,
-        "last_updated": "2026-06-09",
-        "student_no": "2022005678",
-        "interests": ["数据库内核", "性能优化"],
-        "resource_preferences": ["技术文章", "源码"],
-        "weekly_hours": 12,
-        "ai_suggestions": "建议深入学习索引结构和查询优化器原理",
-        "strong_points": [],
-        "recent_tasks": [],
-        "recent_tests": []
-    },
-    {
-        "profile_id": 3,
-        "student_id": 103,
-        "student_name": "陈思雨",
-        "course_id": 2,
-        "course_name": "Python程序设计",
-        "learning_goal": "掌握Python编程，能够开发实用工具",
-        "current_level": "大一学生，零基础入门",
-        "weak_points": ["函数参数传递", "模块导入", "异常处理"],
-        "preferences": ["视频教程", "手把手练习"],
-        "mastery_score": 0.35,
-        "last_updated": "2026-06-07",
-        "student_no": "2023012345",
-        "interests": ["Web开发", "自动化脚本"],
-        "resource_preferences": ["视频", "练习题"],
-        "weekly_hours": 6,
-        "ai_suggestions": "建议从基础语法入手，多做小项目练习",
-        "strong_points": [{"kp_id": 20, "kp_name": "Python基础语法", "mastery": 0.72}],
-        "recent_tasks": [],
-        "recent_tests": []
-    }
-]
+from app.repositories.profile_repo import ProfileRepository
 
 
 class ProfileService:
-    """学生画像 Service"""
+    """学生画像 Service（委托 Repository 完成数据库操作）"""
+
+    def __init__(self):
+        self._repo = ProfileRepository()
+
+    # ------------------------------------------------------------------
+    # list_profiles
+    # ------------------------------------------------------------------
 
     def list_profiles(
         self,
@@ -88,49 +23,149 @@ class ProfileService:
         course_id: Optional[int] = None,
         keyword: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """获取学生画像列表"""
-        items = _MOCK_PROFILES.copy()
-        if course_id:
-            items = [p for p in items if p["course_id"] == course_id]
-        if keyword:
-            items = [
-                p for p in items
-                if keyword.lower() in p["student_name"].lower() or keyword.lower() in p.get("student_no", "").lower()
-            ]
-        total = len(items)
-        start = (page - 1) * page_size
-        end = start + page_size
-        return {
-            "code": 0,
-            "message": "success",
-            "data": {
-                "items": items[start:end],
-                "total": total,
-                "page": page,
-                "page_size": page_size,
+        """
+        获取学生画像列表（分页）。
+
+        Args:
+            user: 当前登录用户（FastAPI Depends 注入，当前未使用）
+            page: 页码（从 1 开始）
+            page_size: 每页条数
+            course_id: 可选，按课程 ID 过滤
+            keyword: 可选，按学生姓名或学号关键字搜索
+
+        Returns:
+            标准响应 dict：{code, message, data: {items, total, page, page_size}}
+        """
+        try:
+            items, total = self._repo.list_profiles(
+                page=page,
+                page_size=page_size,
+                course_id=course_id,
+                keyword=keyword,
+            )
+            return {
+                "code": 0,
+                "message": "success",
+                "data": {
+                    "items": items,
+                    "total": total,
+                    "page": page,
+                    "page_size": page_size,
+                },
             }
-        }
+        except Exception as e:
+            return {
+                "code": 500,
+                "message": f"查询失败: {e}",
+                "data": None,
+            }
+
+    # ------------------------------------------------------------------
+    # get_profile
+    # ------------------------------------------------------------------
 
     def get_profile(self, profile_id: int, user: Any) -> Dict[str, Any]:
-        """获取学生画像详情"""
-        for p in _MOCK_PROFILES:
-            if p["profile_id"] == profile_id:
-                return {"code": 0, "message": "success", "data": p}
-        return {"code": 404, "message": "画像不存在", "data": None}
+        """
+        获取单个学生画像详情。
 
-    def update_profile(self, profile_id: int, data: Dict[str, Any], user: Any) -> Dict[str, Any]:
-        """更新学生画像"""
-        for p in _MOCK_PROFILES:
-            if p["profile_id"] == profile_id:
-                p.update(data)
-                p["last_updated"] = "2026-06-11"
-                return {"code": 0, "message": "更新成功", "data": p}
-        return {"code": 404, "message": "画像不存在", "data": None}
+        Args:
+            profile_id: 画像 ID
+            user: 当前登录用户（FastAPI Depends 注入，当前未使用）
 
-    def update_mastery(self, profile_id: int, data: Dict[str, Any], user: Any) -> Dict[str, Any]:
-        """更新知识点掌握度"""
-        for p in _MOCK_PROFILES:
-            if p["profile_id"] == profile_id:
-                p["last_updated"] = "2026-06-11"
-                return {"code": 0, "message": "掌握度更新成功", "data": {"kp_id": data.get("kp_id"), "new_mastery": data.get("mastery")}}
-        return {"code": 404, "message": "画像不存在", "data": None}
+        Returns:
+            标准响应 dict：{code, message, data: profile_dict 或 None}
+        """
+        try:
+            profile = self._repo.get_profile(profile_id)
+            if profile is None:
+                return {"code": 404, "message": "画像不存在", "data": None}
+            return {"code": 0, "message": "success", "data": profile}
+        except Exception as e:
+            return {"code": 500, "message": f"查询失败: {e}", "data": None}
+
+    # ------------------------------------------------------------------
+    # update_profile
+    # ------------------------------------------------------------------
+
+    def update_profile(
+        self, profile_id: int, data: Dict[str, Any], user: Any
+    ) -> Dict[str, Any]:
+        """
+        更新学生画像字段。
+
+        支持更新的字段：
+            learning_goal, current_level, interests,
+            resource_preferences, weekly_hours, mastery_score
+
+        Args:
+            profile_id: 画像 ID
+            data: 要更新的字段字典
+            user: 当前登录用户（FastAPI Depends 注入，当前未使用）
+
+        Returns:
+            标准响应 dict：{code, message, data: 更新后的 profile_dict 或 None}
+        """
+        try:
+            updated = self._repo.update_profile(profile_id, data)
+            if updated is None:
+                return {"code": 404, "message": "画像不存在", "data": None}
+            return {"code": 0, "message": "更新成功", "data": updated}
+        except Exception as e:
+            return {"code": 500, "message": f"更新失败: {e}", "data": None}
+
+    # ------------------------------------------------------------------
+    # update_mastery
+    # ------------------------------------------------------------------
+
+    def update_mastery(
+        self, profile_id: int, data: Dict[str, Any], user: Any
+    ) -> Dict[str, Any]:
+        """
+        更新或插入知识点掌握度记录。
+
+        请求 data 应包含：
+            kp_id: int           - 知识点 ID
+            mastery: float       - 掌握度（0~1）
+            update_reason: str   - 更新原因（可选）
+
+        Args:
+            profile_id: 画像 ID
+            data: 包含 kp_id 和 mastery 的字典
+            user: 当前登录用户（FastAPI Depends 注入，当前未使用）
+
+        Returns:
+            标准响应 dict：{code, message, data: {kp_id, new_mastery} 或 None}
+        """
+        try:
+            kp_id = data.get("kp_id")
+            mastery = data.get("mastery")
+            update_reason = data.get("update_reason")
+
+            if kp_id is None or mastery is None:
+                return {"code": 400, "message": "缺少 kp_id 或 mastery", "data": None}
+
+            result = self._repo.update_mastery(
+                profile_id=profile_id,
+                kp_id=kp_id,
+                mastery_level=float(mastery),
+                update_reason=update_reason,
+            )
+            if result is None:
+                return {"code": 404, "message": "画像或知识点不存在", "data": None}
+            return {
+                "code": 0,
+                "message": "掌握度更新成功",
+                "data": {
+                    "kp_id": result["kp_id"],
+                    "kp_name": result.get("kp_name", ""),
+                    "new_mastery": result["mastery_level"],
+                    "last_test_score": result.get("last_test_score"),
+                    "last_test_date": (
+                        result["last_test_date"].strftime("%Y-%m-%d")
+                        if result.get("last_test_date")
+                        else None
+                    ),
+                },
+            }
+        except Exception as e:
+            return {"code": 500, "message": f"掌握度更新失败: {e}", "data": None}

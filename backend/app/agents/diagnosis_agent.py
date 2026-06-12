@@ -21,6 +21,9 @@ PROMPT_DIAGNOSIS = """你是一个专业的学习诊断智能体。请根据以�
 - 当前基础：{current_level}
 - AI 建议：{ai_suggestions}
 
+## 相关知识上下文（RAG 检索结果）
+{context}
+
 ## 课程知识点掌握情况
 {knowledge_points}
 
@@ -79,6 +82,9 @@ class DiagnosisAgent:
             for t in recent_tasks[:5]
         ) or "（暂无学习任务记录）"
 
+        # 检索 RAG 上下文（混合向量+关键词检索）
+        rag_context = self._retrieve_rag_context(student_profile, knowledge_points)
+
         messages = [
             {
                 "role": "user",
@@ -88,6 +94,7 @@ class DiagnosisAgent:
                     learning_goal=student_profile.get("learning_goal", "未设置"),
                     current_level=student_profile.get("current_level", "未知"),
                     ai_suggestions=student_profile.get("ai_suggestions", "暂无"),
+                    context=rag_context,
                     knowledge_points=kp_text,
                     recent_tasks=task_text,
                 )
@@ -100,6 +107,42 @@ class DiagnosisAgent:
             return result
 
         return self._fallback(knowledge_points)
+
+    def _retrieve_rag_context(
+        self,
+        student_profile: Dict[str, Any],
+        knowledge_points: List[Dict[str, Any]],
+    ) -> str:
+        """
+        从 RAG 服务检索相关知识点上下文。
+
+        若 pgvector 不可用（RAG 服务抛异常），静默回退到空字符串，
+        不影响诊断主流程。
+        """
+        try:
+            from app.services.rag_service import get_context_for_agent
+
+            course_id = student_profile.get("course_id")
+            # 用学生薄弱知识点名称拼接检索 query
+            weak_names = [
+                kp.get("name", "") for kp in knowledge_points
+                if kp.get("mastery_level", 1.0) < 0.5
+            ]
+            query = "、".join(weak_names[:3]) if weak_names else (
+                student_profile.get("learning_goal") or student_profile.get("student_name", "")
+            )
+
+            if not query:
+                return "（暂无相关知识点上下文）"
+
+            context = get_context_for_agent(query=query, course_id=course_id, top_k=5)
+            if context:
+                logger.info(f"[{self.AGENT_NAME}] RAG 检索到 {len(context.splitlines())} 行上下文")
+                return context
+            return "（RAG 检索结果为空）"
+        except Exception as e:
+            logger.warning(f"[{self.AGENT_NAME}] RAG 检索失败，回退到无上下文: {e}")
+            return "（RAG 检索暂不可用）"
 
     def _call_llm(self, messages: List[Dict[str, str]]) -> Optional[Dict[str, Any]]:
         if self.llm_gateway is None:

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue"
+import { useRoute } from "vue-router"
 import { agentsApi, type WorkflowResult } from "@/api/agents"
 import { profilesApi } from "@/api/profiles"
+import { learningApi } from "@/api/learning"
 import { ElMessage } from "element-plus"
 import * as Icons from "@element-plus/icons-vue"
 
@@ -31,49 +33,67 @@ const students = ref<Array<{ id: number; name: string; profile_id: number }>>([]
 const courses = ref<Array<{ id: number; name: string }>>([])
 const knowledgePoints = ref<Array<{ id: number; name: string }>>([])
 
+const courseKnowledgePointsMap = ref<Record<number, Array<{ id: number; name: string }>>>({})
+
+const route = useRoute()
+
 onMounted(async () => {
   try {
-    const agentsRes = await agentsApi.getAgents()
-    const profilesRes = await profilesApi.list({ page_size: 100 })
+    const [agentsRes, profilesRes, coursesRes] = await Promise.all([
+      agentsApi.getAgents(),
+      profilesApi.list({ page_size: 100 }),
+      learningApi.listCourses()
+    ])
     students.value = (profilesRes.data.data.items || []).map((p: any) => ({
       id: p.student_id,
       name: p.student_name,
       profile_id: p.profile_id
     }))
-    courses.value = [
-      { id: 1, name: "数据库系统原理" },
-      { id: 2, name: "Python程序设计" },
-      { id: 3, name: "软件工程实践" }
-    ]
+    courses.value = coursesRes.data.data || []
+
+    // Auto-select from URL query params
+    const queryCourse = route.query.course
+    const queryKp = route.query.kp
+    if (queryCourse) {
+      const courseId = Number(queryCourse)
+      if (!isNaN(courseId)) {
+        form.value.course_id = courseId
+        await onCourseChange()
+        if (queryKp) {
+          const kpId = Number(queryKp)
+          if (!isNaN(kpId)) {
+            form.value.knowledge_point_ids = [kpId]
+          }
+        }
+      }
+    }
   } catch {
     // ignore
   }
 })
 
-const courseKnowledgePoints: Record<number, Array<{ id: number; name: string }>> = {
-  1: [
-    { id: 1, name: "关系模型基础" },
-    { id: 2, name: "SQL基本查询" },
-    { id: 3, name: "数据定义DDL" },
-    { id: 5, name: "SQL多表连接" },
-    { id: 8, name: "事务隔离级别" },
-    { id: 12, name: "数据库范式" }
-  ],
-  2: [
-    { id: 20, name: "Python基础语法" },
-    { id: 21, name: "函数参数传递" },
-    { id: 22, name: "模块导入" },
-    { id: 23, name: "异常处理" }
-  ],
-  3: [
-    { id: 30, name: "需求分析" },
-    { id: 31, name: "UML建模" }
-  ]
-}
-
 function onCourseChange() {
   form.value.knowledge_point_ids = []
-  knowledgePoints.value = courseKnowledgePoints[form.value.course_id!] || []
+  const courseId = form.value.course_id
+  if (!courseId) {
+    knowledgePoints.value = []
+    return
+  }
+  if (courseKnowledgePointsMap.value[courseId]) {
+    knowledgePoints.value = courseKnowledgePointsMap.value[courseId]
+    return
+  }
+  learningApi.getCourse(courseId).then(res => {
+    const courseData = res.data.data
+    const kps: Array<{ id: number; name: string }> = (courseData.knowledge_points || []).map((kp: any) => ({
+      id: kp.id,
+      name: kp.name
+    }))
+    courseKnowledgePointsMap.value[courseId] = kps
+    knowledgePoints.value = kps
+  }).catch(() => {
+    knowledgePoints.value = []
+  })
 }
 
 const agentSteps = computed(() => [

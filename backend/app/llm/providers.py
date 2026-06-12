@@ -3,6 +3,7 @@ import logging
 from typing import Any, Dict
 from app.llm.mock_provider import MockProvider
 from app.llm.openai_compatible_provider import OpenAICompatibleProvider
+from app.llm.minimax_provider import MiniMaxProvider
 
 logger = logging.getLogger(__name__)
 
@@ -10,6 +11,7 @@ _PROVIDER_REGISTRY: Dict[str, type] = {
     "mock": MockProvider,
     "openai": OpenAICompatibleProvider,
     "openai_compatible": OpenAICompatibleProvider,
+    "minimax": MiniMaxProvider,
 }
 
 
