@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     llm_base_url: str = Field(default="https://api.deepseek.com/v1", alias="LLM_BASE_URL")
     llm_model: str = Field(default="deepseek-chat", alias="LLM_MODEL")
 
+    # --- 应用数据目录 ---
+    app_data_dir: str = Field(default="data", alias="APP_DATA_DIR")
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

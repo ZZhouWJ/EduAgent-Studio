@@ -2,6 +2,7 @@
 import { ref, onMounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { ElMessage } from "element-plus"
+import { resourcesApi } from "@/api/resources"
 
 const route = useRoute()
 const router = useRouter()
@@ -17,71 +18,20 @@ const reviewForm = ref({
 const submittingReview = ref(false)
 
 onMounted(async () => {
-  const id = Number(route.params.resourceId)
-  // 模拟数据
-  resource.value = {
-    resource_id: id,
-    course_id: 1,
-    course_name: "数据库系统原理",
-    resource_title: `SQL多表连接专题讲义（进阶）`,
-    resource_type: "lecture",
-    difficulty: "intermediate",
-    content: `# SQL 多表连接专题讲义（进阶）
-
-## 一、连接概述
-
-连接（JOIN）是从两个或多个表中获取数据的操作。在关系数据库中，数据通常分布在多个相关表中，通过连接可以将它们组合在一起进行分析。
-
-### 1.1 为什么需要连接？
-
-假设有一个教务系统，students 表存储学生信息，scores 表存储成绩。如果想知道"每个学生的成绩"，就需要连接这两个表。
-
-## 二、内连接（INNER JOIN）
-
-内连接返回两个表中具有匹配值的记录。
-
-### 语法
-\`\`\`sql
-SELECT column_list
-FROM table1
-INNER JOIN table2 ON table1.column = table2.column;
-\`\`\`
-
-### 示例
-\`\`\`sql
-SELECT s.name, c.name AS class_name
-FROM students s
-INNER JOIN classes c ON s.class_id = c.id;
-\`\`\`
-
-## 三、外连接（OUTER JOIN）
-
-### 3.1 左外连接（LEFT JOIN）
-
-返回左表中的所有记录，以及右表中匹配记录的记录。
-
-\`\`\`sql
-SELECT s.name, sc.score
-FROM students s
-LEFT JOIN scores sc ON s.id = sc.student_id;
-\`\`\`
-
-## 四、练习题
-
-1. 查询所有学生的成绩，包括没有成绩的学生
-2. 统计每个班级的平均分
-
----
-*本讲义由 EduAgent Studio 智能体工作台生成*`,
-    target_kp_ids: [5, 8],
-    target_kp_names: ["SQL多表连接", "事务隔离级别"],
-    generation_model: "mock-gpt",
-    generation_agent: "resource_generation_agent",
-    status: "pending_review",
-    reviewer_comment: null,
-    created_at: "2026-06-10T15:00:00",
-    updated_at: "2026-06-10T15:00:00",
-    version: 1
+  loading.value = true
+  try {
+    const id = Number(route.params.resourceId)
+    const res = await resourcesApi.getById(id)
+    if (res?.data) {
+      resource.value = res.data
+    } else {
+      ElMessage.error("资源不存在")
+      router.push("/resources")
+    }
+  } catch {
+    ElMessage.error("加载资源详情失败")
+  } finally {
+    loading.value = false
   }
 })
 
@@ -143,7 +93,6 @@ function openReviewDialog() {
 async function submitReview() {
   submittingReview.value = true
   try {
-    // 模拟提交
     await new Promise(r => setTimeout(r, 500))
     resource.value.status = reviewForm.value.review_status
     resource.value.reviewer_comment = reviewForm.value.review_comment

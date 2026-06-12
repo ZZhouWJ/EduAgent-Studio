@@ -65,5 +65,106 @@ async def get_resource(
 ):
     for r in _MOCK_RESOURCES:
         if r["resource_id"] == resource_id:
-            return {"code": 0, "message": "success", "data": r}
+            # 补全详细内容（实际场景中从 DB 读取）
+            detail = {
+                **r,
+                "content": _RESOURCE_CONTENTS.get(resource_id, ""),
+                "target_kp_ids": _RESOURCE_KP_MAP.get(resource_id, []),
+                "target_kp_names": _RESOURCE_KP_NAMES.get(resource_id, []),
+                "generation_model": "deepseek-chat",
+                "generation_agent": "resource_generation_agent",
+                "status": r["status"],
+                "reviewer_comment": None,
+                "updated_at": r["created_at"],
+                "version": 1,
+            }
+            return {"code": 0, "message": "success", "data": detail}
     return {"code": 404, "message": "资源不存在", "data": None}
+
+
+# 资源正文内容（对应 resource_id）
+_RESOURCE_CONTENTS = {
+    1: """# SQL 多表连接专题讲义（进阶）
+
+## 一、连接概述
+
+连接（JOIN）是从两个或多个表中获取数据的操作。在关系数据库中，数据通常分布在多个相关表中，通过连接可以将它们组合在一起进行分析。
+
+### 1.1 为什么需要连接？
+
+假设有一个教务系统，students 表存储学生信息，scores 表存储成绩。如果想知道"每个学生的成绩"，就需要连接这两个表。
+
+## 二、内连接（INNER JOIN）
+
+内连接返回两个表中具有匹配值的记录。
+
+### 语法
+```sql
+SELECT column_list
+FROM table1
+INNER JOIN table2 ON table1.column = table2.column;
+```
+
+### 示例
+```sql
+SELECT s.name, c.name AS class_name
+FROM students s
+INNER JOIN classes c ON s.class_id = c.id;
+```
+
+## 三、外连接（OUTER JOIN）
+
+### 3.1 左外连接（LEFT JOIN）
+
+返回左表中的所有记录，以及右表中匹配记录的记录。
+
+```sql
+SELECT s.name, sc.score
+FROM students s
+LEFT JOIN scores sc ON s.id = sc.student_id;
+```
+
+### 3.2 右外连接（RIGHT JOIN）
+
+返回右表中的所有记录，以及左表中匹配记录的记录。
+
+### 3.3 全外连接（FULL OUTER JOIN）
+
+返回两个表的所有记录，匹配不上则为 NULL。
+
+## 四、练习题
+
+1. 查询所有学生的成绩，包括没有成绩的学生
+2. 统计每个班级的平均分
+3. 找出同时选修了"数据库"和"操作系统"两门课的学生
+
+---
+*本讲义由 EduAgent Studio 智能体工作台生成*
+""",
+    2: """# 数据库范式复习计划
+
+## 复习目标
+掌握数据库设计范式，能够识别并消除数据冗余。
+
+## 每日任务
+- Day 1: 第一范式（1NF）与第二范式（2NF）
+- Day 2: 第三范式（3NF）与 BCNF
+- Day 3: 综合练习与实际案例分析
+
+---
+*由 EduAgent Studio 生成*
+""",
+}
+
+_RESOURCE_KP_MAP = {
+    1: [5, 8],
+    2: [12],
+    3: [21, 22],
+}
+
+_RESOURCE_KP_NAMES = {
+    1: ["SQL多表连接", "事务隔离级别"],
+    2: ["数据库范式"],
+    3: ["函数参数传递", "模块导入"],
+}
+
