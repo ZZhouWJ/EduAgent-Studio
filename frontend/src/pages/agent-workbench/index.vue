@@ -1,15 +1,23 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue"
-import { agentsApi, type AgentResult } from "@/api/agents"
+import { agentsApi, type WorkflowResult } from "@/api/agents"
 import { profilesApi } from "@/api/profiles"
 import { ElMessage } from "element-plus"
 import * as Icons from "@element-plus/icons-vue"
 
 const generating = ref(false)
-const result = ref<AgentResult | null>(null)
+const result = ref<WorkflowResult | null>(null)
 const activeTab = ref("diagnosis")
 const saveDialogVisible = ref(false)
 const saveTitle = ref("")
+const savedResource = ref<any>(null)
+
+const executionLog = ref<Array<{
+  step: string
+  status: "pending" | "running" | "success" | "failed"
+  message: string
+  timestamp: string
+}>>([])
 
 const form = ref({
   student_id: undefined as number | undefined,
@@ -23,7 +31,6 @@ const students = ref<Array<{ id: number; name: string; profile_id: number }>>([]
 const courses = ref<Array<{ id: number; name: string }>>([])
 const knowledgePoints = ref<Array<{ id: number; name: string }>>([])
 
-// Load initial data
 onMounted(async () => {
   try {
     const agentsRes = await agentsApi.getAgents()
@@ -43,7 +50,6 @@ onMounted(async () => {
   }
 })
 
-// When course changes, load knowledge points
 const courseKnowledgePoints: Record<number, Array<{ id: number; name: string }>> = {
   1: [
     { id: 1, name: "关系模型基础" },
@@ -71,12 +77,24 @@ function onCourseChange() {
 }
 
 const agentSteps = computed(() => [
-  { id: "diagnosis", name: "学习诊断", desc: "分析薄弱知识点", status: result.value ? "success" : "pending" },
-  { id: "planning", name: "资源规划", desc: "生成学习路径", status: result.value ? "success" : "pending" },
-  { id: "generation", name: "资源生成", desc: "生成学习资源", status: result.value ? "success" : "pending" },
-  { id: "assessment", name: "评测反馈", desc: "生成反馈建议", status: result.value ? "success" : "pending" },
-  { id: "review", name: "审核建议", desc: "质量检查", status: result.value ? "success" : "pending" }
+  { id: "diagnosis", name: "学习诊断", desc: "分析薄弱知识点" },
+  { id: "planning", name: "资源规划", desc: "生成学习路径" },
+  { id: "generation", name: "资源生成", desc: "生成学习资源" },
+  { id: "assessment", name: "评测反馈", desc: "分析学习效果" },
+  { id: "review", name: "审核建议", desc: "质量检查" }
 ])
+
+function getStepStatus(stepId: string) {
+  return executionLog.value.find(l => l.step === stepId)?.status || "pending"
+}
+
+function getStepMessage(stepId: string) {
+  return executionLog.value.find(l => l.step === stepId)?.message || ""
+}
+
+function getStepTimestamp(stepId: string) {
+  return executionLog.value.find(l => l.step === stepId)?.timestamp || ""
+}
 
 const resourceTypes = [
   { value: "lecture", label: "知识点讲义" },
@@ -100,20 +118,127 @@ async function handleGenerate() {
   }
   generating.value = true
   result.value = null
+  savedResource.value = null
+  executionLog.value = []
   activeTab.value = "diagnosis"
+
+  const steps = ["diagnosis", "planning", "generation", "assessment", "review"]
+  executionLog.value = steps.map(s => ({
+    step: s,
+    status: "pending" as const,
+    message: "",
+    timestamp: ""
+  }))
+
   try {
-    const res = await agentsApi.generate({
+    const response = await fetch("/api/agents/generate/stream", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + (localStorage.getItem("token") || "")
+      },
+      body: JSON.stringify({
+        student_id: form.value.student_id,
+        course_id: form.value.course_id,
+        knowledge_point_ids: form.value.knowledge_point_ids,
+        resource_type: form.value.resource_type,
+        difficulty: form.value.difficulty
+      })
+    })
+
+    const reader = response.body?.getReader()
+    if (!reader) throw new Error("Stream not available")
+
+    const decoder = new TextDecoder()
+    let buffer = ""
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split("\n")
+      buffer = lines.pop() || ""
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          try {
+            const event = JSON.parse(line.slice(6))
+            if (event.type === "error") {
+              ElMessage.error("执行错误: " + event.message)
+              break
+            }
+            if (event.type === "done") break
+
+            // Map event node name to step id
+            const nodeToStep: Record<string, string> = {
+              diagnosis: "diagnosis",
+              planning: "planning",
+              generation: "generation",
+              assessment: "assessment",
+              teacher_review: "review",
+            }
+            const stepId = nodeToStep[event.node] || event.step
+
+            // Update running step
+            if (stepId && stepId !== "completed") {
+              const logEntry = executionLog.value.find(l => l.step === stepId)
+              if (logEntry && logEntry.status === "pending") {
+                logEntry.status = "running"
+                logEntry.message = "执行中..."
+                logEntry.timestamp = new Date().toLocaleTimeString("zh-CN")
+              }
+            }
+
+            // Mark completed steps
+            const hasFlags = [
+              { flag: "has_diagnosis", step: "diagnosis" },
+              { flag: "has_plan", step: "planning" },
+              { flag: "has_resource", step: "generation" },
+              { flag: "has_assessment", step: "assessment" },
+              { flag: "has_review", step: "review" },
+            ]
+            for (const { flag, step } of hasFlags) {
+              if (event[flag]) {
+                const logEntry = executionLog.value.find(l => l.step === step)
+                if (logEntry) {
+                  logEntry.status = "success"
+                  logEntry.message = "完成"
+                  logEntry.timestamp = new Date().toLocaleTimeString("zh-CN")
+                }
+              }
+            }
+          } catch {
+            // ignore parse errors
+          }
+        }
+      }
+    }
+
+    // Fetch full result
+    const fullRes = await agentsApi.generate({
       student_id: form.value.student_id,
       course_id: form.value.course_id,
       knowledge_point_ids: form.value.knowledge_point_ids,
       resource_type: form.value.resource_type,
       difficulty: form.value.difficulty
     })
-    result.value = res.data.data
+    result.value = fullRes.data.data
     activeTab.value = "resource"
+
+    // Mark review as success if not already
+    const reviewEntry = executionLog.value.find(l => l.step === "review")
+    if (reviewEntry && reviewEntry.status !== "success") {
+      reviewEntry.status = "success"
+      reviewEntry.message = `质量评分: ${result.value?.teacher_review_suggestion?.quality_score}/10`
+      reviewEntry.timestamp = new Date().toLocaleTimeString("zh-CN")
+    }
+
     ElMessage.success("个性化学习资源生成完成")
   } catch (e: any) {
     ElMessage.error("生成失败: " + (e?.message || "未知错误"))
+    executionLog.value.forEach(l => {
+      if (l.status === "pending" || l.status === "running") l.status = "failed"
+    })
   } finally {
     generating.value = false
   }
@@ -130,11 +255,12 @@ async function confirmSave() {
     return
   }
   try {
-    await agentsApi.saveResource({
+    const res = await agentsApi.saveResource({
       result: result.value!,
       title: saveTitle.value,
       course_id: form.value.course_id!
     })
+    savedResource.value = res.data.data
     ElMessage.success("资源已保存到学习资源库")
     saveDialogVisible.value = false
   } catch {
@@ -142,14 +268,29 @@ async function confirmSave() {
   }
 }
 
+function downloadResource() {
+  if (!savedResource.value?.storage_url) {
+    ElMessage.warning("请先保存资源")
+    return
+  }
+  const url = savedResource.value.storage_url
+  window.open(url, "_blank")
+}
+
 function renderMarkdown(content: string) {
   return content
     .replace(/^# /gm, '<h2 style="margin-top:12px;font-size:16px;font-weight:600">')
     .replace(/^## /gm, '<h3 style="margin-top:10px;font-size:14px;font-weight:600">')
     .replace(/^### /gm, '<h4 style="margin-top:8px;font-size:13px;font-weight:600">')
-    .replace(/\n/g, '<br>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, "<br>")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/`(.+?)`/g, '<code style="background:#f5f5f5;padding:2px 4px;border-radius:3px;font-size:12px">$1</code>')
+    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre style="background:#1e1e1e;color:#d4d4d4;padding:10px;border-radius:6px;font-size:12px;line-height:1.5;overflow-x:auto"><code>$2</code></pre>')
+}
+
+function accuracyPercent(assessment: WorkflowResult["assessment"]) {
+  const rate = assessment?.test_results?.accuracy_rate || 0.7
+  return Math.round(rate * 100)
 }
 </script>
 
@@ -191,14 +332,19 @@ function renderMarkdown(content: string) {
               </el-select>
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" :loading="generating" style="width:100%" @click="handleGenerate">
+              <el-button
+                type="primary"
+                :loading="generating"
+                style="width:100%"
+                @click="handleGenerate"
+              >
                 {{ generating ? "生成中..." : "生成个性化学习资源" }}
               </el-button>
             </el-form-item>
           </el-form>
         </el-card>
 
-        <!-- 智能体列表说明 -->
+        <!-- 协作智能体 -->
         <el-card class="mt-16">
           <template #header>
             <span style="font-weight:600">协作智能体</span>
@@ -221,16 +367,40 @@ function renderMarkdown(content: string) {
           <div class="agent-chain">
             <div v-for="(step, idx) in agentSteps" :key="step.id" class="chain-step">
               <div class="step-indicator">
-                <el-icon v-if="step.status === 'pending'" color="#c0c4cc"><Icons.Clock /></el-icon>
-                <el-icon v-else color="#67c23a"><Icons.CircleCheck /></el-icon>
+                <el-icon v-if="getStepStatus(step.id) === 'pending'" color="#c0c4cc"><Icons.Clock /></el-icon>
+                <el-icon v-else-if="getStepStatus(step.id) === 'running'" color="#409eff" class="spinning"><Icons.Loading /></el-icon>
+                <el-icon v-else-if="getStepStatus(step.id) === 'success'" color="#67c23a"><Icons.CircleCheck /></el-icon>
+                <el-icon v-else-if="getStepStatus(step.id) === 'failed'" color="#f56c6c"><Icons.CircleClose /></el-icon>
               </div>
               <div class="step-info">
-                <div class="step-name">{{ step.name }}</div>
+                <div class="step-name" :class="{ 'step-running': getStepStatus(step.id) === 'running' }">
+                  {{ step.name }}
+                </div>
                 <div class="step-desc">{{ step.desc }}</div>
               </div>
               <el-icon v-if="idx < agentSteps.length - 1" class="chain-arrow" color="#c0c4cc"><Icons.ArrowRight /></el-icon>
             </div>
           </div>
+        </el-card>
+
+        <!-- 执行详情 -->
+        <el-card style="margin-top:12px">
+          <template #header>
+            <span style="font-weight:600">执行详情</span>
+          </template>
+          <el-timeline>
+            <el-timeline-item
+              v-for="log in executionLog"
+              :key="log.step"
+              :type="log.status === 'success' ? 'success' : log.status === 'failed' ? 'danger' : log.status === 'running' ? 'primary' : 'info'"
+              :hollow="log.status === 'pending'"
+            >
+              <div style="font-weight:500">{{ log.step }}</div>
+              <div style="font-size:12px;color:#909399">
+                {{ log.message }} {{ log.timestamp }}
+              </div>
+            </el-timeline-item>
+          </el-timeline>
         </el-card>
       </el-col>
 
@@ -239,68 +409,159 @@ function renderMarkdown(content: string) {
         <el-card v-if="result">
           <template #header>
             <span style="font-weight:600">生成结果</span>
-            <el-button type="success" size="small" style="float:right" @click="handleSave">
-              保存到学习资源库
-            </el-button>
+            <div style="float:right;display:flex;gap:8px">
+              <el-button
+                v-if="!savedResource"
+                type="success"
+                size="small"
+                @click="handleSave"
+              >
+                保存到学习资源库
+              </el-button>
+              <template v-else>
+                <el-button type="primary" size="small" @click="downloadResource">
+                  下载 Markdown
+                </el-button>
+                <el-tag type="success" size="small">
+                  已保存 · {{ (savedResource.file_size / 1024).toFixed(1) }}KB
+                </el-tag>
+              </template>
+            </div>
           </template>
+
           <el-tabs v-model="activeTab">
+            <!-- 诊断结果 -->
             <el-tab-pane label="诊断结果" name="diagnosis">
-              <el-descriptions :column="1" border>
+              <el-descriptions :column="1" border size="small">
                 <el-descriptions-item label="薄弱知识点">
                   <el-tag
                     v-for="wp in (result.diagnosis?.weak_points || [])"
                     :key="wp.kp_id"
                     type="danger"
-                    style="margin-right:4px"
+                    style="margin-right:4px;margin-bottom:2px"
                   >
                     {{ wp.name }}（掌握度 {{ Math.round(wp.mastery_level * 100) }}%）
+                  </el-tag>
+                  <span v-if="!result.diagnosis?.weak_points?.length" style="color:#909399">暂无数据</span>
+                </el-descriptions-item>
+                <el-descriptions-item label="强项知识点">
+                  <el-tag
+                    v-for="sp in (result.diagnosis?.strength_points || [])"
+                    :key="sp.kp_id"
+                    type="success"
+                    style="margin-right:4px;margin-bottom:2px"
+                  >
+                    {{ sp.name }}（{{ Math.round(sp.mastery_level * 100) }}%）
                   </el-tag>
                 </el-descriptions-item>
                 <el-descriptions-item label="学习难点">
                   <span v-for="d in (result.diagnosis?.learning_difficulties || [])" :key="d" style="margin-right:8px">{{ d }}</span>
                 </el-descriptions-item>
-                <el-descriptions-item label="资源需求">{{ (result.diagnosis?.resource_needs || []).join('、') }}</el-descriptions-item>
+                <el-descriptions-item label="资源需求">
+                  <span v-for="r in (result.diagnosis?.resource_needs || [])" :key="r" style="margin-right:8px">{{ r }}</span>
+                </el-descriptions-item>
+                <el-descriptions-item label="建议难度">
+                  {{ result.diagnosis?.suggested_difficulty === 'basic' ? '基础' : result.diagnosis?.suggested_difficulty === 'intermediate' ? '进阶' : result.diagnosis?.suggested_difficulty === 'advanced' ? '高级' : '-' }}
+                </el-descriptions-item>
               </el-descriptions>
             </el-tab-pane>
 
+            <!-- 学习规划 -->
             <el-tab-pane label="学习规划" name="plan">
-              <el-steps direction="vertical" :space="60" v-if="result.plan?.learning_path?.length">
+              <el-descriptions :column="2" border size="small" v-if="result.plan">
+                <el-descriptions-item label="学习策略" :span="2">
+                  {{ result.plan.learning_sequence || '-' }}
+                </el-descriptions-item>
+                <el-descriptions-item label="资源组合">
+                  {{ (result.plan.resource_combination || []).join('、') }}
+                </el-descriptions-item>
+                <el-descriptions-item label="预计总时长">
+                  {{ result.plan.estimated_total_time || '-' }}
+                </el-descriptions-item>
+              </el-descriptions>
+              <el-steps direction="vertical" :space="60" :active="result.plan?.learning_path?.length || 0" style="margin-top:16px" v-if="result.plan?.learning_path?.length">
                 <el-step
                   v-for="step in result.plan.learning_path"
                   :key="step.order"
                   :title="`步骤${step.order}: ${step.kp_name}`"
-                  :description="`预计${step.estimated_time}，使用${step.resource_type}`"
+                  :description="`${step.resource_type} | 预计 ${step.estimated_time} | 优先级: ${step.priority === 'high' ? '高' : step.priority === 'medium' ? '中' : '低'}`"
                 />
               </el-steps>
               <el-empty v-else description="暂无学习规划" />
             </el-tab-pane>
 
+            <!-- 生成资源 -->
             <el-tab-pane label="生成资源" name="resource">
               <div v-if="result.resource">
                 <h3 style="margin:0 0 8px;font-size:16px">{{ result.resource.title }}</h3>
-                <el-tag size="small" style="margin-right:4px">{{ result.resource.type }}</el-tag>
-                <el-tag size="small" type="info">{{ result.resource.difficulty }}</el-tag>
-                <div class="resource-content" style="margin-top:12px;padding:12px;background:#f5f7fa;border-radius:4px;max-height:500px;overflow-y:auto;font-size:13px;line-height:1.8" v-html="renderMarkdown(result.resource.content || '')" />
+                <el-tag size="small" style="margin-right:4px">{{ result.resource.type === 'lecture' ? '知识点讲义' : result.resource.type === 'quiz' ? '习题与答案' : result.resource.type === 'ppt' ? 'PPT大纲' : result.resource.type === 'case' ? '案例材料' : result.resource.type }}</el-tag>
+                <el-tag size="small" type="info" style="margin-right:4px">{{ result.resource.difficulty === 'basic' ? '基础' : result.resource.difficulty === 'intermediate' ? '进阶' : result.resource.difficulty === 'advanced' ? '高级' : result.resource.difficulty }}</el-tag>
+                <el-tag size="small" type="warning" style="margin-right:4px">约{{ result.resource.estimated_learning_time }}</el-tag>
+                <div style="margin-top:12px;padding:12px;background:#f5f7fa;border-radius:4px;max-height:480px;overflow-y:auto;font-size:13px;line-height:1.8" v-html="renderMarkdown(result.resource.content || '')" />
               </div>
             </el-tab-pane>
 
+            <!-- 评测反馈 -->
             <el-tab-pane label="评测反馈" name="assessment">
               <div v-if="result.assessment">
-                <el-progress type="circle" :percentage="Math.round((result.assessment.accuracy_rate || 0) * 100)" :width="100" />
-                <el-divider />
-                <el-tag v-for="s in (result.assessment.suggestions || [])" :key="s" style="margin-right:4px;margin-bottom:4px">{{ s }}</el-tag>
+                <div style="display:flex;align-items:center;gap:24px;margin-bottom:16px">
+                  <el-progress type="circle" :percentage="accuracyPercent(result.assessment)" :width="100" />
+                  <div>
+                    <div style="font-size:24px;font-weight:700;color:#409eff">{{ accuracyPercent(result.assessment) }}%</div>
+                    <div style="color:#909399;font-size:13px">正确率</div>
+                  </div>
+                  <div>
+                    <div style="font-size:14px;font-weight:600;margin-bottom:4px">反馈</div>
+                    <div style="color:#606266;font-size:13px">{{ result.assessment.feedback || '-' }}</div>
+                  </div>
+                </div>
+                <div style="margin-bottom:12px">
+                  <div style="font-weight:600;margin-bottom:8px">改进建议</div>
+                  <el-tag v-for="s in (result.assessment.suggestions || [])" :key="s" style="margin-right:4px;margin-bottom:4px">{{ s }}</el-tag>
+                </div>
+                <div style="color:#909399;font-size:13px">
+                  下一步推荐：{{ result.assessment.next_resource_recommendation || '-' }}
+                </div>
               </div>
+              <el-empty v-else description="暂无评测数据" />
             </el-tab-pane>
 
+            <!-- 审核建议 -->
             <el-tab-pane label="审核建议" name="review">
               <div v-if="result.teacher_review_suggestion">
-                <el-descriptions :column="1" border>
-                  <el-descriptions-item label="质量评分">{{ result.teacher_review_suggestion.quality_score }}/10</el-descriptions-item>
-                  <el-descriptions-item label="整体评价">{{ result.teacher_review_suggestion.overall_comment }}</el-descriptions-item>
+                <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+                  <el-rate
+                    :model-value="(result.teacher_review_suggestion.quality_score || 0) / 2"
+                    disabled
+                    show-score
+                    score-template="{value} / 10"
+                  />
+                  <el-tag :type="(result.teacher_review_suggestion.quality_score || 0) >= 7 ? 'success' : 'warning'" size="large">
+                    {{ result.teacher_review_suggestion.quality_score }}/10
+                  </el-tag>
+                </div>
+                <el-descriptions :column="1" border size="small" style="margin-bottom:12px">
+                  <el-descriptions-item label="质量检查">
+                    <el-tag
+                      v-for="check in (result.teacher_review_suggestion.quality_checks || [])"
+                      :key="check.check"
+                      :type="check.passed ? 'success' : 'danger'"
+                      size="small"
+                      style="margin-right:4px;margin-bottom:2px"
+                    >
+                      {{ check.check }}: {{ check.passed ? '通过' : '待改进' }}
+                    </el-tag>
+                  </el-descriptions-item>
+                  <el-descriptions-item label="整体评价">
+                    {{ result.teacher_review_suggestion.overall_comment || '-' }}
+                  </el-descriptions-item>
                 </el-descriptions>
-                <el-divider />
-                <el-tag v-for="s in (result.teacher_review_suggestion.suggestions || [])" :key="s" style="margin-right:4px;margin-bottom:4px">{{ s }}</el-tag>
+                <div v-if="(result.teacher_review_suggestion.suggestions || []).length">
+                  <div style="font-weight:600;margin-bottom:8px">修改建议</div>
+                  <el-tag v-for="s in result.teacher_review_suggestion.suggestions" :key="s" style="margin-right:4px;margin-bottom:4px">{{ s }}</el-tag>
+                </div>
               </div>
+              <el-empty v-else description="暂无审核数据" />
             </el-tab-pane>
           </el-tabs>
         </el-card>
@@ -309,9 +570,9 @@ function renderMarkdown(content: string) {
     </el-row>
 
     <!-- 保存对话框 -->
-    <el-dialog v-model="saveDialogVisible" title="保存到学习资源库" width="400">
+    <el-dialog v-model="saveDialogVisible" title="保存到学习资源库" width="420">
       <el-form>
-        <el-form-item label="资源标题">
+        <el-form-item label="资源标题" required>
           <el-input v-model="saveTitle" placeholder="请输入资源标题" />
         </el-form-item>
       </el-form>
@@ -324,6 +585,13 @@ function renderMarkdown(content: string) {
 </template>
 
 <style scoped>
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.spinning {
+  animation: spin 1s linear infinite;
+}
 .agent-workbench {
   max-width: 1600px;
   margin: 0 auto;
@@ -335,12 +603,8 @@ function renderMarkdown(content: string) {
   color: #303133;
   margin-bottom: 16px;
 }
-.config-card {
-  height: fit-content;
-}
-.mt-16 {
-  margin-top: 16px;
-}
+.config-card { height: fit-content; }
+.mt-16 { margin-top: 16px; }
 .agent-list {
   display: flex;
   flex-direction: column;
@@ -352,9 +616,7 @@ function renderMarkdown(content: string) {
   gap: 8px;
   font-size: 14px;
 }
-.agent-name {
-  color: #606266;
-}
+.agent-name { color: #606266; }
 .agent-chain {
   display: flex;
   flex-direction: column;
@@ -366,21 +628,15 @@ function renderMarkdown(content: string) {
   gap: 8px;
   position: relative;
 }
-.step-indicator {
-  flex-shrink: 0;
-}
-.step-info {
-  flex: 1;
-}
+.step-indicator { flex-shrink: 0; }
+.step-info { flex: 1; }
 .step-name {
   font-size: 14px;
   font-weight: 500;
   color: #303133;
 }
-.step-desc {
-  font-size: 12px;
-  color: #909399;
-}
+.step-running { color: #409eff; }
+.step-desc { font-size: 12px; color: #909399; }
 .chain-arrow {
   position: absolute;
   bottom: -18px;

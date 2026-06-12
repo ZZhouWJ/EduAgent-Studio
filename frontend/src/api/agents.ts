@@ -8,15 +8,28 @@ export interface AgentRequest {
   difficulty: string
 }
 
-export interface AgentResult {
+export interface WorkflowResult {
   diagnosis: {
+    diagnosis_id: string
     weak_points: Array<{ kp_id: number; name: string; mastery_level: number; reason: string }>
+    strength_points: Array<{ kp_id: number; name: string; mastery_level: number }>
     learning_difficulties: string[]
     resource_needs: string[]
+    suggested_difficulty: string
   }
   plan: {
-    learning_path: Array<{ order: number; kp_name: string; estimated_time: string; resource_type: string; priority: string }>
+    plan_id: string
+    learning_path: Array<{
+      order: number
+      kp_id: number
+      kp_name: string
+      estimated_time: string
+      resource_type: string
+      priority: string
+    }>
     resource_combination: string[]
+    learning_sequence: string
+    estimated_total_time: string
   }
   resource: {
     resource_id: string
@@ -25,29 +38,65 @@ export interface AgentResult {
     content: string
     knowledge_points: number[]
     difficulty: string
+    target_audience: string
+    estimated_learning_time: string
+    generation_metadata: { agent: string; model: string }
   }
   assessment: {
-    accuracy_rate: number
+    assessment_id: string
+    test_results: { total_questions: number; correct_answers: number; accuracy_rate: number }
+    mastery_updates: Array<{ kp_id: number; old_mastery: number; new_mastery: number; change_reason: string }>
+    feedback: string
     suggestions: string[]
+    next_resource_recommendation: string
   }
   teacher_review_suggestion: {
+    review_id: string
     quality_score: number
     quality_checks: Array<{ check: string; passed: boolean; note: string }>
+    risk_alerts: Array<{ level: string; message: string }>
     suggestions: string[]
     overall_comment: string
   }
+  metadata: {
+    total_duration_ms: number
+    step_history: Array<{ step: string; status: string; timestamp: string; error?: string; duration_ms: number }>
+    quality_score: number
+    revision_count: number
+  }
+}
+
+export interface SaveResourceResponse {
+  resource_id: string
+  title: string
+  course_id: number
+  type: string
+  content: string
+  knowledge_points: number[]
+  difficulty: string
+  status: string
+  created_at: string
+  storage_path: string
+  storage_url: string
+  file_size: number
 }
 
 export const agentsApi = {
   generate(data: AgentRequest) {
-    return request.post<{ data: AgentResult }>("/api/agents/generate", data)
+    return request.post<{ data: WorkflowResult }>("/api/agents/generate", data)
   },
+
   getAgents() {
     return request.get<{ data: Array<{ id: string; name: string; description: string; type: string }> }>(
       "/api/agents/list"
     )
   },
-  saveResource(data: { result: AgentResult; title: string; course_id: number }) {
-    return request.post("/api/agents/save-resource", data)
+
+  saveResource(data: { result: WorkflowResult; title: string; course_id: number }) {
+    return request.post<{ data: SaveResourceResponse }>("/api/agents/save-resource", data)
+  },
+
+  getWorkflowStatus(runId: string) {
+    return request.get<{ data: WorkflowResult }>(`/api/agents/workflow/${runId}`)
   }
 }
