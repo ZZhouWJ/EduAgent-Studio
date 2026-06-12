@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from typing import List
 from app.services.agent_service import AgentService
-from app.services.auth_service import get_current_user
+from app.services.auth_service import get_current_user_dependency as get_current_user
 
 router = APIRouter(prefix="/agents", tags=["智能体工作台"])
 

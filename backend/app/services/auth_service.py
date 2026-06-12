@@ -435,3 +435,33 @@ def update_my_roles(
         ip_address=ip_address,
         user_agent=user_agent,
     )
+
+
+def _extract_token_from_header(authorization: str) -> str:
+    """从 Authorization: Bearer <token> 提取 token。"""
+    if not authorization:
+        return ""
+    parts = authorization.split(" ", 1)
+    if len(parts) == 2 and parts[0].lower() in ("bearer", "token"):
+        return parts[1]
+    return authorization
+
+
+def get_current_user_dependency(authorization: str = "") -> Dict[str, Any]:
+    """
+    FastAPI 依赖：从 Authorization: Bearer <token> 提取并验证用户。
+
+    用法（路由函数参数）：
+        @router.get("/xxx")
+        async def xxx(user: dict = Depends(get_current_user_dependency)):
+            ...
+
+    FastAPI 会自动从请求头注入 authorization 参数。
+    """
+    token = _extract_token_from_header(authorization)
+    if not token:
+        raise UnauthorizedException("缺少认证信息")
+    user = get_current_user(token)
+    if user is None:
+        raise UnauthorizedException("Token 无效或已过期")
+    return user

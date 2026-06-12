@@ -1,7 +1,7 @@
 """学习资源 API"""
 from fastapi import APIRouter, Depends, Query
 from typing import Optional
-from app.services.auth_service import get_current_user
+from app.services.auth_service import get_current_user_dependency as get_current_user
 
 router = APIRouter(prefix="/learning", tags=["学习资源"])
 

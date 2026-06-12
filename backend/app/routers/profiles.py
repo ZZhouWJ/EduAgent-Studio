@@ -1,7 +1,7 @@
 """学生画像 API"""
 from fastapi import APIRouter, Depends, Query
 from typing import Optional
-from app.services.auth_service import get_current_user
+from app.services.auth_service import get_current_user_dependency as get_current_user
 from app.services.profile_service import ProfileService
 
 router = APIRouter(prefix="/profiles", tags=["学生画像"])

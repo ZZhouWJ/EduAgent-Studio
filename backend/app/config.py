@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     server_host: str = Field(default="0.0.0.0", alias="SERVER_HOST")
     server_port: int = Field(default=8000, alias="SERVER_PORT")
 
+    # --- LLM 配置 ---
+    llm_provider: str = Field(default="openai_compatible", alias="LLM_PROVIDER")
+    llm_api_key: str = Field(default="", alias="LLM_API_KEY")
+    llm_base_url: str = Field(default="https://api.deepseek.com/v1", alias="LLM_BASE_URL")
+    llm_model: str = Field(default="deepseek-chat", alias="LLM_MODEL")
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
@@ -56,6 +62,20 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() == "production"
+
+    def llm_config(self, model_name: str = None) -> "LLMConfig":
+        """返回当前 LLM 配置。"""
+        from app.llm.gateway import LLMConfig as LLMConfigCls
+        return LLMConfigCls(
+            model_id=0,
+            model_name=model_name or self.llm_model,
+            provider=self.llm_provider,
+            api_key=self.llm_api_key,
+            base_url=self.llm_base_url,
+            temperature=0.7,
+            max_tokens=2048,
+            timeout=60,
+        )
 
 
 @lru_cache()

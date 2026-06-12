@@ -3,11 +3,51 @@
 
 分析学生画像、课程知识点和历史反馈，识别薄弱知识点和学习难点。
 """
+import json
 import logging
 import uuid
 from typing import Any, Dict, List, Optional
 
+from app.config import get_settings
+
 logger = logging.getLogger(__name__)
+
+PROMPT_DIAGNOSIS = """你是一个专业的学习诊断智能体。请根据以下学生信息，分析其薄弱知识点。
+
+## 学生画像
+- 姓名：{student_name}
+- 学号：{student_no}
+- 学习目标：{learning_goal}
+- 当前基础：{current_level}
+- AI 建议：{ai_suggestions}
+
+## 课程知识点掌握情况
+{knowledge_points}
+
+## 最近学习任务
+{recent_tasks}
+
+请以 JSON 格式输出诊断结果：
+{{
+  "weak_points": [
+    {{"kp_id": 1, "name": "知识点名称", "mastery_level": 0.3, "reason": "诊断理由"}}
+  ],
+  "strength_points": [
+    {{"kp_id": 2, "name": "知识点名称", "mastery_level": 0.85}}
+  ],
+  "learning_difficulties": ["学习困难1", "学习困难2"],
+  "resource_needs": ["资源需求1", "资源需求2"],
+  "suggested_difficulty": "intermediate"
+}}
+
+要求：
+- weak_points 列出 mastery_level < 0.5 的知识点，并给出简短诊断理由
+- strength_points 列出 mastery_level >= 0.5 的知识点
+- learning_difficulties 描述 2-3 个具体的学习困难
+- resource_needs 建议 2-3 种学习资源类型
+- suggested_difficulty 从 "basic" / "intermediate" / "advanced" 中选择
+- 只输出 JSON，不要有其他内容
+"""
 
 
 class DiagnosisAgent:
@@ -28,9 +68,69 @@ class DiagnosisAgent:
         """执行诊断"""
         logger.info(f"[{self.AGENT_NAME}] 诊断学生: {student_profile.get('student_name', 'Unknown')}")
 
+        kp_text = "\n".join(
+            f"- {kp.get('name', '')}: 掌握度 {kp.get('mastery_level', kp.get('mastery', 0)):.0%}"
+            for kp in knowledge_points
+        ) or "（暂无知识点数据）"
+
+        recent_tasks = student_profile.get("recent_tasks", []) or []
+        task_text = "\n".join(
+            f"- {t.get('title', '')} [状态: {t.get('status', '')}]"
+            for t in recent_tasks[:5]
+        ) or "（暂无学习任务记录）"
+
+        messages = [
+            {
+                "role": "user",
+                "content": PROMPT_DIAGNOSIS.format(
+                    student_name=student_profile.get("student_name", "未知"),
+                    student_no=student_profile.get("student_no", ""),
+                    learning_goal=student_profile.get("learning_goal", "未设置"),
+                    current_level=student_profile.get("current_level", "未知"),
+                    ai_suggestions=student_profile.get("ai_suggestions", "暂无"),
+                    knowledge_points=kp_text,
+                    recent_tasks=task_text,
+                )
+            }
+        ]
+
+        result = self._call_llm(messages)
+
+        if result:
+            return result
+
+        return self._fallback(knowledge_points)
+
+    def _call_llm(self, messages: List[Dict[str, str]]) -> Optional[Dict[str, Any]]:
+        if self.llm_gateway is None:
+            logger.warning(f"[{self.AGENT_NAME}] llm_gateway 未注入，使用规则回退")
+            return None
+
+        try:
+            settings = get_settings()
+            config = settings.llm_config()
+            llm_result = self.llm_gateway.generate(messages, config)
+            if llm_result.status == "failed":
+                logger.error(f"[{self.AGENT_NAME}] LLM 调用失败: {llm_result.error}")
+                return None
+            content = llm_result.content.strip()
+            if content.startswith("```"):
+                lines = content.split("\n")
+                content = "\n".join(lines[1:] if lines[0].startswith("```json") else lines)
+                content = content.replace("```", "").strip()
+            data = json.loads(content)
+            data["diagnosis_id"] = f"diag-{uuid.uuid4().hex[:8]}"
+            logger.info(f"[{self.AGENT_NAME}] LLM 诊断完成: {len(data.get('weak_points', []))} 个薄弱点")
+            return data
+        except json.JSONDecodeError as e:
+            logger.error(f"[{self.AGENT_NAME}] LLM 返回 JSON 解析失败: {e}, 内容: {llm_result.content[:200] if llm_result else 'N/A'}")
+        except Exception as e:
+            logger.error(f"[{self.AGENT_NAME}] LLM 调用异常: {e}")
+        return None
+
+    def _fallback(self, knowledge_points: List[Dict[str, Any]]) -> Dict[str, Any]:
         weak_points = []
         strong_points = []
-
         for kp in knowledge_points:
             mastery = kp.get("mastery_level", kp.get("mastery", 0.5))
             if mastery < 0.5:
@@ -38,7 +138,7 @@ class DiagnosisAgent:
                     "kp_id": kp.get("kp_id", 0),
                     "name": kp.get("name", ""),
                     "mastery_level": mastery,
-                    "reason": f"测验正确率仅{int(mastery * 100)}%，知识点掌握不足"
+                    "reason": f"掌握度 {mastery:.0%}，低于阈值"
                 })
             else:
                 strong_points.append({
@@ -46,15 +146,11 @@ class DiagnosisAgent:
                     "name": kp.get("name", ""),
                     "mastery_level": mastery
                 })
-
         return {
             "diagnosis_id": f"diag-{uuid.uuid4().hex[:8]}",
             "weak_points": weak_points,
             "strength_points": strong_points,
-            "learning_difficulties": [
-                "多表连接时条件判断容易混淆",
-                "子查询嵌套层次过深难以理解"
-            ],
+            "learning_difficulties": ["多表连接时条件判断容易混淆", "子查询嵌套层次过深难以理解"],
             "resource_needs": ["图文并茂的讲义", "具体案例演示", "补充练习题"],
             "suggested_difficulty": "intermediate"
         }
