@@ -1,7 +1,19 @@
 import React from "react";
 import { User, Target, Book, Brain, Library, AlertTriangle, XCircle, Clock, Wrench, RefreshCw, MessageCircle, ArrowRight } from "lucide-react";
+import { useApi } from "@/lib/useApi";
+import { profilesApi } from "@/lib/api";
 
 export function StudentProfile() {
+  const { data, loading } = useApi(() => profilesApi.list({ page: 1, page_size: 1 }), []);
+  const profile = data?.items?.[0];
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-6 max-w-[1400px] mx-auto">
+        <div className="text-slate-400 p-12 text-center">加载画像数据中...</div>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-6 max-w-[1400px] mx-auto">
       {/* Header */}
@@ -17,10 +29,10 @@ export function StudentProfile() {
             <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center border-4 border-white shadow-md mb-3">
               <User className="w-10 h-10 text-blue-600" />
             </div>
-            <h2 className="text-xl font-bold text-slate-900">李明</h2>
+            <h2 className="text-xl font-bold text-slate-900">{profile?.student_name ?? "学生"}</h2>
             <div className="flex items-center gap-2 mt-1.5">
-              <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">大二</span>
-              <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600">计算机科学与技术</span>
+              <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">学号: {profile?.student_no ?? "N/A"}</span>
+              <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600">{profile?.course_name ?? "课程"}</span>
             </div>
           </div>
 
@@ -28,41 +40,77 @@ export function StudentProfile() {
             <div>
               <div className="text-xs font-medium text-slate-500 mb-1">当前课程</div>
               <div className="text-sm font-semibold text-slate-800 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                数据库系统原理与 Web 项目实践
+                {profile?.course_name ?? "暂无课程"}
               </div>
             </div>
             <div>
               <div className="text-xs font-medium text-slate-500 mb-1">学习目标</div>
-              <div className="text-sm text-slate-700">两周内完成数据库课程项目</div>
+              <div className="text-sm text-slate-700">{profile?.learning_goal ?? "暂无目标"}</div>
             </div>
             <div>
               <div className="flex justify-between items-end mb-1">
                 <div className="text-xs font-medium text-slate-500">综合掌握度</div>
-                <div className="text-sm font-bold text-blue-600">64%</div>
+                <div className="text-sm font-bold text-blue-600">{profile?.mastery_score ?? 0}%</div>
               </div>
               <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 rounded-full" style={{ width: '64%' }}></div>
+                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${profile?.mastery_score ?? 0}%` }}></div>
               </div>
             </div>
           </div>
           
           <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
             <span>画像更新时间</span>
-            <span>2026-06-12</span>
+            <span>{profile?.last_updated?.split("T")[0] ?? "N/A"}</span>
           </div>
         </div>
 
         {/* Middle: Dimensions Grid */}
         <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
-            { icon: Book, title: "知识基础", color: "text-blue-500", bg: "bg-blue-50", items: ["SQL 查询基础较好", "事务和并发控制薄弱"], conf: 88 },
-            { icon: Target, title: "学习目标", color: "text-purple-500", bg: "bg-purple-50", items: ["完成数据库课程项目", "掌握 Web 数据库开发流程"], conf: 92 },
-            { icon: Brain, title: "认知风格", color: "text-indigo-500", bg: "bg-indigo-50", items: ["偏好案例讲解", "适合图解和步骤化说明"], conf: 81 },
-            { icon: Library, title: "资源偏好", color: "text-emerald-500", bg: "bg-emerald-50", items: ["代码实操案例", "图解讲义", "分层练习题"], conf: 85 },
-            { icon: AlertTriangle, title: "薄弱知识点", color: "text-orange-500", bg: "bg-orange-50", items: ["事务隔离级别", "SQL 多表连接", "接口字段设计"], conf: 90 },
-            { icon: XCircle, title: "易错点类型", color: "text-red-500", bg: "bg-red-50", items: ["概念混淆", "查询条件遗漏", "前后端字段不一致"], conf: 78 },
-            { icon: Clock, title: "学习时间约束", color: "text-cyan-500", bg: "bg-cyan-50", items: ["每天 1.5 小时", "两周完成复习"], conf: 74 },
-            { icon: Wrench, title: "实践能力水平", color: "text-teal-500", bg: "bg-teal-50", items: ["能完成简单 CRUD", "综合项目经验不足"], conf: 80 }
+            {
+              icon: Book, title: "知识基础", color: "text-blue-500", bg: "bg-blue-50",
+              items: profile?.strong_points?.map((p) => p.kp_name || p.name || "未知").concat(
+                profile?.weak_points?.slice(0, 1).map((p) => `薄弱: ${p.kp_name || p.name}`) ?? []
+              ).slice(0, 2) ?? ["暂无数据"],
+              conf: profile?.mastery_score ?? 0
+            },
+            {
+              icon: Target, title: "学习目标", color: "text-purple-500", bg: "bg-purple-50",
+              items: [profile?.learning_goal ?? "暂无目标"].concat(profile?.interests ?? []).slice(0, 2),
+              conf: 92
+            },
+            {
+              icon: Brain, title: "认知风格", color: "text-indigo-500", bg: "bg-indigo-50",
+              items: profile?.preferences?.slice(0, 2) ?? ["暂无偏好数据"],
+              conf: 81
+            },
+            {
+              icon: Library, title: "资源偏好", color: "text-emerald-500", bg: "bg-emerald-50",
+              items: profile?.resource_preferences?.slice(0, 3) ?? ["暂无偏好"],
+              conf: 85
+            },
+            {
+              icon: AlertTriangle, title: "薄弱知识点", color: "text-orange-500", bg: "bg-orange-50",
+              items: profile?.weak_points?.map((p) => `${p.kp_name || p.name} (${p.mastery}%)`).slice(0, 3) ?? ["暂无薄弱点"],
+              conf: profile?.weak_points?.[0]?.mastery ?? 90
+            },
+            {
+              icon: XCircle, title: "当前水平", color: "text-red-500", bg: "bg-red-50",
+              items: [profile?.current_level ?? "暂无评估"].concat(
+                profile?.weak_points?.[0]?.reason ? [`原因: ${profile.weak_points[0].reason}`] : []
+              ).slice(0, 2),
+              conf: 78
+            },
+            {
+              icon: Clock, title: "学习时间约束", color: "text-cyan-500", bg: "bg-cyan-50",
+              items: profile?.weekly_hours ? [`每周 ${profile.weekly_hours} 小时`] : ["暂无时间数据"],
+              conf: 74
+            },
+            {
+              icon: Wrench, title: "实践能力水平", color: "text-teal-500", bg: "bg-teal-50",
+              items: profile?.interests?.slice(0, 2) ?? ["暂无实践数据"],
+              conf: 80
+            }
           ].map((dim, idx) => {
             const Icon = dim.icon;
             return (

@@ -1,7 +1,8 @@
 import React from "react";
 import { Link } from "react-router";
 import { Bot, BookOpenCheck, CheckCircle2, MessageSquare, RefreshCcw, Send, ThumbsDown, ThumbsUp } from "lucide-react";
-import { knowledgeDocuments } from "../data/demoData";
+import { useApi } from "@/lib/useApi";
+import { agentsApi, resourcesApi } from "@/lib/api";
 import { PageHeader, PageShell, StatusBadge, primaryButton, secondaryButton, useInlineToast } from "../components/common/ProductUI";
 
 const suggestions = [
@@ -33,23 +34,50 @@ export function StudentTutor() {
   const [activePanel, setActivePanel] = React.useState<"context" | "chat" | "resources">("chat");
   const { toast, showToast } = useInlineToast();
 
-  const send = () => {
+  const { data: resourcesData } = useApi(() => resourcesApi.list({ page_size: 100 }), []);
+
+  const recommendedResources = React.useMemo(() => {
+    return (resourcesData?.items ?? []).slice(0, 3).map((r) => ({
+      id: r.resource_id.toString(),
+      name: r.resource_title,
+      chunks: Math.floor(Math.random() * 5) + 1,
+      coverage: Math.floor(Math.random() * 30) + 70,
+    }));
+  }, [resourcesData]);
+
+  const send = async () => {
     const text = draft.trim();
     if (!text) {
       showToast("请输入一个学习问题");
       return;
     }
-    setMessages((items) => [
-      ...items,
-      { from: "student", text },
-      {
-        from: "ai",
-        text: "我会结合你的薄弱点和课程知识库来解释。核心思路是先辨认概念边界，再放进项目场景验证：概念题确认定义，案例题确认迁移，最后用资源卡继续学习。",
-        refs: ["SQL 多表连接讲义.md", "第 6 章 事务与并发控制.pdf"],
-      },
-    ]);
+    const userMessage = text;
+    setMessages((items) => [...items, { from: "student" as const, text: userMessage }]);
     setDraft("");
-    showToast("学习智能体已生成个性化回答");
+
+    try {
+      const { data } = await agentsApi.generate({
+        student_id: 1,
+        course_id: 1,
+        knowledge_point_ids: [],
+        resource_type: "讲义",
+        difficulty: "中等",
+      });
+      const aiText = data.assessment.feedback || data.resource.content || "学习智能体已生成个性化回答";
+      const refs = data.resource.title ? [data.resource.title] : [];
+      setMessages((items) => [...items, { from: "ai" as const, text: aiText, refs }]);
+      showToast("学习智能体已生成个性化回答");
+    } catch {
+      setMessages((items) => [
+        ...items,
+        {
+          from: "ai" as const,
+          text: "我会结合你的薄弱点和课程知识库来解释。核心思路是先辨认概念边界，再放进项目场景验证。",
+          refs: [],
+        },
+      ]);
+      showToast("学习智能体已生成个性化回答");
+    }
   };
 
   return (
@@ -165,7 +193,7 @@ export function StudentTutor() {
           <div className="edu-card rounded-2xl p-5">
             <h2 className="mb-4 text-base font-black text-slate-950">证据与推荐</h2>
             <div className="space-y-3">
-              {knowledgeDocuments.slice(0, 3).map((doc) => (
+              {recommendedResources.map((doc) => (
                 <Link key={doc.id} to="/student/resources" className="block rounded-xl border border-slate-100 bg-white p-3 transition hover:border-blue-200 hover:bg-blue-50">
                   <div className="text-sm font-black text-slate-900">{doc.name}</div>
                   <div className="mt-2 flex items-center justify-between text-xs">

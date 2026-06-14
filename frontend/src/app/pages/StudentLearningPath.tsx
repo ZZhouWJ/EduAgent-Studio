@@ -1,25 +1,8 @@
 import React from "react";
 import { Link } from "react-router";
 import { ArrowRight, BookOpenCheck, CheckCircle2, CircleDot, Clock3, Code2, Network, Route, Target } from "lucide-react";
-
-const PATH_NODES = [
-  { name: "关系模型", state: "done" },
-  { name: "SQL 查询", state: "done" },
-  { name: "多表连接", state: "warn" },
-  { name: "子查询", state: "done" },
-  { name: "事务", state: "weak" },
-  { name: "并发控制", state: "weak" },
-  { name: "事务隔离级别", state: "current" },
-  { name: "索引优化", state: "warn" },
-  { name: "Web 数据库项目实践", state: "next" },
-];
-
-const PATH_STEPS = [
-  { title: "多表连接补强", reason: "先补齐事务案例中的查询依赖", resource: "SQL 多表连接分层练习题", time: "25 分钟", status: "进行中" },
-  { title: "事务隔离级别基础理解", reason: "当前主要薄弱点，掌握度 32%", resource: "事务隔离级别图解讲义", time: "35 分钟", status: "当前推荐" },
-  { title: "并发控制案例学习", reason: "通过银行转账案例理解脏读、幻读", resource: "银行转账并发动画脚本", time: "20 分钟", status: "待学习" },
-  { title: "综合实验实践", reason: "将知识迁移到 Web 数据库项目", resource: "FastAPI + PostgreSQL 实操案例", time: "45 分钟", status: "待学习" },
-];
+import { useApi } from "@/lib/useApi";
+import { learningApi } from "@/lib/api";
 
 const stateClass: Record<string, string> = {
   done: "border-emerald-200 bg-emerald-50 text-emerald-700",
@@ -30,6 +13,56 @@ const stateClass: Record<string, string> = {
 };
 
 export function StudentLearningPath() {
+  const { data: coursesData } = useApi(() => learningApi.listCourses(), []);
+  const courseId = coursesData?.[0]?.id;
+  const { data: pathData, loading } = useApi(
+    () => (courseId ? learningApi.getLearningPath(courseId) : Promise.resolve(null)),
+    [courseId]
+  );
+
+  const pathNodes = React.useMemo(() => {
+    return (pathData?.nodes ?? []).map((node) => ({
+      name: node.kp_name || node.name,
+      state: node.status_label === "已掌握" ? "done"
+        : node.status_label === "薄弱点" ? "weak"
+        : node.status_label === "当前学习点" ? "current"
+        : node.mastery_level < 50 ? "weak"
+        : node.mastery_level < 80 ? "warn"
+        : "done",
+    }));
+  }, [pathData]);
+
+  const pathSteps = React.useMemo(() => {
+    return (pathData?.nodes ?? [])
+      .filter((n) => n.status_label === "当前学习点" || n.status_label === "薄弱点" || n.status_label === "待学习")
+      .slice(0, 4)
+      .map((node) => ({
+        title: node.kp_name || node.name,
+        reason: node.description || "根据画像推荐",
+        resource: node.kp_name ? `${node.kp_name}相关学习资源` : "推荐学习资源",
+        time: node.estimated_hours ? `${node.estimated_hours} 小时` : "30 分钟",
+        status: node.status_label === "当前学习点" ? "当前推荐" : node.status_label,
+      }));
+  }, [pathData]);
+
+  const displayNodes = pathNodes.length > 0 ? pathNodes : [
+    { name: "关系模型", state: "done" },
+    { name: "SQL 查询", state: "done" },
+    { name: "多表连接", state: "warn" },
+    { name: "子查询", state: "done" },
+    { name: "事务", state: "weak" },
+    { name: "并发控制", state: "weak" },
+    { name: "事务隔离级别", state: "current" },
+    { name: "索引优化", state: "warn" },
+    { name: "Web 数据库项目实践", state: "next" },
+  ];
+
+  const displaySteps = pathSteps.length > 0 ? pathSteps : [
+    { title: "多表连接补强", reason: "先补齐事务案例中的查询依赖", resource: "SQL 多表连接分层练习题", time: "25 分钟", status: "进行中" },
+    { title: "事务隔离级别基础理解", reason: "当前主要薄弱点，掌握度 32%", resource: "事务隔离级别图解讲义", time: "35 分钟", status: "当前推荐" },
+    { title: "并发控制案例学习", reason: "通过银行转账案例理解脏读、幻读", resource: "银行转账并发动画脚本", time: "20 分钟", status: "待学习" },
+    { title: "综合实验实践", reason: "将知识迁移到 Web 数据库项目", resource: "FastAPI + PostgreSQL 实操案例", time: "45 分钟", status: "待学习" },
+  ];
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
       <section className="flex items-start justify-between gap-6">
@@ -61,10 +94,13 @@ export function StudentLearningPath() {
 
           <div className="relative rounded-[24px] border border-slate-100 bg-slate-50/70 p-8">
             <div className="absolute inset-0 edu-grid-bg opacity-50" />
+            {loading ? (
+              <div className="text-center py-8 text-slate-400">加载学习路径中...</div>
+            ) : (
             <div className="relative grid grid-cols-3 gap-5">
-              {PATH_NODES.map((node, index) => (
+              {displayNodes.map((node, index) => (
                 <div key={node.name} className="relative">
-                  {index < PATH_NODES.length - 1 && index % 3 !== 2 && (
+                  {index < displayNodes.length - 1 && index % 3 !== 2 && (
                     <div className="absolute left-full top-1/2 h-px w-5 bg-slate-200" />
                   )}
                   <div className={`rounded-2xl border p-4 ${stateClass[node.state]}`}>
@@ -103,7 +139,7 @@ export function StudentLearningPath() {
             当前推荐路径
           </h2>
           <div className="space-y-4">
-            {PATH_STEPS.map((step, index) => (
+            {displaySteps.map((step, index) => (
               <div key={step.title} className="rounded-2xl border border-slate-100 bg-white p-4">
                 <div className="mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -125,6 +161,8 @@ export function StudentLearningPath() {
                 </div>
               </div>
             ))}
+            </div>
+            )}
           </div>
         </div>
       </section>

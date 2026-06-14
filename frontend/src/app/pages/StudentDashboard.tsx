@@ -17,6 +17,8 @@ import {
   Target,
   Timer,
 } from "lucide-react";
+import { useApi } from "@/lib/useApi";
+import { learningApi, statisticsApi } from "@/lib/api";
 
 const STUDENT_STATS = [
   { label: "综合掌握度", value: "64%", hint: "较上次 +4%", icon: BarChart3, tone: "blue" },
@@ -50,6 +52,20 @@ const toneClass: Record<string, string> = {
 };
 
 export function StudentDashboard() {
+  const { data: learningData, loading: learningLoading } = useApi(() => learningApi.listCourses(), []);
+  const { data: tasksData, loading: tasksLoading } = useApi(() => learningApi.listTasks({ page_size: 100 }), []);
+  const { data: statsData } = useApi(() => statisticsApi.learningOverview(), []);
+
+  const courseName = learningData?.[0]?.name ?? "数据库系统原理与 Web 项目实践";
+  const studentName = "同学";
+
+  const inProgressTasks = React.useMemo(() => {
+    return (tasksData?.items ?? []).filter((t) => t.status === "in_progress").slice(0, 5);
+  }, [tasksData]);
+
+  const allTasks = React.useMemo(() => {
+    return tasksData?.items ?? [];
+  }, [tasksData]);
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
       <section className="edu-card relative overflow-hidden rounded-[24px] p-7">
@@ -95,7 +111,13 @@ export function StudentDashboard() {
       </section>
 
       <section className="grid grid-cols-5 gap-4">
-        {STUDENT_STATS.map((stat) => {
+        {[
+          { label: "综合掌握度", value: `${statsData?.avg_mastery ?? 64}%`, hint: "当前课程整体水平", icon: BarChart3, tone: "blue" },
+          { label: "待完成任务", value: `${statsData?.active_tasks ?? 5}`, hint: "本周学习任务", icon: CheckCircle2, tone: "purple" },
+          { label: "课程数量", value: `${learningData?.length ?? 1}`, hint: "已选课程", icon: Timer, tone: "emerald" },
+          { label: "资源总数", value: `${statsData?.resource_count ?? 12}`, hint: "可用学习资源", icon: FileText, tone: "orange" },
+          { label: "反馈次数", value: `${statsData?.feedback_count ?? 3}`, hint: "已提交反馈", icon: Target, tone: "red" },
+        ].map((stat) => {
           const Icon = stat.icon;
           return (
             <div key={stat.label} className="edu-card edu-card-hover rounded-2xl p-4">
@@ -121,7 +143,26 @@ export function StudentDashboard() {
           </div>
 
           <div className="space-y-3">
-            {TODAY_PATH.map((step, index) => (
+            {inProgressTasks.length > 0 ? inProgressTasks.map((step, index) => (
+              <div key={step.id} className="grid grid-cols-[36px_1fr_auto] items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
+                <div className={`grid h-9 w-9 place-items-center rounded-xl text-xs font-black ring-1 ${step.status === "completed" ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : step.status === "in_progress" ? "bg-blue-600 text-white ring-blue-200" : "bg-white text-slate-500 ring-slate-200"}`}>
+                  {index + 1}
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h4 className="text-sm font-black text-slate-900">{step.title}</h4>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-slate-500 ring-1 ring-slate-100">{step.type}</span>
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">{step.description}</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs font-black text-slate-700">{step.status}</div>
+                  <div className={`mt-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${step.status === "in_progress" ? "bg-blue-50 text-blue-700" : step.status === "completed" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                    {step.status}
+                  </div>
+                </div>
+              </div>
+            )) : TODAY_PATH.map((step, index) => (
               <div key={step.title} className="grid grid-cols-[36px_1fr_auto] items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
                 <div className={`grid h-9 w-9 place-items-center rounded-xl text-xs font-black ring-1 ${step.status === "已完成" ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : step.status === "当前" ? "bg-blue-600 text-white ring-blue-200" : "bg-white text-slate-500 ring-slate-200"}`}>
                   {index + 1}

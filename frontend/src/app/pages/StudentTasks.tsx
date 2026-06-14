@@ -1,7 +1,8 @@
 import React from "react";
 import { Link } from "react-router";
 import { BookOpenCheck, CheckCircle2, Clock3, FileText, MessageSquare, PlayCircle, Target } from "lucide-react";
-import { studentTasks } from "../data/demoData";
+import { useApi } from "@/lib/useApi";
+import { learningApi } from "@/lib/api";
 import { DetailDrawer, EmptyState, PageHeader, ProgressBar, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast } from "../components/common/ProductUI";
 
 const statusOptions = ["全部", "进行中", "未开始", "已完成"];
@@ -9,20 +10,33 @@ const statusOptions = ["全部", "进行中", "未开始", "已完成"];
 export function StudentTasks() {
   const [query, setQuery] = React.useState("");
   const [status, setStatus] = React.useState("全部");
-  const [selected, setSelected] = React.useState<(typeof studentTasks)[number] | null>(null);
+  const [selected, setSelected] = React.useState<{ id: number; title: string; course_name: string; type: string; status: string; priority: string; description: string } | null>(null);
   const [completed, setCompleted] = React.useState<string[]>([]);
   const { toast, showToast } = useInlineToast();
 
+  const { data: tasksData, loading } = useApi(() => learningApi.listTasks({ page_size: 100 }), []);
+
+  const allTasks = React.useMemo(() => {
+    return (tasksData?.items ?? []).map((task) => ({
+      ...task,
+      id: task.id.toString(),
+      course: task.course_name,
+      knowledge: task.type,
+      progress: task.status === "completed" ? 100 : task.status === "in_progress" ? 50 : 0,
+      section: task.status === "in_progress" ? "今日任务" : task.status === "not_started" ? "本周任务" : "已完成任务",
+    }));
+  }, [tasksData]);
+
   const normalized = query.trim().toLowerCase();
-  const tasks = studentTasks
+  const tasks = allTasks
     .map((task) => (completed.includes(task.id) ? { ...task, status: "已完成", progress: 100 } : task))
     .filter((task) => (status === "全部" ? true : task.status === status))
     .filter((task) => !normalized || `${task.title}${task.knowledge}`.toLowerCase().includes(normalized));
 
   const stats = [
-    { label: "待完成任务", value: "3", hint: "今日 2 项", icon: Target, tone: "orange" as const },
-    { label: "进行中任务", value: "2", hint: "平均进度 56%", icon: PlayCircle, tone: "blue" as const },
-    { label: "已完成任务", value: `${1 + completed.length}`, hint: "本周持续更新", icon: CheckCircle2, tone: "emerald" as const },
+    { label: "待完成任务", value: String(allTasks.filter((t) => t.status === "not_started").length), hint: "本周任务", icon: Target, tone: "orange" as const },
+    { label: "进行中任务", value: String(allTasks.filter((t) => t.status === "in_progress").length), hint: "今日任务", icon: PlayCircle, tone: "blue" as const },
+    { label: "已完成任务", value: String(allTasks.filter((t) => t.status === "completed").length + completed.length), hint: "本周持续更新", icon: CheckCircle2, tone: "emerald" as const },
     { label: "今日建议学习时长", value: "45 分钟", hint: "拆分为轻任务", icon: Clock3, tone: "purple" as const },
   ];
 
@@ -48,7 +62,11 @@ export function StudentTasks() {
         </div>
       </section>
 
-      {tasks.length === 0 ? (
+      {loading ? (
+        <div className="edu-card rounded-2xl p-12 text-center">
+          <div className="text-slate-400">加载任务数据中...</div>
+        </div>
+      ) : tasks.length === 0 ? (
         <EmptyState title="没有匹配的学习任务" description="调整搜索词或状态筛选后，系统会重新展示符合条件的任务。" action={<button className={secondaryButton} onClick={() => { setQuery(""); setStatus("全部"); }}>清空筛选</button>} />
       ) : (
         ["今日任务", "本周任务", "已完成任务"].map((section) => {
@@ -92,13 +110,13 @@ export function StudentTasks() {
         })
       )}
 
-      {selected && <DetailDrawer title={selected.title} subtitle={`${selected.course} / ${selected.knowledge}`} open={!!selected} onClose={() => setSelected(null)}>
+      {selected && <DetailDrawer title={selected.title} subtitle={`${selected.course_name} / ${selected.type}`} open={!!selected} onClose={() => setSelected(null)}>
         <div className="space-y-5">
           {[
-            ["任务目标", selected.objective],
-            ["测验要求", selected.quiz],
-            ["完成标准", selected.standard],
-            ["智能体推荐理由", selected.agentReason],
+            ["任务描述", selected.description],
+            ["任务类型", selected.type],
+            ["优先级", selected.priority],
+            ["当前状态", selected.status],
           ].map(([label, value]) => (
             <div key={label} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
               <h3 className="text-sm font-black text-slate-900">{label}</h3>
