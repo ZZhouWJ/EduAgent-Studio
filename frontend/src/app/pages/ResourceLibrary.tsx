@@ -1,70 +1,68 @@
 import React from "react";
 import { Search, Filter, FileText, CheckCircle2, AlertCircle, PlayCircle, Code, ListTree, MoreVertical } from "lucide-react";
+import { useApi } from "@/lib/useApi";
+import { resourcesApi } from "@/lib/api";
 
-const RESOURCES = [
-  {
-    title: "事务隔离级别图解讲义",
-    type: "课程讲义",
-    course: "数据库系统原理与 Web 项目实践",
-    student: "李明",
-    tag: "事务隔离级别",
-    diff: "基础",
-    status: "待审核",
-    conf: 86,
-    refs: 3,
-    time: "10分钟前",
-    icon: FileText,
-    iconColor: "text-blue-500",
-    iconBg: "bg-blue-50"
-  },
-  {
-    title: "SQL 多表连接分层练习题",
-    type: "题库",
-    course: "数据库系统原理与 Web 项目实践",
-    student: "李明",
-    tag: "多表连接",
-    diff: "进阶",
-    status: "已通过",
-    conf: 91,
-    refs: 5,
-    time: "2小时前",
-    icon: ListTree,
-    iconColor: "text-purple-500",
-    iconBg: "bg-purple-50"
-  },
-  {
-    title: "FastAPI + PostgreSQL 实操案例",
-    type: "代码案例",
-    course: "数据库系统原理与 Web 项目实践",
-    student: "李明",
-    tag: "Web 数据库项目",
-    diff: "标准",
-    status: "待审核",
-    conf: 84,
-    refs: 2,
-    time: "1天前",
-    icon: Code,
-    iconColor: "text-emerald-500",
-    iconBg: "bg-emerald-50"
-  },
-  {
-    title: "B+树索引结构动画分镜脚本",
-    type: "视频脚本",
-    course: "数据库系统原理与 Web 项目实践",
-    student: "王华",
-    tag: "索引优化",
-    diff: "基础",
-    status: "被退回",
-    conf: 72,
-    refs: 1,
-    time: "2天前",
-    icon: PlayCircle,
-    iconColor: "text-orange-500",
-    iconBg: "bg-orange-50"
+interface Resource {
+  title: string
+  type: string
+  course: string
+  student: string
+  tag: string
+  diff: string
+  status: string
+  conf: number
+  refs: number
+  time: string
+  icon: React.ComponentType<{ className?: string }>
+  iconColor: string
+  iconBg: string
+}
+
+const TYPE_ICON_MAP: Record<string, { icon: React.ComponentType<{ className?: string }>; iconColor: string; iconBg: string }> = {
+  "课程讲义": { icon: FileText, iconColor: "text-blue-500", iconBg: "bg-blue-50" },
+  "题库": { icon: ListTree, iconColor: "text-purple-500", iconBg: "bg-purple-50" },
+  "代码案例": { icon: Code, iconColor: "text-emerald-500", iconBg: "bg-emerald-50" },
+  "视频脚本": { icon: PlayCircle, iconColor: "text-orange-500", iconBg: "bg-orange-50" },
+};
+
+function formatTimeAgo(dateStr: string): string {
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (diff < 60) return `${diff}秒前`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
+    return `${Math.floor(diff / 86400)}天前`;
+  } catch {
+    return dateStr;
   }
-];
+}
 
 export function ResourceLibrary() {
+  const [typeFilter, setTypeFilter] = React.useState("");
+  const { data, loading } = useApi(() => resourcesApi.list({ type: typeFilter || undefined, page_size: 100 }), [typeFilter]);
+
+  const resources: Resource[] = (data?.items ?? []).map((r) => {
+    const iconInfo = TYPE_ICON_MAP[r.resource_type] ?? { icon: FileText, iconColor: "text-slate-500", iconBg: "bg-slate-50" };
+    return {
+      title: r.resource_title,
+      type: r.resource_type,
+      course: r.course_name,
+      student: "—",
+      tag: "—",
+      diff: r.difficulty,
+      status: r.status,
+      conf: 80,
+      refs: 0,
+      time: formatTimeAgo(r.created_at),
+      icon: iconInfo.icon,
+      iconColor: iconInfo.iconColor,
+      iconBg: iconInfo.iconBg,
+    };
+  });
+
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto h-full flex flex-col">
       <div className="shrink-0">
@@ -103,9 +101,10 @@ export function ResourceLibrary() {
       <div className="flex gap-2 shrink-0 border-b border-slate-200">
         {["全部", "课程讲义", "思维导图", "分层练习题", "代码实操案例", "PPT 大纲", "视频/动画脚本"].map((tab, i) => (
           <button 
-            key={i} 
+            key={tab} 
+            onClick={() => setTypeFilter(tab === "全部" ? "" : tab)}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              i === 0 
+              (tab === "全部" && !typeFilter) || (typeFilter === tab)
                 ? "border-blue-600 text-blue-600" 
                 : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
             }`}
@@ -115,8 +114,14 @@ export function ResourceLibrary() {
         ))}
       </div>
 
+      {loading ? (
+        <div className="flex items-center justify-center h-32 text-slate-400">加载中...</div>
+      ) : (
       <div className="flex-1 overflow-y-auto min-h-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-max">
-        {RESOURCES.map((res, i) => {
+        {resources.length === 0 ? (
+          <div className="col-span-full flex items-center justify-center h-32 text-slate-400">暂无资源</div>
+        ) : (
+        resources.map((res, i) => {
           const Icon = res.icon;
           return (
             <div key={i} className="bg-white rounded-2xl p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col group">
@@ -170,8 +175,10 @@ export function ResourceLibrary() {
               </div>
             </div>
           );
-        })}
+        })
+        )}
       </div>
+      )}
     </div>
   );
 }

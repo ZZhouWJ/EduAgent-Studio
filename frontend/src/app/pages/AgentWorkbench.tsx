@@ -25,9 +25,13 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+import { useApi } from "@/lib/useApi";
+import { agentsApi, learningApi, modelsApi } from "@/lib/api";
+import { useInlineToast } from "../components/common/ProductUI";
 
 const RESOURCE_TYPES = ["课程讲义", "思维导图", "分层练习题", "代码实操案例", "PPT 大纲", "视频/动画脚本"];
 
+// TODO: 后端暂无多智能体执行链路端点，保持静态展示
 const AGENT_STEPS = [
   {
     name: "班级诊断智能体",
@@ -126,6 +130,14 @@ function stepClasses(state: string) {
 }
 
 export function AgentWorkbench() {
+  const { toast, showToast } = useInlineToast();
+  const { data: courseList } = useApi(() => learningApi.listCourses(), []);
+  const { data: modelData } = useApi(() => modelsApi.getModels({ status: "active" }), []);
+
+  // TODO: agentsApi.generate() 需要课程ID、学生ID、知识点ID等参数，暂未接入表单状态
+
+  const activeModel = modelData?.items?.[0]?.display_name ?? "讯飞星火";
+  const defaultCourse = courseList?.[0]?.name ?? "数据库系统原理与 Web 项目实践";
   return (
     <div className="page-shell flex min-h-0 flex-col">
       <div className="flex shrink-0 flex-col items-stretch justify-between gap-4 lg:flex-row lg:items-start lg:gap-6">
@@ -142,9 +154,9 @@ export function AgentWorkbench() {
 
         <div className="grid shrink-0 grid-cols-1 gap-2 text-sm sm:grid-cols-3 lg:max-w-[620px]">
           {[
-            ["当前课程", "数据库系统原理与 Web 项目实践"],
+            ["当前课程", defaultCourse],
             ["生成对象", "数据库 22-1 班 / 李明等 12 人"],
-            ["模型模式", "讯飞星火"],
+            ["模型模式", activeModel],
           ].map(([label, value]) => (
             <div key={label} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
               <div className="text-[11px] font-bold text-slate-400">{label}</div>
@@ -169,7 +181,11 @@ export function AgentWorkbench() {
               <div>
                 <label className="mb-1.5 block text-sm font-bold text-slate-700">选择课程</label>
                 <select className="edu-focus-ring h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700">
-                  <option>数据库系统原理与 Web 项目实践</option>
+                  {courseList?.length ? (
+                    courseList.map((c) => <option key={c.id}>{c.name}</option>)
+                  ) : (
+                    <option>数据库系统原理与 Web 项目实践</option>
+                  )}
                 </select>
               </div>
 
@@ -253,7 +269,11 @@ export function AgentWorkbench() {
             </div>
 
             <div className="mt-5 space-y-3 border-t border-slate-100 pt-5">
-              <button className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(110deg,#2563EB,#7C3AED)] text-sm font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.24)] transition hover:shadow-[0_18px_36px_rgba(37,99,235,0.32)]">
+              <button
+                onClick={() => {
+                  showToast("智能体生成已启动（API 接入待完成表单状态）");
+                }}
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(110deg,#2563EB,#7C3AED)] text-sm font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.24)] transition hover:shadow-[0_18px_36px_rgba(37,99,235,0.32)]">
                 <Play className="h-4 w-4" />
                 启动智能体生成
               </button>
@@ -421,6 +441,7 @@ export function AgentWorkbench() {
           </div>
         </aside>
       </div>
+      {toast}
     </div>
   );
 }

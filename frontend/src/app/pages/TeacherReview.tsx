@@ -1,7 +1,32 @@
 import React from "react";
 import { CheckCircle2, AlertCircle, Eye, AlertTriangle, MessageSquare, ShieldCheck, Download, MoreHorizontal } from "lucide-react";
+import { useApi } from "@/lib/useApi";
+import { reviewsApi } from "@/lib/api";
+
+function formatTimeAgo(dateStr: string): string {
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (diff < 60) return `${diff}秒前`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
+    return `${Math.floor(diff / 86400)}天前`;
+  } catch {
+    return dateStr;
+  }
+}
 
 export function TeacherReview() {
+  const [selectedId, setSelectedId] = React.useState<number | null>(null);
+  const { data: pendingData, loading: loadingPending } = useApi(() => reviewsApi.getPending({ page: 1, page_size: 20 }), []);
+  const { data: selectedDetail, loading: loadingDetail } = useApi(
+    () => selectedId != null ? reviewsApi.getById(selectedId) : Promise.resolve(null),
+    [selectedId]
+  );
+
+  const pendingList = pendingData?.items ?? [];
+  const currentItem = selectedDetail ?? pendingList.find((r) => r.request_id === selectedId) ?? pendingList[0];
   return (
     <div className="page-shell flex min-h-0 flex-col pb-6">
       <div className="shrink-0">
@@ -21,32 +46,29 @@ export function TeacherReview() {
           </div>
           
           <div className="custom-scrollbar flex-1 space-y-3 overflow-y-auto pb-4 pr-0 lg:pr-2">
-            {[
-              { title: "事务隔离级别图解讲义", student: "李明", type: "课程讲义", conf: 86, risk: "低", active: true },
-              { title: "B+树索引结构原理", student: "王华", type: "PPT 大纲", conf: 72, risk: "高", active: false },
-              { title: "SQL 多表连接复杂查询", student: "赵强", type: "代码案例", conf: 81, risk: "中", active: false },
-              { title: "数据库范式判断练习", student: "李明", type: "分层练习题", conf: 89, risk: "低", active: false },
-            ].map((item, i) => (
-              <div key={i} className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                item.active 
+            {loadingPending ? (
+              <div className="flex items-center justify-center h-32 text-slate-400">加载中...</div>
+            ) : pendingList.length === 0 ? (
+              <div className="flex items-center justify-center h-32 text-slate-400">暂无待审核资源</div>
+            ) : (
+            pendingList.map((item) => (
+              <div key={item.request_id} onClick={() => setSelectedId(item.request_id)} className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                item.request_id === selectedId 
                   ? "bg-blue-50 border-blue-200 shadow-sm" 
                   : "bg-white border-slate-200 hover:border-blue-300 hover:shadow-md"
               }`}>
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className={`font-bold text-[15px] ${item.active ? "text-blue-900" : "text-slate-800"}`}>{item.title}</h3>
-                  {item.risk === '高' && <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />}
-                  {item.risk === '中' && <AlertCircle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />}
+                  <h3 className={`font-bold text-[15px] ${item.request_id === selectedId ? "text-blue-900" : "text-slate-800"}`}>{item.output_title}</h3>
                 </div>
                 <div className="flex flex-wrap gap-2 mb-3">
-                  <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[11px]">{item.type}</span>
-                  <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[11px]">学生：{item.student}</span>
+                  <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[11px]">学生：{item.submitter_real_name}</span>
                 </div>
                 <div className="flex justify-between items-center text-xs">
-                  <span className="text-slate-500">可信度评分: <span className="font-bold text-emerald-600">{item.conf}%</span></span>
-                  <span className="text-slate-400">10分钟前提交</span>
+                  <span className="text-slate-400">{formatTimeAgo(item.created_at)}提交</span>
                 </div>
               </div>
-            ))}
+            ))
+            )}
           </div>
         </div>
 
@@ -56,9 +78,9 @@ export function TeacherReview() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-bold">课程讲义</span>
-                <span className="text-sm text-slate-500">适用学生：李明</span>
+                <span className="text-sm text-slate-500">适用学生：{currentItem?.submitter_real_name ?? "—"}</span>
               </div>
-              <h2 className="text-xl font-bold text-slate-900">事务隔离级别图解讲义</h2>
+              <h2 className="text-xl font-bold text-slate-900">{currentItem?.output_title ?? "—"}</h2>
             </div>
             <div className="flex gap-2">
               <button className="flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 hover:bg-slate-50">
@@ -68,6 +90,10 @@ export function TeacherReview() {
           </div>
 
           <div className="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
+            {loadingDetail ? (
+              <div className="flex items-center justify-center h-48 text-slate-400">加载详情中...</div>
+            ) : (
+            <>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
               <div className="space-y-4">
                 <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
@@ -127,8 +153,8 @@ export function TeacherReview() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">是否适合当前学生 (李明)</label>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">是否适合当前学生 ({currentItem?.submitter_real_name ?? "—"})</label>
                   <div className="flex flex-wrap gap-4">
                     <label className="flex min-h-11 cursor-pointer items-center gap-2">
                       <input type="radio" name="fit" className="text-blue-600 w-4 h-4 focus:ring-blue-500" defaultChecked />
@@ -151,6 +177,8 @@ export function TeacherReview() {
                 </div>
               </div>
             </div>
+            </>
+            )}
           </div>
 
           <div className="flex shrink-0 flex-col gap-3 border-t border-slate-100 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">

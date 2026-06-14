@@ -1,23 +1,40 @@
 import React from "react";
 import { Database, FileUp, GitBranch, Layers3, SearchCheck, Sparkles } from "lucide-react";
-import { knowledgeDocuments, knowledgePoints } from "../data/demoData";
+import { useApi } from "@/lib/useApi";
+import { learningApi } from "@/lib/api";
 import { DetailDrawer, PageHeader, PageShell, ProgressBar, SearchInput, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast } from "../components/common/ProductUI";
 
 export function TeacherKnowledgeBase() {
   const [query, setQuery] = React.useState("可重复读和串行化的区别");
-  const [selected, setSelected] = React.useState<(typeof knowledgeDocuments)[number] | null>(null);
+  const [selected, setSelected] = React.useState<{ id: string; name: string; type: string; chunks: number; coverage: number; updatedAt: string; owner: string } | null>(null);
   const [tested, setTested] = React.useState(true);
   const [activePanel, setActivePanel] = React.useState<"documents" | "graph" | "search">("documents");
   const { toast, showToast } = useInlineToast();
 
+  // TODO: 后端暂无真正的 RAG 知识库端点，用 learningApi.listCourses() 课程列表作为入口占位
+  const { data: courseList, loading } = useApi(() => learningApi.listCourses(), []);
+
   const stats = [
-    { label: "课程文档", value: "6", hint: "结构化解析", icon: FileUp, tone: "blue" as const },
+    { label: "课程文档", value: String(courseList?.length ?? "—"), hint: "结构化解析", icon: FileUp, tone: "blue" as const },
     { label: "知识点", value: "16", hint: "含依赖关系", icon: GitBranch, tone: "purple" as const },
     { label: "知识片段", value: "128", hint: "可追溯引用", icon: Layers3, tone: "emerald" as const },
     { label: "最近检索", value: "42", hint: "今日", icon: SearchCheck, tone: "cyan" as const },
     { label: "引用覆盖率", value: "82%", hint: "高于阈值", icon: Database, tone: "orange" as const },
     { label: "待补充资料", value: "2", hint: "实验说明", icon: Sparkles, tone: "red" as const },
   ];
+
+  // TODO: 后端暂无知识文档端点，用课程列表做占位展示
+  const knowledgeDocuments: Array<{ id: string; name: string; type: string; chunks: number; coverage: number; updatedAt: string; owner: string }> = (courseList ?? []).map((c) => ({
+    id: String(c.id),
+    name: c.name,
+    type: "课程",
+    chunks: c.knowledge_point_count,
+    coverage: 80,
+    updatedAt: "—",
+    owner: c.teacher,
+  }));
+
+  const knowledgePoints: string[] = [];
 
   return (
     <PageShell>
