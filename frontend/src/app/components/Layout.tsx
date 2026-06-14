@@ -1,5 +1,6 @@
 import React from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router";
+import { Toaster } from "sonner";
 import {
   ActivitySquare,
   BarChart3,
@@ -423,6 +424,7 @@ export function Layout() {
           <Outlet />
         </main>
       </div>
+      <Toaster position="top-right" richColors />
     </div>
   );
 }
