@@ -1,6 +1,7 @@
 import React from "react";
 import { Bot, CheckCircle2, GraduationCap, LockKeyhole, ShieldCheck, UserCog, Users } from "lucide-react";
 
+// TODO: 后端无角色权限矩阵端点，暂保留静态展示
 const PERMISSIONS = [
   {
     role: "学生 Student",

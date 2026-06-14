@@ -10,6 +10,22 @@
 
 ---
 
+## 关键事实（执行前必读）
+
+- **后端状态**：已就绪，进程在 8000 端口监听，MySQL 已连接（`/api/health/db` 返回 connected）
+- **后端进程**：`nohup python run.py > /tmp/backend.log 2>&1 &`（子 agent 起的）
+- **后端 `.env` 关键值**：
+  - `APP_NAME=AI-Collab-Audit-System`（不是 EduAgent Studio，但前端不依赖这个）
+  - `DB_HOST=127.0.0.1 DB_PORT=3306 DB_USER=root DB_PASSWORD=061202 DB_NAME=ai_collab_audit_system`
+  - `LLM_PROVIDER=minimax LLM_MODEL=MiniMax-M3`
+- **测试账号**：`admin`、`teacher01`、`student01` / `student02` / `student03`（密码是 bcrypt 哈希 `$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lrujj3vjPGga31lW` —— 与 "password" 字符串对应）
+- **修复过的 git 提交**：
+  - `adcb8c2` 阶段 0：切换到 React 模板
+  - `1cd5cca` 修复后端合并冲突（main.py + learning.py）
+  - `2cbc97f` 加 langgraph-checkpoint-sqlite 依赖
+
+---
+
 ## 阶段 0：仓库清理
 
 ### Task 0.1：把 `frontend_old` 加入 `.gitignore` 并提交清理快照

@@ -2,24 +2,8 @@ import React from "react";
 import { Link } from "react-router";
 import { ActivitySquare, ArrowRight, Bot, CheckCircle2, CircleAlert, Coins, Database, HardDrive, Library, LockKeyhole, Server, Settings2, ShieldAlert, TerminalSquare, Users } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-
-const ADMIN_STATS = [
-  { label: "用户总数", value: "1,284", hint: "学生 1,108 / 教师 86", icon: Users, tone: "blue" },
-  { label: "课程总数", value: "42", hint: "本月新增 5 门", icon: Database, tone: "purple" },
-  { label: "学习资源总数", value: "8,642", hint: "AI 生成 72%", icon: Library, tone: "emerald" },
-  { label: "今日智能体调用", value: "3,480", hint: "峰值 14:00", icon: Bot, tone: "cyan" },
-  { label: "今日模型成本", value: "¥186", hint: "预算使用 43%", icon: Coins, tone: "orange" },
-  { label: "内容安全风险", value: "7", hint: "2 条高优先级", icon: ShieldAlert, tone: "red" },
-];
-
-const OPS_DATA = [
-  { name: "00:00", calls: 220, tokens: 42, cost: 18 },
-  { name: "04:00", calls: 160, tokens: 28, cost: 12 },
-  { name: "08:00", calls: 520, tokens: 84, cost: 36 },
-  { name: "12:00", calls: 760, tokens: 118, cost: 52 },
-  { name: "16:00", calls: 690, tokens: 106, cost: 45 },
-  { name: "20:00", calls: 430, tokens: 71, cost: 23 },
-];
+import { useApi } from "../lib/useApi";
+import { statisticsApi } from "../lib/api";
 
 const SERVICES = [
   { name: "后端服务", status: "正常", desc: "响应 128ms", icon: Server },
@@ -53,7 +37,82 @@ const toneClass: Record<string, string> = {
   red: "bg-red-50 text-red-700 ring-red-100",
 };
 
+function OverviewCard({ label, value, hint, icon, tone }: {
+  label: string; value: string; hint: string; icon: React.ComponentType<{ className?: string }>; tone: string;
+}) {
+  const Icon = icon;
+  return (
+    <div className="edu-card edu-card-hover rounded-2xl p-4">
+      <div className={`mb-4 grid h-10 w-10 place-items-center rounded-xl ring-1 ${toneClass[tone]}`}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <div className="text-sm font-semibold text-slate-500">{label}</div>
+      <div className="mt-1 text-[24px] font-black leading-8 text-slate-950">{value}</div>
+      <div className="mt-1 text-xs font-medium text-slate-400">{hint}</div>
+    </div>
+  );
+}
+
 export function AdminDashboard() {
+  const overview = useApi(() => statisticsApi.overview(), []);
+  const recentActivities = useApi(() => statisticsApi.recentActivities({ limit: 10 }), []);
+  const modelCalls = useApi(() => statisticsApi.modelCalls(), []);
+  const costs = useApi(() => statisticsApi.costs(), []);
+
+  const loading = overview.loading || recentActivities.loading || modelCalls.loading || costs.loading;
+
+  const stats = [
+    {
+      label: "项目总数",
+      value: loading ? "-" : `${overview.data?.project_count ?? 0}`,
+      hint: `活跃 ${overview.data?.active_project_count ?? 0} 个`,
+      icon: Users,
+      tone: "blue",
+    },
+    {
+      label: "任务总数",
+      value: loading ? "-" : `${overview.data?.task_count ?? 0}`,
+      hint: "平台任务",
+      icon: Database,
+      tone: "purple",
+    },
+    {
+      label: "学习资源总数",
+      value: loading ? "-" : `${overview.data?.artifact_count ?? 0}`,
+      hint: "AI 生成资源",
+      icon: Library,
+      tone: "emerald",
+    },
+    {
+      label: "今日调用次数",
+      value: loading ? "-" : `${overview.data?.invocation_count ?? 0}`,
+      hint: `成功率 ${overview.data ? Math.round((overview.data.success_invocation_count / Math.max(overview.data.invocation_count, 1)) * 100) : 0}%`,
+      icon: Bot,
+      tone: "cyan",
+    },
+    {
+      label: "Token 总消耗",
+      value: loading ? "-" : `${overview.data ? (overview.data.total_tokens / 1000).toFixed(1) + "K" : "-"}`,
+      hint: "输入 + 输出合计",
+      icon: ActivitySquare,
+      tone: "orange",
+    },
+    {
+      label: "内容安全风险",
+      value: loading ? "-" : `${overview.data?.pending_review_count ?? 0}`,
+      hint: "待教师复核",
+      icon: ShieldAlert,
+      tone: "red",
+    },
+  ];
+
+  const opsChartData = modelCalls.data?.slice(0, 10).map((m) => ({
+    name: m.display_name.length > 8 ? m.display_name.slice(0, 8) : m.display_name,
+    calls: m.call_count,
+    tokens: Math.round((m.total_input_tokens + m.total_output_tokens) / 1000),
+    cost: m.avg_latency_ms,
+  })) ?? [];
+
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
       <section className="edu-card relative overflow-hidden rounded-[24px] p-7">
@@ -78,19 +137,9 @@ export function AdminDashboard() {
       </section>
 
       <section className="grid grid-cols-6 gap-4">
-        {ADMIN_STATS.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <div key={stat.label} className="edu-card edu-card-hover rounded-2xl p-4">
-              <div className={`mb-4 grid h-10 w-10 place-items-center rounded-xl ring-1 ${toneClass[stat.tone]}`}>
-                <Icon className="h-5 w-5" />
-              </div>
-              <div className="text-sm font-semibold text-slate-500">{stat.label}</div>
-              <div className="mt-1 text-[24px] font-black leading-8 text-slate-950">{stat.value}</div>
-              <div className="mt-1 text-xs font-medium text-slate-400">{stat.hint}</div>
-            </div>
-          );
-        })}
+        {stats.map((stat) => (
+          <OverviewCard key={stat.label} {...stat} />
+        ))}
       </section>
 
       <section className="grid grid-cols-[0.9fr_1.1fr] gap-6">
@@ -122,19 +171,26 @@ export function AdminDashboard() {
         </div>
 
         <div className="edu-card rounded-2xl p-6">
-          <h2 className="mb-5 text-lg font-black text-slate-950">调用与成本趋势</h2>
-          <div className="h-[318px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={OPS_DATA} margin={{ top: 8, right: 16, left: -18, bottom: 0 }}>
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "#64748B" }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "#94A3B8" }} />
-                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #E2E8F0" }} />
-                <Line type="monotone" dataKey="calls" name="调用次数" stroke="#2563EB" strokeWidth={3} dot={{ r: 4 }} />
-                <Line type="monotone" dataKey="tokens" name="Token 消耗" stroke="#7C3AED" strokeWidth={2} strokeDasharray="5 5" dot={false} />
-                <Line type="monotone" dataKey="cost" name="成本变化" stroke="#F59E0B" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <h2 className="mb-5 text-lg font-black text-slate-950">模型调用统计</h2>
+          {loading ? (
+            <div className="flex h-[318px] items-center justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+            </div>
+          ) : opsChartData.length > 0 ? (
+            <div className="h-[318px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={opsChartData} margin={{ top: 8, right: 16, left: -18, bottom: 0 }}>
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "#64748B" }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "#94A3B8" }} />
+                  <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #E2E8F0" }} />
+                  <Line type="monotone" dataKey="calls" name="调用次数" stroke="#2563EB" strokeWidth={3} dot={{ r: 4 }} />
+                  <Line type="monotone" dataKey="tokens" name="Token(K)" stroke="#7C3AED" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="flex h-[318px] items-center justify-center text-sm text-slate-400">暂无调用数据</div>
+          )}
         </div>
       </section>
 

@@ -1,12 +1,7 @@
 import React from "react";
 import { AlertTriangle, Bot, CheckCircle2, ClipboardCheck, FileWarning, Gauge, LockKeyhole, ShieldAlert, ShieldCheck, SlidersHorizontal } from "lucide-react";
-
-const RISK_QUEUE = [
-  { title: "事务隔离级别讲义引用覆盖率偏低", level: "中风险", owner: "数据库课程 / 张老师", reason: "证据来源 2 条，低于课程规则要求" },
-  { title: "异常高频资源生成请求", level: "高风险", owner: "student_0842", reason: "10 分钟内触发 46 次资源生成" },
-  { title: "低可信度代码案例待复核", level: "中风险", owner: "Web 项目实践", reason: "模型自检显示接口字段存在不一致风险" },
-  { title: "教师审核超时队列", level: "低风险", owner: "操作提醒", reason: "12 个资源超过 24 小时未处理" },
-];
+import { useApi } from "../lib/useApi";
+import { statisticsApi } from "../lib/api";
 
 const GOVERNANCE_RULES = [
   ["事实一致性阈值", "≥ 80%", "低于阈值必须进入教师复核"],
@@ -15,7 +10,47 @@ const GOVERNANCE_RULES = [
   ["敏感内容检测", "启用", "输出前后双重扫描"],
 ];
 
+const RISK_QUEUE = [
+  { title: "事务隔离级别讲义引用覆盖率偏低", level: "中风险", owner: "数据库课程 / 张老师", reason: "证据来源 2 条，低于课程规则要求" },
+  { title: "异常高频资源生成请求", level: "高风险", owner: "student_0842", reason: "10 分钟内触发 46 次资源生成" },
+  { title: "低可信度代码案例待复核", level: "中风险", owner: "Web 项目实践", reason: "模型自检显示接口字段存在不一致风险" },
+  { title: "教师审核超时队列", level: "低风险", owner: "操作提醒", reason: "12 个资源超过 24 小时未处理" },
+];
+
 export function AdminGovernance() {
+  const reviewsState = useApi(() => statisticsApi.reviews(), []);
+  const reviewRateState = useApi(() => statisticsApi.reviewRateByCourse(), []);
+
+  const reviews = reviewsState.data;
+  const highRiskCount = reviews?.top_issue_tags?.filter((t) => t.severity === "high").length ?? 0;
+
+  const stats = [
+    {
+      label: "高风险内容",
+      value: reviews ? `${highRiskCount}` : "-",
+      Icon: ShieldAlert,
+      cls: "bg-red-50 text-red-700 ring-red-100",
+    },
+    {
+      label: "待复核资源",
+      value: reviews ? `${reviews.revision_required_count}` : "-",
+      Icon: ClipboardCheck,
+      cls: "bg-orange-50 text-orange-700 ring-orange-100",
+    },
+    {
+      label: "异常调用",
+      value: "-",
+      Icon: Gauge,
+      cls: "bg-purple-50 text-purple-700 ring-purple-100",
+    },
+    {
+      label: "已拦截输出",
+      value: reviews ? `${reviews.rejected_count}` : "-",
+      Icon: ShieldCheck,
+      cls: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    },
+  ];
+
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
       <section className="edu-card relative overflow-hidden rounded-[24px] p-7">
@@ -40,18 +75,13 @@ export function AdminGovernance() {
       </section>
 
       <section className="grid grid-cols-4 gap-4">
-        {[
-          ["高风险内容", "2", ShieldAlert, "bg-red-50 text-red-700 ring-red-100"],
-          ["待复核资源", "12", ClipboardCheck, "bg-orange-50 text-orange-700 ring-orange-100"],
-          ["异常调用", "3", Gauge, "bg-purple-50 text-purple-700 ring-purple-100"],
-          ["已拦截输出", "18", ShieldCheck, "bg-emerald-50 text-emerald-700 ring-emerald-100"],
-        ].map(([label, value, Icon, cls]) => (
-          <div key={label as string} className="edu-card rounded-2xl p-5">
+        {stats.map(({ label, value, Icon, cls }) => (
+          <div key={label} className="edu-card rounded-2xl p-5">
             <div className={`mb-4 grid h-11 w-11 place-items-center rounded-xl ring-1 ${cls}`}>
               <Icon className="h-5 w-5" />
             </div>
-            <div className="text-sm font-semibold text-slate-500">{label as string}</div>
-            <div className="mt-1 text-3xl font-black text-slate-950">{value as string}</div>
+            <div className="text-sm font-semibold text-slate-500">{label}</div>
+            <div className="mt-1 text-3xl font-black text-slate-950">{reviewsState.loading ? "..." : value}</div>
           </div>
         ))}
       </section>
