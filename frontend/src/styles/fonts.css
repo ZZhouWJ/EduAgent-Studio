@@ -1,0 +1,21 @@
+:root {
+  --edu-font-sans: "PingFang SC", "HarmonyOS Sans", "Microsoft YaHei", "Noto Sans SC", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --edu-font-mono: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+html,
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--edu-font-sans);
+}
+
+code,
+kbd,
+samp,
+pre,
+.font-mono {
+  font-family: var(--edu-font-mono);
+}

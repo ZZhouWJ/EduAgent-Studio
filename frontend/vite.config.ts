@@ -1,49 +1,36 @@
-import { resolve } from "node:path"
-import vue from "@vitejs/plugin-vue"
-import { defineConfig, loadEnv } from "vite"
+import { defineConfig } from 'vite'
+import path from 'path'
+import tailwindcss from '@tailwindcss/vite'
+import react from '@vitejs/plugin-react'
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), "") as ImportMetaEnv
-  const {
-    VITE_PUBLIC_PATH,
-    VITE_API_BASE_URL,
-    VITE_API_PROXY_TARGET,
-  } = env
 
-  const proxyTarget = VITE_API_PROXY_TARGET || VITE_API_BASE_URL || "http://127.0.0.1:8000"
-
+function figmaAssetResolver() {
   return {
-    base: VITE_PUBLIC_PATH || "/",
-    resolve: {
-      alias: {
-        "@": resolve(__dirname, "src")
+    name: 'figma-asset-resolver',
+    resolveId(id) {
+      if (id.startsWith('figma:asset/')) {
+        const filename = id.replace('figma:asset/', '')
+        return path.resolve(__dirname, 'src/assets', filename)
       }
     },
-    server: {
-      host: true,
-      port: 5173,
-      strictPort: false,
-      open: false,
-      cors: true,
-      proxy: {
-        "/api": {
-          target: proxyTarget,
-          changeOrigin: true
-        }
-      }
-    },
-    build: {
-      reportCompressedSize: false,
-      chunkSizeWarningLimit: 2048
-    },
-    esbuild:
-      mode === "development"
-        ? undefined
-        : {
-            pure: ["console.log"],
-            drop: ["debugger"],
-            legalComments: "none"
-          },
-    plugins: [vue()]
   }
+}
+
+export default defineConfig({
+  plugins: [
+    figmaAssetResolver(),
+    // The React and Tailwind plugins are both required for Make, even if
+    // Tailwind is not being actively used – do not remove them
+    react(),
+    tailwindcss(),
+  ],
+  resolve: {
+    alias: {
+      // Alias @ to the src directory
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+
+  // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
+  assetsInclude: ['**/*.svg', '**/*.csv'],
 })

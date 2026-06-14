@@ -39,3 +39,6 @@ minio-data/
 *.tmp
 *.bak
 backend/data/
+
+# Old frontend (保留在本地作为参考，不进仓库)
+frontend_old/
