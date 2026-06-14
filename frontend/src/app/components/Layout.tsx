@@ -1,5 +1,7 @@
 import React from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router";
+import { useNavigate } from "react-router";
+import { useAuthStore } from "@/stores/auth";
 import { Toaster } from "sonner";
 import {
   ActivitySquare,
@@ -185,12 +187,29 @@ function isActivePath(currentPath: string, itemPath: string) {
 
 export function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const role = getRole(location.pathname);
   const config = ROLE_CONFIG[role];
   const allItems = config.sections.flatMap((section) => section.items);
   const activeItem = allItems.find((item) => isActivePath(location.pathname, item.path));
   const pageTitle = activeItem?.label ?? config.roleLabel;
+
+  const realName = user?.real_name || user?.username || '游客';
+  const firstChar = realName.charAt(0).toUpperCase();
+  const roleLabelMap: Record<string, string> = {
+    student: '学生 / 在读',
+    teacher: '教师 / 课程负责人',
+    admin: '管理员 / 平台治理',
+  };
+  const userMeta = roleLabelMap[role];
+
+  async function handleLogout() {
+    await logout();
+    navigate('/login', { replace: true });
+  }
 
   React.useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -306,7 +325,7 @@ export function Layout() {
             <div className="relative mx-3 mt-4 rounded-2xl border border-white/10 bg-white/[0.06] p-3">
               <div className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-blue-100">
                 <UserRound className="h-3.5 w-3.5 text-blue-300" />
-                {config.user} · {config.userMeta}
+                {config.user} · {userMeta}
               </div>
               <p className="text-[11px] leading-4 text-slate-300">{config.courseLine}</p>
             </div>
@@ -314,14 +333,13 @@ export function Layout() {
             {renderNavigation(() => setIsMobileMenuOpen(false))}
 
             <div className="relative border-t border-white/10 p-3">
-              <Link
-                to="/login"
-                onClick={() => setIsMobileMenuOpen(false)}
+              <button
+                onClick={async () => { await handleLogout(); setIsMobileMenuOpen(false) }}
                 className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-bold text-slate-300 transition hover:bg-white/[0.07] hover:text-white"
               >
                 <LogOut className="h-[18px] w-[18px]" />
                 退出登录
-              </Link>
+              </button>
             </div>
           </aside>
         </div>
@@ -346,7 +364,7 @@ export function Layout() {
             </div>
           </div>
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[linear-gradient(135deg,#EFF6FF,#F5F3FF)] text-sm font-black text-blue-700 ring-1 ring-blue-100">
-            {config.avatar}
+            {firstChar}
           </div>
         </header>
 
@@ -407,13 +425,13 @@ export function Layout() {
 
             <div className="hidden h-8 w-px bg-slate-200 sm:block" />
 
-            <button className="flex h-11 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm transition hover:border-blue-200">
+            <button onClick={handleLogout} className="flex h-11 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm transition hover:border-blue-200">
               <div className="hidden text-right sm:block">
-                <div className="text-sm font-bold leading-4 text-slate-800">{config.user}</div>
-                <div className="mt-0.5 text-[11px] font-semibold text-blue-700">{config.userMeta}</div>
+                <div className="text-sm font-bold leading-4 text-slate-800">{realName}</div>
+                <div className="mt-0.5 text-[11px] font-semibold text-blue-700">{userMeta}</div>
               </div>
               <div className="grid h-8 w-8 place-items-center rounded-xl bg-[linear-gradient(135deg,#EFF6FF,#F5F3FF)] text-sm font-black text-blue-700 ring-1 ring-blue-100">
-                {config.avatar}
+                {firstChar}
               </div>
               <ChevronDown className="h-4 w-4 text-slate-400" />
             </button>

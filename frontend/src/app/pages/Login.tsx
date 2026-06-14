@@ -1,5 +1,7 @@
 import React from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
+import { notify } from "@/lib/toast";
+import { useAuthStore } from "@/stores/auth";
 import {
   ArrowRight,
   BookOpenCheck,
@@ -47,10 +49,24 @@ const ROLE_ENTRIES = [
 
 export function Login() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const { login, loading } = useAuthStore();
+  const [username, setUsername] = useState("admin");
+  const [password, setPassword] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate("/teacher");
+    try {
+      const user = await login(username, password);
+      notify.success(`欢迎回来，${user.real_name || user.username}`);
+      const redirect = params.get('redirect');
+      const home = user.roles?.includes('admin') ? '/admin'
+        : user.roles?.includes('teacher') ? '/teacher'
+        : '/student';
+      navigate(redirect || home, { replace: true });
+    } catch (err) {
+      notify.error(err instanceof Error ? err.message : '登录失败');
+    }
   };
 
   return (
@@ -169,7 +185,8 @@ export function Login() {
                   <input
                     id="username"
                     type="text"
-                    defaultValue="admin"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
                     className="edu-focus-ring h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-800"
                     autoComplete="username"
                   />
@@ -185,7 +202,8 @@ export function Login() {
                   <input
                     id="password"
                     type="password"
-                    defaultValue="Admin@123456"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     className="edu-focus-ring h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-800"
                     autoComplete="current-password"
                   />
@@ -204,10 +222,12 @@ export function Login() {
 
               <button
                 type="submit"
-                className="group flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(110deg,#2563EB,#7C3AED)] text-sm font-black text-white shadow-[0_16px_36px_rgba(37,99,235,0.26)] transition hover:shadow-[0_20px_42px_rgba(37,99,235,0.32)]"
+                disabled={loading}
+                aria-busy={loading}
+                className="group flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(110deg,#2563EB,#7C3AED)] text-sm font-black text-white shadow-[0_16px_36px_rgba(37,99,235,0.26)] transition hover:shadow-[0_20px_42px_rgba(37,99,235,0.32)] disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                登录系统
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                {loading ? '登录中...' : '登录系统'}
+                {!loading && <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />}
               </button>
             </form>
 
@@ -225,7 +245,10 @@ export function Login() {
                     <button
                       key={entry.role}
                       type="button"
-                      onClick={() => navigate(entry.path)}
+                      onClick={() => {
+                        setUsername(entry.account.split(' / ')[0]);
+                        notify.info(`已填入 ${entry.account.split(' / ')[0]}，请输入密码后登录`);
+                      }}
                       className="flex min-h-11 w-full items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-200 hover:bg-white hover:shadow-sm"
                     >
                       <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ring-1 ${entry.cls}`}>
