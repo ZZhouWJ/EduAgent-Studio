@@ -2,23 +2,8 @@ import React from "react";
 import { Link } from "react-router";
 import { AlertTriangle, ArrowRight, BookOpen, Bot, CheckSquare, Database, FileText, Library, MessageSquare, ShieldAlert, Sparkles, Target, Users } from "lucide-react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-
-const TEACHER_STATS = [
-  { label: "管理课程数", value: "3", hint: "本学期", icon: BookOpen, tone: "blue" },
-  { label: "学生人数", value: "128", hint: "2 个班级", icon: Users, tone: "purple" },
-  { label: "待审核资源", value: "12", hint: "3 个高优先级", icon: CheckSquare, tone: "orange" },
-  { label: "班级平均掌握度", value: "76%", hint: "较上周 +2.4%", icon: Target, tone: "emerald" },
-  { label: "本周新增反馈", value: "45", hint: "5 条需关注", icon: MessageSquare, tone: "cyan" },
-  { label: "高风险资源", value: "3", hint: "需人工复核", icon: ShieldAlert, tone: "red" },
-];
-
-const WEAKNESS_DATA = [
-  { name: "事务隔离", score: 38 },
-  { name: "多表连接", score: 46 },
-  { name: "数据库范式", score: 52 },
-  { name: "索引优化", score: 55 },
-  { name: "接口设计", score: 61 },
-];
+import { useApi } from "@/lib/useApi";
+import { statisticsApi } from "@/lib/api";
 
 const ACTION_ITEMS = [
   { title: "3 个 AI 生成资源待审核", desc: "其中 1 个资源引用覆盖率低于 70%", icon: CheckSquare, tone: "orange", action: "进入审核" },
@@ -44,6 +29,24 @@ const toneClass: Record<string, string> = {
 };
 
 export function TeacherDashboard() {
+  const { data: overview, loading: loadingOverview } = useApi(() => statisticsApi.overview(), []);
+  const { data: learningData, loading: loadingLearning } = useApi(() => statisticsApi.learningOverview(), []);
+  const { data: weakPoints, loading: loadingWeak } = useApi(() => statisticsApi.weakKnowledgePoints(5), []);
+  // TODO: 接入真实 ACTION_ITEMS（后端暂无对应端点，保持静态）
+  // TODO: 接入真实 GENERATION_SUGGESTIONS（后端暂无对应端点，保持静态）
+
+  const loading = loadingOverview || loadingLearning || loadingWeak;
+
+  const stats = [
+    { label: "管理课程数", value: String(overview?.active_project_count ?? "—"), hint: "本学期", icon: BookOpen, tone: "blue" },
+    { label: "学生人数", value: String(learningData?.student_count ?? "—"), hint: overview ? `${overview?.artifact_count ?? 0} 个班级` : "—", icon: Users, tone: "purple" },
+    { label: "待审核资源", value: String(overview?.pending_review_count ?? "—"), hint: "3 个高优先级", icon: CheckSquare, tone: "orange" },
+    { label: "班级平均掌握度", value: learningData ? `${learningData.avg_mastery}%` : "—", hint: "较上周 +2.4%", icon: Target, tone: "emerald" },
+    { label: "本周新增反馈", value: String(learningData?.feedback_count ?? "—"), hint: "5 条需关注", icon: MessageSquare, tone: "cyan" },
+    { label: "高风险资源", value: "3", hint: "需人工复核", icon: ShieldAlert, tone: "red" },
+  ];
+
+  const weaknessData = (weakPoints ?? []).map((wp) => ({ name: wp.kp_name, score: wp.avg_mastery }));
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
       <section className="edu-card relative overflow-hidden rounded-[24px] p-7">
@@ -87,8 +90,11 @@ export function TeacherDashboard() {
         </div>
       </section>
 
+      {loading ? (
+        <div className="flex items-center justify-center h-32 text-slate-400">加载中...</div>
+      ) : (
       <section className="grid grid-cols-6 gap-4">
-        {TEACHER_STATS.map((stat) => {
+        {stats.map((stat) => {
           const Icon = stat.icon;
           return (
             <div key={stat.label} className="edu-card edu-card-hover rounded-2xl p-4">
@@ -102,6 +108,7 @@ export function TeacherDashboard() {
           );
         })}
       </section>
+      )}
 
       <section className="grid grid-cols-[1fr_0.95fr] gap-6">
         <div className="edu-card rounded-2xl p-6">
@@ -133,12 +140,12 @@ export function TeacherDashboard() {
           </h3>
           <div className="h-[285px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={WEAKNESS_DATA} layout="vertical" margin={{ top: 4, right: 24, left: 8, bottom: 4 }}>
+              <BarChart data={weaknessData} layout="vertical" margin={{ top: 4, right: 24, left: 8, bottom: 4 }}>
                 <XAxis type="number" domain={[0, 100]} hide />
                 <YAxis dataKey="name" type="category" width={86} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "#475569", fontWeight: 600 }} />
                 <Tooltip cursor={{ fill: "#F8FAFC" }} contentStyle={{ borderRadius: 12, border: "1px solid #E2E8F0" }} />
                 <Bar dataKey="score" name="掌握度" radius={[0, 8, 8, 0]} barSize={22}>
-                  {WEAKNESS_DATA.map((entry) => (
+                  {weaknessData.map((entry) => (
                     <Cell key={entry.name} fill={entry.score < 45 ? "#EF4444" : entry.score < 60 ? "#F59E0B" : "#10B981"} />
                   ))}
                 </Bar>

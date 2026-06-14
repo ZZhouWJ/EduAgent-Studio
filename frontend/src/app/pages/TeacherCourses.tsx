@@ -1,16 +1,55 @@
 import React from "react";
 import { Link } from "react-router";
 import { BarChart3, BookOpen, Bot, Database, FileText, GraduationCap, Library, Users } from "lucide-react";
-import { courses } from "../data/demoData";
+import { useApi } from "@/lib/useApi";
+import { learningApi } from "@/lib/api";
 import { DetailDrawer, PageHeader, ProgressBar, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast } from "../components/common/ProductUI";
+
+interface Course {
+  id: number
+  name: string
+  code: string
+  description: string
+  teacher: string
+  semester: string
+  status: string
+  knowledge_point_count: number
+  student_count: number
+  task_count: number
+  cover_color: string
+  tags: string[]
+}
 
 export function TeacherCourses() {
   const [query, setQuery] = React.useState("");
   const [status, setStatus] = React.useState("全部");
-  const [selected, setSelected] = React.useState<(typeof courses)[number] | null>(null);
+  const [selected, setSelected] = React.useState<Course | null>(null);
   const { toast, showToast } = useInlineToast();
 
-  const list = courses.filter((course) => (status === "全部" || course.status === status) && `${course.name}${course.code}`.toLowerCase().includes(query.toLowerCase()));
+  const { data: courseList, loading } = useApi(() => learningApi.listCourses(), []);
+
+  // 后端返回 snake_case，映射到 UI 期望的字段
+  const mappedCourses: Array<{
+    id: string | number; name: string; code: string; owner: string; department: string; summary: string; students: number; knowledgePoints: number; resources: number; mastery: number; status: string; updatedAt: string; classes: string[]; chapters: string[]; weakPoints: string[]
+  }> = (courseList ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    code: c.code,
+    owner: c.teacher,
+    department: "—",
+    summary: c.description,
+    students: c.student_count,
+    knowledgePoints: c.knowledge_point_count,
+    resources: c.task_count,
+    mastery: 0,
+    status: c.status,
+    updatedAt: "—",
+    classes: [],
+    chapters: [],
+    weakPoints: [],
+  }));
+
+  const list = mappedCourses.filter((course) => (status === "全部" || course.status === status) && `${course.name}${course.code}`.toLowerCase().includes(query.toLowerCase()));
 
   const stats = [
     { label: "管理课程数", value: "3", hint: "本学期", icon: BookOpen, tone: "blue" as const },
@@ -85,25 +124,7 @@ export function TeacherCourses() {
       {selected && <DetailDrawer title={selected.name} subtitle={`${selected.code} / ${selected.owner}`} open={!!selected} onClose={() => setSelected(null)}>
         <div className="space-y-5">
           <p className="text-sm leading-6 text-slate-600">{selected.summary}</p>
-          <div className="grid grid-cols-2 gap-3">
-            {selected.chapters.map((item) => <div key={item} className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm font-bold text-slate-700">{item}</div>)}
-          </div>
-          <div>
-            <h3 className="mb-3 text-sm font-black text-slate-950">薄弱点 Top 5</h3>
-            <div className="space-y-2">
-              {selected.weakPoints.map((item, index) => (
-                <div key={item} className="flex items-center justify-between rounded-xl bg-white p-3 ring-1 ring-slate-100">
-                  <span className="text-sm font-bold text-slate-700">{index + 1}. {item}</span>
-                  <span className="text-xs font-black text-orange-700">{38 + index * 6}%</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <Link to="/teacher/knowledge-base" className={primaryButton}>知识库</Link>
-            <Link to="/teacher/tasks" className={secondaryButton}>发布任务</Link>
-            <Link to="/teacher/agent-workbench" className={secondaryButton}>生成资源</Link>
-          </div>
+          {/* TODO: 后端暂无章节(chapters)、薄弱点(weakPoints)字段，暂时留空 */}
         </div>
       </DetailDrawer>}
       {toast}

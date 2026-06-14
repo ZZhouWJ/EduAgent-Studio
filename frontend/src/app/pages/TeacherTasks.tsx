@@ -1,41 +1,64 @@
 import React from "react";
 import { CalendarClock, CheckSquare, ClipboardList, Plus, Save, Users } from "lucide-react";
-import { courses, teacherTasks } from "../data/demoData";
+import { useApi } from "@/lib/useApi";
+import { learningApi } from "@/lib/api";
 import { EmptyState, ModalShell, PageHeader, ProgressBar, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast } from "../components/common/ProductUI";
+
+interface TaskItem {
+  id: string
+  title: string
+  course: string
+  knowledge: string
+  target: string
+  due: string
+  completion: number
+  status: string
+}
 
 export function TeacherTasks() {
   const [query, setQuery] = React.useState("");
   const [status, setStatus] = React.useState("全部");
-  const [selectedId, setSelectedId] = React.useState(teacherTasks[0].id);
-  const [items, setItems] = React.useState(teacherTasks);
+  const { data: taskData, loading: loadingTasks } = useApi(() => learningApi.listTasks({ page_size: 50 }), []);
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [open, setOpen] = React.useState(false);
   const { toast, showToast } = useInlineToast();
+
+  // 映射后端 LearningTask → UI TaskItem（后端暂无 knowledge/target 字段，暂时显示"—"）
+  const items: TaskItem[] = (taskData?.items ?? []).map((t) => ({
+    id: String(t.id),
+    title: t.title,
+    course: t.course_name,
+    knowledge: "—",
+    target: "—",
+    due: t.due_date ? t.due_date.replace("T", " ").slice(0, 16) : "—",
+    completion: t.completion_rate,
+    status: t.status,
+  }));
 
   const filtered = items.filter((item) => (status === "全部" || item.status === status) && `${item.title}${item.knowledge}${item.target}`.toLowerCase().includes(query.toLowerCase()));
   const selected = filtered.find((item) => item.id === selectedId) || filtered[0] || items[0];
 
   const addTask = () => {
-    const created = {
+    const created: TaskItem = {
       id: `tt-${Date.now()}`,
       title: "事务隔离级别强化测评",
-      course: courses[0].name,
-      knowledge: "事务隔离级别",
-      target: "数据库 22-1 班重点学生",
-      due: "06-21 20:00",
+      course: items[0]?.course ?? "—",
+      knowledge: "—",
+      target: "—",
+      due: new Date().toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).replace(",", ""),
       completion: 0,
       status: "进行中",
     };
-    setItems((current) => [created, ...current]);
-    setSelectedId(created.id);
     setOpen(false);
     showToast("新学习任务已插入任务列表");
+    // TODO: 调用后端创建任务 API
   };
 
   const stats = [
     { label: "已发布任务", value: `${items.length}`, hint: "覆盖 3 门课程", icon: ClipboardList, tone: "blue" as const },
     { label: "进行中任务", value: `${items.filter((item) => item.status === "进行中").length}`, hint: "本周跟踪", icon: CalendarClock, tone: "purple" as const },
     { label: "平均完成率", value: "58%", hint: "较上周 +6%", icon: CheckSquare, tone: "emerald" as const },
-    { label: "低完成率任务", value: "1", hint: "需提醒", icon: Users, tone: "orange" as const },
+    { label: "低完成率任务", value: `${items.filter((item) => item.completion < 45).length}`, hint: "需提醒", icon: Users, tone: "orange" as const },
     { label: "本周新增任务", value: "4", hint: "含 AI 推荐", icon: Plus, tone: "cyan" as const },
   ];
 
@@ -53,6 +76,9 @@ export function TeacherTasks() {
         {stats.map((stat) => <StatCard key={stat.label} {...stat} />)}
       </section>
 
+      {loadingTasks ? (
+        <div className="flex items-center justify-center h-32 text-slate-400">加载中...</div>
+      ) : (
       <section className="grid grid-cols-[0.9fr_1.1fr] gap-6">
         <div className="edu-card rounded-2xl p-5">
           <div className="mb-4 flex flex-wrap items-end gap-4">
@@ -91,10 +117,10 @@ export function TeacherTasks() {
         <div className="edu-card rounded-2xl p-6">
           <div className="mb-5 flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-xl font-black text-slate-950">{selected.title}</h2>
-              <p className="mt-1 text-sm text-slate-500">{selected.target} / {selected.due}</p>
+              <h2 className="text-xl font-black text-slate-950">{selected?.title ?? "—"}</h2>
+              <p className="mt-1 text-sm text-slate-500">{selected?.target} / {selected?.due}</p>
             </div>
-            <StatusBadge status={selected.status} />
+            {selected && <StatusBadge status={selected.status} />}
           </div>
           <div className="grid grid-cols-2 gap-4">
             {[
@@ -127,13 +153,14 @@ export function TeacherTasks() {
           </div>
         </div>
       </section>
+      )}
 
       <ModalShell title="新建学习任务" open={open} onClose={() => setOpen(false)}>
         <div className="grid grid-cols-2 gap-4">
           {["选择课程", "选择知识点", "选择学生或班级", "关联资源", "设置截止时间", "测评要求"].map((label, index) => (
             <label key={label} className="text-sm font-bold text-slate-700">
               {label}
-              <input className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700" defaultValue={index === 0 ? courses[0].name : index === 1 ? "事务隔离级别" : ""} />
+              <input className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700" defaultValue={index === 0 ? (items[0]?.course ?? "") : index === 1 ? "事务隔离级别" : ""} />
             </label>
           ))}
         </div>
