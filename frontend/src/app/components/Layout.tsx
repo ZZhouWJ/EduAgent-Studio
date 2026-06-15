@@ -2,6 +2,7 @@ import React from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router";
 import { useNavigate } from "react-router";
 import { useAuthStore } from "@/stores/auth";
+import { useRouterGuard } from "@/lib/router-guard";
 import { Toaster } from "sonner";
 import {
   ActivitySquare,
@@ -186,6 +187,7 @@ function isActivePath(currentPath: string, itemPath: string) {
 }
 
 export function Layout() {
+  useRouterGuard();
   const location = useLocation();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);

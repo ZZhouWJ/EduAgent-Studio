@@ -49,9 +49,9 @@ export interface CostStats {
   output_cost: number
   total_tokens: number
   currency: string
-  cost_by_model: Array<{ model_name: string; cost: number }>
-  cost_by_project: Array<{ project_name: string; cost: number }>
-  cost_by_user: Array<{ real_name: string; cost: number }>
+  cost_by_model: Array<{ model_id?: number; model_name: string; display_name?: string; provider_name?: string; total_cost: number; call_count?: number; input_cost?: number; output_cost?: number; total_tokens?: number; input_tokens?: number; output_tokens?: number }>
+  cost_by_project: Array<{ project_id?: number; project_name: string; total_cost: number; task_count?: number }>
+  cost_by_user: Array<{ user_id?: number; real_name: string; total_cost: number }>
 }
 
 export interface ReviewStats {

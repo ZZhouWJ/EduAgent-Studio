@@ -75,6 +75,10 @@ export interface LearningPathGraph {
   summary: LearningPathSummary
 }
 
+export interface CourseUpdateRequest {
+  status: string
+}
+
 export const learningApi = {
   listCourses() {
     return client.get<Course[]>('/learning/courses')
@@ -82,6 +86,10 @@ export const learningApi = {
 
   getCourse(course_id: number) {
     return client.get<Course>(`/learning/courses/${course_id}`)
+  },
+
+  updateCourse(course_id: number, data: CourseUpdateRequest) {
+    return client.put<{ code: number; message: string }>(`/learning/courses/${course_id}`, data)
   },
 
   listTasks(params?: {

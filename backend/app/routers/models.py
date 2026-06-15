@@ -77,7 +77,7 @@ class CreateApiConfigRequest(BaseModel):
 # 模型供应商
 # =============================================================================
 
-@router.get("/api/model-providers")
+@router.get("/model-providers")
 async def list_providers(
     request: Request,
     authorization: Optional[str] = Header(None, alias="Authorization"),
@@ -90,7 +90,7 @@ async def list_providers(
     return success_response(data=result)
 
 
-@router.post("/api/model-providers")
+@router.post("/model-providers")
 async def create_provider(
     request: Request,
     authorization: Optional[str] = Header(None, alias="Authorization"),
@@ -118,7 +118,7 @@ async def create_provider(
 # AI 模型
 # =============================================================================
 
-@router.get("/api/ai-models")
+@router.get("/ai-models")
 async def list_models(
     request: Request,
     authorization: Optional[str] = Header(None, alias="Authorization"),
@@ -142,7 +142,7 @@ async def list_models(
     return success_response(data=result)
 
 
-@router.post("/api/ai-models")
+@router.post("/ai-models")
 async def create_model(
     request: Request,
     authorization: Optional[str] = Header(None, alias="Authorization"),
@@ -174,7 +174,7 @@ async def create_model(
 # API 配置
 # =============================================================================
 
-@router.get("/api/api-configs")
+@router.get("/api-configs")
 async def list_api_configs(
     request: Request,
     authorization: Optional[str] = Header(None, alias="Authorization"),
@@ -194,7 +194,7 @@ async def list_api_configs(
     return success_response(data=result)
 
 
-@router.post("/api/api-configs")
+@router.post("/api-configs")
 async def create_api_config(
     request: Request,
     authorization: Optional[str] = Header(None, alias="Authorization"),

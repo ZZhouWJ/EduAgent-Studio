@@ -70,7 +70,7 @@ class MergeBranchesRequest(BaseModel):
 # POST /api/outputs/{output_id}/adopt
 # =============================================================================
 
-@router.post("/api/outputs/{output_id}/adopt")
+@router.post("/outputs/{output_id}/adopt")
 async def adopt_output(
     request: Request,
     output_id: int = Path(..., gt=0),
@@ -100,7 +100,7 @@ async def adopt_output(
 # GET /api/projects/{project_id}/artifacts
 # =============================================================================
 
-@router.get("/api/projects/{project_id}/artifacts")
+@router.get("/projects/{project_id}/artifacts")
 async def list_project_artifacts(
     request: Request,
     project_id: int = Path(..., gt=0),
@@ -129,7 +129,7 @@ async def list_project_artifacts(
 # GET /api/artifacts/{adopted_id}
 # =============================================================================
 
-@router.get("/api/artifacts/{adopted_id}")
+@router.get("/artifacts/{adopted_id}")
 async def get_artifact_detail(
     request: Request,
     adopted_id: int = Path(..., gt=0),
@@ -150,7 +150,7 @@ async def get_artifact_detail(
 # POST /api/tasks/{task_id}/branches/merge
 # =============================================================================
 
-@router.post("/api/tasks/{task_id}/branches/merge")
+@router.post("/tasks/{task_id}/branches/merge")
 async def merge_branches(
     request: Request,
     task_id: int = Path(..., gt=0),

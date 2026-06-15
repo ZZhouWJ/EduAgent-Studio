@@ -2,11 +2,16 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Path, Query
+from pydantic import BaseModel, Field
 
 from app.services.auth_service import get_current_user_dependency as get_current_user
 from app.services import learning_service
 
 router = APIRouter(prefix="/learning", tags=["学习任务"])
+
+
+class UpdateCourseStatusRequest(BaseModel):
+    status: str = Field(..., description="课程状态: active / archived / draft")
 
 
 @router.get("/courses")
@@ -22,6 +27,16 @@ async def get_course(
 ):
     """获取课程详情（含知识点列表）"""
     return learning_service.LearningService().get_course(course_id)
+
+
+@router.put("/courses/{course_id}")
+async def update_course(
+    course_id: int = Path(..., gt=0),
+    body: UpdateCourseStatusRequest = ...,
+    token: str = Depends(get_current_user),
+):
+    """更新课程状态"""
+    return learning_service.LearningService().update_course_status(course_id, body.status)
 
 
 @router.get("/tasks")

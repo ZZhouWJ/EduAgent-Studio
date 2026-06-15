@@ -1,6 +1,10 @@
 import client from '../api'
 import type { Course } from './learning'
 
+export interface CourseUpdateBody {
+  status: string
+}
+
 export const coursesApi = {
   list() {
     return client.get<Course[]>('/learning/courses')
@@ -8,5 +12,9 @@ export const coursesApi = {
 
   getById(course_id: number) {
     return client.get<Course>(`/learning/courses/${course_id}`)
+  },
+
+  updateCourse(course_id: number, data: CourseUpdateBody) {
+    return client.put(`/learning/courses/${course_id}`, data)
   },
 }

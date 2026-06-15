@@ -72,7 +72,7 @@ class CompleteReviewRequest(BaseModel):
 # POST /api/outputs/{output_id}/submit-review
 # =============================================================================
 
-@router.post("/api/outputs/{output_id}/submit-review")
+@router.post("/outputs/{output_id}/submit-review")
 async def submit_for_review(
     request: Request,
     output_id: int = Path(..., gt=0),
@@ -100,7 +100,7 @@ async def submit_for_review(
 # GET /api/reviews/pending
 # =============================================================================
 
-@router.get("/api/reviews/pending")
+@router.get("/reviews/pending")
 async def list_pending_reviews(
     request: Request,
     authorization: Optional[str] = Header(None, alias="Authorization"),
@@ -125,7 +125,7 @@ async def list_pending_reviews(
 # GET /api/reviews/{request_id}
 # =============================================================================
 
-@router.get("/api/reviews/{request_id}")
+@router.get("/reviews/{request_id}")
 async def get_review_detail(
     request: Request,
     request_id: int = Path(..., gt=0),
@@ -146,7 +146,7 @@ async def get_review_detail(
 # POST /api/reviews/{request_id}/complete
 # =============================================================================
 
-@router.post("/api/reviews/{request_id}/complete")
+@router.post("/reviews/{request_id}/complete")
 async def complete_review(
     request: Request,
     request_id: int = Path(..., gt=0),
@@ -181,7 +181,7 @@ async def complete_review(
 # GET /api/issue-tags
 # =============================================================================
 
-@router.get("/api/issue-tags")
+@router.get("/issue-tags")
 async def list_issue_tags(
     authorization: Optional[str] = Header(None, alias="Authorization"),
 ) -> dict:

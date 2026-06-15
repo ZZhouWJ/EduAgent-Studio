@@ -3,21 +3,8 @@ import { Link } from "react-router";
 import { AlertTriangle, ArrowRight, BookOpen, Bot, CheckSquare, Database, FileText, Library, MessageSquare, ShieldAlert, Sparkles, Target, Users } from "lucide-react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useApi } from "@/lib/useApi";
-import { statisticsApi } from "@/lib/api";
-
-const ACTION_ITEMS = [
-  { title: "3 个 AI 生成资源待审核", desc: "其中 1 个资源引用覆盖率低于 70%", icon: CheckSquare, tone: "orange", action: "进入审核" },
-  { title: "12 名学生事务隔离级别掌握度低于 50%", desc: "建议发布基础图解讲义和判断题", icon: Users, tone: "red", action: "查看学生" },
-  { title: "5 条学习反馈需要关注", desc: "集中在可重复读、串行化和幻读概念", icon: MessageSquare, tone: "blue", action: "查看反馈" },
-  { title: "课程知识库有 2 份资料待补充", desc: "实验说明和教师 PPT 页码缺少结构化标注", icon: Database, tone: "purple", action: "补充资料" },
-];
-
-const GENERATION_SUGGESTIONS = [
-  { title: "事务隔离级别图解讲义", type: "讲义", target: "12 名薄弱学生" },
-  { title: "多表连接分层练习题", type: "题库", target: "全班巩固" },
-  { title: "银行转账并发案例", type: "案例", target: "项目实践组" },
-  { title: "FastAPI + PostgreSQL 综合实验", type: "实验", target: "课程项目冲刺" },
-];
+import { reviewsApi, statisticsApi, learningApi } from "@/lib/api";
+import { useAuthStore } from "@/stores/auth";
 
 const toneClass: Record<string, string> = {
   blue: "bg-blue-50 text-blue-700 ring-blue-100",
@@ -29,24 +16,48 @@ const toneClass: Record<string, string> = {
 };
 
 export function TeacherDashboard() {
+  const user = useAuthStore((s) => s.user);
+  const greetingName = user?.real_name ?? "老师";
   const { data: overview, loading: loadingOverview } = useApi(() => statisticsApi.overview(), []);
   const { data: learningData, loading: loadingLearning } = useApi(() => statisticsApi.learningOverview(), []);
   const { data: weakPoints, loading: loadingWeak } = useApi(() => statisticsApi.weakKnowledgePoints(5), []);
-  // TODO: 接入真实 ACTION_ITEMS（后端暂无对应端点，保持静态）
-  // TODO: 接入真实 GENERATION_SUGGESTIONS（后端暂无对应端点，保持静态）
+  const { data: pendingReviews } = useApi(() => reviewsApi.list({ status: "pending", page_size: 5 }), []);
+  const { data: lowMastery } = useApi(() => statisticsApi.masteryDistribution(), []);
+  const { data: tasksData } = useApi(() => learningApi.listTasks({ page_size: 6 }), []);
 
   const loading = loadingOverview || loadingLearning || loadingWeak;
 
   const stats = [
     { label: "管理课程数", value: String(overview?.active_project_count ?? "—"), hint: "本学期", icon: BookOpen, tone: "blue" },
     { label: "学生人数", value: String(learningData?.student_count ?? "—"), hint: overview ? `${overview?.artifact_count ?? 0} 个班级` : "—", icon: Users, tone: "purple" },
-    { label: "待审核资源", value: String(overview?.pending_review_count ?? "—"), hint: "3 个高优先级", icon: CheckSquare, tone: "orange" },
-    { label: "班级平均掌握度", value: learningData ? `${learningData.avg_mastery}%` : "—", hint: "较上周 +2.4%", icon: Target, tone: "emerald" },
-    { label: "本周新增反馈", value: String(learningData?.feedback_count ?? "—"), hint: "5 条需关注", icon: MessageSquare, tone: "cyan" },
-    { label: "高风险资源", value: "3", hint: "需人工复核", icon: ShieldAlert, tone: "red" },
+    { label: "待审核资源", value: String(overview?.pending_review_count ?? "—"), hint: pendingReviews?.total ? `${pendingReviews.total} 条待处理` : "暂无", icon: CheckSquare, tone: "orange" },
+    { label: "班级平均掌握度", value: learningData ? `${learningData.avg_mastery}%` : "—", hint: "实时统计", icon: Target, tone: "emerald" },
+    { label: "本周新增反馈", value: String(learningData?.feedback_count ?? "—"), hint: "全部学生", icon: MessageSquare, tone: "cyan" },
+    { label: "高风险资源", value: String(overview?.failed_invocation_count ?? 0), hint: "需人工复核", icon: ShieldAlert, tone: "red" },
   ];
 
-  const weaknessData = (weakPoints ?? []).map((wp) => ({ name: wp.kp_name, score: wp.avg_mastery }));
+  const weaknessData = (weakPoints ?? []).map((wp) => ({ name: wp.kp_name, score: Math.round(wp.avg_mastery * 100) }));
+
+  // 待处理事项：每条都从真实后端数据派生
+  const lowMasteryCount = (lowMastery ?? []).filter((m) => m.range.includes("0%") || m.range.includes("1-30") || m.range.includes("30-50")).reduce((acc, m) => acc + m.count, 0);
+  const actionItems = [
+    { title: `${overview?.pending_review_count ?? 0} 个 AI 生成资源待审核`, desc: pendingReviews?.items?.length ? `最新：${pendingReviews.items[0]?.output_title ?? "—"}` : "暂无新提交", icon: CheckSquare, tone: "orange", action: "进入审核", link: "/teacher/review" },
+    { title: `${lowMasteryCount} 名学生知识点掌握度低于 50%`, desc: weaknessData.length ? `集中在 ${weaknessData[0]?.name ?? "—"} 等 ${weaknessData.length} 个知识点` : "等待数据", icon: Users, tone: "red", action: "查看学生", link: "/teacher/students" },
+    { title: `${learningData?.feedback_count ?? 0} 条学习反馈需要关注`, desc: "来自本班学生近 7 天", icon: MessageSquare, tone: "blue", action: "查看反馈", link: "/student/feedback" },
+    { title: `${learningData?.resource_count ?? 0} 个学习资源可发布`, desc: "已审核通过，等待分发", icon: Database, tone: "purple", action: "补充资料", link: "/teacher/resources" },
+  ];
+
+  // 资源生成建议：直接从最近的 submitted/in_progress 任务中抽取
+  const taskSuggestions = (tasksData?.items ?? []).slice(0, 4).map((t) => ({
+    title: t.title,
+    type: t.type ?? "任务",
+    target: t.course_name,
+    status: t.status,
+  }));
+  if (taskSuggestions.length === 0) {
+    // 后端没有任务时给一个空态提示而不是假数据
+    taskSuggestions.push({ title: "尚无任务可生成", type: "—", target: "请前往智能体工作台创建", status: "draft" });
+  }
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
       <section className="edu-card relative overflow-hidden rounded-[24px] p-7">
@@ -75,10 +86,10 @@ export function TeacherDashboard() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             {[
-              ["今日待办", "4", "按优先级处理"],
-              ["重点学生", "12", "掌握度低于 50%"],
-              ["建议生成", "4", "资源生成机会"],
-              ["知识库缺口", "2", "资料待补充"],
+              ["今日待办", String((pendingReviews?.total ?? 0) + (tasksData?.items?.filter((t) => t.status === "in_progress").length ?? 0)), "按优先级处理"],
+              ["重点学生", String(lowMasteryCount), "掌握度低于 50%"],
+              ["建议生成", String(taskSuggestions.length), "资源生成机会"],
+              ["课程资源", String(learningData?.resource_count ?? 0), "本课程已发布"],
             ].map(([label, value, hint]) => (
               <div key={label} className="rounded-2xl border border-slate-100 bg-white/[0.85] p-4 shadow-sm">
                 <div className="text-xs font-bold text-slate-400">{label}</div>
@@ -117,7 +128,7 @@ export function TeacherDashboard() {
             待处理事项
           </h3>
           <div className="grid grid-cols-2 gap-4">
-            {ACTION_ITEMS.map((item) => {
+            {actionItems.map((item) => {
               const Icon = item.icon;
               return (
                 <div key={item.title} className="rounded-2xl border border-slate-100 bg-white p-4">
@@ -126,7 +137,9 @@ export function TeacherDashboard() {
                   </div>
                   <h4 className="text-sm font-black text-slate-900">{item.title}</h4>
                   <p className="mt-2 min-h-[40px] text-xs leading-5 text-slate-500">{item.desc}</p>
-                  <button className="mt-3 text-xs font-black text-blue-700">{item.action}</button>
+                  <Link to={item.link} className="mt-3 inline-block min-h-[44px] text-xs font-black text-blue-700">
+                    {item.action} →
+                  </Link>
                 </div>
               );
             })}
@@ -164,8 +177,12 @@ export function TeacherDashboard() {
           <Link to="/teacher/agent-workbench" className="text-sm font-bold text-blue-700">进入生成</Link>
         </div>
         <div className="grid grid-cols-4 gap-4">
-          {GENERATION_SUGGESTIONS.map((item, index) => (
-            <div key={item.title} className="rounded-2xl border border-slate-100 bg-white p-4 transition hover:border-purple-200 hover:shadow-md">
+          {taskSuggestions.map((item, index) => (
+            <Link
+              key={`${item.title}-${index}`}
+              to="/teacher/agent-workbench"
+              className="rounded-2xl border border-slate-100 bg-white p-4 transition hover:border-purple-200 hover:shadow-md"
+            >
               <div className="mb-3 flex items-center justify-between">
                 <div className="grid h-10 w-10 place-items-center rounded-xl bg-purple-50 text-purple-700 ring-1 ring-purple-100">
                   {index === 0 ? <FileText className="h-5 w-5" /> : index === 1 ? <CheckSquare className="h-5 w-5" /> : index === 2 ? <Library className="h-5 w-5" /> : <BookOpen className="h-5 w-5" />}
@@ -174,7 +191,7 @@ export function TeacherDashboard() {
               </div>
               <h4 className="min-h-[40px] text-sm font-black leading-5 text-slate-900">{item.title}</h4>
               <div className="mt-4 text-xs font-bold text-slate-500">{item.target}</div>
-            </div>
+            </Link>
           ))}
         </div>
       </section>

@@ -22,7 +22,7 @@ from app.services import project_service
 from app.utils.exceptions import UnauthorizedException
 from app.utils.response import error_response, success_response
 
-router = APIRouter(prefix="/api/projects", tags=["项目管理"])
+router = APIRouter(prefix="", tags=["项目管理"])
 
 
 def _extract_token(authorization: Optional[str]) -> str:

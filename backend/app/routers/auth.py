@@ -17,7 +17,7 @@ from app.services import auth_service
 from app.utils.exceptions import UnauthorizedException
 from app.utils.response import error_response, success_response
 
-router = APIRouter(prefix="/api/auth", tags=["认证"])
+router = APIRouter(prefix="/auth", tags=["认证"])
 
 
 class LoginRequest(BaseModel):

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { notify } from "@/lib/toast";
 import { useAuthStore } from "@/stores/auth";
@@ -13,7 +13,6 @@ import {
   Network,
   ShieldCheck,
   Sparkles,
-  UserCog,
   UserRound,
   Users,
 } from "lucide-react";
@@ -22,30 +21,39 @@ const FLOW = ["学生画像", "智能体诊断", "路径规划", "资源生成",
 
 const ROLE_ENTRIES = [
   {
-    role: "学生体验",
-    desc: "查看个性化学习路径、推荐资源和学习反馈",
-    account: "student1 / 123456",
-    path: "/student",
-    icon: GraduationCap,
-    cls: "bg-blue-50 text-blue-700 ring-blue-100",
+    role: "管理员",
+    desc: "全平台管理、用户/角色、模型/智能体配置、调用审计与成本",
+    account: "admin / Pass@1234",
+    icon: ShieldCheck,
+    cls: "bg-red-50 text-red-700 ring-red-100",
   },
   {
     role: "教师体验",
     desc: "管理课程、生成资源、审核 AI 内容和查看教学分析",
-    account: "teacher1 / 123456",
-    path: "/teacher",
+    account: "teacher_li / Pass@1234",
     icon: Users,
     cls: "bg-purple-50 text-purple-700 ring-purple-100",
   },
   {
-    role: "管理员体验",
-    desc: "管理用户、模型、调用审计和平台运行状态",
-    account: "admin / Admin@123",
-    path: "/admin",
-    icon: UserCog,
-    cls: "bg-slate-100 text-slate-800 ring-slate-200",
+    role: "学生体验",
+    desc: "查看个性化学习路径、推荐资源和学习反馈",
+    account: "student_zhang / Pass@1234",
+    icon: GraduationCap,
+    cls: "bg-blue-50 text-blue-700 ring-blue-100",
   },
 ];
+
+async function loginAndGo(username: string, password: string) {
+  try {
+    const user = await useAuthStore.getState().login(username, password);
+    const target = user.roles.includes("admin") ? "/admin"
+      : user.roles.includes("teacher") ? "/teacher"
+      : "/student";
+    window.location.href = target;
+  } catch (e) {
+    notify.error("登录失败：" + String(e));
+  }
+}
 
 export function Login() {
   const navigate = useNavigate();
@@ -215,7 +223,7 @@ export function Login() {
                   <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" defaultChecked />
                   <span className="text-sm font-medium text-slate-600">记住我</span>
                 </label>
-                <a href="#" className="inline-flex min-h-10 items-center text-sm font-bold text-blue-700 hover:text-blue-800">
+                <a href="/login" className="inline-flex min-h-10 cursor-pointer items-center text-sm font-bold text-blue-700 hover:text-blue-800">
                   忘记密码？
                 </a>
               </div>
@@ -241,15 +249,13 @@ export function Login() {
               <div className="space-y-2">
                 {ROLE_ENTRIES.map((entry) => {
                   const Icon = entry.icon;
+                  const [acc, pwd] = entry.account.split(' / ');
                   return (
                     <button
                       key={entry.role}
                       type="button"
-                      onClick={() => {
-                        setUsername(entry.account.split(' / ')[0]);
-                        notify.info(`已填入 ${entry.account.split(' / ')[0]}，请输入密码后登录`);
-                      }}
-                      className="flex min-h-11 w-full items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-200 hover:bg-white hover:shadow-sm"
+                      onClick={() => loginAndGo(acc, pwd)}
+                      className="flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-200 hover:bg-white hover:shadow-sm"
                     >
                       <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ring-1 ${entry.cls}`}>
                         <Icon className="h-5 w-5" />
