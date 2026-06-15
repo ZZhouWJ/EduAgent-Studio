@@ -161,8 +161,6 @@ export function StudentLearningPath() {
                 </div>
               </div>
             ))}
-            </div>
-            )}
           </div>
         </div>
       </section>

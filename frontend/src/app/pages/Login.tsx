@@ -24,7 +24,7 @@ const ROLE_ENTRIES = [
   {
     role: "学生体验",
     desc: "查看个性化学习路径、推荐资源和学习反馈",
-    account: "student01 / Student@123",
+    account: "student1 / 123456",
     path: "/student",
     icon: GraduationCap,
     cls: "bg-blue-50 text-blue-700 ring-blue-100",
@@ -32,7 +32,7 @@ const ROLE_ENTRIES = [
   {
     role: "教师体验",
     desc: "管理课程、生成资源、审核 AI 内容和查看教学分析",
-    account: "teacher01 / Teacher@123",
+    account: "teacher1 / 123456",
     path: "/teacher",
     icon: Users,
     cls: "bg-purple-50 text-purple-700 ring-purple-100",
@@ -40,7 +40,7 @@ const ROLE_ENTRIES = [
   {
     role: "管理员体验",
     desc: "管理用户、模型、调用审计和平台运行状态",
-    account: "admin / Admin@123456",
+    account: "admin / Admin@123",
     path: "/admin",
     icon: UserCog,
     cls: "bg-slate-100 text-slate-800 ring-slate-200",

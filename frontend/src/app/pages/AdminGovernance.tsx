@@ -1,7 +1,7 @@
 import React from "react";
 import { AlertTriangle, Bot, CheckCircle2, ClipboardCheck, FileWarning, Gauge, LockKeyhole, ShieldAlert, ShieldCheck, SlidersHorizontal } from "lucide-react";
-import { useApi } from "../lib/useApi";
-import { statisticsApi } from "../lib/api";
+import { useApi } from "@/lib/useApi";
+import { statisticsApi } from "@/lib/api";
 
 const GOVERNANCE_RULES = [
   ["事实一致性阈值", "≥ 80%", "低于阈值必须进入教师复核"],

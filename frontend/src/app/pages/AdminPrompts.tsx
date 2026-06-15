@@ -1,8 +1,8 @@
 import React from "react";
 import { Copy, FileText, History, Play, Plus, Save, WandSparkles } from "lucide-react";
-import { useApi } from "../lib/useApi";
-import { promptsApi, PromptTemplate, PromptVersion } from "../lib/api";
-import { DetailDrawer, ModalShell, PageHeader, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast } from "../components/common/ProductUI";
+import { useApi } from "@/lib/useApi";
+import { promptsApi, PromptTemplate, PromptVersion } from "@/lib/api";
+import { DetailDrawer, ModalShell, PageHeader, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast } from "@/components/common/ProductUI";
 
 function mapTemplate(t: PromptTemplate) {
   return {

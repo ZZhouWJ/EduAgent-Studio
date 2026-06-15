@@ -1,8 +1,8 @@
 import React from "react";
 import { ActivitySquare, Download, Gauge, ShieldAlert, Timer, WalletCards } from "lucide-react";
-import { useApi } from "../lib/useApi";
-import { invocationsApi, Invocation } from "../lib/api";
-import { DetailDrawer, PageHeader, PageShell, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, useInlineToast } from "../components/common/ProductUI";
+import { useApi } from "@/lib/useApi";
+import { invocationsApi, Invocation } from "@/lib/api";
+import { DetailDrawer, PageHeader, PageShell, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, useInlineToast } from "@/components/common/ProductUI";
 
 function mapInvocation(i: Invocation) {
   const statusMap: Record<string, string> = { success: "成功", failed: "失败", pending: "进行中" };

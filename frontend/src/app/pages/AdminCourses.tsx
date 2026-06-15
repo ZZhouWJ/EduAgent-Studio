@@ -1,8 +1,8 @@
 import React from "react";
 import { BookOpen, Database, FileText, GraduationCap, Library, UserRound, Users } from "lucide-react";
-import { useApi } from "../lib/useApi";
-import { learningApi, Course } from "../lib/api";
-import { DetailDrawer, PageHeader, PageShell, ProgressBar, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast } from "../components/common/ProductUI";
+import { useApi } from "@/lib/useApi";
+import { learningApi, Course } from "@/lib/api";
+import { DetailDrawer, PageHeader, PageShell, ProgressBar, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast } from "@/components/common/ProductUI";
 
 function mapCourse(c: Course) {
   const statusMap: Record<string, string> = { active: "活跃", inactive: "停用", archived: "归档" };

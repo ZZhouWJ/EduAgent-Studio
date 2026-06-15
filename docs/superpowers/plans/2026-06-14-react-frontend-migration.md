@@ -18,7 +18,7 @@
   - `APP_NAME=AI-Collab-Audit-System`（不是 EduAgent Studio，但前端不依赖这个）
   - `DB_HOST=127.0.0.1 DB_PORT=3306 DB_USER=root DB_PASSWORD=061202 DB_NAME=ai_collab_audit_system`
   - `LLM_PROVIDER=minimax LLM_MODEL=MiniMax-M3`
-- **测试账号**：`admin`、`teacher01`、`student01` / `student02` / `student03`（密码是 bcrypt 哈希 `$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lrujj3vjPGga31lW` —— 与 "password" 字符串对应）
+- **测试账号**：`admin`（密码 `Admin@123`）、`teacher1`（密码 `123456`）、`student1`（密码 `123456`）
 - **修复过的 git 提交**：
   - `adcb8c2` 阶段 0：切换到 React 模板
   - `1cd5cca` 修复后端合并冲突（main.py + learning.py）
@@ -1330,7 +1330,7 @@ import { notify } from '@/lib/toast'
 cd frontend && pnpm dev
 ```
 
-打开浏览器访问 http://localhost:5173/login，尝试登录 `admin / Admin@123456`，应该跳转到 `/admin`（前提是后端在 8002 跑着）。
+打开浏览器访问 http://localhost:5174/login，尝试登录 `admin / Admin@123`，应该跳转到 `/admin`（前提是后端在 8000 跑着）。
 
 ---
 
@@ -1486,9 +1486,9 @@ cd frontend && pnpm dev
 
 | 角色 | 账号 | 测试路径 |
 |---|---|---|
-| admin | admin / Admin@123456 | 登录 → /admin → 用户管理 → 提示词模板 → 模型配置 → 调用审计 → 成本统计 |
-| teacher | teacher01 / Teacher@123 | 登录 → /teacher → Dashboard → 课程空间 → 智能体工作台（生成一次）→ 资源库 → 审核中心（审核通过）→ 分析看板 |
-| student | student01 / Student@123 | 登录 → /student → Dashboard → 画像 → 学习路径 → 任务 → 反馈 |
+| admin | admin / Admin@123 | 登录 → /admin → 用户管理 → 提示词模板 → 模型配置 → 调用审计 → 成本统计 |
+| teacher | teacher1 / 123456 | 登录 → /teacher → Dashboard → 课程空间 → 智能体工作台（生成一次）→ 资源库 → 审核中心（审核通过）→ 分析看板 |
+| student | student1 / 123456 | 登录 → /student → Dashboard → 画像 → 学习路径 → 任务 → 反馈 |
 
 - [ ] **Step 4：记录并修复 bug**
 

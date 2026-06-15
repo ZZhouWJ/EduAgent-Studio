@@ -1,9 +1,9 @@
 import React from "react";
 import { BellRing, Coins, Download, LineChart as LineChartIcon, PieChart, WalletCards } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { useApi } from "../lib/useApi";
-import { statisticsApi } from "../lib/api";
-import { ModalShell, PageHeader, PageShell, SegmentedControl, StatCard, primaryButton, secondaryButton, useInlineToast } from "../components/common/ProductUI";
+import { useApi } from "@/lib/useApi";
+import { statisticsApi } from "@/lib/api";
+import { ModalShell, PageHeader, PageShell, SegmentedControl, StatCard, primaryButton, secondaryButton, useInlineToast } from "@/components/common/ProductUI";
 
 const DEMO_COURSES = ["全部课程", "数据库系统原理与 Web 项目实践", "人工智能导论"];
 const DEMO_MODELS = ["全部模型", "Qwen-Max", "GPT-4o", "Claude-3.5"];

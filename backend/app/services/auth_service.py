@@ -6,6 +6,8 @@
 
 from typing import Any, Dict, Optional
 
+from fastapi import Header
+
 from app.repositories import user_repo
 from app.utils.exceptions import ConflictException, UnauthorizedException, ValidationException
 from app.utils.password import hash_password, verify_password
@@ -447,7 +449,7 @@ def _extract_token_from_header(authorization: str) -> str:
     return authorization
 
 
-def get_current_user_dependency(authorization: str = "") -> Dict[str, Any]:
+def get_current_user_dependency(authorization: Optional[str] = Header(None, alias="Authorization")) -> Dict[str, Any]:
     """
     FastAPI 依赖：从 Authorization: Bearer <token> 提取并验证用户。
 
@@ -458,7 +460,7 @@ def get_current_user_dependency(authorization: str = "") -> Dict[str, Any]:
 
     FastAPI 会自动从请求头注入 authorization 参数。
     """
-    token = _extract_token_from_header(authorization)
+    token = _extract_token_from_header(authorization or "")
     if not token:
         raise UnauthorizedException("缺少认证信息")
     user = get_current_user(token)

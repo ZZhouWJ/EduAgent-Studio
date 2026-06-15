@@ -2,8 +2,8 @@ import React from "react";
 import { Link } from "react-router";
 import { ActivitySquare, ArrowRight, Bot, CheckCircle2, CircleAlert, Coins, Database, HardDrive, Library, LockKeyhole, Server, Settings2, ShieldAlert, TerminalSquare, Users } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { useApi } from "../lib/useApi";
-import { statisticsApi } from "../lib/api";
+import { useApi } from "@/lib/useApi";
+import { statisticsApi } from "@/lib/api";
 
 const SERVICES = [
   { name: "后端服务", status: "正常", desc: "响应 128ms", icon: Server },

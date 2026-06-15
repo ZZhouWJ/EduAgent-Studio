@@ -1,8 +1,8 @@
 import React from "react";
 import { ActivitySquare, Download, FileClock, LogIn, Settings2, ShieldAlert } from "lucide-react";
-import { useApi } from "../lib/useApi";
-import { logsApi, OperationLog, LoginLog } from "../lib/api";
-import { DetailDrawer, PageHeader, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, useInlineToast } from "../components/common/ProductUI";
+import { useApi } from "@/lib/useApi";
+import { logsApi, OperationLog, LoginLog } from "@/lib/api";
+import { DetailDrawer, PageHeader, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, useInlineToast } from "@/components/common/ProductUI";
 
 const logTabs = ["全部", "登录日志", "资源日志", "审核日志", "画像日志", "系统配置日志"];
 

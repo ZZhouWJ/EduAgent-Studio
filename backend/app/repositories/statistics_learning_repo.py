@@ -204,7 +204,7 @@ class StatisticsLearningRepository:
                     SUM(input_tokens) AS total_input_tokens,
                     SUM(output_tokens) AS total_output_tokens,
                     SUM(cost) AS total_cost
-                FROM invocations
+                FROM ai_invocations
                 WHERE is_deleted = 0
                   AND created_at >= %s
                   AND created_at <= %s
@@ -291,7 +291,7 @@ class StatisticsLearningRepository:
                     agent_name,
                     SUM(input_tokens + output_tokens) AS total_tokens,
                     SUM(cost) AS total_cost
-                FROM invocations
+                FROM ai_invocations
                 WHERE is_deleted = 0
                 GROUP BY agent_name
                 ORDER BY total_tokens DESC

@@ -244,7 +244,6 @@ export function LearningFeedback() {
           })}
         </div>
       </div>
+      {toast}
     </div>
-    {toast}
-  );
 }

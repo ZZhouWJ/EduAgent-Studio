@@ -1,8 +1,8 @@
 import React from "react";
 import { KeyRound, Plus, Save, ShieldCheck, UserCog, Users } from "lucide-react";
-import { useApi } from "../lib/useApi";
-import { usersApi, User } from "../lib/api";
-import { DetailDrawer, ModalShell, PageHeader, PageShell, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast } from "../components/common/ProductUI";
+import { useApi } from "@/lib/useApi";
+import { usersApi, User } from "@/lib/api";
+import { DetailDrawer, ModalShell, PageHeader, PageShell, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast } from "@/components/common/ProductUI";
 
 function mapUser(u: User) {
   return {

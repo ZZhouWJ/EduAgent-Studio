@@ -56,67 +56,68 @@ class LearningRepository:
             WHERE c.is_deleted = 0
             ORDER BY c.course_id ASC
         """
+
         with get_db_cursor() as cursor:
             cursor.execute(sql)
             courses = cursor.fetchall()
 
-        result = []
-        for course in courses:
-            course_id = course["course_id"]
+            result = []
+            for course in courses:
+                course_id = course["course_id"]
 
-            kp_sql = """
-                SELECT kp_id, kp_name, difficulty_level
-                FROM knowledge_points
-                WHERE course_id = %s AND is_deleted = 0
-                ORDER BY kp_id ASC
-            """
-            cursor.execute(kp_sql, (course_id,))
-            kp_rows = cursor.fetchall()
-            knowledge_points = [
-                {
-                    "id": row["kp_id"],
-                    "name": row["kp_name"],
-                    "mastery_avg": 0.5,
-                    "difficulty": _map_difficulty(row["difficulty_level"]),
-                }
-                for row in kp_rows
-            ]
+                kp_sql = """
+                    SELECT kp_id, kp_name, difficulty_level
+                    FROM knowledge_points
+                    WHERE course_id = %s AND is_deleted = 0
+                    ORDER BY kp_id ASC
+                """
+                cursor.execute(kp_sql, (course_id,))
+                kp_rows = cursor.fetchall()
+                knowledge_points = [
+                    {
+                        "id": row["kp_id"],
+                        "name": row["kp_name"],
+                        "mastery_avg": 0.5,
+                        "difficulty": _map_difficulty(row["difficulty_level"]),
+                    }
+                    for row in kp_rows
+                ]
 
-            cursor.execute(
-                "SELECT COUNT(*) AS cnt FROM knowledge_points WHERE course_id = %s AND is_deleted = 0",
-                (course_id,),
-            )
-            kp_count = cursor.fetchone()["cnt"]
+                cursor.execute(
+                    "SELECT COUNT(*) AS cnt FROM knowledge_points WHERE course_id = %s AND is_deleted = 0",
+                    (course_id,),
+                )
+                kp_count = cursor.fetchone()["cnt"]
 
-            cursor.execute(
-                "SELECT COUNT(*) AS cnt FROM student_profiles WHERE course_id = %s AND is_deleted = 0",
-                (course_id,),
-            )
-            student_count = cursor.fetchone()["cnt"]
+                cursor.execute(
+                    "SELECT COUNT(*) AS cnt FROM student_profiles WHERE course_id = %s AND is_deleted = 0",
+                    (course_id,),
+                )
+                student_count = cursor.fetchone()["cnt"]
 
-            cursor.execute(
-                "SELECT COUNT(*) AS cnt FROM learning_tasks WHERE course_id = %s AND is_deleted = 0",
-                (course_id,),
-            )
-            task_count = cursor.fetchone()["cnt"]
+                cursor.execute(
+                    "SELECT COUNT(*) AS cnt FROM learning_tasks WHERE course_id = %s AND is_deleted = 0",
+                    (course_id,),
+                )
+                task_count = cursor.fetchone()["cnt"]
 
-            result.append(
-                {
-                    "id": course_id,
-                    "name": course["course_name"],
-                    "code": course["course_code"],
-                    "description": course["description"],
-                    "teacher": course["teacher"] or "",
-                    "semester": "2025-2026学年春季学期",
-                    "status": course["status"],
-                    "knowledge_point_count": kp_count,
-                    "student_count": student_count,
-                    "task_count": task_count,
-                    "cover_color": _compute_cover_color(course_id),
-                    "tags": [],
-                    "knowledge_points": knowledge_points,
-                }
-            )
+                result.append(
+                    {
+                        "id": course_id,
+                        "name": course["course_name"],
+                        "code": course["course_code"],
+                        "description": course["description"],
+                        "teacher": course["teacher"] or "",
+                        "semester": "2025-2026学年春季学期",
+                        "status": course["status"],
+                        "knowledge_point_count": kp_count,
+                        "student_count": student_count,
+                        "task_count": task_count,
+                        "cover_color": _compute_cover_color(course_id),
+                        "tags": [],
+                        "knowledge_points": knowledge_points,
+                    }
+                )
 
         return result
 
@@ -160,36 +161,37 @@ class LearningRepository:
             WHERE kp.course_id = %s AND kp.is_deleted = 0
             ORDER BY kp.kp_id ASC
         """
-        cursor.execute(kp_sql, (profile_id, course_id))
-        kp_rows = cursor.fetchall()
-        knowledge_points = [
-            {
-                "id": row["kp_id"],
-                "name": row["kp_name"],
-                "mastery_level": row["mastery_level"],
-                "mastery_avg": row["mastery_level"],
-                "difficulty": _map_difficulty(row["difficulty_level"]),
-            }
-            for row in kp_rows
-        ]
+        with get_db_cursor() as cursor:
+            cursor.execute(kp_sql, (profile_id, course_id))
+            kp_rows = cursor.fetchall()
+            knowledge_points = [
+                {
+                    "id": row["kp_id"],
+                    "name": row["kp_name"],
+                    "mastery_level": row["mastery_level"],
+                    "mastery_avg": row["mastery_level"],
+                    "difficulty": _map_difficulty(row["difficulty_level"]),
+                }
+                for row in kp_rows
+            ]
 
-        cursor.execute(
-            "SELECT COUNT(*) AS cnt FROM knowledge_points WHERE course_id = %s AND is_deleted = 0",
-            (course_id,),
-        )
-        kp_count = cursor.fetchone()["cnt"]
+            cursor.execute(
+                "SELECT COUNT(*) AS cnt FROM knowledge_points WHERE course_id = %s AND is_deleted = 0",
+                (course_id,),
+            )
+            kp_count = cursor.fetchone()["cnt"]
 
-        cursor.execute(
-            "SELECT COUNT(*) AS cnt FROM student_profiles WHERE course_id = %s AND is_deleted = 0",
-            (course_id,),
-        )
-        student_count = cursor.fetchone()["cnt"]
+            cursor.execute(
+                "SELECT COUNT(*) AS cnt FROM student_profiles WHERE course_id = %s AND is_deleted = 0",
+                (course_id,),
+            )
+            student_count = cursor.fetchone()["cnt"]
 
-        cursor.execute(
-            "SELECT COUNT(*) AS cnt FROM learning_tasks WHERE course_id = %s AND is_deleted = 0",
-            (course_id,),
-        )
-        task_count = cursor.fetchone()["cnt"]
+            cursor.execute(
+                "SELECT COUNT(*) AS cnt FROM learning_tasks WHERE course_id = %s AND is_deleted = 0",
+                (course_id,),
+            )
+            task_count = cursor.fetchone()["cnt"]
 
         return {
             "id": course["course_id"],

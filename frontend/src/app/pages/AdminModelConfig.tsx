@@ -1,8 +1,8 @@
 import React from "react";
 import { ActivitySquare, Bot, Coins, Gauge, PlugZap, Save, Settings2, ToggleLeft } from "lucide-react";
-import { useApi } from "../lib/useApi";
-import { modelsApi, AIModel } from "../lib/api";
-import { ModalShell, PageHeader, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast } from "../components/common/ProductUI";
+import { useApi } from "@/lib/useApi";
+import { modelsApi, AIModel } from "@/lib/api";
+import { ModalShell, PageHeader, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast } from "@/components/common/ProductUI";
 
 function mapModel(m: AIModel) {
   const abilities = m.capability_tags ? m.capability_tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
