@@ -2,19 +2,19 @@
 
 > 基于大模型的个性化学习资源生成与多智能体协作系统
 
-面向高校课程学习场景，基于学生画像和知识点掌握情况，组织多个学习智能体协同完成学习诊断、路径规划、资源生成、评测反馈和学习分析，形成「画像 - 生成 - 学习 - 评测 - 优化」的个性化学习闭环。
+面向高校课程学习场景，基于学生画像和知识点掌握情况，组织多个学习智能体协同完成学习诊断、路径规划、资源生成、评测反馈和学习分析，形成闭环的个性化学习系统。
 
 [![React](https://img.shields.io/badge/Frontend-React_18-61DAFB?style=flat&logo=react)](https://react.dev)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat&logo=fastapi)](https://fastapi.tiangolo.com)
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL+pgvector-336791?style=flat&logo=postgresql)](https://www.postgresql.org)
 [![LangGraph](https://img.shields.io/badge/Multi--Agent-LangGraph-7C3AED?style=flat)](https://langchain-ai.github.io/langgraph/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 ---
 
 ## 项目简介
 
-本系统为中国软件杯 A3 赛题「基于大模型的个性化资源生成与学习多智能体系统开发」参赛作品。
+本系统为中国软件杯 A3 赛题「基于大模型的个性化资源���成与学习多智能体系统开发」参赛作品。
 
 ## 核心功能
 
@@ -159,7 +159,7 @@ docker-compose up -d
 
 ## API 概览
 
-后端提供 40+ RESTful API 端点，按模块分组：
+后端提供 40+ RESTful API 端点，��模块分组：
 
 | 模块 | 前缀 | 说明 |
 |------|------|------|
