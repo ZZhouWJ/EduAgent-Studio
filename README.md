@@ -4,7 +4,7 @@
 
 面向高校课程学习场景，基于学生画像和知识点掌握情况，组织多个学习智能体协同完成学习诊断、路径规划、资源生成、评测反馈和学习分析，形成「画像 - 生成 - 学习 - 评测 - 优化」的个性化学习闭环。
 
-![Vue3](https://img.shields.io/badge/Frontend-Vue3-4FC08D?style=flat&logo=vue.js)
+![React](https://img.shields.io/badge/Frontend-React_18-61DAFB?style=flat&logo=react)
 ![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat&logo=fastapi)
 ![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL+pgvector-336791?style=flat&logo=postgresql)
 ![LangGraph](https://img.shields.io/badge/Multi--Agent-LangGraph-7C3AED?style=flat)
@@ -35,7 +35,7 @@
 ## 技术栈
 
 ### 前端展示层
-Vue3 + Vite + TypeScript + Element Plus + Pinia + Vue Router + Axios + ECharts
+React 18 + Vite 6 + TypeScript 5 + Tailwind v4 + shadcn/ui (Radix + CVA) + Zustand + Axios + Recharts + react-router 7
 
 ### 后端服务层
 FastAPI + Pydantic + SQLAlchemy + Alembic + JWT + RBAC + RESTful API + SSE
@@ -115,10 +115,19 @@ cp .env.example .env
 ```
 
 ### 3. 初始化数据库
+
+项目当前用 **MySQL** 跑业务表，用 **PostgreSQL + pgvector** 跑向量检索：
+
 ```bash
-# PostgreSQL（新建A3表）
-psql -U postgres -d eduagent_studio < database/09_create_a3_tables.sql
-psql -U postgres -d eduagent_studio < database/10_insert_a3_data.sql
+# MySQL（跑 business 表 + A3 表）
+mysql -u root -p ai_collab_audit_system < database/01_create_initial_tables.sql
+mysql -u root -p ai_collab_audit_system < database/02_insert_initial_data.sql
+# ... 03-08 视情况追加 ...
+mysql -u root -p ai_collab_audit_system < database/09_create_a3_tables.sql
+mysql -u root -p ai_collab_audit_system < database/10_insert_a3_data.sql
+
+# PostgreSQL（pgvector 可选，给知识库用）
+psql -U postgres -d eduagent_studio < database/pgvector/01_enable_pgvector.sql
 ```
 
 ### 4. 启动后端
@@ -150,7 +159,10 @@ cp .env.example .env
 npm run dev
 ```
 
-访问：http://localhost:5173
+访问：http://localhost:5174
+
+> 注意：5173 端口可能已被其他项目占用，Vite 会自动切换到 5174/5175 等。
+> Vite proxy 会把 `/api/*` 转发到 `http://127.0.0.1:8000`（后端默认端口）。
 
 ## Docker Compose 启动（推荐）
 
@@ -160,11 +172,25 @@ docker-compose up -d
 
 ## 演示账号
 
-| 角色 | 用户名 | 密码 | 说明 |
-|------|--------|------|------|
-| 管理员 | admin | Admin@123456 | 全部功能访问权限 |
-| 教师 | teacher01 | Teacher@123 | 课程管理、资源审核 |
-| 学生 | student01 | Student@123 | 查看任务、生成资源、提交反馈 |
+| 角色 | 用户名 | 密码 | 登录入口 |
+|------|--------|------|---------|
+| 管理员 | admin | `Admin@123` | `/admin` |
+| 教师 | teacher1 | `123456` | `/teacher` |
+| 学生 | student1 | `123456` | `/student` |
+
+> 实际数据库中 `admin`/`teacher01`/`student01` 等账号的密码可能因历史数据不同步而无法登录，
+> 可用如下 Python 脚本重置（连接信息见 `backend/.env`）：
+>
+> ```python
+> import pymysql, bcrypt
+> conn = pymysql.connect(host='127.0.0.1', port=3306, user='root',
+>                        password='<DB_PASSWORD>', database='ai_collab_audit_system')
+> cur = conn.cursor()
+> for u, p in [('admin','Admin@123'), ('teacher1','123456'), ('student1','123456')]:
+>     cur.execute("UPDATE users SET password_hash=%s WHERE username=%s",
+>                 (bcrypt.hashpw(p.encode(), bcrypt.gensalt(12)).decode(), u))
+> conn.commit()
+> ```
 
 ## 安全说明
 
