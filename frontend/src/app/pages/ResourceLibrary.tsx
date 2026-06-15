@@ -1,30 +1,7 @@
 import React from "react";
 import { Search, Filter, FileText, CheckCircle2, AlertCircle, PlayCircle, Code, ListTree, MoreVertical } from "lucide-react";
 import { useApi } from "@/lib/useApi";
-import { resourcesApi } from "@/lib/api";
-
-interface Resource {
-  title: string
-  type: string
-  course: string
-  student: string
-  tag: string
-  diff: string
-  status: string
-  conf: number
-  refs: number
-  time: string
-  icon: React.ComponentType<{ className?: string }>
-  iconColor: string
-  iconBg: string
-}
-
-const TYPE_ICON_MAP: Record<string, { icon: React.ComponentType<{ className?: string }>; iconColor: string; iconBg: string }> = {
-  "课程讲义": { icon: FileText, iconColor: "text-blue-500", iconBg: "bg-blue-50" },
-  "题库": { icon: ListTree, iconColor: "text-purple-500", iconBg: "bg-purple-50" },
-  "代码案例": { icon: Code, iconColor: "text-emerald-500", iconBg: "bg-emerald-50" },
-  "视频脚本": { icon: PlayCircle, iconColor: "text-orange-500", iconBg: "bg-orange-50" },
-};
+import { learningApi, resourcesApi } from "@/lib/api";
 
 function formatTimeAgo(dateStr: string): string {
   try {
@@ -40,72 +17,118 @@ function formatTimeAgo(dateStr: string): string {
   }
 }
 
+function resourceIcon(type: string) {
+  const t = (type ?? "").toLowerCase();
+  if (t.includes("讲义") || t.includes("文档")) return FileText;
+  if (t.includes("练习") || t.includes("题库")) return ListTree;
+  if (t.includes("代码") || t.includes("案例")) return Code;
+  if (t.includes("视频") || t.includes("动画")) return PlayCircle;
+  return FileText;
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  approved: "已通过",
+  pending: "待审核",
+  rejected: "被退回",
+  draft: "草稿",
+};
+
 export function ResourceLibrary() {
   const [typeFilter, setTypeFilter] = React.useState("");
-  const { data, loading } = useApi(() => resourcesApi.list({ type: typeFilter || undefined, page_size: 100 }), [typeFilter]);
+  const [statusFilter, setStatusFilter] = React.useState("");
+  const [courseFilter, setCourseFilter] = React.useState("");
+  const [keyword, setKeyword] = React.useState("");
 
-  const resources: Resource[] = (data?.items ?? []).map((r) => {
-    const iconInfo = TYPE_ICON_MAP[r.resource_type] ?? { icon: FileText, iconColor: "text-slate-500", iconBg: "bg-slate-50" };
-    return {
-      title: r.resource_title,
-      type: r.resource_type,
-      course: r.course_name,
-      student: "—",
-      tag: "—",
-      diff: r.difficulty,
-      status: r.status,
-      conf: 80,
-      refs: 0,
-      time: formatTimeAgo(r.created_at),
-      icon: iconInfo.icon,
-      iconColor: iconInfo.iconColor,
-      iconBg: iconInfo.iconBg,
-    };
+  const { data, loading } = useApi(
+    () => resourcesApi.list({
+      type: typeFilter || undefined,
+      course_id: courseFilter ? Number(courseFilter) : undefined,
+      page_size: 100,
+    }),
+    [typeFilter, statusFilter, courseFilter]
+  );
+  const coursesState = useApi(() => learningApi.listCourses(), []);
+
+  const courses = coursesState.data ?? [];
+
+  const resources = (data?.items ?? []).map((r) => ({
+    id: r.resource_id,
+    title: r.resource_title,
+    type: r.resource_type || "资源",
+    course: r.course_name,
+    status: STATUS_LABELS[r.status] ?? r.status,
+    rawStatus: r.status,
+    difficulty: r.difficulty || "—",
+    time: formatTimeAgo(r.created_at),
+    icon: resourceIcon(r.resource_type ?? ""),
+  }));
+
+  // Dynamic tabs from real data
+  const allTypes = Array.from(new Set(resources.map((r) => r.type))).filter(Boolean);
+  const tabs = ["全部", ...allTypes];
+
+  const filtered = resources.filter((r) => {
+    const statusMatch = !statusFilter || r.rawStatus === statusFilter;
+    const keywordMatch = !keyword || r.title.toLowerCase().includes(keyword.toLowerCase());
+    return statusMatch && keywordMatch;
   });
 
   return (
-    <div className="space-y-6 max-w-[1400px] mx-auto h-full flex flex-col">
+    <div className="mx-auto flex h-full max-w-[1400px] flex-col space-y-6 pb-6">
       <div className="shrink-0">
-        <h1 className="text-2xl font-bold text-slate-900">学习资源库</h1>
-        <p className="text-slate-500 mt-1 text-sm">统一管理由多智能体生成并经教师审核的个性化学习资源。</p>
+        <h1 className="text-2xl font-black text-slate-900">学习资源库</h1>
+        <p className="mt-1 text-sm text-slate-500">统一管理由多智能体生成并经教师审核的个性化学习资源。</p>
       </div>
 
-      <div className="bg-white rounded-2xl p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] border border-slate-100 flex items-center justify-between gap-4 shrink-0">
-        <div className="flex gap-2 items-center flex-1">
-          <div className="relative max-w-xs w-full">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input 
-              type="text" 
+      {/* Filters */}
+      <div className="flex shrink-0 items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+        <div className="flex items-center gap-2 flex-1">
+          <div className="relative w-full max-w-xs">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
               aria-label="搜索资源标题"
-              className="w-full h-9 pl-9 pr-3 rounded-lg bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              className="h-9 w-full cursor-text pl-9 pr-3 rounded-lg border border-slate-200 bg-slate-50 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              placeholder="搜索资源标题..."
             />
           </div>
-          <select className="h-9 px-3 rounded-lg bg-slate-50 border border-slate-200 text-sm outline-none w-32">
-            <option>所有课程</option>
+          <select
+            className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm"
+            value={courseFilter}
+            onChange={(e) => setCourseFilter(e.target.value)}
+          >
+            <option value="">所有课程</option>
+            {courses.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
           </select>
-          <select className="h-9 px-3 rounded-lg bg-slate-50 border border-slate-200 text-sm outline-none w-32">
-            <option>所有学生</option>
-          </select>
-          <select className="h-9 px-3 rounded-lg bg-slate-50 border border-slate-200 text-sm outline-none w-32">
-            <option>全部状态</option>
-            <option>已通过</option>
-            <option>待审核</option>
-            <option>被退回</option>
+          <select
+            className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">全部状态</option>
+            <option value="approved">已通过</option>
+            <option value="pending">待审核</option>
+            <option value="rejected">被退回</option>
           </select>
         </div>
-        <button className="h-9 px-4 flex items-center gap-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">
-          <Filter className="w-4 h-4" /> 更多筛选
+        <button className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600 transition hover:bg-slate-50">
+          <Filter className="h-4 w-4" /> 更多筛选
         </button>
       </div>
 
-      <div className="flex gap-2 shrink-0 border-b border-slate-200">
-        {["全部", "课程讲义", "思维导图", "分层练习题", "代码实操案例", "PPT 大纲", "视频/动画脚本"].map((tab, i) => (
-          <button 
-            key={tab} 
+      {/* Type Tabs */}
+      <div className="flex shrink-0 gap-2 border-b border-slate-200">
+        {tabs.map((tab) => (
+          <button
+            key={tab}
             onClick={() => setTypeFilter(tab === "全部" ? "" : tab)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              (tab === "全部" && !typeFilter) || (typeFilter === tab)
-                ? "border-blue-600 text-blue-600" 
+            className={`cursor-pointer border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+              (tab === "全部" && !typeFilter) || typeFilter === tab
+                ? "border-blue-600 text-blue-600"
                 : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
             }`}
           >
@@ -114,70 +137,59 @@ export function ResourceLibrary() {
         ))}
       </div>
 
+      {/* Resource Grid */}
       {loading ? (
         <div className="flex items-center justify-center h-32 text-slate-400">加载中...</div>
+      ) : filtered.length === 0 ? (
+        <div className="flex items-center justify-center h-32 text-slate-400">暂无资源</div>
       ) : (
-      <div className="flex-1 overflow-y-auto min-h-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-max">
-        {resources.length === 0 ? (
-          <div className="col-span-full flex items-center justify-center h-32 text-slate-400">暂无资源</div>
-        ) : (
-        resources.map((res, i) => {
-          const Icon = res.icon;
-          return (
-            <div key={i} className="bg-white rounded-2xl p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] border border-slate-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col group">
-              <div className="flex justify-between items-start mb-4">
-                <div className={`w-10 h-10 rounded-xl ${res.iconBg} flex items-center justify-center`}>
-                  <Icon className={`w-5 h-5 ${res.iconColor}`} />
+        <div className="auto-rows-max grid grid-cols-1 gap-4 overflow-y-auto min-h-0 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filtered.map((res) => {
+            const Icon = res.icon;
+            const statusColor =
+              res.rawStatus === "approved" ? "text-emerald-600" :
+              res.rawStatus === "pending" ? "text-orange-600" : "text-red-600";
+            return (
+              <div
+                key={res.id}
+                className="group flex flex-col rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-1 hover:shadow-lg"
+              >
+                <div className="mb-4 flex items-start justify-between">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
+                    <Icon className="h-5 w-5 cursor-pointer text-blue-500" />
+                  </div>
+                  <button className="text-slate-400 opacity-0 transition-opacity group-hover:opacity-100">
+                    <MoreVertical className="h-5 w-5 cursor-pointer" />
+                  </button>
                 </div>
-                <button className="text-slate-400 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <MoreVertical className="w-5 h-5" />
-                </button>
-              </div>
-              
-              <h3 className="font-bold text-slate-900 text-[15px] leading-tight mb-2 line-clamp-2">{res.title}</h3>
-              
-              <div className="flex flex-wrap gap-1.5 mb-4">
-                <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600">{res.tag}</span>
-                <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-600">{res.type}</span>
-              </div>
 
-              <div className="mt-auto space-y-2.5 mb-4">
-                <div className="flex justify-between text-xs text-slate-500">
-                  <span>适用学生</span>
-                  <span className="font-medium text-slate-700">{res.student}</span>
+                <h3 className="mb-2 line-clamp-2 text-[15px] font-black leading-tight text-slate-900">{res.title}</h3>
+
+                <div className="mb-4 flex flex-wrap gap-1.5">
+                  <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">{res.course}</span>
+                  <span className="rounded bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-600">{res.type}</span>
                 </div>
-                <div className="flex justify-between text-xs text-slate-500">
-                  <span>难度 & 来源</span>
-                  <span className="font-medium text-slate-700">{res.diff} · {res.refs}引</span>
-                </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-slate-500">可信度</span>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${res.conf}%` }}></div>
-                    </div>
-                    <span className="font-bold text-emerald-600">{res.conf}%</span>
+
+                <div className="mt-auto mb-4 space-y-2.5">
+                  <div className="flex justify-between text-xs text-slate-500">
+                    <span>难度</span>
+                    <span className="font-medium text-slate-700">{res.difficulty}</span>
                   </div>
                 </div>
-              </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  {res.status === "已通过" && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
-                  {res.status === "待审核" && <AlertCircle className="w-4 h-4 text-orange-500" />}
-                  {res.status === "被退回" && <AlertCircle className="w-4 h-4 text-red-500" />}
-                  <span className={`text-xs font-bold ${
-                    res.status === "已通过" ? "text-emerald-600" :
-                    res.status === "待审核" ? "text-orange-600" : "text-red-600"
-                  }`}>{res.status}</span>
+                <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                  <div className="flex items-center gap-1.5">
+                    {res.rawStatus === "approved" && <CheckCircle2 className="h-4 w-4 cursor-pointer text-emerald-500" />}
+                    {res.rawStatus === "pending" && <AlertCircle className="h-4 w-4 cursor-pointer text-orange-500" />}
+                    {res.rawStatus === "rejected" && <AlertCircle className="h-4 w-4 cursor-pointer text-red-500" />}
+                    <span className={`text-xs font-bold ${statusColor}`}>{res.status}</span>
+                  </div>
+                  <span className="text-[11px] text-slate-400">{res.time}</span>
                 </div>
-                <span className="text-[11px] text-slate-400">{res.time}</span>
               </div>
-            </div>
-          );
-        })
-        )}
-      </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

@@ -5,19 +5,20 @@ import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "rec
 import { useApi } from "@/lib/useApi";
 import { statisticsApi } from "@/lib/api";
 
-const SERVICES = [
-  { name: "后端服务", status: "正常", desc: "响应 128ms", icon: Server },
-  { name: "数据库", status: "正常", desc: "连接池 46%", icon: Database },
-  { name: "Redis", status: "正常", desc: "命中率 94%", icon: ActivitySquare },
-  { name: "MinIO", status: "正常", desc: "存储 68%", icon: HardDrive },
-  { name: "模型服务", status: "轻微拥塞", desc: "排队 12 个请求", icon: Bot },
-];
+interface ServiceItem {
+  name: string;
+  status: string;
+  desc: string;
+  icon: React.ComponentType<{ className?: string }>;
+  key: string;
+}
 
-const RISKS = [
-  ["高风险生成内容", "2", "涉及事实准确性和安全边界"],
-  ["低可信度资源", "5", "引用覆盖率低于 70%"],
-  ["待教师复核资源", "12", "已通知课程负责人"],
-  ["异常调用记录", "3", "同一账号高频请求"],
+const INITIAL_SERVICES: ServiceItem[] = [
+  { name: "后端服务", status: "检测中", desc: "—", icon: Server, key: "api" },
+  { name: "数据库", status: "检测中", desc: "—", icon: Database, key: "db" },
+  { name: "Redis", status: "未知", desc: "无独立健康端点", icon: ActivitySquare, key: "redis" },
+  { name: "MinIO", status: "未知", desc: "无独立健康端点", icon: HardDrive, key: "minio" },
+  { name: "模型服务", status: "—", desc: "—", icon: Bot, key: "llm" },
 ];
 
 const ENTRY = [
@@ -42,7 +43,7 @@ function OverviewCard({ label, value, hint, icon, tone }: {
 }) {
   const Icon = icon;
   return (
-    <div className="edu-card edu-card-hover rounded-2xl p-4">
+    <div className="edu-card edu-card-hover cursor-pointer rounded-2xl p-4">
       <div className={`mb-4 grid h-10 w-10 place-items-center rounded-xl ring-1 ${toneClass[tone]}`}>
         <Icon className="h-5 w-5" />
       </div>
@@ -54,12 +55,60 @@ function OverviewCard({ label, value, hint, icon, tone }: {
 }
 
 export function AdminDashboard() {
+  const [services, setServices] = React.useState<ServiceItem[]>(INITIAL_SERVICES);
+
+  // Poll health endpoints every 30 seconds
+  React.useEffect(() => {
+    const tick = async () => {
+      setServices((prev) => prev.map((s) => {
+        if (s.key === "api") return { ...s, status: "检测中", desc: "—" };
+        return s;
+      }));
+      try {
+        const r1 = await fetch("/api/health");
+        const j1 = await r1.json();
+        setServices((prev) => prev.map((s) =>
+          s.key === "api"
+            ? { ...s, status: j1.code === 0 ? "正常" : "异常", desc: j1.data?.env ?? "—" }
+            : s
+        ));
+      } catch { /* keep previous */ }
+      try {
+        const r2 = await fetch("/api/health/db");
+        const j2 = await r2.json();
+        setServices((prev) => prev.map((s) =>
+          s.key === "db"
+            ? {
+                ...s,
+                status: j2.code === 0 ? "正常" : "异常",
+                desc: j2.code === 0 ? `v${j2.data?.server_version ?? "—"}` : "连接失败",
+              }
+            : s
+        ));
+      } catch { /* keep previous */ }
+    };
+    tick();
+    const h = setInterval(tick, 30000);
+    return () => clearInterval(h);
+  }, []);
+
   const overview = useApi(() => statisticsApi.overview(), []);
   const recentActivities = useApi(() => statisticsApi.recentActivities({ limit: 10 }), []);
   const modelCalls = useApi(() => statisticsApi.modelCalls(), []);
   const costs = useApi(() => statisticsApi.costs(), []);
+  const reviewsStats = useApi(() => statisticsApi.reviews(), []);
 
   const loading = overview.loading || recentActivities.loading || modelCalls.loading || costs.loading;
+
+  // RISKS derived from reviews top_issue_tags
+  const riskItems = (reviewsStats.data?.top_issue_tags ?? []).slice(0, 4).map((t): [string, string, string] => [
+    `高频问题标签：${t.tag_name}`,
+    String(t.count),
+    t.severity === "high" ? "高风险" : t.severity === "medium" ? "中风险" : "低风险",
+  ]);
+  const risks: [string, string, string][] = riskItems.length > 0 ? riskItems : [
+    ["尚无问题标签", "0", "等待数据"],
+  ];
 
   const stats = [
     {
@@ -120,7 +169,7 @@ export function AdminDashboard() {
         <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#0F172A,#2563EB,#10B981)]" />
         <div className="relative flex items-start justify-between gap-6">
           <div>
-            <div className="mb-4 flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
+            <div className="mb-4 flex w-fit cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
               <LockKeyhole className="h-3.5 w-3.5" />
               系统运营总览
             </div>
@@ -129,14 +178,14 @@ export function AdminDashboard() {
               面向平台运维和 AI 治理，集中监控用户、课程、资源、模型调用、成本和内容安全风险。
             </p>
           </div>
-          <Link to="/admin/governance" className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl bg-slate-950 px-5 text-sm font-black text-white">
+          <Link to="/admin/governance" className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-950 px-5 text-sm font-black text-white transition hover:bg-slate-800">
             查看 AI 治理
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </section>
 
-      <section className="grid grid-cols-6 gap-4">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
         {stats.map((stat) => (
           <OverviewCard key={stat.label} {...stat} />
         ))}
@@ -144,24 +193,25 @@ export function AdminDashboard() {
 
       <section className="grid grid-cols-[0.9fr_1.1fr] gap-6">
         <div className="edu-card rounded-2xl p-6">
-          <h2 className="mb-5 flex items-center gap-2 text-lg font-black text-slate-950">
+          <h2 className="mb-5 flex cursor-pointer items-center gap-2 text-lg font-black text-slate-950">
             <Server className="h-5 w-5 text-emerald-600" />
             系统运行状态
           </h2>
           <div className="space-y-3">
-            {SERVICES.map((service) => {
+            {services.map((service) => {
               const Icon = service.icon;
-              const warn = service.status !== "正常";
+              const warn = service.status !== "正常" && service.status !== "未知" && service.status !== "—" && service.status !== "检测中";
+              const isPending = service.status === "检测中";
               return (
-                <div key={service.name} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4">
-                  <div className={`grid h-10 w-10 place-items-center rounded-xl ring-1 ${warn ? "bg-orange-50 text-orange-700 ring-orange-100" : "bg-emerald-50 text-emerald-700 ring-emerald-100"}`}>
+                <div key={service.key} className="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 transition hover:border-slate-200">
+                  <div className={`grid h-10 w-10 place-items-center rounded-xl ring-1 ${isPending ? "bg-slate-100 text-slate-400 ring-slate-200" : warn ? "bg-orange-50 text-orange-700 ring-orange-100" : "bg-emerald-50 text-emerald-700 ring-emerald-100"}`}>
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-black text-slate-900">{service.name}</div>
                     <div className="mt-1 text-xs text-slate-500">{service.desc}</div>
                   </div>
-                  <div className={`rounded-full px-2 py-1 text-[11px] font-black ${warn ? "bg-orange-50 text-orange-700" : "bg-emerald-50 text-emerald-700"}`}>
+                  <div className={`rounded-full px-2 py-1 text-[11px] font-black ${isPending ? "bg-slate-100 text-slate-500" : warn ? "bg-orange-50 text-orange-700" : "bg-emerald-50 text-emerald-700"}`}>
                     {service.status}
                   </div>
                 </div>
@@ -171,7 +221,7 @@ export function AdminDashboard() {
         </div>
 
         <div className="edu-card rounded-2xl p-6">
-          <h2 className="mb-5 text-lg font-black text-slate-950">模型调用统计</h2>
+          <h2 className="mb-5 cursor-pointer text-lg font-black text-slate-950">模型调用统计</h2>
           {loading ? (
             <div className="flex h-[318px] items-center justify-center">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
@@ -196,30 +246,33 @@ export function AdminDashboard() {
 
       <section className="grid grid-cols-[1fr_1.25fr] gap-6">
         <div className="edu-card rounded-2xl p-6">
-          <h2 className="mb-5 flex items-center gap-2 text-lg font-black text-slate-950">
+          <h2 className="mb-5 flex cursor-pointer items-center gap-2 text-lg font-black text-slate-950">
             <CircleAlert className="h-5 w-5 text-red-600" />
             内容安全与审核风险
           </h2>
           <div className="space-y-3">
-            {RISKS.map(([title, value, desc]) => (
-              <div key={title} className="rounded-2xl border border-slate-100 bg-white p-4">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-black text-slate-900">{title}</div>
-                  <div className="text-xl font-black text-red-600">{value}</div>
+            {risks.map(([title, value, level]) => {
+              const isHigh = level === "高风险";
+              return (
+                <div key={title} className="cursor-pointer rounded-2xl border border-slate-100 bg-white p-4 transition hover:border-red-200">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-black text-slate-900">{title}</div>
+                    <div className={`text-xl font-black ${isHigh ? "text-red-600" : "text-orange-600"}`}>{value}</div>
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">{level}</div>
                 </div>
-                <div className="mt-1 text-xs text-slate-500">{desc}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
         <div className="edu-card rounded-2xl p-6">
-          <h2 className="mb-5 text-lg font-black text-slate-950">模型与智能体配置入口</h2>
-          <div className="grid grid-cols-5 gap-3">
+          <h2 className="mb-5 cursor-pointer text-lg font-black text-slate-950">模型与智能体配置入口</h2>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             {ENTRY.map((entry) => {
               const Icon = entry.icon;
               return (
-                <Link key={entry.title} to={entry.path} className="rounded-2xl border border-slate-100 bg-white p-4 transition hover:border-blue-200 hover:shadow-md">
+                <Link key={entry.title} to={entry.path} className="cursor-pointer rounded-2xl border border-slate-100 bg-white p-4 transition hover:border-blue-200 hover:shadow-md">
                   <div className="mb-3 grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
                     <Icon className="h-5 w-5" />
                   </div>

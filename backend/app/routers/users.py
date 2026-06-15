@@ -20,7 +20,7 @@ from app.services import auth_service, user_service
 from app.utils.exceptions import ForbiddenException, UnauthorizedException
 from app.utils.response import error_response, success_response
 
-router = APIRouter(prefix="/api", tags=["用户与权限"])
+router = APIRouter(prefix="", tags=["用户与权限"])
 
 
 def _resolve_current_user(authorization: Optional[str]) -> dict:

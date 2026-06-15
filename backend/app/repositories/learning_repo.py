@@ -481,3 +481,22 @@ class LearningRepository:
             },
         }
 
+    def update_course_status(self, course_id: int, status: str) -> Optional[Dict[str, Any]]:
+        """更新课程状态。返回更新后的课程 dict 或 None（不存在）。"""
+        allowed = {"active", "archived", "draft"}
+        if status not in allowed:
+            raise ValueError(f"Invalid status: {status}. Must be one of {allowed}.")
+
+        with get_db_cursor(commit=True) as cursor:
+            cursor.execute(
+                "UPDATE courses SET status=%s, updated_at=NOW() WHERE course_id=%s AND is_deleted=0",
+                (status, course_id),
+            )
+            if cursor.rowcount == 0:
+                return None
+            cursor.execute(
+                "SELECT course_id, course_name, course_code, status FROM courses WHERE course_id=%s",
+                (course_id,),
+            )
+            return dict(cursor.fetchone())
+

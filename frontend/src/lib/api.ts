@@ -1,81 +1,96 @@
-import axios, { type AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
+// Re-export barrel that preserves the original `@/lib/api` (no-extension)
+// resolution path. The actual client, token helpers, ApiError, and all
+// `xxxApi` modules live in `./api/index.ts`; this file re-exports them so that
+// `import { agentsApi } from "@/lib/api"` keeps working and resolves to the
+// real implementations instead of an empty stub.
+//
+// Historical: this file used to host the axios client only, which made Vite
+// prefer it over the sibling `./api/index.ts` directory entry and broke
+// every page importing `xxxApi` from `@/lib/api`.
+export {
+  client,
+  getToken,
+  setToken,
+  clearToken,
+  ApiError,
+  type ApiEnvelope,
+  authApi,
+  usersApi,
+  profilesApi,
+  learningApi,
+  coursesApi,
+  resourcesApi,
+  feedbackApi,
+  agentsApi,
+  tasksApi,
+  projectsApi,
+  artifactsApi,
+  promptsApi,
+  reviewsApi,
+  invocationsApi,
+  modelsApi,
+  logsApi,
+  statisticsApi,
+  type UserInfo,
+  type LoginResponse,
+  type User,
+  type Role,
+  type Permission,
+  type ProfileDetail,
+  type Course,
+  type KnowledgePoint,
+  type LearningTask,
+  type LearningPathNode,
+  type LearningPathEdge,
+  type LearningPathSummary,
+  type LearningPathGraph,
+  type LearningResource,
+  type LearningFeedback,
+  type AgentRequest,
+  type WorkflowResult,
+  type SaveResourceResponse,
+  type TaskOutput,
+  type TaskBranch,
+  type OutputComment,
+  type GenerationResult,
+  type Project,
+  type ProjectMember,
+  type ProjectTask,
+  type CreateProjectBody,
+  type Artifact,
+  type ArtifactDetail,
+  type PromptTemplate,
+  type PromptVersion,
+  type PromptTaskType,
+  type CreateTemplateBody,
+  type UpdateTemplateBody,
+  type CreateVersionBody,
+  type ReviewRequest,
+  type ReviewDetail,
+  type IssueTag,
+  type CompleteReviewBody,
+  type Invocation,
+  type InvocationDetail,
+  type ModelProvider,
+  type AIModel,
+  type TaskType,
+  type ApiConfig,
+  type OperationLog,
+  type LoginLog,
+  type StatisticsOverview,
+  type ProjectStats,
+  type ModelCallStats,
+  type CostStats,
+  type ReviewStats,
+  type MemberContribution,
+  type RecentActivity,
+  type LearningOverview,
+  type MasteryDist,
+  type WeakKnowledgePoint,
+  type ResourceTypeDist,
+  type InvocationTrend,
+  type ReviewRateByCourse,
+  type CostDistribution,
+} from './api/index'
 
-const TOKEN_KEY = 'eduagent_token'
-
-export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
-}
-
-export function setToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token)
-}
-
-export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY)
-}
-
-export interface ApiEnvelope<T = unknown> {
-  code: number
-  message: string
-  data: T
-}
-
-export class ApiError extends Error {
-  code: number
-  httpStatus?: number
-  constructor(message: string, code: number, httpStatus?: number) {
-    super(message)
-    this.name = 'ApiError'
-    this.code = code
-    this.httpStatus = httpStatus
-  }
-}
-
-const client: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  timeout: 30000,
-})
-
-client.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const token = getToken()
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => Promise.reject(error),
-)
-
-client.interceptors.response.use(
-  (response) => {
-    const body = response.data as ApiEnvelope
-    if (body && typeof body === 'object' && 'code' in body) {
-      if (body.code === 0) {
-        return body.data as any
-      }
-      return Promise.reject(new ApiError(body.message || '请求失败', body.code, response.status))
-    }
-    return response.data
-  },
-  (error: AxiosError<ApiEnvelope>) => {
-    if (error.response) {
-      const { status, data } = error.response
-      const message = data?.message || error.message || '请求失败'
-      if (status === 401) {
-        clearToken()
-        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-          window.location.href = '/login'
-        }
-        return Promise.reject(new ApiError('登录已过期，请重新登录', 401, 401))
-      }
-      if (status === 403) return Promise.reject(new ApiError('无访问权限', 403, 403))
-      if (status === 404) return Promise.reject(new ApiError('请求地址不存在', 404, 404))
-      if (status >= 500) return Promise.reject(new ApiError('服务器错误，请稍后重试', status, status))
-      return Promise.reject(new ApiError(message, data?.code ?? status, status))
-    }
-    return Promise.reject(new ApiError('网络错误，请检查网络连接', -1))
-  },
-)
-
-export default client
+export { client as default } from './api/index'

@@ -73,7 +73,7 @@ class CreateVersionRequest(BaseModel):
 # 任务类型列表
 # =============================================================================
 
-@router.get("/api/task-types")
+@router.get("/task-types")
 async def list_task_types(
     request: Request,
     authorization: Optional[str] = Header(None, alias="Authorization"),
@@ -89,7 +89,7 @@ async def list_task_types(
 # 提示词模板列表
 # =============================================================================
 
-@router.get("/api/prompt-templates")
+@router.get("/prompt-templates")
 async def list_templates(
     request: Request,
     authorization: Optional[str] = Header(None, alias="Authorization"),
@@ -115,7 +115,7 @@ async def list_templates(
 # 创建提示词模板
 # =============================================================================
 
-@router.post("/api/prompt-templates")
+@router.post("/prompt-templates")
 async def create_template(
     request: Request,
     authorization: Optional[str] = Header(None, alias="Authorization"),
@@ -141,7 +141,7 @@ async def create_template(
 # 提示词模板详情
 # =============================================================================
 
-@router.get("/api/prompt-templates/{template_id}")
+@router.get("/prompt-templates/{template_id}")
 async def get_template_detail(
     request: Request,
     template_id: int = Path(..., gt=0),
@@ -161,7 +161,7 @@ async def get_template_detail(
 # 更新提示词模板
 # =============================================================================
 
-@router.put("/api/prompt-templates/{template_id}")
+@router.put("/prompt-templates/{template_id}")
 async def update_template(
     request: Request,
     template_id: int = Path(..., gt=0),
@@ -190,7 +190,7 @@ async def update_template(
 # 软删除提示词模板
 # =============================================================================
 
-@router.delete("/api/prompt-templates/{template_id}")
+@router.delete("/prompt-templates/{template_id}")
 async def delete_template(
     request: Request,
     template_id: int = Path(..., gt=0),
@@ -214,7 +214,7 @@ async def delete_template(
 # 提示词版本列表
 # =============================================================================
 
-@router.get("/api/prompt-templates/{template_id}/versions")
+@router.get("/prompt-templates/{template_id}/versions")
 async def list_template_versions(
     request: Request,
     template_id: int = Path(..., gt=0),
@@ -234,7 +234,7 @@ async def list_template_versions(
 # 创建提示词版本
 # =============================================================================
 
-@router.post("/api/prompt-templates/{template_id}/versions")
+@router.post("/prompt-templates/{template_id}/versions")
 async def create_version(
     request: Request,
     template_id: int = Path(..., gt=0),
@@ -262,7 +262,7 @@ async def create_version(
 # 启用提示词版本
 # =============================================================================
 
-@router.post("/api/prompt-templates/{template_id}/versions/{version_id}/activate")
+@router.post("/prompt-templates/{template_id}/versions/{version_id}/activate")
 async def activate_version(
     request: Request,
     template_id: int = Path(..., gt=0),

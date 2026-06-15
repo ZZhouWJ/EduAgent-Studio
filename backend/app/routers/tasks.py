@@ -123,7 +123,7 @@ class CompareOutputsRequest(BaseModel):
 # 项目任务列表
 # =============================================================================
 
-@router.get("/api/projects/{project_id}/tasks")
+@router.get("/projects/{project_id}/tasks")
 async def list_project_tasks(
     request: Request,
     project_id: int = Path(..., gt=0),
@@ -151,7 +151,7 @@ async def list_project_tasks(
 # 创建项目任务
 # =============================================================================
 
-@router.post("/api/projects/{project_id}/tasks")
+@router.post("/projects/{project_id}/tasks")
 async def create_task(
     request: Request,
     project_id: int = Path(..., gt=0),
@@ -182,7 +182,7 @@ async def create_task(
 # 任务详情
 # =============================================================================
 
-@router.get("/api/tasks/{task_id}")
+@router.get("/tasks/{task_id}")
 async def get_task_detail(
     request: Request,
     task_id: int = Path(..., gt=0),
@@ -202,7 +202,7 @@ async def get_task_detail(
 # 更新任务
 # =============================================================================
 
-@router.put("/api/tasks/{task_id}")
+@router.put("/tasks/{task_id}")
 async def update_task(
     request: Request,
     task_id: int = Path(..., gt=0),
@@ -233,7 +233,7 @@ async def update_task(
 # 删除任务（软删除）
 # =============================================================================
 
-@router.delete("/api/tasks/{task_id}")
+@router.delete("/tasks/{task_id}")
 async def delete_task(
     request: Request,
     task_id: int = Path(..., gt=0),
@@ -257,7 +257,7 @@ async def delete_task(
 # 任务分支列表
 # =============================================================================
 
-@router.get("/api/tasks/{task_id}/branches")
+@router.get("/tasks/{task_id}/branches")
 async def list_task_branches(
     request: Request,
     task_id: int = Path(..., gt=0),
@@ -277,7 +277,7 @@ async def list_task_branches(
 # 创建任务分支
 # =============================================================================
 
-@router.post("/api/tasks/{task_id}/branches")
+@router.post("/tasks/{task_id}/branches")
 async def create_task_branch(
     request: Request,
     task_id: int = Path(..., gt=0),
@@ -304,7 +304,7 @@ async def create_task_branch(
 # 输出版本列表
 # =============================================================================
 
-@router.get("/api/tasks/{task_id}/outputs")
+@router.get("/tasks/{task_id}/outputs")
 async def list_task_outputs(
     request: Request,
     task_id: int = Path(..., gt=0),
@@ -324,7 +324,7 @@ async def list_task_outputs(
 # 输出版本详情
 # =============================================================================
 
-@router.get("/api/outputs/{output_id}")
+@router.get("/outputs/{output_id}")
 async def get_output_detail(
     request: Request,
     output_id: int = Path(..., gt=0),
@@ -344,7 +344,7 @@ async def get_output_detail(
 # 输出版本时间线
 # =============================================================================
 
-@router.get("/api/outputs/{output_id}/timeline")
+@router.get("/outputs/{output_id}/timeline")
 async def get_output_timeline(
     request: Request,
     output_id: int = Path(..., gt=0),
@@ -364,7 +364,7 @@ async def get_output_timeline(
 # 创建人工输出版本
 # =============================================================================
 
-@router.post("/api/tasks/{task_id}/outputs/manual")
+@router.post("/tasks/{task_id}/outputs/manual")
 async def create_manual_output(
     request: Request,
     task_id: int = Path(..., gt=0),
@@ -394,7 +394,7 @@ async def create_manual_output(
 # 编辑输出版本（乐观锁）
 # =============================================================================
 
-@router.put("/api/outputs/{output_id}")
+@router.put("/outputs/{output_id}")
 async def update_output(
     request: Request,
     output_id: int = Path(..., gt=0),
@@ -422,7 +422,7 @@ async def update_output(
 # 另存为新版本（/save-as 兼容路径）
 # =============================================================================
 
-@router.post("/api/outputs/{output_id}/save-as")
+@router.post("/outputs/{output_id}/save-as")
 async def save_output_as(
     request: Request,
     output_id: int = Path(..., gt=0),
@@ -437,7 +437,7 @@ async def save_output_as(
 # 另存为新版本（/save-as-new-version 验收指定路径）
 # =============================================================================
 
-@router.post("/api/outputs/{output_id}/save-as-new-version")
+@router.post("/outputs/{output_id}/save-as-new-version")
 async def save_output_as_new_version(
     request: Request,
     output_id: int = Path(..., gt=0),
@@ -476,7 +476,7 @@ def _save_as_impl(
 # 输出批注列表
 # =============================================================================
 
-@router.get("/api/outputs/{output_id}/comments")
+@router.get("/outputs/{output_id}/comments")
 async def list_output_comments(
     request: Request,
     output_id: int = Path(..., gt=0),
@@ -498,7 +498,7 @@ async def list_output_comments(
 # 新增批注
 # =============================================================================
 
-@router.post("/api/outputs/{output_id}/comments")
+@router.post("/outputs/{output_id}/comments")
 async def create_output_comment(
     request: Request,
     output_id: int = Path(..., gt=0),
@@ -525,7 +525,7 @@ async def create_output_comment(
 # 批注状态更新
 # =============================================================================
 
-@router.put("/api/comments/{comment_id}/status")
+@router.put("/comments/{comment_id}/status")
 async def update_comment_status(
     request: Request,
     comment_id: int = Path(..., gt=0),
@@ -551,7 +551,7 @@ async def update_comment_status(
 # 版本对比
 # =============================================================================
 
-@router.get("/api/outputs/compare")
+@router.get("/outputs/compare")
 async def compare_outputs(
     request: Request,
     output1_id: int = Query(..., gt=0),

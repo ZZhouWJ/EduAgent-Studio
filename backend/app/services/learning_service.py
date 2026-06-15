@@ -39,6 +39,17 @@ class LearningService:
             return {"code": 404, "message": "任务不存在", "data": None}
         return {"code": 0, "message": "success", "data": task}
 
+    def update_course_status(self, course_id: int, status: str) -> Dict[str, Any]:
+        try:
+            result = self._repo.update_course_status(course_id, status)
+            if result is None:
+                return {"code": 404, "message": "课程不存在或无法更新", "data": None}
+            return {"code": 0, "message": "课程状态已更新", "data": result}
+        except ValueError as e:
+            return {"code": 400, "message": str(e), "data": None}
+        except Exception as e:
+            return {"code": 500, "message": f"更新课程状态失败: {e}", "data": None}
+
     def get_learning_path(self, course_id: int, profile_id: Optional[int] = None) -> Dict[str, Any]:
         """获取课程知识点学习路径图谱（含掌握度）。"""
         try:

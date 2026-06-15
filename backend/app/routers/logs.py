@@ -14,7 +14,7 @@ from app.services import auth_service, user_service
 from app.utils.exceptions import UnauthorizedException
 from app.utils.response import success_response
 
-router = APIRouter(prefix="/api", tags=["日志"])
+router = APIRouter(prefix="", tags=["日志"])
 
 
 def _resolve_current_user(authorization: Optional[str]) -> dict:

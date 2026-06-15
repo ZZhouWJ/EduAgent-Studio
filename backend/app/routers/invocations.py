@@ -49,7 +49,7 @@ class GenerateRequest(BaseModel):
 # 任务模型生成
 # =============================================================================
 
-@router.post("/api/tasks/{task_id}/generate")
+@router.post("/tasks/{task_id}/generate")
 async def generate_task_outputs(
     request: Request,
     task_id: int = Path(..., gt=0),
@@ -82,7 +82,7 @@ async def generate_task_outputs(
 # 调用日志
 # =============================================================================
 
-@router.get("/api/invocations")
+@router.get("/invocations")
 async def list_invocations(
     request: Request,
     authorization: Optional[str] = Header(None, alias="Authorization"),
@@ -112,7 +112,7 @@ async def list_invocations(
     return success_response(data=result)
 
 
-@router.get("/api/invocations/{invocation_id}")
+@router.get("/invocations/{invocation_id}")
 async def get_invocation_detail(
     request: Request,
     invocation_id: int = Path(..., gt=0),

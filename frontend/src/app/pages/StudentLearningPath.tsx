@@ -97,39 +97,42 @@ export function StudentLearningPath() {
             {loading ? (
               <div className="text-center py-8 text-slate-400">加载学习路径中...</div>
             ) : (
-            <div className="relative grid grid-cols-3 gap-5">
-              {displayNodes.map((node, index) => (
-                <div key={node.name} className="relative">
-                  {index < displayNodes.length - 1 && index % 3 !== 2 && (
-                    <div className="absolute left-full top-1/2 h-px w-5 bg-slate-200" />
-                  )}
-                  <div className={`rounded-2xl border p-4 ${stateClass[node.state]}`}>
-                    <div className="mb-2 flex items-center justify-between">
-                      <CircleDot className="h-4 w-4" />
-                      <span className="text-[11px] font-black">0{index + 1}</span>
+              <>
+                <div className="relative grid grid-cols-3 gap-5">
+                  {displayNodes.map((node, index) => (
+                    <div key={node.name} className="relative">
+                      {index < displayNodes.length - 1 && index % 3 !== 2 && (
+                        <div className="absolute left-full top-1/2 h-px w-5 bg-slate-200" />
+                      )}
+                      <div className={`rounded-2xl border p-4 ${stateClass[node.state]}`}>
+                        <div className="mb-2 flex items-center justify-between">
+                          <CircleDot className="h-4 w-4" />
+                          <span className="text-[11px] font-black">0{index + 1}</span>
+                        </div>
+                        <div className="text-sm font-black">{node.name}</div>
+                        <div className="mt-1 text-[11px] font-bold opacity-80">
+                          {node.state === "done" ? "已掌握" : node.state === "warn" ? "待巩固" : node.state === "weak" ? "薄弱点" : node.state === "current" ? "当前学习点" : "后续实践"}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-sm font-black">{node.name}</div>
-                    <div className="mt-1 text-[11px] font-bold opacity-80">
-                      {node.state === "done" ? "已掌握" : node.state === "warn" ? "待巩固" : node.state === "weak" ? "薄弱点" : node.state === "current" ? "当前学习点" : "后续实践"}
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
 
-          <div className="mt-5 grid grid-cols-4 gap-3">
-            {[
-              ["已掌握", "绿色"],
-              ["待巩固", "黄色"],
-              ["薄弱点", "红色"],
-              ["当前学习点", "蓝色"],
-            ].map(([label, color]) => (
-              <div key={label} className="rounded-xl border border-slate-100 bg-white p-3">
-                <div className="text-xs font-bold text-slate-400">{color}</div>
-                <div className="mt-1 text-sm font-black text-slate-800">{label}</div>
-              </div>
-            ))}
+                <div className="mt-5 grid grid-cols-4 gap-3">
+                  {[
+                    ["已掌握", "绿色"],
+                    ["待巩固", "黄色"],
+                    ["薄弱点", "红色"],
+                    ["当前学习点", "蓝色"],
+                  ].map(([label, color]) => (
+                    <div key={label} className="rounded-xl border border-slate-100 bg-white p-3">
+                      <div className="text-xs font-bold text-slate-400">{color}</div>
+                      <div className="mt-1 text-sm font-black text-slate-800">{label}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
