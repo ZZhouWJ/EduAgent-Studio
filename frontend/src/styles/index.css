@@ -1,3 +1,53 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+
+/* ─── Login 页专用样式 ───────────────────────────────────── */
+
+/* 左侧渐变动画背景：缓慢流动的深色渐变 */
+.edu-login-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    #0f172a 0%,
+    #1e3a5f 25%,
+    #1a365d 50%,
+    #1e3a5f 75%,
+    #0f172a 100%
+  );
+  background-size: 400% 400%;
+  animation: edu-bg-shift 20s ease-in-out infinite;
+  will-change: background-position;
+}
+
+@keyframes edu-bg-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* 登录按钮 shimmer hover 光带动效 */
+.edu-btn-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.edu-btn-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.18) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.edu-btn-shimmer:hover::after {
+  transform: translateX(100%);
+}
