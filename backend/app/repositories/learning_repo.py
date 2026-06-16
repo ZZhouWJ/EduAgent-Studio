@@ -437,7 +437,9 @@ class LearningRepository:
 
             # 节点大小按难度和掌握度调整
             size_base = 60
-            node_size = size_base + int(row["difficulty_level"] or 1) * 10
+            diff_map = {"basic": 1, "intermediate": 2, "advanced": 3}
+            diff_val = diff_map.get(row["difficulty_level"] or "basic", 1)
+            node_size = size_base + diff_val * 10
 
             nodes.append({
                 "id": row["kp_id"],

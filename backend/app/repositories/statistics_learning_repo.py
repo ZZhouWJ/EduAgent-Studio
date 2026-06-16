@@ -199,16 +199,16 @@ class StatisticsLearningRepository:
         with get_db_cursor() as cursor:
             cursor.execute("""
                 SELECT
-                    DATE(created_at) AS call_date,
+                    DATE(ai.created_at) AS call_date,
                     COUNT(*) AS invocation_count,
-                    SUM(input_tokens) AS total_input_tokens,
-                    SUM(output_tokens) AS total_output_tokens,
-                    SUM(cost) AS total_cost
-                FROM ai_invocations
-                WHERE is_deleted = 0
-                  AND created_at >= %s
-                  AND created_at <= %s
-                GROUP BY DATE(created_at)
+                    COALESCE(SUM(ai.input_tokens), 0) AS total_input_tokens,
+                    COALESCE(SUM(ai.output_tokens), 0) AS total_output_tokens,
+                    COALESCE(SUM(cr.total_cost), 0) AS total_cost
+                FROM ai_invocations ai
+                LEFT JOIN cost_records cr ON ai.invocation_id = cr.invocation_id
+                WHERE ai.created_at >= %s
+                  AND ai.created_at <= %s
+                GROUP BY DATE(ai.created_at)
                 ORDER BY call_date ASC
             """, (start_date, end_date + timedelta(days=1)))
             rows = cursor.fetchall()
@@ -277,36 +277,32 @@ class StatisticsLearningRepository:
     # -------------------------------------------------------------------------
 
     def get_cost_distribution(self) -> List[Dict[str, Any]]:
-        """Token 消耗占比（按智能体分类）。"""
-        AGENT_NAMES = {
-            "diagnosis_agent": "学习诊断",
-            "planning_agent": "资源规划",
-            "resource_generation_agent": "资源生成",
-            "assessment_agent": "评测反馈",
-            "teacher_review_agent": "教师审核辅助",
-        }
+        """Token 消耗占比（按模型分类）。"""
         with get_db_cursor() as cursor:
             cursor.execute("""
                 SELECT
-                    agent_name,
-                    SUM(input_tokens + output_tokens) AS total_tokens,
-                    SUM(cost) AS total_cost
-                FROM ai_invocations
-                WHERE is_deleted = 0
-                GROUP BY agent_name
+                    COALESCE(am.display_name, am.model_name) AS agent,
+                    COALESCE(SUM(cr.total_tokens), 0) AS total_tokens,
+                    COALESCE(SUM(cr.total_cost), 0) AS total_cost
+                FROM cost_records cr
+                INNER JOIN ai_models am ON cr.model_id = am.model_id AND am.is_deleted = 0
+                GROUP BY am.model_id, am.display_name, am.model_name
                 ORDER BY total_tokens DESC
             """)
             rows = cursor.fetchall()
 
         total_tokens = sum((row["total_tokens"] or 0) for row in rows)
+        if total_tokens == 0:
+            total_tokens = 1  # avoid division by zero
         result = []
         for row in rows:
             tokens = row["total_tokens"] or 0
+            agent_name = row["agent"] or "unknown"
             result.append({
-                "agent": row["agent_name"] or "unknown",
-                "agent_name": AGENT_NAMES.get(row["agent_name"] or "", row["agent_name"] or ""),
+                "agent": agent_name,
+                "agent_name": agent_name,
                 "tokens": tokens,
-                "ratio": round(tokens / total_tokens, 4) if total_tokens > 0 else 0.0,
+                "ratio": round(tokens / total_tokens, 4),
             })
 
         return result

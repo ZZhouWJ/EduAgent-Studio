@@ -138,7 +138,7 @@ WHERE r.role_code = 'admin';
 
 -- ============================================================
 -- 4. 插入管理员用户
--- 密码使用 bcrypt 哈希占位值（仅供测试使用）
+-- 密码: Admin@123
 -- ============================================================
 
 INSERT INTO `users` (
@@ -146,7 +146,7 @@ INSERT INTO `users` (
     `email`, `phone`, `status`, `last_login_at`, `created_by`
 ) VALUES (
     'admin',
-    '$2b$12$ShxG2SvnL1QcViFPuMRqHO.T8jCQgOpdWBJdYAwhVn9QgnVRCJB4O',
+    '$2b$12$qcQ153oZs.H2BawPkUExwuQqaL57OaLtz2IBXg9Ma1Vqto3avnqU6',
     '系统管理员',
     NULL,
     'admin@example.com',
@@ -158,14 +158,14 @@ INSERT INTO `users` (
 
 -- ============================================================
 -- 4b. 插入教师用户（张老师）
--- 密码 bcrypt("Teacher@123")
+-- 密码: Teacher@123
 -- ============================================================
 INSERT INTO `users` (
     `username`, `password_hash`, `real_name`, `student_no`,
     `email`, `phone`, `status`, `last_login_at`, `created_by`
 ) VALUES (
     'teacher01',
-    '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4qITKZYeLq89mNMS',
+    '$2b$12$w5QGe1HfcQMvR6utMzo/SumB1CtfxgJTmssOkQd85X2mXB6fVeqJq',
     '张老师',
     NULL,
     'teacher01@example.com',
@@ -177,15 +177,15 @@ INSERT INTO `users` (
 
 -- ============================================================
 -- 4c. 插入学生用户（李明、王悦、陈思雨）
--- 密码 bcrypt("Student@123")
+-- 密码: Student@123
 -- ============================================================
 INSERT INTO `users` (
     `username`, `password_hash`, `real_name`, `student_no`,
     `email`, `phone`, `status`, `last_login_at`, `created_by`
 ) VALUES
-    ('student01', '$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', '李明', 'S2023001', 'liming@example.com', '13800000002', 'active', NULL, NULL),
-    ('student02', '$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', '王悦', 'S2023002', 'wangyue@example.com', '13800000003', 'active', NULL, NULL),
-    ('student03', '$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', '陈思雨', 'S2023003', 'chensiyu@example.com', '13800000004', 'active', NULL, NULL);
+    ('student01', '$2b$12$FPXBkF.9dvhYw6LyCMWX8uXjksoSDn90cJfg.7ibsi5RxJnW14NX.', '李明', 'S2023001', 'liming@example.com', '13800000002', 'active', NULL, NULL),
+    ('student02', '$2b$12$K.TLGk0Pz16cEJGA4SqBfeztyWYSlbkdgbNTEM5d5ArF.4ojPzJEm', '王悦', 'S2023002', 'wangyue@example.com', '13800000003', 'active', NULL, NULL),
+    ('student03', '$2b$12$UcfobnpocONx6a5Nh9ws0e214jhfi6CWmWZmtZPXLS6x0dKsp8Zw.', '陈思雨', 'S2023003', 'chensiyu@example.com', '13800000004', 'active', NULL, NULL);
 
 -- ============================================================
 -- 5. 为管理员分配 admin 角色

@@ -25,7 +25,7 @@ from enum import Enum
 from typing import Annotated, Any, Dict, List, Literal, Optional, TypedDict
 
 from langgraph.graph import StateGraph, END, START
-from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.memory import InMemorySaver
 
 from app.config import get_settings
 
@@ -409,19 +409,15 @@ def _get_llm_gateway():
 # 5. LangGraph StateGraph 工厂
 # ---------------------------------------------------------------------------
 
-_checkpointer: Optional[SqliteSaver] = None
+_checkpointer: Optional[InMemorySaver] = None
 
 
-def _get_checkpointer() -> SqliteSaver:
-    """单例 Checkpointer — SQLite 持久化工作流状态"""
+def _get_checkpointer() -> InMemorySaver:
+    """单例 Checkpointer — 内存持久化工作流状态"""
     global _checkpointer
     if _checkpointer is None:
-        settings = get_settings()
-        os.makedirs(settings.app_data_dir, exist_ok=True)
-        db_path = os.path.join(settings.app_data_dir, "checkpoints.db")
-        conn = sqlite3.connect(db_path, check_same_thread=False)
-        _checkpointer = SqliteSaver(conn)
-        logger.info(f"Checkpoint SQLite DB: {db_path}")
+        _checkpointer = InMemorySaver()
+        logger.info("Checkpointer initialized (InMemory)")
     return _checkpointer
 
 
