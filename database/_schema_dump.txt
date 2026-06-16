@@ -1,0 +1,805 @@
+
+========== adopted_outputs ==========
+CREATE TABLE `adopted_outputs` (
+  `adopted_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '????ID',
+  `project_id` int(10) unsigned NOT NULL COMMENT '??ID',
+  `task_id` int(10) unsigned NOT NULL COMMENT '??ID',
+  `output_id` int(10) unsigned NOT NULL COMMENT '????ID',
+  `artifact_title` varchar(200) NOT NULL COMMENT '????',
+  `artifact_type` varchar(50) DEFAULT NULL COMMENT '????',
+  `release_version` varchar(50) DEFAULT NULL COMMENT '?????',
+  `adopted_by` int(10) unsigned NOT NULL COMMENT '?????',
+  `adopted_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`adopted_id`),
+  KEY `idx_adopted_outputs_project` (`project_id`,`is_deleted`),
+  KEY `idx_adopted_outputs_task` (`task_id`),
+  KEY `idx_adopted_outputs_output` (`output_id`),
+  KEY `fk_adopted_outputs_user` (`adopted_by`),
+  CONSTRAINT `fk_adopted_outputs_output` FOREIGN KEY (`output_id`) REFERENCES `task_outputs` (`output_id`),
+  CONSTRAINT `fk_adopted_outputs_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`project_id`),
+  CONSTRAINT `fk_adopted_outputs_task` FOREIGN KEY (`task_id`) REFERENCES `project_tasks` (`task_id`),
+  CONSTRAINT `fk_adopted_outputs_user` FOREIGN KEY (`adopted_by`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COMMENT='?????'
+
+========== ai_invocations ==========
+CREATE TABLE `ai_invocations` (
+  `invocation_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT '????ID',
+  `project_id` int(10) unsigned DEFAULT NULL COMMENT '??ID',
+  `task_id` int(10) unsigned DEFAULT NULL COMMENT '??ID',
+  `branch_id` int(10) unsigned DEFAULT NULL COMMENT '??ID',
+  `model_id` int(10) unsigned DEFAULT NULL COMMENT '??ID',
+  `prompt_version_id` int(10) unsigned DEFAULT NULL COMMENT '?????ID',
+  `input_text` longtext NOT NULL COMMENT '????',
+  `output_text` longtext COMMENT '????',
+  `input_tokens` int(10) unsigned DEFAULT NULL COMMENT '?? token ?',
+  `output_tokens` int(10) unsigned DEFAULT NULL COMMENT '?? token ?',
+  `latency_ms` int(10) unsigned DEFAULT NULL COMMENT '??????',
+  `status` enum('success','failed','timeout','blocked') NOT NULL DEFAULT 'success' COMMENT '?????success=???failed=???timeout=???blocked=??',
+  `cost` decimal(10,4) DEFAULT NULL COMMENT '本次调用费用',
+  `error_message` text COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '软删除标记',
+  PRIMARY KEY (`invocation_id`),
+  KEY `idx_ai_invocations_task` (`task_id`),
+  KEY `idx_ai_invocations_model` (`model_id`),
+  KEY `idx_ai_invocations_created_at` (`created_at`),
+  KEY `idx_ai_invocations_project` (`project_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COMMENT='AI?????????????????'
+
+========== ai_models ==========
+CREATE TABLE `ai_models` (
+  `model_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '??ID',
+  `provider_id` int(10) unsigned NOT NULL COMMENT '?????ID',
+  `model_name` varchar(100) NOT NULL COMMENT '??????',
+  `display_name` varchar(100) NOT NULL COMMENT '????',
+  `capability_tags` varchar(500) DEFAULT NULL COMMENT '?????????',
+  `max_context` int(10) unsigned DEFAULT NULL COMMENT '????? token ?',
+  `input_price` decimal(10,6) NOT NULL DEFAULT '0.000000' COMMENT '?????? price_unit ????',
+  `output_price` decimal(10,6) NOT NULL DEFAULT '0.000000' COMMENT '?????? price_unit ????',
+  `price_unit` varchar(20) NOT NULL DEFAULT '1K_TOKENS' COMMENT '??????? 1K_TOKENS?',
+  `status` enum('active','disabled') NOT NULL DEFAULT 'active' COMMENT '???active=???disabled=??',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`model_id`),
+  UNIQUE KEY `uk_ai_models_provider_name` (`provider_id`,`model_name`,`is_deleted`),
+  KEY `idx_ai_models_status` (`status`,`is_deleted`),
+  CONSTRAINT `fk_ai_models_provider` FOREIGN KEY (`provider_id`) REFERENCES `model_providers` (`provider_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COMMENT='AI???'
+
+========== api_configs ==========
+CREATE TABLE `api_configs` (
+  `api_config_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT 'API??ID',
+  `provider_id` int(10) unsigned NOT NULL COMMENT '?????ID',
+  `config_name` varchar(100) NOT NULL COMMENT '????',
+  `encrypted_api_key` text NOT NULL COMMENT 'AES-256-GCM ???? API Key',
+  `key_iv` varchar(64) NOT NULL COMMENT 'AES-256-GCM ?? IV?Base64?',
+  `key_tag` varchar(64) NOT NULL COMMENT 'AES-256-GCM ?????Base64?',
+  `key_version` int(11) NOT NULL DEFAULT '1' COMMENT '?????',
+  `key_mask` varchar(50) NOT NULL COMMENT 'API Key ?????? sk-****abcd',
+  `quota_limit` decimal(15,2) DEFAULT NULL COMMENT '????',
+  `used_quota` decimal(15,2) NOT NULL DEFAULT '0.00' COMMENT '?????',
+  `status` enum('active','disabled') NOT NULL DEFAULT 'active' COMMENT '???active=???disabled=??',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`api_config_id`),
+  KEY `idx_api_configs_provider` (`provider_id`,`is_deleted`),
+  CONSTRAINT `fk_api_configs_provider` FOREIGN KEY (`provider_id`) REFERENCES `model_providers` (`provider_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COMMENT='API???'
+
+========== cost_records ==========
+CREATE TABLE `cost_records` (
+  `cost_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT '????ID',
+  `invocation_id` bigint(20) unsigned NOT NULL COMMENT 'AI????ID',
+  `project_id` int(10) unsigned DEFAULT NULL COMMENT '??ID',
+  `task_id` int(10) unsigned DEFAULT NULL COMMENT '??ID',
+  `model_id` int(10) unsigned DEFAULT NULL COMMENT '??ID',
+  `user_id` int(10) unsigned DEFAULT NULL COMMENT '????ID',
+  `input_tokens` int(10) unsigned NOT NULL DEFAULT '0' COMMENT '??token?',
+  `output_tokens` int(10) unsigned NOT NULL DEFAULT '0' COMMENT '??token?',
+  `total_tokens` int(10) unsigned NOT NULL DEFAULT '0' COMMENT '?token?',
+  `input_cost` decimal(10,6) NOT NULL DEFAULT '0.000000' COMMENT '????',
+  `output_cost` decimal(10,6) NOT NULL DEFAULT '0.000000' COMMENT '????',
+  `total_cost` decimal(10,6) NOT NULL DEFAULT '0.000000' COMMENT '???',
+  `currency` varchar(10) NOT NULL DEFAULT 'CNY' COMMENT '????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  PRIMARY KEY (`cost_id`),
+  KEY `idx_cost_records_invocation` (`invocation_id`),
+  KEY `idx_cost_records_project` (`project_id`),
+  KEY `idx_cost_records_model` (`model_id`),
+  KEY `idx_cost_records_created_at` (`created_at`)
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COMMENT='????????/???????????'
+
+========== courses ==========
+CREATE TABLE `courses` (
+  `course_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '课程ID',
+  `course_name` varchar(200) NOT NULL COMMENT '课程名称',
+  `course_code` varchar(50) DEFAULT NULL COMMENT '课程代码',
+  `description` text COMMENT '课程描述',
+  `teacher_id` int(10) unsigned NOT NULL COMMENT '主讲教师ID',
+  `status` enum('active','archived','draft') NOT NULL DEFAULT 'active' COMMENT '课程状态',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '软删除标记',
+  `deleted_at` datetime DEFAULT NULL COMMENT '删除时间',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`course_id`),
+  KEY `idx_courses_teacher` (`teacher_id`),
+  KEY `idx_courses_status_deleted` (`status`,`is_deleted`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COMMENT='课程表'
+
+========== issue_tags ==========
+CREATE TABLE `issue_tags` (
+  `tag_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '??ID',
+  `tag_name` varchar(50) NOT NULL COMMENT '????',
+  `tag_code` varchar(50) NOT NULL COMMENT '??????????',
+  `description` varchar(255) DEFAULT NULL COMMENT '????',
+  `severity` enum('low','medium','high') NOT NULL DEFAULT 'low' COMMENT '?????low=???medium=???high=??',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`tag_id`),
+  UNIQUE KEY `uk_issue_tags_code` (`tag_code`)
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COMMENT='?????'
+
+========== knowledge_points ==========
+CREATE TABLE `knowledge_points` (
+  `kp_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '知识点ID',
+  `course_id` int(10) unsigned NOT NULL COMMENT '所属课程ID',
+  `kp_name` varchar(200) NOT NULL COMMENT '知识点名称',
+  `kp_code` varchar(50) DEFAULT NULL COMMENT '知识点编码',
+  `parent_kp_id` int(10) unsigned DEFAULT NULL COMMENT '父知识点ID',
+  `difficulty_level` enum('basic','intermediate','advanced') NOT NULL DEFAULT 'basic' COMMENT '难度等级',
+  `description` text COMMENT '知识点描述',
+  `estimated_hours` decimal(5,2) DEFAULT NULL COMMENT '预计学习时长（小时）',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '软删除标记',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`kp_id`),
+  KEY `idx_kp_course` (`course_id`),
+  KEY `idx_kp_parent` (`parent_kp_id`),
+  KEY `idx_kp_difficulty` (`difficulty_level`)
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COMMENT='知识点表'
+
+========== learning_feedbacks ==========
+CREATE TABLE `learning_feedbacks` (
+  `feedback_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '反馈ID',
+  `profile_id` int(10) unsigned NOT NULL COMMENT '学生画像ID',
+  `resource_id` int(10) unsigned DEFAULT NULL COMMENT '关联学习资源ID',
+  `course_id` int(10) unsigned NOT NULL COMMENT '课程ID',
+  `feedback_type` enum('quiz_result','self_report','study_note','question') NOT NULL COMMENT '反馈类型',
+  `content` text COMMENT '反馈内容',
+  `quiz_score` decimal(5,3) DEFAULT NULL COMMENT '测验得分（0-1）',
+  `self_mastery` decimal(5,3) DEFAULT NULL COMMENT '自评掌握度（0-1）',
+  `difficulty_rating` enum('too_easy','appropriate','too_hard') DEFAULT NULL COMMENT '难度评价',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '软删除标记',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`feedback_id`),
+  KEY `idx_feedback_profile` (`profile_id`),
+  KEY `idx_feedback_resource` (`resource_id`),
+  KEY `idx_feedback_course` (`course_id`),
+  KEY `idx_feedback_created` (`created_at`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COMMENT='学习反馈表'
+
+========== learning_resources ==========
+CREATE TABLE `learning_resources` (
+  `resource_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '资源ID',
+  `course_id` int(10) unsigned NOT NULL COMMENT '所属课程ID',
+  `resource_title` varchar(200) NOT NULL COMMENT '资源标题',
+  `resource_type` enum('lecture','ppt','quiz','case','review','test','other') NOT NULL COMMENT '资源类型',
+  `difficulty` enum('basic','intermediate','advanced') NOT NULL DEFAULT 'basic' COMMENT '难度等级',
+  `content` longtext COMMENT '资源正文内容',
+  `target_kp_ids` varchar(500) DEFAULT NULL COMMENT '关联知识点ID列表',
+  `generation_model` varchar(100) DEFAULT NULL COMMENT '生成所用模型',
+  `generation_agent` varchar(100) DEFAULT NULL COMMENT '生成所用智能体',
+  `invocation_id` bigint(20) unsigned DEFAULT NULL COMMENT '关联的AI调用记录ID',
+  `status` enum('draft','pending_review','approved','rejected','archived') NOT NULL DEFAULT 'draft' COMMENT '审核状态',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '软删除标记',
+  `deleted_at` datetime DEFAULT NULL COMMENT '删除时间',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '创建人',
+  `updated_at` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`resource_id`),
+  KEY `idx_resource_course` (`course_id`),
+  KEY `idx_resource_type` (`resource_type`),
+  KEY `idx_resource_status` (`status`,`is_deleted`),
+  KEY `idx_resource_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='学习资源表'
+
+========== learning_tasks ==========
+CREATE TABLE `learning_tasks` (
+  `task_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '任务ID',
+  `course_id` int(10) unsigned NOT NULL COMMENT '所属课程ID',
+  `title` varchar(200) NOT NULL COMMENT '任务标题',
+  `description` text COMMENT '任务描述',
+  `target_kp_ids` varchar(500) DEFAULT NULL COMMENT '目标知识点ID列表',
+  `creator_id` int(10) unsigned NOT NULL COMMENT '创建人（教师）',
+  `assignee_id` int(10) unsigned DEFAULT NULL COMMENT '指派学生ID',
+  `status` enum('draft','assigned','in_progress','completed','archived') NOT NULL DEFAULT 'draft' COMMENT '任务状态',
+  `due_date` datetime DEFAULT NULL COMMENT '截止时间',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '软删除标记',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`task_id`),
+  KEY `idx_task_course` (`course_id`),
+  KEY `idx_task_assignee` (`assignee_id`),
+  KEY `idx_task_status` (`status`,`is_deleted`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COMMENT='学习任务表'
+
+========== login_logs ==========
+CREATE TABLE `login_logs` (
+  `login_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT '????ID',
+  `user_id` int(10) unsigned DEFAULT NULL COMMENT '??ID?????????',
+  `username` varchar(50) NOT NULL COMMENT '????????',
+  `login_status` enum('success','failed') NOT NULL COMMENT '?????success=???failed=??',
+  `failure_reason` varchar(100) DEFAULT NULL COMMENT '????',
+  `ip_address` varchar(45) DEFAULT NULL COMMENT '???IP',
+  `user_agent` varchar(500) DEFAULT NULL COMMENT 'User-Agent',
+  `login_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  PRIMARY KEY (`login_id`),
+  KEY `idx_login_logs_user_time` (`user_id`,`login_time`),
+  KEY `idx_login_logs_username_time` (`username`,`login_time`),
+  KEY `idx_login_logs_login_time` (`login_time`)
+) ENGINE=InnoDB AUTO_INCREMENT=157 DEFAULT CHARSET=utf8mb4 COMMENT='?????????????????'
+
+========== merge_records ==========
+CREATE TABLE `merge_records` (
+  `merge_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '????ID',
+  `project_id` int(10) unsigned NOT NULL COMMENT '??ID',
+  `task_id` int(10) unsigned NOT NULL COMMENT '??ID',
+  `base_output_id` int(10) unsigned DEFAULT NULL COMMENT '??????ID',
+  `source_output_id` int(10) unsigned DEFAULT NULL COMMENT '?????ID',
+  `target_output_id` int(10) unsigned DEFAULT NULL COMMENT '??????ID',
+  `merged_output_id` int(10) unsigned DEFAULT NULL COMMENT '?????????ID',
+  `merge_strategy` enum('adopt_source','adopt_target','manual_merge','adopt_separately') NOT NULL DEFAULT 'manual_merge' COMMENT '?????adopt_source=???????adopt_target=???????manual_merge=??????????adopt_separately=??????????',
+  `merge_comment` varchar(500) DEFAULT NULL COMMENT '????',
+  `merged_by` int(10) unsigned NOT NULL COMMENT '?????',
+  `merged_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`merge_id`),
+  KEY `idx_merge_records_task` (`task_id`),
+  KEY `idx_merge_records_project` (`project_id`),
+  KEY `idx_merge_records_merged_by` (`merged_by`),
+  KEY `fk_merge_records_base_output` (`base_output_id`),
+  KEY `fk_merge_records_source_output` (`source_output_id`),
+  KEY `fk_merge_records_target_output` (`target_output_id`),
+  KEY `fk_merge_records_merged_output` (`merged_output_id`),
+  CONSTRAINT `fk_merge_records_base_output` FOREIGN KEY (`base_output_id`) REFERENCES `task_outputs` (`output_id`),
+  CONSTRAINT `fk_merge_records_merged_by` FOREIGN KEY (`merged_by`) REFERENCES `users` (`user_id`),
+  CONSTRAINT `fk_merge_records_merged_output` FOREIGN KEY (`merged_output_id`) REFERENCES `task_outputs` (`output_id`),
+  CONSTRAINT `fk_merge_records_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`project_id`),
+  CONSTRAINT `fk_merge_records_source_output` FOREIGN KEY (`source_output_id`) REFERENCES `task_outputs` (`output_id`),
+  CONSTRAINT `fk_merge_records_target_output` FOREIGN KEY (`target_output_id`) REFERENCES `task_outputs` (`output_id`),
+  CONSTRAINT `fk_merge_records_task` FOREIGN KEY (`task_id`) REFERENCES `project_tasks` (`task_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='???????'
+
+========== model_providers ==========
+CREATE TABLE `model_providers` (
+  `provider_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '???ID',
+  `provider_name` varchar(100) NOT NULL COMMENT '?????',
+  `provider_code` varchar(50) NOT NULL COMMENT '???????????',
+  `base_url` varchar(500) DEFAULT NULL COMMENT 'API base URL',
+  `website` varchar(255) DEFAULT NULL COMMENT '????',
+  `description` varchar(500) DEFAULT NULL COMMENT '?????',
+  `status` enum('active','disabled') NOT NULL DEFAULT 'active' COMMENT '???active=???disabled=??',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`provider_id`),
+  UNIQUE KEY `uk_model_providers_code` (`provider_code`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COMMENT='??????'
+
+========== operation_logs ==========
+CREATE TABLE `operation_logs` (
+  `log_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT '??ID',
+  `user_id` int(10) unsigned DEFAULT NULL COMMENT '????ID',
+  `project_id` int(10) unsigned DEFAULT NULL COMMENT '????ID',
+  `task_id` int(10) unsigned DEFAULT NULL COMMENT '????ID',
+  `target_type` varchar(50) DEFAULT NULL COMMENT '??????????',
+  `target_id` bigint(20) unsigned DEFAULT NULL COMMENT '????ID',
+  `action_type` varchar(50) NOT NULL COMMENT '?????create/update/delete/submit/review/adopt/merge/archive ??',
+  `action_desc` varchar(500) NOT NULL COMMENT '????',
+  `old_value` text COMMENT '?????JSON?',
+  `new_value` text COMMENT '?????JSON?',
+  `ip_address` varchar(45) DEFAULT NULL COMMENT '???IP',
+  `user_agent` varchar(500) DEFAULT NULL COMMENT 'User-Agent',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  PRIMARY KEY (`log_id`),
+  KEY `idx_operation_logs_user_time` (`user_id`,`created_at`),
+  KEY `idx_operation_logs_project` (`project_id`),
+  KEY `idx_operation_logs_task` (`task_id`),
+  KEY `idx_operation_logs_target` (`target_type`,`target_id`),
+  KEY `idx_operation_logs_action_type` (`action_type`),
+  KEY `idx_operation_logs_created_at` (`created_at`)
+) ENGINE=InnoDB AUTO_INCREMENT=36 DEFAULT CHARSET=utf8mb4 COMMENT='?????????????????'
+
+========== output_comments ==========
+CREATE TABLE `output_comments` (
+  `comment_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '??ID',
+  `output_id` int(10) unsigned NOT NULL COMMENT '????ID',
+  `commenter_id` int(10) unsigned NOT NULL COMMENT '???',
+  `comment_type` enum('comment','suggestion','approval') NOT NULL DEFAULT 'comment' COMMENT '?????comment=?????suggestion=???approval=??',
+  `comment_text` text NOT NULL COMMENT '????',
+  `status` enum('open','resolved','closed') NOT NULL DEFAULT 'open' COMMENT '?????open=????resolved=????closed=???',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`comment_id`),
+  KEY `idx_output_comments_output` (`output_id`,`is_deleted`),
+  KEY `idx_output_comments_commenter` (`commenter_id`),
+  CONSTRAINT `fk_output_comments_commenter` FOREIGN KEY (`commenter_id`) REFERENCES `users` (`user_id`),
+  CONSTRAINT `fk_output_comments_output` FOREIGN KEY (`output_id`) REFERENCES `task_outputs` (`output_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COMMENT='?????'
+
+========== output_issue_relations ==========
+CREATE TABLE `output_issue_relations` (
+  `relation_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '??ID',
+  `output_id` int(10) unsigned NOT NULL COMMENT '????ID',
+  `review_id` int(10) unsigned DEFAULT NULL COMMENT '????ID?????',
+  `tag_id` int(10) unsigned NOT NULL COMMENT '????ID',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`relation_id`),
+  KEY `idx_output_issue_relations_output` (`output_id`),
+  KEY `idx_output_issue_relations_review` (`review_id`),
+  KEY `idx_output_issue_relations_tag` (`tag_id`),
+  CONSTRAINT `fk_output_issue_relations_output` FOREIGN KEY (`output_id`) REFERENCES `task_outputs` (`output_id`),
+  CONSTRAINT `fk_output_issue_relations_review` FOREIGN KEY (`review_id`) REFERENCES `output_reviews` (`review_id`),
+  CONSTRAINT `fk_output_issue_relations_tag` FOREIGN KEY (`tag_id`) REFERENCES `issue_tags` (`tag_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COMMENT='???????'
+
+========== output_reviews ==========
+CREATE TABLE `output_reviews` (
+  `review_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '????ID',
+  `request_id` int(10) unsigned NOT NULL COMMENT '????ID',
+  `output_id` int(10) unsigned NOT NULL COMMENT '????ID',
+  `reviewer_id` int(10) unsigned NOT NULL COMMENT '???',
+  `accuracy_score` decimal(3,1) DEFAULT NULL COMMENT '??????0-10?',
+  `completeness_score` decimal(3,1) DEFAULT NULL COMMENT '??????0-10?',
+  `logic_score` decimal(3,1) DEFAULT NULL COMMENT '??????0-10?',
+  `format_score` decimal(3,1) DEFAULT NULL COMMENT '??????0-10?',
+  `usability_score` decimal(3,1) DEFAULT NULL COMMENT '??????0-10?',
+  `risk_score` decimal(3,1) DEFAULT NULL COMMENT '?????0-10????????',
+  `review_status` enum('pending','approved','rejected','revision_required') NOT NULL COMMENT '?????pending=???approved=???rejected=???revision_required=???',
+  `review_comment` text COMMENT '????',
+  `reviewed_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`review_id`),
+  KEY `idx_output_reviews_output` (`output_id`),
+  KEY `idx_output_reviews_request` (`request_id`),
+  KEY `idx_output_reviews_reviewer` (`reviewer_id`),
+  CONSTRAINT `fk_output_reviews_output` FOREIGN KEY (`output_id`) REFERENCES `task_outputs` (`output_id`),
+  CONSTRAINT `fk_output_reviews_request` FOREIGN KEY (`request_id`) REFERENCES `review_requests` (`request_id`),
+  CONSTRAINT `fk_output_reviews_reviewer` FOREIGN KEY (`reviewer_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COMMENT='?????'
+
+========== permissions ==========
+CREATE TABLE `permissions` (
+  `permission_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '??ID',
+  `permission_name` varchar(100) NOT NULL COMMENT '????',
+  `permission_code` varchar(100) NOT NULL COMMENT '??????????',
+  `module_name` varchar(50) NOT NULL COMMENT '????',
+  `description` varchar(255) DEFAULT NULL COMMENT '????',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`permission_id`),
+  UNIQUE KEY `uk_permissions_code` (`permission_code`),
+  KEY `idx_permissions_module` (`module_name`,`is_deleted`)
+) ENGINE=InnoDB AUTO_INCREMENT=42 DEFAULT CHARSET=utf8mb4 COMMENT='???'
+
+========== project_members ==========
+CREATE TABLE `project_members` (
+  `member_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '??ID',
+  `project_id` int(10) unsigned NOT NULL COMMENT '??ID',
+  `user_id` int(10) unsigned NOT NULL COMMENT '??ID',
+  `project_role` enum('member','leader','reviewer','teacher') NOT NULL DEFAULT 'member' COMMENT '??????member=?????leader=??????reviewer=??????teacher=????',
+  `joined_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `status` enum('active','inactive') NOT NULL DEFAULT 'active' COMMENT '?????active=???inactive=???',
+  `contribution_score` decimal(5,2) DEFAULT NULL COMMENT '?????0-100?',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`member_id`),
+  UNIQUE KEY `uk_project_members_unique` (`project_id`,`user_id`,`is_deleted`),
+  KEY `idx_project_members_project` (`project_id`,`is_deleted`),
+  KEY `idx_project_members_user` (`user_id`,`is_deleted`),
+  CONSTRAINT `fk_project_members_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`project_id`),
+  CONSTRAINT `fk_project_members_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COMMENT='?????'
+
+========== project_tasks ==========
+CREATE TABLE `project_tasks` (
+  `task_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '??ID',
+  `project_id` int(10) unsigned NOT NULL COMMENT '??ID',
+  `task_type_id` int(10) unsigned NOT NULL COMMENT '????ID',
+  `title` varchar(200) NOT NULL COMMENT '????',
+  `description` text COMMENT '????',
+  `creator_id` int(10) unsigned NOT NULL COMMENT '?????',
+  `assignee_id` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `status` enum('draft','running','generated','submitted','approved','rejected','revision_required','adopted','archived','conflict_pending') NOT NULL DEFAULT 'draft' COMMENT '?????draft=???running=????generated=????submitted=????approved=????rejected=????revision_required=????adopted=????archived=????conflict_pending=?????',
+  `priority` enum('low','normal','high','urgent') NOT NULL DEFAULT 'normal' COMMENT '????low=??normal=???high=??urgent=??',
+  `due_date` datetime DEFAULT NULL COMMENT '????',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`task_id`),
+  KEY `idx_tasks_project_status` (`project_id`,`status`,`is_deleted`),
+  KEY `idx_tasks_assignee` (`assignee_id`,`is_deleted`),
+  KEY `idx_tasks_creator` (`creator_id`),
+  KEY `fk_tasks_task_type` (`task_type_id`),
+  CONSTRAINT `fk_tasks_assignee` FOREIGN KEY (`assignee_id`) REFERENCES `users` (`user_id`),
+  CONSTRAINT `fk_tasks_creator` FOREIGN KEY (`creator_id`) REFERENCES `users` (`user_id`),
+  CONSTRAINT `fk_tasks_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`project_id`),
+  CONSTRAINT `fk_tasks_task_type` FOREIGN KEY (`task_type_id`) REFERENCES `task_types` (`task_type_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COMMENT='?????'
+
+========== projects ==========
+CREATE TABLE `projects` (
+  `project_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '??ID',
+  `project_name` varchar(200) NOT NULL COMMENT '????',
+  `project_type` varchar(50) DEFAULT NULL COMMENT '????',
+  `description` text COMMENT '????',
+  `owner_id` int(10) unsigned NOT NULL COMMENT '???????ID',
+  `status` enum('active','archived','suspended') NOT NULL DEFAULT 'active' COMMENT '?????active=????archived=????suspended=???',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`project_id`),
+  KEY `idx_projects_owner` (`owner_id`),
+  KEY `idx_projects_status_deleted` (`status`,`is_deleted`),
+  CONSTRAINT `fk_projects_owner` FOREIGN KEY (`owner_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COMMENT='?????'
+
+========== prompt_templates ==========
+CREATE TABLE `prompt_templates` (
+  `template_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '??ID',
+  `template_name` varchar(200) NOT NULL COMMENT '????',
+  `task_type_id` int(10) unsigned NOT NULL COMMENT '???????ID',
+  `description` varchar(500) DEFAULT NULL COMMENT '????',
+  `current_version_id` int(10) unsigned DEFAULT NULL COMMENT '???????ID',
+  `is_active` tinyint(1) NOT NULL DEFAULT '1' COMMENT '?????1=???0=??',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`template_id`),
+  KEY `idx_prompt_templates_task_type` (`task_type_id`,`is_deleted`),
+  CONSTRAINT `fk_prompt_templates_task_type` FOREIGN KEY (`task_type_id`) REFERENCES `task_types` (`task_type_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=55 DEFAULT CHARSET=utf8mb4 COMMENT='??????'
+
+========== prompt_versions ==========
+CREATE TABLE `prompt_versions` (
+  `prompt_version_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '?????ID',
+  `template_id` int(10) unsigned NOT NULL COMMENT '????ID',
+  `version_no` int(10) unsigned NOT NULL COMMENT '???',
+  `prompt_content` text NOT NULL COMMENT '?????',
+  `change_note` varchar(500) DEFAULT NULL COMMENT '????',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`prompt_version_id`),
+  UNIQUE KEY `uk_prompt_versions_template_version` (`template_id`,`version_no`),
+  KEY `idx_prompt_versions_template` (`template_id`),
+  CONSTRAINT `fk_prompt_versions_template` FOREIGN KEY (`template_id`) REFERENCES `prompt_templates` (`template_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=30 DEFAULT CHARSET=utf8mb4 COMMENT='??????'
+
+========== review_requests ==========
+CREATE TABLE `review_requests` (
+  `request_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '????ID',
+  `output_id` int(10) unsigned NOT NULL COMMENT '????????ID',
+  `task_id` int(10) unsigned NOT NULL COMMENT '????ID',
+  `project_id` int(10) unsigned NOT NULL COMMENT '????ID',
+  `submitter_id` int(10) unsigned NOT NULL COMMENT '???',
+  `reviewer_id` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `request_status` enum('pending','approved','rejected','revision_required') NOT NULL DEFAULT 'pending' COMMENT '?????pending=????approved=???rejected=???revision_required=???',
+  `submit_note` text COMMENT '????',
+  `reviewed_at` datetime DEFAULT NULL COMMENT '????',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`request_id`),
+  KEY `idx_review_requests_output` (`output_id`),
+  KEY `idx_review_requests_status` (`request_status`,`is_deleted`),
+  KEY `idx_review_requests_project` (`project_id`),
+  KEY `idx_review_requests_reviewer` (`reviewer_id`),
+  KEY `fk_review_requests_task` (`task_id`),
+  KEY `fk_review_requests_submitter` (`submitter_id`),
+  CONSTRAINT `fk_review_requests_output` FOREIGN KEY (`output_id`) REFERENCES `task_outputs` (`output_id`),
+  CONSTRAINT `fk_review_requests_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`project_id`),
+  CONSTRAINT `fk_review_requests_reviewer` FOREIGN KEY (`reviewer_id`) REFERENCES `users` (`user_id`),
+  CONSTRAINT `fk_review_requests_submitter` FOREIGN KEY (`submitter_id`) REFERENCES `users` (`user_id`),
+  CONSTRAINT `fk_review_requests_task` FOREIGN KEY (`task_id`) REFERENCES `project_tasks` (`task_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COMMENT='?????'
+
+========== role_permissions ==========
+CREATE TABLE `role_permissions` (
+  `role_permission_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '??????ID',
+  `role_id` int(10) unsigned NOT NULL COMMENT '??ID',
+  `permission_id` int(10) unsigned NOT NULL COMMENT '??ID',
+  `assigned_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`role_permission_id`),
+  UNIQUE KEY `uk_role_permissions_pair` (`role_id`,`permission_id`,`is_deleted`),
+  KEY `idx_role_permissions_permission` (`permission_id`),
+  CONSTRAINT `fk_role_permissions_permission` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`permission_id`),
+  CONSTRAINT `fk_role_permissions_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=135 DEFAULT CHARSET=utf8mb4 COMMENT='???????'
+
+========== roles ==========
+CREATE TABLE `roles` (
+  `role_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '??ID',
+  `role_name` varchar(50) NOT NULL COMMENT '????',
+  `role_code` varchar(50) NOT NULL COMMENT '??????????',
+  `description` varchar(255) DEFAULT NULL COMMENT '????',
+  `status` enum('active','disabled') NOT NULL DEFAULT 'active' COMMENT '???active=???disabled=??',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`role_id`),
+  UNIQUE KEY `uk_roles_role_code` (`role_code`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COMMENT='???'
+
+========== student_knowledge_mastery ==========
+CREATE TABLE `student_knowledge_mastery` (
+  `mastery_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '掌握度记录ID',
+  `profile_id` int(10) unsigned NOT NULL COMMENT '画像ID',
+  `kp_id` int(10) unsigned NOT NULL COMMENT '知识点ID',
+  `mastery_level` decimal(5,3) NOT NULL DEFAULT '0.000' COMMENT '掌握度评分（0-1）',
+  `last_test_score` decimal(5,3) DEFAULT NULL COMMENT '最近一次测验得分（0-1）',
+  `last_test_date` date DEFAULT NULL COMMENT '最近测验日期',
+  `update_reason` varchar(255) DEFAULT NULL COMMENT '更新原因',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '软删除标记',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`mastery_id`),
+  UNIQUE KEY `uk_profile_kp` (`profile_id`,`kp_id`),
+  KEY `idx_mastery_kp` (`kp_id`),
+  KEY `idx_mastery_level` (`mastery_level`)
+) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COMMENT='学生知识点掌握度表'
+
+========== student_profiles ==========
+CREATE TABLE `student_profiles` (
+  `profile_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '画像ID',
+  `student_id` int(10) unsigned NOT NULL COMMENT '学生用户ID',
+  `course_id` int(10) unsigned NOT NULL COMMENT '所属课程ID',
+  `learning_goal` text COMMENT '学习目标',
+  `current_level` text COMMENT '当前基础水平',
+  `interests` varchar(500) DEFAULT NULL COMMENT '兴趣方向',
+  `resource_preferences` varchar(500) DEFAULT NULL COMMENT '资源类型偏好',
+  `weekly_hours` int(10) unsigned DEFAULT NULL COMMENT '每周可用于学习的小时数',
+  `mastery_score` decimal(5,3) NOT NULL DEFAULT '0.000' COMMENT '综合掌握度评分（0-1）',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '软删除标记',
+  `deleted_at` datetime DEFAULT NULL COMMENT '删除时间',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`profile_id`),
+  UNIQUE KEY `uk_student_course` (`student_id`,`course_id`),
+  KEY `idx_profile_course` (`course_id`),
+  KEY `idx_profile_mastery` (`mastery_score`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COMMENT='学生画像表'
+
+========== task_branches ==========
+CREATE TABLE `task_branches` (
+  `branch_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '??ID',
+  `project_id` int(10) unsigned NOT NULL COMMENT '??ID',
+  `task_id` int(10) unsigned NOT NULL COMMENT '??ID',
+  `branch_name` varchar(200) NOT NULL COMMENT '????',
+  `base_output_id` int(10) unsigned DEFAULT NULL COMMENT '??????ID?? task_outputs ????? ALTER TABLE ?????',
+  `status` enum('active','merged','closed','conflict_pending') NOT NULL DEFAULT 'active' COMMENT '?????active=???merged=????closed=????conflict_pending=?????',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`branch_id`),
+  KEY `idx_task_branches_task` (`task_id`,`is_deleted`),
+  KEY `idx_task_branches_project` (`project_id`),
+  KEY `idx_task_branches_status` (`status`),
+  KEY `fk_task_branches_base_output` (`base_output_id`),
+  CONSTRAINT `fk_task_branches_base_output` FOREIGN KEY (`base_output_id`) REFERENCES `task_outputs` (`output_id`),
+  CONSTRAINT `fk_task_branches_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`project_id`),
+  CONSTRAINT `fk_task_branches_task` FOREIGN KEY (`task_id`) REFERENCES `project_tasks` (`task_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COMMENT='?????'
+
+========== task_outputs ==========
+CREATE TABLE `task_outputs` (
+  `output_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '????ID',
+  `task_id` int(10) unsigned NOT NULL COMMENT '??ID',
+  `branch_id` int(10) unsigned DEFAULT NULL COMMENT '????ID',
+  `invocation_id` bigint(20) unsigned DEFAULT NULL COMMENT '???AI????ID',
+  `version_no` int(10) unsigned NOT NULL DEFAULT '1' COMMENT '???',
+  `output_title` varchar(200) NOT NULL COMMENT '????',
+  `content` longtext NOT NULL COMMENT '????',
+  `source_type` enum('ai_generated','manual_edit','hybrid','manual_merge') NOT NULL COMMENT '?????ai_generated=AI???manual_edit=?????hybrid=???manual_merge=????',
+  `parent_output_id` int(10) unsigned DEFAULT NULL COMMENT '???ID??????????',
+  `lock_version` int(10) unsigned NOT NULL DEFAULT '1' COMMENT '??????',
+  `last_modified_at` datetime DEFAULT NULL COMMENT '??????',
+  `last_modified_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `edit_summary` varchar(500) DEFAULT NULL COMMENT '??????',
+  `is_final_candidate` tinyint(1) NOT NULL DEFAULT '0' COMMENT '?????????1=??0=?',
+  `status` enum('draft','generated','submitted','approved','rejected','revision_required','adopted','conflict_pending') NOT NULL DEFAULT 'draft' COMMENT '?????draft=???generated=????submitted=????approved=????rejected=????revision_required=????adopted=????conflict_pending=?????',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`output_id`),
+  KEY `idx_task_outputs_task` (`task_id`,`is_deleted`),
+  KEY `idx_task_outputs_parent` (`parent_output_id`),
+  KEY `idx_task_outputs_branch` (`branch_id`),
+  KEY `idx_task_outputs_status` (`status`,`is_deleted`),
+  KEY `idx_task_outputs_invocation` (`invocation_id`),
+  CONSTRAINT `fk_task_outputs_branch` FOREIGN KEY (`branch_id`) REFERENCES `task_branches` (`branch_id`),
+  CONSTRAINT `fk_task_outputs_invocation` FOREIGN KEY (`invocation_id`) REFERENCES `ai_invocations` (`invocation_id`),
+  CONSTRAINT `fk_task_outputs_parent` FOREIGN KEY (`parent_output_id`) REFERENCES `task_outputs` (`output_id`),
+  CONSTRAINT `fk_task_outputs_task` FOREIGN KEY (`task_id`) REFERENCES `project_tasks` (`task_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COMMENT='???????'
+
+========== task_types ==========
+CREATE TABLE `task_types` (
+  `task_type_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '????ID',
+  `type_name` varchar(100) NOT NULL COMMENT '????',
+  `type_code` varchar(50) NOT NULL COMMENT '??????????',
+  `description` varchar(255) DEFAULT NULL COMMENT '????',
+  `default_template_id` int(10) unsigned DEFAULT NULL COMMENT '??????????ID',
+  `status` enum('active','disabled') NOT NULL DEFAULT 'active' COMMENT '???active=???disabled=???',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`task_type_id`),
+  UNIQUE KEY `uk_task_types_code` (`type_code`)
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COMMENT='?????'
+
+========== user_roles ==========
+CREATE TABLE `user_roles` (
+  `user_role_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '??????ID',
+  `user_id` int(10) unsigned NOT NULL COMMENT '??ID',
+  `role_id` int(10) unsigned NOT NULL COMMENT '??ID',
+  `assigned_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `assigned_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`user_role_id`),
+  UNIQUE KEY `uk_user_roles_user_role` (`user_id`,`role_id`,`is_deleted`),
+  KEY `idx_user_roles_role` (`role_id`),
+  CONSTRAINT `fk_user_roles_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`),
+  CONSTRAINT `fk_user_roles_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COMMENT='???????'
+
+========== users ==========
+CREATE TABLE `users` (
+  `user_id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '??ID',
+  `username` varchar(50) NOT NULL COMMENT '????????',
+  `password_hash` varchar(255) NOT NULL COMMENT '?????',
+  `real_name` varchar(100) NOT NULL COMMENT '????',
+  `student_no` varchar(30) DEFAULT NULL COMMENT '??????????',
+  `email` varchar(255) DEFAULT NULL COMMENT '??',
+  `phone` varchar(20) DEFAULT NULL COMMENT '???',
+  `status` enum('active','disabled') NOT NULL DEFAULT 'active' COMMENT '?????active=???disabled=??',
+  `last_login_at` datetime DEFAULT NULL COMMENT '??????',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0' COMMENT '??????0=????1=???',
+  `deleted_at` datetime DEFAULT NULL COMMENT '????',
+  `deleted_by` int(10) unsigned DEFAULT NULL COMMENT '?????',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '????',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  `updated_at` datetime DEFAULT NULL COMMENT '????',
+  `updated_by` int(10) unsigned DEFAULT NULL COMMENT '???',
+  PRIMARY KEY (`user_id`),
+  UNIQUE KEY `uk_users_username` (`username`),
+  UNIQUE KEY `uk_users_student_no` (`student_no`),
+  UNIQUE KEY `uk_users_email` (`email`),
+  KEY `idx_users_status_deleted` (`status`,`is_deleted`),
+  KEY `idx_users_username` (`username`)
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COMMENT='???'
+
+========== v_artifacts ==========
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v_artifacts` AS select `ao`.`adopted_id` AS `adopted_id`,`ao`.`project_id` AS `project_id`,`p`.`project_name` AS `project_name`,`p`.`project_type` AS `project_type`,`ao`.`task_id` AS `task_id`,`t`.`title` AS `task_title`,`ao`.`output_id` AS `output_id`,`o`.`output_title` AS `output_title`,`o`.`version_no` AS `version_no`,`o`.`content` AS `content`,`ao`.`artifact_title` AS `artifact_title`,`ao`.`artifact_type` AS `artifact_type`,`ao`.`release_version` AS `release_version`,`ao`.`adopted_by` AS `adopted_by`,`u`.`real_name` AS `adopted_by_name`,`ao`.`adopted_at` AS `adopted_at`,`p`.`owner_id` AS `project_owner_id`,`ow`.`real_name` AS `project_owner_name` from (((((`adopted_outputs` `ao` join `projects` `p` on(((`ao`.`project_id` = `p`.`project_id`) and (`p`.`is_deleted` = 0)))) join `project_tasks` `t` on(((`ao`.`task_id` = `t`.`task_id`) and (`t`.`is_deleted` = 0)))) join `task_outputs` `o` on(((`ao`.`output_id` = `o`.`output_id`) and (`o`.`is_deleted` = 0)))) join `users` `u` on(((`ao`.`adopted_by` = `u`.`user_id`) and (`u`.`is_deleted` = 0)))) join `users` `ow` on(((`p`.`owner_id` = `ow`.`user_id`) and (`ow`.`is_deleted` = 0)))) where (`ao`.`is_deleted` = 0) order by `ao`.`adopted_at` desc
+
+========== v_model_invocation_statistics ==========
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v_model_invocation_statistics` AS select `m`.`model_id` AS `model_id`,`m`.`model_name` AS `model_name`,`m`.`display_name` AS `display_name`,`m`.`provider_id` AS `provider_id`,`mp`.`provider_name` AS `provider_name`,`m`.`status` AS `model_status`,count(distinct `ai`.`invocation_id`) AS `total_invocations`,sum((case when (`ai`.`status` = 'success') then 1 else 0 end)) AS `success_count`,sum((case when (`ai`.`status` = 'failed') then 1 else 0 end)) AS `failed_count`,sum((case when (`ai`.`status` = 'timeout') then 1 else 0 end)) AS `timeout_count`,sum((case when (`ai`.`status` = 'blocked') then 1 else 0 end)) AS `blocked_count`,coalesce(sum(`ai`.`input_tokens`),0) AS `total_input_tokens`,coalesce(sum(`ai`.`output_tokens`),0) AS `total_output_tokens`,coalesce((sum(`ai`.`input_tokens`) + sum(`ai`.`output_tokens`)),0) AS `total_tokens`,coalesce(sum(`cr`.`total_cost`),0) AS `total_cost`,coalesce(avg(`ai`.`latency_ms`),0) AS `avg_latency_ms`,coalesce(max(`ai`.`latency_ms`),0) AS `max_latency_ms`,coalesce(min((case when (`ai`.`latency_ms` > 0) then `ai`.`latency_ms` end)),0) AS `min_latency_ms`,(case when (count(distinct `ai`.`invocation_id`) > 0) then round(((sum((case when (`ai`.`status` = 'success') then 1 else 0 end)) * 100.0) / count(distinct `ai`.`invocation_id`)),2) else 0.00 end) AS `success_rate`,coalesce(((sum(`ai`.`input_tokens`) / 1000.0) * `m`.`input_price`),0) AS `estimated_input_cost`,coalesce(((sum(`ai`.`output_tokens`) / 1000.0) * `m`.`output_price`),0) AS `estimated_output_cost` from (((`ai_models` `m` left join `model_providers` `mp` on(((`m`.`provider_id` = `mp`.`provider_id`) and (`mp`.`is_deleted` = 0)))) left join `ai_invocations` `ai` on((`m`.`model_id` = `ai`.`model_id`))) left join `cost_records` `cr` on((`ai`.`invocation_id` = `cr`.`invocation_id`))) where (`m`.`is_deleted` = 0) group by `m`.`model_id`,`m`.`model_name`,`m`.`display_name`,`m`.`provider_id`,`mp`.`provider_name`,`m`.`status` order by `total_invocations` desc
+
+========== v_pending_reviews ==========
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v_pending_reviews` AS select `rr`.`request_id` AS `request_id`,`rr`.`output_id` AS `output_id`,`rr`.`task_id` AS `task_id`,`rr`.`project_id` AS `project_id`,`rr`.`submitter_id` AS `submitter_id`,`sub`.`real_name` AS `submitter_name`,`rr`.`reviewer_id` AS `reviewer_id`,`rev`.`real_name` AS `reviewer_name`,`rr`.`request_status` AS `request_status`,`rr`.`submit_note` AS `submit_note`,`rr`.`created_at` AS `submit_time`,`o`.`output_title` AS `output_title`,`o`.`source_type` AS `source_type`,`o`.`version_no` AS `version_no`,`o`.`content` AS `content_preview`,`t`.`title` AS `task_title`,`p`.`project_name` AS `project_name`,`u1`.`real_name` AS `output_creator` from ((((((`review_requests` `rr` join `task_outputs` `o` on(((`rr`.`output_id` = `o`.`output_id`) and (`o`.`is_deleted` = 0)))) join `project_tasks` `t` on(((`rr`.`task_id` = `t`.`task_id`) and (`t`.`is_deleted` = 0)))) join `projects` `p` on(((`rr`.`project_id` = `p`.`project_id`) and (`p`.`is_deleted` = 0)))) left join `users` `sub` on(((`rr`.`submitter_id` = `sub`.`user_id`) and (`sub`.`is_deleted` = 0)))) left join `users` `rev` on(((`rr`.`reviewer_id` = `rev`.`user_id`) and (`rev`.`is_deleted` = 0)))) left join `users` `u1` on(((`o`.`created_by` = `u1`.`user_id`) and (`u1`.`is_deleted` = 0)))) where ((`rr`.`is_deleted` = 0) and (`rr`.`request_status` = 'pending')) order by `rr`.`created_at`
+
+========== v_project_task_statistics ==========
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v_project_task_statistics` AS select `p`.`project_id` AS `project_id`,`p`.`project_name` AS `project_name`,`p`.`project_type` AS `project_type`,`p`.`owner_id` AS `owner_id`,`u`.`real_name` AS `owner_name`,`p`.`status` AS `project_status`,`p`.`created_at` AS `project_created_at`,count(distinct `t`.`task_id`) AS `total_tasks`,sum((case when (`t`.`status` = 'draft') then 1 else 0 end)) AS `task_draft`,sum((case when (`t`.`status` = 'running') then 1 else 0 end)) AS `task_running`,sum((case when (`t`.`status` = 'generated') then 1 else 0 end)) AS `task_generated`,sum((case when (`t`.`status` = 'submitted') then 1 else 0 end)) AS `task_submitted`,sum((case when (`t`.`status` = 'approved') then 1 else 0 end)) AS `task_approved`,sum((case when (`t`.`status` = 'rejected') then 1 else 0 end)) AS `task_rejected`,sum((case when (`t`.`status` = 'revision_required') then 1 else 0 end)) AS `task_revision_required`,sum((case when (`t`.`status` = 'adopted') then 1 else 0 end)) AS `task_adopted`,sum((case when (`t`.`status` = 'archived') then 1 else 0 end)) AS `task_archived`,sum((case when (`t`.`status` = 'conflict_pending') then 1 else 0 end)) AS `task_conflict_pending`,count(distinct `pm`.`member_id`) AS `total_members`,count(distinct `o`.`output_id`) AS `total_outputs`,count(distinct `rr`.`request_id`) AS `total_review_requests`,sum((case when (`rr`.`request_status` = 'pending') then 1 else 0 end)) AS `pending_reviews`,count(distinct `ao`.`adopted_id`) AS `total_adopted` from ((((((`projects` `p` left join `users` `u` on(((`p`.`owner_id` = `u`.`user_id`) and (`u`.`is_deleted` = 0)))) left join `project_tasks` `t` on(((`p`.`project_id` = `t`.`project_id`) and (`t`.`is_deleted` = 0)))) left join `project_members` `pm` on(((`p`.`project_id` = `pm`.`project_id`) and (`pm`.`is_deleted` = 0)))) left join `task_outputs` `o` on(((`t`.`task_id` = `o`.`task_id`) and (`o`.`is_deleted` = 0)))) left join `review_requests` `rr` on(((`p`.`project_id` = `rr`.`project_id`) and (`rr`.`is_deleted` = 0)))) left join `adopted_outputs` `ao` on(((`p`.`project_id` = `ao`.`project_id`) and (`ao`.`is_deleted` = 0)))) where (`p`.`is_deleted` = 0) group by `p`.`project_id`,`p`.`project_name`,`p`.`project_type`,`p`.`owner_id`,`u`.`real_name`,`p`.`status`,`p`.`created_at` order by `p`.`created_at` desc
+
+========== v_user_permissions ==========
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v_user_permissions` AS select `u`.`user_id` AS `user_id`,`u`.`username` AS `username`,`u`.`real_name` AS `real_name`,`u`.`email` AS `email`,`u`.`status` AS `user_status`,group_concat(distinct `r`.`role_name` order by `r`.`role_name` ASC separator ', ') AS `roles`,group_concat(distinct `r`.`role_code` order by `r`.`role_code` ASC separator ',') AS `role_codes`,count(distinct `rp`.`permission_id`) AS `permission_count`,group_concat(distinct `p`.`permission_name` order by `p`.`module_name` ASC,`p`.`permission_name` ASC separator ', ') AS `permissions`,`u`.`last_login_at` AS `last_login_at`,`u`.`created_at` AS `created_at` from ((((`users` `u` left join `user_roles` `ur` on(((`u`.`user_id` = `ur`.`user_id`) and (`ur`.`is_deleted` = 0)))) left join `roles` `r` on(((`ur`.`role_id` = `r`.`role_id`) and (`r`.`is_deleted` = 0)))) left join `role_permissions` `rp` on(((`r`.`role_id` = `rp`.`role_id`) and (`rp`.`is_deleted` = 0)))) left join `permissions` `p` on(((`rp`.`permission_id` = `p`.`permission_id`) and (`p`.`is_deleted` = 0)))) where (`u`.`is_deleted` = 0) group by `u`.`user_id`,`u`.`username`,`u`.`real_name`,`u`.`email`,`u`.`status`,`u`.`last_login_at`,`u`.`created_at` order by `u`.`created_at` desc
