@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Home, ShieldQuestion } from "lucide-react";
 import { primaryButton, secondaryButton } from "../components/common/ProductUI";
 

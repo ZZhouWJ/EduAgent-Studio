@@ -198,7 +198,7 @@ export function AdminPrompts() {
                 <StatusBadge status={selectedTemplate.enabled ? "启用" : "停用"} />
               </div>
               <div className="mb-5 rounded-2xl border border-slate-100 bg-slate-950 p-5 font-mono text-sm leading-6 text-slate-200">
-                {promptContent || activeVersion?.raw?.prompt_content ?? "通过版本历史选择加载内容"}
+                {(promptContent || activeVersion?.raw?.prompt_content) ?? "通过版本历史选择加载内容"}
               </div>
               <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <button onClick={() => setOpen(true)} className={`${primaryButton} cursor-pointer`}>编辑模板</button>

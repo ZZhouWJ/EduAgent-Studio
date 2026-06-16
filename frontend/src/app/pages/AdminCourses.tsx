@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { BookOpen, Database, FileText, GraduationCap, Library, UserRound, Users } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { coursesApi, learningApi, Course } from "@/lib/api";

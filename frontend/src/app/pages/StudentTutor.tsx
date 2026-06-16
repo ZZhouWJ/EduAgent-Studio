@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { Bot, BookOpenCheck, CheckCircle2, MessageSquare, RefreshCcw, Send, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { agentsApi, resourcesApi } from "@/lib/api";

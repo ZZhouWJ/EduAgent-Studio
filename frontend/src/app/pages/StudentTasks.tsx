@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { BookOpenCheck, CheckCircle2, Clock3, FileText, MessageSquare, PlayCircle, Target } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { learningApi, resourcesApi } from "@/lib/api";

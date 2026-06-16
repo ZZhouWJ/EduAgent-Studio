@@ -1,7 +1,8 @@
 import React from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { AlertTriangle, ArrowRight, BookOpen, Bot, CheckSquare, Database, FileText, Library, MessageSquare, ShieldAlert, Sparkles, Target, Users } from "lucide-react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { motion } from "motion/react";
 import { useApi } from "@/lib/useApi";
 import { reviewsApi, statisticsApi, learningApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
@@ -14,6 +15,99 @@ const toneClass: Record<string, string> = {
   cyan: "bg-cyan-50 text-cyan-700 ring-cyan-100",
   red: "bg-red-50 text-red-700 ring-red-100",
 };
+
+/* ─── Hero 标语区：逐字打印 + 光带扫过 + 浮动点缀 ─── */
+function HeroSlogan() {
+  const main = "把知识变简单，把成长变自然。";
+  const sub = "每一次学习，都更接近答案。";
+  const chars = Array.from(main);
+
+  return (
+    <div className="relative overflow-hidden">
+      {/* 漂浮的语义化小图标（书页、种子、答案标记） */}
+      <motion.div
+        className="absolute -right-2 -top-3 text-blue-200/70"
+        animate={{ y: [0, -8, 0], rotate: [0, 6, 0] }}
+        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <BookOpen className="h-7 w-7" />
+      </motion.div>
+      <motion.div
+        className="absolute -left-1 top-2 text-emerald-200/70"
+        animate={{ y: [0, 10, 0], rotate: [0, -8, 0] }}
+        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
+      >
+        <Sparkles className="h-6 w-6" />
+      </motion.div>
+
+      {/* 主标语：逐字打印 + 渐变光带扫过 */}
+      <h2 className="text-[34px] font-black leading-[1.18] tracking-tight text-slate-950 sm:text-[40px]">
+        {chars.map((ch, i) => (
+          <motion.span
+            key={i}
+            initial={{ opacity: 0, y: 14, filter: "blur(6px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            transition={{
+              delay: 0.05 + i * 0.055,
+              duration: 0.55,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            className="inline-block bg-gradient-to-br from-slate-950 via-blue-700 to-indigo-600 bg-clip-text text-transparent"
+          >
+            {ch === " " ? "\u00A0" : ch}
+          </motion.span>
+        ))}
+
+        {/* 闪烁光标 */}
+        <motion.span
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0, 1, 1, 0] }}
+          transition={{ delay: 0.05 + chars.length * 0.055, duration: 1.1, repeat: 2 }}
+          className="ml-1 inline-block h-[28px] w-[3px] -translate-y-[2px] rounded-sm bg-blue-500 align-middle sm:h-[34px]"
+        />
+      </h2>
+
+      {/* 主标语下方光带扫过 */}
+      <motion.div
+        initial={{ scaleX: 0 }}
+        animate={{ scaleX: 1 }}
+        transition={{ delay: 0.05 + chars.length * 0.055 + 0.2, duration: 0.9, ease: [0.65, 0, 0.35, 1] }}
+        style={{ transformOrigin: "0% 50%" }}
+        className="mt-2 h-[2px] w-[68%] bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-400"
+      />
+
+      {/* 副标语：错峰淡入 + 节拍闪烁的句号 */}
+      <motion.p
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 + chars.length * 0.055 + 0.5, duration: 0.7 }}
+        className="mt-4 flex flex-wrap items-center gap-2 text-[15px] font-medium leading-7 text-slate-600"
+      >
+        {Array.from(sub).map((ch, i) =>
+          ch === "。" ? (
+            <motion.span
+              key={`dot-${i}`}
+              animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.15, 1] }}
+              transition={{ duration: 1.8, repeat: Infinity, delay: i * 0.05 }}
+              className="text-blue-500"
+            >
+              {ch}
+            </motion.span>
+          ) : (
+            <motion.span
+              key={`c-${i}`}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 + chars.length * 0.055 + 0.5 + i * 0.03, duration: 0.4 }}
+            >
+              {ch}
+            </motion.span>
+          )
+        )}
+      </motion.p>
+    </div>
+  );
+}
 
 export function TeacherDashboard() {
   const user = useAuthStore((s) => s.user);
@@ -69,10 +163,17 @@ export function TeacherDashboard() {
               <Sparkles className="h-3.5 w-3.5" />
               教学工作台
             </div>
-            <h2 className="text-[30px] font-black leading-tight text-slate-950">张老师，欢迎回到教学工作台。</h2>
-            <p className="mt-2 text-sm font-bold text-slate-700">当前课程：数据库系统原理与 Web 项目实践</p>
+            <HeroSlogan />
+            <motion.p
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 + Array.from("把知识变简单，把成长变自然。").length * 0.055 + 1.0, duration: 0.5 }}
+              className="mt-3 text-sm font-bold text-slate-700"
+            >
+              {greetingName}，欢迎回到「数据库系统原理与 Web 项目实践」课堂。
+            </motion.p>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              系统检测到“事务隔离级别”和“SQL 多表连接”是当前班级主要薄弱点，建议生成针对性资源并安排阶段测评。
+              系统检测到"事务隔离级别"和"SQL 多表连接"是当前班级主要薄弱点，建议生成针对性资源并安排阶段测评。
             </p>
             <div className="mt-6 flex gap-3">
               <Link to="/teacher/agent-workbench" className="inline-flex h-11 items-center gap-2 rounded-xl bg-[linear-gradient(110deg,#2563EB,#7C3AED)] px-5 text-sm font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.22)]">

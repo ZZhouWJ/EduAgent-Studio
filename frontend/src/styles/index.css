@@ -2,6 +2,184 @@
 @import './tailwind.css';
 @import './theme.css';
 
+/* ─── 通用动效工具类 ───────────────────────────────────── */
+
+/* 浮动 / 漂浮动效 */
+@keyframes edu-float {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50%      { transform: translateY(-12px) rotate(2deg); }
+}
+.edu-float         { animation: edu-float 5s ease-in-out infinite; }
+.edu-float-slow    { animation: edu-float 8s ease-in-out infinite; }
+.edu-float-fast    { animation: edu-float 3.2s ease-in-out infinite; }
+
+/* 渐入滑入（页面切换 / 元素入场） */
+@keyframes edu-fade-up {
+  0%   { opacity: 0; transform: translateY(18px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.edu-fade-up { animation: edu-fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes edu-fade-in {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+.edu-fade-in { animation: edu-fade-in 0.5s ease both; }
+
+/* 缩放入场 */
+@keyframes edu-pop-in {
+  0%   { opacity: 0; transform: scale(0.92); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.edu-pop-in { animation: edu-pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* 缓慢脉动光晕 */
+@keyframes edu-pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.45); }
+  50%      { box-shadow: 0 0 0 14px rgba(37, 99, 235, 0); }
+}
+.edu-pulse-ring { animation: edu-pulse-ring 2.2s ease-in-out infinite; }
+
+/* 渐变流动描边 */
+@keyframes edu-aurora {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+.edu-aurora {
+  background: linear-gradient(120deg, #2563eb, #7c3aed, #06b6d4, #10b981, #2563eb);
+  background-size: 300% 300%;
+  animation: edu-aurora 9s ease infinite;
+}
+
+/* 骨架闪烁 */
+@keyframes edu-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.edu-skeleton {
+  background: linear-gradient(90deg, #e2e8f0 0%, #f1f5f9 50%, #e2e8f0 100%);
+  background-size: 800px 100%;
+  animation: edu-shimmer 1.4s linear infinite;
+}
+
+/* 文字渐变光带扫过 */
+@keyframes edu-text-shine {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.edu-text-shine {
+  background: linear-gradient(90deg, #0f172a 0%, #2563eb 30%, #7c3aed 50%, #2563eb 70%, #0f172a 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: edu-text-shine 4.5s linear infinite;
+}
+
+/* 卡片悬浮 + 边光 */
+.edu-card-glow {
+  position: relative;
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+.edu-card-glow::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.6), rgba(124, 58, 237, 0.4), rgba(6, 182, 212, 0.4));
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 220ms ease;
+  pointer-events: none;
+}
+.edu-card-glow:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.1);
+  border-color: rgba(37, 99, 235, 0.18);
+}
+.edu-card-glow:hover::before { opacity: 1; }
+
+/* 标签徽章渐变 + 微闪 */
+.edu-badge-shine {
+  position: relative;
+  overflow: hidden;
+}
+.edu-badge-shine::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 60%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: edu-shine-sweep 3.5s ease-in-out infinite;
+}
+@keyframes edu-shine-sweep {
+  0%   { left: -100%; }
+  60%  { left: 120%; }
+  100% { left: 120%; }
+}
+
+/* 滚动进度条 */
+.edu-progress-stripe {
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.22) 25%, transparent 25%,
+    transparent 50%, rgba(255, 255, 255, 0.22) 50%,
+    rgba(255, 255, 255, 0.22) 75%, transparent 75%
+  );
+  background-size: 24px 24px;
+  animation: edu-stripe-move 0.9s linear infinite;
+}
+@keyframes edu-stripe-move {
+  0%   { background-position: 0 0; }
+  100% { background-position: 24px 0; }
+}
+
+/* 数字滚动入场 */
+@keyframes edu-count-up {
+  0%   { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.edu-count-up { animation: edu-count-up 0.6s ease both; }
+
+/* 悬浮阴影加深 */
+.edu-hover-lift {
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+.edu-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+}
+
+/* 3D 卡片倾斜（鼠标悬浮） */
+.edu-tilt {
+  transform-style: preserve-3d;
+  transition: transform 300ms ease;
+}
+.edu-tilt:hover {
+  transform: perspective(800px) rotateX(2deg) rotateY(-2deg) translateY(-4px);
+}
+
+/* 链接下划线扫过 */
+.edu-link-sweep {
+  position: relative;
+}
+.edu-link-sweep::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 100%;
+  bottom: -2px;
+  height: 2px;
+  background: linear-gradient(90deg, #2563eb, #7c3aed);
+  transition: right 240ms ease;
+  border-radius: 2px;
+}
+.edu-link-sweep:hover::after { right: 0; }
+
 /* ─── Login 页专用样式 ───────────────────────────────────── */
 
 /* 左侧渐变动画背景：缓慢流动的深色渐变 */
@@ -10,11 +188,11 @@
   inset: 0;
   background: linear-gradient(
     135deg,
-    #0f172a 0%,
-    #1e3a5f 25%,
-    #1a365d 50%,
-    #1e3a5f 75%,
-    #0f172a 100%
+    #0b1226 0%,
+    #1e1b4b 22%,
+    #1e3a8a 48%,
+    #312e81 72%,
+    #0b1226 100%
   );
   background-size: 400% 400%;
   animation: edu-bg-shift 20s ease-in-out infinite;
@@ -40,11 +218,11 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 255, 255, 0.18) 50%,
+    rgba(255, 255, 255, 0.32) 50%,
     transparent 100%
   );
   transform: translateX(-100%);
-  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: none;
 }
 

@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { BookOpen, Clock, Target, Star, ChevronRight, HelpCircle, FileText, CheckCircle2, PlayCircle, PlusCircle, MessageSquare, RefreshCw, BookOpenCheck, ListTree } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { feedbackApi, resourcesApi, statisticsApi } from "@/lib/api";

@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { Login } from "./pages/Login";
 import { AdminAgentConfig } from "./pages/AdminAgentConfig";
@@ -29,57 +29,66 @@ import { TeacherKnowledgeBase } from "./pages/TeacherKnowledgeBase";
 import { TeacherReview } from "./pages/TeacherReview";
 import { TeacherTasks } from "./pages/TeacherTasks";
 
-export const router = createBrowserRouter([
+export const router = createBrowserRouter(
+  [
+    {
+      path: "/login",
+      Component: Login,
+    },
+    {
+      path: "/",
+      Component: Layout,
+      children: [
+        { index: true, element: <Navigate to="/teacher" replace /> },
+
+        { path: "student", Component: StudentDashboard },
+        { path: "student/profile", Component: StudentProfile },
+        { path: "student/learning-path", Component: StudentLearningPath },
+        { path: "student/tasks", Component: StudentTasks },
+        { path: "student/resources", Component: ResourceLibrary },
+        { path: "student/tutor", Component: StudentTutor },
+        { path: "student/feedback", Component: LearningFeedback },
+        { path: "student/report", Component: LearningAnalytics },
+
+        { path: "teacher", Component: TeacherDashboard },
+        { path: "teacher/courses", Component: TeacherCourses },
+        { path: "teacher/students", Component: StudentProfile },
+        { path: "teacher/agent-workbench", Component: AgentWorkbench },
+        { path: "teacher/resources", Component: ResourceLibrary },
+        { path: "teacher/review", Component: TeacherReview },
+        { path: "teacher/tasks", Component: TeacherTasks },
+        { path: "teacher/knowledge-base", Component: TeacherKnowledgeBase },
+        { path: "teacher/analytics", Component: LearningAnalytics },
+
+        { path: "admin", Component: AdminDashboard },
+        { path: "admin/users", Component: AdminUsers },
+        { path: "admin/roles", Component: RolePermissionMap },
+        { path: "admin/courses", Component: AdminCourses },
+        { path: "admin/resources", Component: ResourceLibrary },
+        { path: "admin/model-config", Component: AdminModelConfig },
+        { path: "admin/agent-config", Component: AdminAgentConfig },
+        { path: "admin/prompts", Component: AdminPrompts },
+        { path: "admin/audit", Component: AdminAudit },
+        { path: "admin/costs", Component: AdminCosts },
+        { path: "admin/governance", Component: AdminGovernance },
+        { path: "admin/logs", Component: AdminLogs },
+        { path: "admin/design-system", Component: DesignSystemUpdate },
+
+        { path: "agent-workbench", element: <Navigate to="/teacher/agent-workbench" replace /> },
+        { path: "student-profile", element: <Navigate to="/student/profile" replace /> },
+        { path: "resource-library", element: <Navigate to="/teacher/resources" replace /> },
+        { path: "teacher-review", element: <Navigate to="/teacher/review" replace /> },
+        { path: "learning-feedback", element: <Navigate to="/student/feedback" replace /> },
+        { path: "learning-analytics", element: <Navigate to="/teacher/analytics" replace /> },
+        { path: "*", Component: NotFound },
+      ],
+    },
+  ],
   {
-    path: "/login",
-    Component: Login,
+    future: {
+      v7_startTransition: true,
+      v7_relativeSplatPath: true,
+    },
   },
-  {
-    path: "/",
-    Component: Layout,
-    children: [
-      { index: true, element: <Navigate to="/teacher" replace /> },
+);
 
-      { path: "student", Component: StudentDashboard },
-      { path: "student/profile", Component: StudentProfile },
-      { path: "student/learning-path", Component: StudentLearningPath },
-      { path: "student/tasks", Component: StudentTasks },
-      { path: "student/resources", Component: ResourceLibrary },
-      { path: "student/tutor", Component: StudentTutor },
-      { path: "student/feedback", Component: LearningFeedback },
-      { path: "student/report", Component: LearningAnalytics },
-
-      { path: "teacher", Component: TeacherDashboard },
-      { path: "teacher/courses", Component: TeacherCourses },
-      { path: "teacher/students", Component: StudentProfile },
-      { path: "teacher/agent-workbench", Component: AgentWorkbench },
-      { path: "teacher/resources", Component: ResourceLibrary },
-      { path: "teacher/review", Component: TeacherReview },
-      { path: "teacher/tasks", Component: TeacherTasks },
-      { path: "teacher/knowledge-base", Component: TeacherKnowledgeBase },
-      { path: "teacher/analytics", Component: LearningAnalytics },
-
-      { path: "admin", Component: AdminDashboard },
-      { path: "admin/users", Component: AdminUsers },
-      { path: "admin/roles", Component: RolePermissionMap },
-      { path: "admin/courses", Component: AdminCourses },
-      { path: "admin/resources", Component: ResourceLibrary },
-      { path: "admin/model-config", Component: AdminModelConfig },
-      { path: "admin/agent-config", Component: AdminAgentConfig },
-      { path: "admin/prompts", Component: AdminPrompts },
-      { path: "admin/audit", Component: AdminAudit },
-      { path: "admin/costs", Component: AdminCosts },
-      { path: "admin/governance", Component: AdminGovernance },
-      { path: "admin/logs", Component: AdminLogs },
-      { path: "admin/design-system", Component: DesignSystemUpdate },
-
-      { path: "agent-workbench", element: <Navigate to="/teacher/agent-workbench" replace /> },
-      { path: "student-profile", element: <Navigate to="/student/profile" replace /> },
-      { path: "resource-library", element: <Navigate to="/teacher/resources" replace /> },
-      { path: "teacher-review", element: <Navigate to="/teacher/review" replace /> },
-      { path: "learning-feedback", element: <Navigate to="/student/feedback" replace /> },
-      { path: "learning-analytics", element: <Navigate to="/teacher/analytics" replace /> },
-      { path: "*", Component: NotFound },
-    ],
-  },
-]);

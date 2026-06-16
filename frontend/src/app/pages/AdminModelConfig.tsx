@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { ActivitySquare, Bot, Coins, Gauge, PlugZap, Save, Settings2, ToggleLeft } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { modelsApi, statisticsApi, AIModel } from "@/lib/api";

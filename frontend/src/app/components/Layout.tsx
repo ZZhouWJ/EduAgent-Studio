@@ -1,6 +1,6 @@
 import React from "react";
-import { Link, NavLink, Outlet, useLocation } from "react-router";
-import { useNavigate } from "react-router";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/auth";
 import { useRouterGuard } from "@/lib/router-guard";
 import { Toaster } from "sonner";

@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { BarChart3, BookOpen, Bot, Database, FileText, GraduationCap, Library, Users } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { learningApi } from "@/lib/api";
