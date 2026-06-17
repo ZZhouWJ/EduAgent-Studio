@@ -23,7 +23,7 @@ import {
   Send,
   Settings2,
   ShieldCheck,
-  Sparkles,
+  Terminal,
 } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { agentsApi, learningApi, modelsApi } from "@/lib/api";
@@ -116,8 +116,8 @@ function stepClasses(state: string) {
 
   if (state === "running") {
     return {
-      icon: "bg-[linear-gradient(135deg,#2563EB,#7C3AED)] text-white ring-blue-200 shadow-[0_12px_28px_rgba(37,99,235,0.24)]",
-      card: "border-blue-200 bg-[linear-gradient(135deg,rgba(239,246,255,0.9),rgba(245,243,255,0.82))]",
+      icon: "bg-blue-600 text-white ring-blue-200",
+      card: "border-blue-200 bg-blue-50/60",
       badge: "bg-blue-100 text-blue-700 ring-blue-200",
     };
   }
@@ -142,13 +142,13 @@ export function AgentWorkbench() {
     <div className="page-shell flex min-h-0 flex-col">
       <div className="flex shrink-0 flex-col items-stretch justify-between gap-4 lg:flex-row lg:items-start lg:gap-6">
         <div className="min-w-0">
-          <div className="mb-2 flex w-fit items-center gap-2 rounded-full border border-purple-100 bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700">
+          <div className="mb-2 flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
             <Network className="h-3.5 w-3.5" />
-            Multi-Agent Resource Generation
+            资源生成工作台
           </div>
-          <h1 className="text-2xl font-black text-slate-950">教师智能体工作台</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">资源生成工作台</h1>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-            面向课程、班级和重点学生群体，组织班级诊断、画像聚合、知识定位、路径规划、资源生成、测评生成与教师审核辅助智能体协同工作。
+            面向课程、班级和重点学生群体，组织班级诊断、画像聚合、知识定位、路径规划、资源生成、测评生成与教师审核辅助等环节协同工作。
           </p>
         </div>
 
@@ -172,9 +172,9 @@ export function AgentWorkbench() {
             <div className="mb-5 flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2">
                 <Settings2 className="h-5 w-5 text-slate-700" />
-                <h2 className="text-base font-black text-slate-950">生成上下文</h2>
+                <h2 className="text-base font-semibold text-slate-900">生成上下文</h2>
               </div>
-              <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-700">教师端生成</span>
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">教师端</span>
             </div>
 
             <div className="space-y-4">
@@ -226,10 +226,10 @@ export function AgentWorkbench() {
                   {RESOURCE_TYPES.map((type, index) => (
                     <button
                       key={type}
-                      className={`min-h-10 rounded-xl border px-2 text-xs font-bold transition ${
+                      className={`min-h-10 rounded-xl border px-2 text-xs font-semibold transition ${
                         index === 0
-                          ? "border-purple-200 bg-purple-50 text-purple-700"
-                          : "border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700"
+                          ? "border-slate-300 bg-slate-100 text-slate-800"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
                       }`}
                     >
                       {type}
@@ -271,11 +271,12 @@ export function AgentWorkbench() {
             <div className="mt-5 space-y-3 border-t border-slate-100 pt-5">
               <button
                 onClick={() => {
-                  showToast("智能体生成已启动（API 接入待完成表单状态）");
+                  showToast("生成已启动（API 接入待完成表单状态）");
                 }}
-                className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(110deg,#2563EB,#7C3AED)] text-sm font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.24)] transition hover:shadow-[0_18px_36px_rgba(37,99,235,0.32)]">
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-900 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+              >
                 <Play className="h-4 w-4" />
-                启动智能体生成
+                启动生成
               </button>
               <button className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 transition hover:border-blue-200 hover:text-blue-700">
                 <RotateCcw className="h-4 w-4" />
@@ -289,10 +290,10 @@ export function AgentWorkbench() {
           <div className="edu-card flex min-h-[540px] flex-col rounded-2xl p-5 xl:min-h-0 xl:flex-1">
             <div className="mb-5 flex flex-col items-start justify-between gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center">
               <div className="flex items-center gap-2">
-                <Bot className="h-5 w-5 text-purple-700" />
-                <h2 className="text-base font-black text-slate-950">多智能体执行链路</h2>
+                <Route className="h-5 w-5 text-slate-700" />
+                <h2 className="text-base font-semibold text-slate-900">执行链路</h2>
               </div>
-              <div className="flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700 ring-1 ring-blue-100">
+              <div className="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                 <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
                 运行中 4/7
               </div>
@@ -330,20 +331,20 @@ export function AgentWorkbench() {
             </div>
           </div>
 
-          <div className="h-48 shrink-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-[0_18px_36px_rgba(15,23,42,0.18)]">
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-xs font-bold text-slate-400">
+          <div className="h-48 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-xs font-semibold text-slate-500">
               <span className="flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5 text-cyan-300" />
+                <Terminal className="h-3.5 w-3.5" />
                 实时生成日志
               </span>
-              <span className="rounded-full bg-blue-500/10 px-2 py-1 text-blue-200 ring-1 ring-blue-400/20">streaming</span>
+              <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] text-slate-600">实时</span>
             </div>
             <div className="custom-scrollbar h-[144px] overflow-y-auto p-4 font-mono text-[13px] leading-6">
               {LOGS.map((log, index) => (
-                <div key={log} className={index === LOGS.length - 1 ? "flex items-center gap-2 text-blue-200" : "text-slate-300"}>
-                  <span className={index === LOGS.length - 1 ? "text-blue-300" : "text-emerald-300"}>{index === LOGS.length - 1 ? ">" : "✓"}</span>
+                <div key={log} className={index === LOGS.length - 1 ? "flex items-center gap-2 text-slate-700" : "text-slate-500"}>
+                  <span className={index === LOGS.length - 1 ? "text-slate-700" : "text-slate-400"}>{index === LOGS.length - 1 ? ">" : "·"}</span>
                   <span>{log}</span>
-                  {index === LOGS.length - 1 && <span className="ml-1 h-4 w-1 animate-pulse bg-blue-300" />}
+                  {index === LOGS.length - 1 && <span className="ml-1 h-4 w-1 animate-pulse bg-slate-400" />}
                 </div>
               ))}
             </div>
@@ -354,14 +355,14 @@ export function AgentWorkbench() {
           <div className="edu-card rounded-2xl p-5">
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-blue-700" />
-                <h2 className="text-base font-black text-slate-950">生成资源预览</h2>
+                <FileText className="h-5 w-5 text-slate-700" />
+                <h2 className="text-base font-semibold text-slate-900">资源预览</h2>
               </div>
-              <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100">课程讲义</span>
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">课程讲义</span>
             </div>
 
-            <div className="rounded-2xl border border-blue-100 bg-[linear-gradient(180deg,#EFF6FF,#FFFFFF)] p-4">
-              <h3 className="text-lg font-black leading-6 text-slate-950">事务隔离级别图解讲义</h3>
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <h3 className="text-lg font-semibold leading-6 text-slate-900">事务隔离级别图解讲义</h3>
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 面向数据库课程中事务隔离级别学习困难的学生，通过银行转账案例解释读未提交、读已提交、可重复读、串行化之间的区别。
               </p>
@@ -404,13 +405,13 @@ export function AgentWorkbench() {
 
             <div className="space-y-3">
               {EVIDENCE.map((item, index) => (
-                <button key={item.title} className="flex w-full items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50">
-                  <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-xs font-black text-blue-700 ring-1 ring-blue-100">
+                <button key={item.title} className="flex w-full items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-slate-300 hover:bg-slate-50">
+                  <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-100 text-xs font-semibold text-slate-700">
                     {index + 1}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-bold leading-5 text-slate-800">{item.title}</div>
-                    <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                    <div className="text-sm font-semibold leading-5 text-slate-800">{item.title}</div>
+                    <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
                       <Link2 className="h-3 w-3" />
                       命中率 {item.match}
                     </div>

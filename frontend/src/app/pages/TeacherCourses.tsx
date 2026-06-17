@@ -53,9 +53,9 @@ export function TeacherCourses() {
 
   const stats = [
     { label: "管理课程数", value: "3", hint: "本学期", icon: BookOpen, tone: "blue" as const },
-    { label: "学生总数", value: "308", hint: "4 个班级", icon: Users, tone: "purple" as const },
+    { label: "学生总数", value: "308", hint: "4 个班级", icon: Users, tone: "slate" as const },
     { label: "知识点数量", value: "56", hint: "已结构化", icon: Database, tone: "emerald" as const },
-    { label: "已生成资源", value: "1,246", hint: "AI 生成 72%", icon: Library, tone: "cyan" as const },
+    { label: "已生成资源", value: "1,246", hint: "生成率 72%", icon: Library, tone: "cyan" as const },
     { label: "平均掌握度", value: "72%", hint: "较上周 +2%", icon: BarChart3, tone: "orange" as const },
     { label: "待审核资源", value: "12", hint: "3 个高优先级", icon: FileText, tone: "red" as const },
   ];

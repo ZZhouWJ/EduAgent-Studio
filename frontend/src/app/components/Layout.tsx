@@ -199,6 +199,14 @@ export function Layout() {
   const activeItem = allItems.find((item) => isActivePath(location.pathname, item.path));
   const pageTitle = activeItem?.label ?? config.roleLabel;
 
+  const navContainerRef = React.useRef<HTMLElement | null>(null);
+  const itemRefs = React.useRef<Record<string, HTMLAnchorElement | null>>({});
+  const [indicator, setIndicator] = React.useState<{ top: number; height: number; opacity: number }>({
+    top: 0,
+    height: 0,
+    opacity: 0,
+  });
+
   const realName = user?.real_name || user?.username || '游客';
   const firstChar = realName.charAt(0).toUpperCase();
   const roleLabelMap: Record<string, string> = {
@@ -217,8 +225,37 @@ export function Layout() {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
+  // 滑动指示器跟随当前激活项
+  React.useLayoutEffect(() => {
+    const updateIndicator = () => {
+      const container = navContainerRef.current;
+      if (!container) return;
+      const activeEl = activeItem ? itemRefs.current[activeItem.path] : null;
+      if (!activeEl) {
+        setIndicator((prev) => ({ ...prev, opacity: 0 }));
+        return;
+      }
+      const containerRect = container.getBoundingClientRect();
+      const itemRect = activeEl.getBoundingClientRect();
+      const top = itemRect.top - containerRect.top + (itemRect.height - itemRect.height * 0.6) / 2;
+      setIndicator({ top, height: itemRect.height * 0.6, opacity: 1 });
+    };
+    updateIndicator();
+    window.addEventListener('resize', updateIndicator);
+    return () => window.removeEventListener('resize', updateIndicator);
+  }, [activeItem?.path, role]);
+
   const renderNavigation = (onNavigate?: () => void) => (
-    <nav className="custom-scrollbar relative mt-4 flex-1 overflow-y-auto px-3 pb-4" aria-label={`${config.roleLabel}导航`}>
+    <nav
+      ref={navContainerRef}
+      className="custom-scrollbar relative mt-4 flex-1 overflow-y-auto px-3 pb-4 edu-mount-fade"
+      aria-label={`${config.roleLabel}导航`}
+    >
+      <span
+        className="edu-nav-indicator"
+        style={{ top: indicator.top, height: indicator.height, opacity: indicator.opacity }}
+        aria-hidden
+      />
       {config.sections.map((section) => (
         <div key={section.title} className="mb-5">
           <div className="mb-2 px-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
@@ -234,14 +271,19 @@ export function Layout() {
                   to={item.path}
                   end={item.path === config.basePath}
                   onClick={onNavigate}
-                  className={`group relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all duration-200 ${
+                  ref={(el) => {
+                    itemRefs.current[item.path] = el;
+                  }}
+                  className={`group relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all duration-200 hover:translate-x-[2px] ${
                     isActive
                       ? `${config.activeGradient} text-white shadow-[0_12px_28px_rgba(37,99,235,0.25)]`
                       : "text-slate-400 hover:bg-white/[0.07] hover:text-white"
                   }`}
                 >
-                  {isActive && <span className="absolute bottom-2 left-0 top-2 w-[3px] rounded-r-full bg-white" />}
-                  <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={isActive ? 2.35 : 2} />
+                  <Icon
+                    className={`h-[18px] w-[18px] shrink-0 transition-transform duration-200 ${isActive ? "" : "group-hover:scale-110"}`}
+                    strokeWidth={isActive ? 2.35 : 2}
+                  />
                   <span className="truncate">{item.label}</span>
                 </NavLink>
               );
@@ -268,7 +310,9 @@ export function Layout() {
           <div className="grid h-10 w-10 place-items-center rounded-2xl border border-white/20 bg-white/10 shadow-[0_12px_30px_rgba(37,99,235,0.25)] backdrop-blur">
             <div className="relative">
               <Bot className="h-5 w-5 text-white" strokeWidth={2.2} />
-              <span className={`absolute -right-1 -top-1 h-2 w-2 rounded-full ring-2 ring-[#0F172A] ${role === "admin" ? "bg-emerald-300" : role === "student" ? "bg-cyan-300" : "bg-blue-300"}`} />
+              <span
+                className={`absolute -right-1 -top-1 h-2 w-2 rounded-full ring-2 ring-[#0F172A] ${role === "admin" ? "bg-emerald-300" : role === "student" ? "bg-cyan-300" : "bg-blue-300"}`}
+              />
             </div>
           </div>
           <div className="min-w-0">

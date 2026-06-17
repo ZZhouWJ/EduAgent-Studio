@@ -5,10 +5,13 @@
 禁止在错误信息中暴露密码、API Key 等敏感数据。
 """
 
+import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.utils.response import error_response
+
+logger = logging.getLogger(__name__)
 
 
 class AppException(Exception):
@@ -80,6 +83,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
         return error_response(
             message="系统内部错误，请稍后重试",
             code=5000,

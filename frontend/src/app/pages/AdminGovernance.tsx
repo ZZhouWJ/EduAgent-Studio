@@ -28,7 +28,7 @@ export function AdminGovernance() {
     level: p.request_status === "high_risk" ? "高风险" :
            reviews?.top_issue_tags?.[0]?.severity === "high" ? "中风险" : "低风险",
     owner: p.submitter_real_name || p.submitter_username || "—",
-    reason: p.submit_note || "AI 生成内容待人工复核",
+    reason: p.submit_note || "生成内容待人工复核",
   }));
 
   const finalQueue = riskQueue.length > 0 ? riskQueue : [
@@ -38,30 +38,28 @@ export function AdminGovernance() {
   const stats = [
     { label: "高风险内容", value: String(highRiskCount || "—"), Icon: ShieldAlert, cls: "bg-red-50 text-red-700 ring-red-100" },
     { label: "待复核资源", value: String(reviews?.revision_required_count ?? "—"), Icon: ClipboardCheck, cls: "bg-orange-50 text-orange-700 ring-orange-100" },
-    { label: "异常调用", value: "—", Icon: Gauge, cls: "bg-purple-50 text-purple-700 ring-purple-100" },
+    { label: "异常调用", value: "—", Icon: Gauge, cls: "bg-slate-100 text-slate-700 ring-slate-200" },
     { label: "已拦截输出", value: String(reviews?.rejected_count ?? "—"), Icon: ShieldCheck, cls: "bg-emerald-50 text-emerald-700 ring-emerald-100" },
   ];
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
       {/* Header */}
-      <section className="edu-card relative overflow-hidden rounded-[24px] p-7">
-        <div className="absolute inset-0 edu-grid-bg opacity-45" />
-        <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#EF4444,#F59E0B,#2563EB)]" />
+      <section className="edu-card relative overflow-hidden rounded-2xl p-7">
         <div className="relative flex items-start justify-between gap-6">
           <div>
-            <div className="mb-4 flex w-fit cursor-pointer items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700">
+            <div className="mb-4 flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
               <ShieldAlert className="h-3.5 w-3.5" />
-              Admin AI Governance
+              内容治理
             </div>
-            <h1 className="text-2xl font-black text-slate-950">内容安全与 AI 治理监控</h1>
+            <h1 className="text-2xl font-semibold text-slate-900">内容安全与治理监控</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              聚合低可信资源、高风险生成内容、异常调用记录和治理规则，确保 AI 生成内容可控、可追溯、可复核。
+              聚合低可信资源、高风险生成内容、异常调用记录和治理规则，确保自动生成内容可控、可追溯、可复核。
             </p>
           </div>
           <button
             onClick={() => notify.info("阈值编辑（演示模式）")}
-            className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-950 px-5 text-sm font-black text-white transition hover:bg-slate-800"
+            className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
           >
             更新治理规则
             <SlidersHorizontal className="h-4 w-4" />

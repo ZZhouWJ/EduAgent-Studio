@@ -16,6 +16,7 @@ import {
 import { useApi } from "@/lib/useApi";
 import { learningApi, resourcesApi, statisticsApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
+import { SafeLottie } from "../components/SafeLottie";
 
 function resourceIcon(type: string) {
   const t = type?.toLowerCase() ?? "";
@@ -49,12 +50,15 @@ function StatCard({
     rose: "bg-rose-50 text-rose-700",
   };
   return (
-    <div className="edu-card edu-card-hover p-5">
-      <div className={`grid h-8 w-8 place-items-center rounded-md ${tones[tone]}`}>
+    <div className="edu-card edu-card-hover group p-5">
+      <div className={`grid h-8 w-8 place-items-center rounded-md transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:rotate-[-4deg] ${tones[tone]}`}>
         <Icon className="h-4 w-4" />
       </div>
       <div className="mt-5 text-[13px] font-medium text-slate-500">{label}</div>
-      <div className="mt-1 text-[26px] font-semibold leading-[1.15] tracking-tight text-slate-900 ds-count-up">
+      <div
+        key={value}
+        className="mt-1 inline-block text-[26px] font-semibold leading-[1.15] tracking-tight text-slate-900 edu-count-up"
+      >
         {value}
       </div>
       <div className="mt-1.5 text-xs text-slate-400">{hint}</div>
@@ -122,7 +126,7 @@ export function StudentDashboard() {
       </header>
 
       {/* ─── KPI ──────────────────────────────────────── */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="edu-stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           label="综合掌握度"
           value={statsData ? `${Math.round((statsData.avg_mastery ?? 0) * 100)}%` : "—"}
@@ -183,7 +187,7 @@ export function StudentDashboard() {
               加载中…
             </div>
           ) : inProgressTasks.length > 0 ? (
-            <ol className="ds-stagger divide-y divide-slate-100">
+            <ol className="edu-stagger divide-y divide-slate-100">
               {inProgressTasks.map((step, index) => {
                 const done = step.status === "completed";
                 const inProgress = step.status === "in_progress";
@@ -236,8 +240,8 @@ export function StudentDashboard() {
               })}
             </ol>
           ) : (
-            <div className="flex flex-col items-center gap-2 py-12 text-slate-400">
-              <Clock3 className="h-6 w-6" />
+            <div className="flex flex-col items-center gap-3 py-10 text-slate-400">
+              <SafeLottie source="empty" className="h-24 w-32" speed={0.8} />
               <span className="text-sm">暂无进行中的任务</span>
               <Link to="/student/tasks" className="ds-link text-xs text-slate-500 hover:text-slate-900">
                 去任务列表看看
@@ -256,7 +260,7 @@ export function StudentDashboard() {
               查看学习路径
             </Link>
           </div>
-          <ul className="ds-stagger divide-y divide-slate-100">
+          <ul className="edu-stagger divide-y divide-slate-100">
             {[
               { name: "事务隔离级别", score: 32, hint: "概念边界不清" },
               { name: "SQL 多表连接", score: 46, hint: "复杂查询仍需练习" },

@@ -40,12 +40,12 @@ export function AdminAgentConfig() {
   ];
 
   const toggle = (id: string) => {
-    showToast("智能体启用状态：TODO - 后端无 toggle 接口");
+    showToast("状态切换：TODO - 后端无 toggle 接口");
   };
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
-      <PageHeader eyebrow="Agent Configuration" title="智能体配置" description="管理画像诊断、知识定位、路径规划、资源生成、测评生成和审核辅助智能体。" icon={Bot} action={<button onClick={() => showToast("测试工作流执行成功，已生成模拟链路日志")} className={primaryButton}><Play className="h-4 w-4" />测试运行工作流</button>} />
+      <PageHeader eyebrow="Agent Configuration" title="智能体配置" description="管理画像诊断、知识定位、路径规划、资源生成、测评生成和审核辅助环节。" icon={Bot} action={<button onClick={() => showToast("工作流测试运行成功，已记录日志")} className={primaryButton}><Play className="h-4 w-4" />测试运行工作流</button>} />
       <section className="grid grid-cols-6 gap-4">{stats.map((stat) => <StatCard key={stat.label} {...stat} />)}</section>
       <section className="edu-card rounded-2xl p-4"><SearchInput label="搜索智能体、模型或模板" value={query} onChange={setQuery} /></section>
       {agentsState.loading ? (

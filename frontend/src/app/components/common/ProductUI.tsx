@@ -60,12 +60,17 @@ const toneClass: Record<NonNullable<StatCardProps["tone"]>, string> = {
 
 export function StatCard({ label, value, hint, icon: Icon, tone = "blue" }: StatCardProps) {
   return (
-    <div className="edu-card edu-card-hover rounded-2xl p-4">
-      <div className={`mb-4 grid h-10 w-10 place-items-center rounded-xl ring-1 ${toneClass[tone]}`}>
+    <div className="edu-card edu-card-hover group rounded-2xl p-4">
+      <div className={`mb-4 grid h-10 w-10 place-items-center rounded-xl ring-1 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:rotate-[-4deg] ${toneClass[tone]}`}>
         <Icon className="h-5 w-5" />
       </div>
       <div className="text-sm font-semibold text-slate-500">{label}</div>
-      <div className="mt-1 text-[25px] font-black leading-8 text-slate-950">{value}</div>
+      <div
+        key={value}
+        className="mt-1 inline-block text-[25px] font-black leading-8 text-slate-950 edu-count-up"
+      >
+        {value}
+      </div>
       {hint && <div className="mt-1 text-xs font-medium text-slate-400">{hint}</div>}
     </div>
   );
@@ -84,7 +89,7 @@ export function StatusBadge({ status }: { status: string }) {
   return <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ring-1 ${cls}`}>{status}</span>;
 }
 
-export function ProgressBar({ value, tone = "blue" }: { value: number; tone?: "blue" | "emerald" | "orange" | "red" | "purple" }) {
+export function ProgressBar({ value, tone = "blue", animate = false }: { value: number; tone?: "blue" | "emerald" | "orange" | "red" | "purple"; animate?: boolean }) {
   const color = {
     blue: "bg-blue-600",
     emerald: "bg-emerald-500",
@@ -95,7 +100,10 @@ export function ProgressBar({ value, tone = "blue" }: { value: number; tone?: "b
 
   return (
     <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-      <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+      <div
+        className={`h-full rounded-full transition-[width] duration-700 ease-out ${color} ${animate ? "edu-progress-stripe" : ""}`}
+        style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
+      />
     </div>
   );
 }
