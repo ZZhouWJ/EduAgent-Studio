@@ -78,6 +78,56 @@ INSTRUCTION_MAP = {
 - 判断题（5道）+ 答案
 - 简答题（2道）+ 参考答案
 - 测验说明（时间、满分、及格线）""",
+
+    "mindmap": """## 资源类型要求（思维导图）
+生成知识点的思维导图，以 Markdown 树形结构呈现，包含：
+- 中心主题：知识点名称
+- 一级分支：核心概念（3-5个）
+- 二级分支：每个概念的关键要点
+- 末级分支：具体示例或注意事项
+- 整体结构层次分明，便于学生建立知识体系""",
+
+    "code_case": """## 资源类型要求（代码实操案例）
+生成一个完整的代码实操案例，包含：
+- 案例目标：解决什么实际问题
+- 需求描述：清晰的功能需求
+- 代码实现：完整可运行的代码（Python/SQL/Java等）
+- 运行结果：代码执行后的输出示例
+- 关键讲解：代码中核心逻辑的解释
+- 拓展练习：2-3道改编题""",
+
+    "video_script": """## 资源类型要求（视频/动画脚本）
+生成一个教学视频/动画脚本，包含：
+- 视频标题和时长建议（3-5分钟）
+- 分镜脚本：每段的文字内容、动画描述、时长
+- 讲解旁白：配合每段画面的讲解词
+- 视觉素材提示：需要展示的图表、代码、动画
+- 互动问题：视频中设置的思考题""",
+
+    "experiment_report": """## 资源类型要求（实验报告）
+生成一份实验报告模板，包含：
+- 实验目的：本次实验要掌握的知识点
+- 实验环境：所需工具、环境配置
+- 实验步骤：详细操作流程（分步骤）
+- 预期结果：每个步骤的预期输出
+- 结果分析：如何分析实验结果
+- 常见问题与解决：实验中的典型问题
+- 思考题：2-3道延伸思考""",
+
+    "error_analysis": """## 资源类型要求（错题解析）
+生成常见错误分析文档，包含：
+- 错误类型分类（如：概念混淆、计算错误、审题失误）
+- 每类错误的典型例题（含错误做法和正确做法）
+- 错误原因剖析：为什么容易犯这个错
+- 正确做法讲解：如何避免
+- 配套练习：同类题目的变式练习""",
+
+    "learning_card": """## 资源类型要求（学习卡片）
+生成一组知识速记卡片（5-8张），每张卡片包含：
+- 卡片标题：一个核心概念/公式/术语
+- 正面：概念名称 + 简短定义
+- 背面：详细解释 + 示例 + 记忆口诀
+- 适合课间快速记忆和复习""",
 }
 
 RESOURCE_TYPE_TITLES = {
@@ -87,7 +137,47 @@ RESOURCE_TYPE_TITLES = {
     "case": "案例材料",
     "review": "复习计划",
     "test": "阶段测验",
+    "mindmap": "思维导图",
+    "code_case": "代码实操案例",
+    "video_script": "视频/动画脚本",
+    "experiment_report": "实验报告",
+    "error_analysis": "错题解析",
+    "learning_card": "学习卡片",
 }
+
+# 防幻觉检测 prompt — 对比生成内容与知识库上下文，标记矛盾点
+PROMPT_HALLUCINATION_CHECK = """你是一个严格的知识质量审查智能体。请对比以下「课程知识库」和「生成内容」，检查是否存在事实性错误或幻觉。
+
+## 课程知识库（权威来源）
+{context}
+
+## 生成内容（待审查）
+{content}
+
+## 审查要求
+请检查以下几类问题：
+1. **事实性错误**：知识库中明确否定或与事实不符的陈述
+2. **概念混淆**：将不同知识点的概念混用
+3. **过时信息**：知识库有更新版本但生成内容仍用旧版本
+4. **代码错误**：SQL/Python 代码与知识库描述的行为不一致
+5. **超纲内容**：超出知识库范围且未标注"进阶内容"
+
+请以 JSON 格式输出审查结果：
+{{
+  "has_hallucination": true/false,
+  "warnings": [
+    {{"type": "事实性错误", "location": "第2段第3句", "claim": "具体错误陈述", "correction": "正确陈述"}},
+    ...
+  ],
+  "summary": "一句话总结"
+}}
+
+要求：
+- has_hallucination: 存在任何事实性错误时为 true
+- warnings: 列出所有发现的问题，无问题时为空数组 []
+- 每条 warning 需包含 type/location/claim/correction
+- 只输出 JSON，不要有其他内容
+"""
 
 
 class ResourceGenerationAgent:
@@ -150,6 +240,15 @@ class ResourceGenerationAgent:
         kp_ids = [p.get("kp_id", 0) for p in learning_path]
         kp_id_str = ",".join(str(kid) for kid in kp_ids if kid) if kp_ids else ""
 
+        # === 防幻觉检测 ===
+        hallucination_warnings = []
+        rag_context = self._retrieve_rag_for_check(kp_name, kp_ids)
+        if rag_context and content and len(content) > 100:
+            check_result = self._hallucination_check(content, rag_context)
+            if check_result:
+                hallucination_warnings = check_result.get("warnings", [])
+                logger.info(f"[{self.AGENT_NAME}] 幻觉检测完成: {len(hallucination_warnings)} 个警告")
+
         return {
             "resource_id": f"res-{uuid.uuid4().hex[:8]}",
             "title": f"{kp_name}专题{RESOURCE_TYPE_TITLES.get(resource_type, '资源')}",
@@ -163,8 +262,56 @@ class ResourceGenerationAgent:
             "generation_metadata": {
                 "agent": self.AGENT_NAME,
                 "model": get_settings().llm_model,
-            }
+            },
+            "hallucination_warnings": hallucination_warnings,
         }
+
+    def _retrieve_rag_for_check(
+        self,
+        kp_name: str,
+        kp_ids: List[int],
+    ) -> str:
+        """为幻觉检测检索课程知识库上下文"""
+        try:
+            from app.services.rag_service import get_context_for_agent
+            query = kp_name or "课程知识点"
+            context = get_context_for_agent(query=query, top_k=5)
+            return context if context else ""
+        except Exception as e:
+            logger.warning(f"[{self.AGENT_NAME}] RAG 检索失败，跳过幻觉检测: {e}")
+            return ""
+
+    def _hallucination_check(self, content: str, rag_context: str) -> Dict[str, Any] | None:
+        """对比生成内容与知识库，检测幻觉"""
+        import json
+        messages = [
+            {
+                "role": "user",
+                "content": PROMPT_HALLUCINATION_CHECK.format(
+                    context=rag_context or "（无知识库上下文）",
+                    content=content[:2000],
+                )
+            }
+        ]
+        try:
+            settings = get_settings()
+            config = settings.llm_config()
+            config.max_tokens = 1024
+            llm_result = self.llm_gateway.generate(messages, config)
+            if llm_result.status == "failed":
+                logger.warning(f"[{self.AGENT_NAME}] 幻觉检测 LLM 调用失败: {llm_result.error}")
+                return None
+            raw = llm_result.content.strip()
+            if raw.startswith("```"):
+                lines = raw.split("\n")
+                raw = "\n".join(lines[1:] if lines[0].startswith("```json") else lines)
+                raw = raw.replace("```", "").strip()
+            return json.loads(raw)
+        except json.JSONDecodeError as e:
+            logger.warning(f"[{self.AGENT_NAME}] 幻觉检测 JSON 解析失败: {e}")
+        except Exception as e:
+            logger.warning(f"[{self.AGENT_NAME}] 幻觉检测异常: {e}")
+        return None
 
     def _call_llm(self, messages: List[Dict[str, str]]) -> str | None:
         if self.llm_gateway is None:

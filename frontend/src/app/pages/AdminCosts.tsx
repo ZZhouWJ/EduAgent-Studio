@@ -63,7 +63,7 @@ export function AdminCosts() {
       { 日期: range, 模型: modelFilter, 课程: courseFilter,
         总成本: costs?.total_cost ?? 0, Token消耗: costs?.total_tokens ?? 0 },
       ...(costs?.cost_by_model ?? []).map((r) => ({
-        模型: r.model_name, 成本: r.total_cost, 占比: `${((r.total_cost / Math.max(costs?.total_cost ?? 1, 1)) * 100).toFixed(1)}%`
+        模型: r.model_name, 成本: r.total_cost ?? 0, 占比: `${(((r.total_cost ?? 0) / Math.max(costs?.total_cost ?? 1, 1)) * 100).toFixed(1)}%`
       }))
     ];
     downloadCsv(rows, `成本报表_${new Date().toISOString().slice(0, 10)}.csv`);
@@ -144,8 +144,8 @@ export function AdminCosts() {
                 {costs.cost_by_model.map((row) => (
                   <tr key={row.model_name} className="cursor-pointer bg-white hover:bg-blue-50/40">
                     <td className="max-w-[280px] truncate px-4 py-4 font-black text-slate-900">{row.model_name}</td>
-                    <td className="px-4 py-4 font-black text-blue-700">¥{row.cost.toFixed(2)}</td>
-                    <td className="px-4 py-4">{((row.cost / Math.max(costs.total_cost, 1)) * 100).toFixed(1)}%</td>
+                    <td className="px-4 py-4 font-black text-blue-700">¥{(row.cost ?? 0).toFixed(2)}</td>
+                    <td className="px-4 py-4">{(((row.cost ?? 0) / Math.max(costs.total_cost, 1)) * 100).toFixed(1)}%</td>
                   </tr>
                 ))}
               </tbody>
