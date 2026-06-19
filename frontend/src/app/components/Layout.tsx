@@ -172,10 +172,11 @@ const ROLE_SWITCH = [
   { role: "admin" as const, label: "管理", path: "/admin" },
 ];
 
-function getRole(pathname: string): RoleKey {
-  if (pathname.startsWith("/student")) return "student";
-  if (pathname.startsWith("/admin")) return "admin";
-  return "teacher";
+function getRoleFromUser(user: { roles?: string[] } | null): RoleKey {
+  if (!user?.roles) return "student";
+  if (user.roles.includes("admin")) return "admin";
+  if (user.roles.includes("teacher")) return "teacher";
+  return "student";
 }
 
 function isActivePath(currentPath: string, itemPath: string) {
@@ -193,7 +194,7 @@ export function Layout() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
-  const role = getRole(location.pathname);
+  const role = getRoleFromUser(user);
   const config = ROLE_CONFIG[role];
   const allItems = config.sections.flatMap((section) => section.items);
   const activeItem = allItems.find((item) => isActivePath(location.pathname, item.path));

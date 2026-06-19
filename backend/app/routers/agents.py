@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from typing import List
 
 from app.services.agent_service import AgentService
-from app.services.auth_service import get_current_user_dependency as get_current_user
+from app.utils.dependencies import get_current_user_dep, require_role
 
 router = APIRouter(prefix="/agents", tags=["智能体工作台"])
 logger = logging.getLogger(__name__)
@@ -29,8 +29,8 @@ class SaveResourceRequest(BaseModel):
 
 
 @router.get("/list")
-async def list_agents(token: str = Depends(get_current_user)):
-    """获取智能体列表"""
+async def list_agents(user: dict = Depends(get_current_user_dep)):
+    """获取智能体列表（登录用户均可访问）"""
     service = AgentService()
     return service.list_agents()
 
@@ -38,7 +38,7 @@ async def list_agents(token: str = Depends(get_current_user)):
 @router.post("/generate")
 async def generate_learning_resource(
     req: GenerateRequest,
-    token: str = Depends(get_current_user),
+    user: dict = Depends(require_role("teacher", "admin")),
 ):
     """
     执行多智能体协作，生成个性化学习资源。
@@ -57,7 +57,7 @@ async def generate_learning_resource(
 @router.post("/generate/stream")
 async def generate_stream(
     req: GenerateRequest,
-    token: str = Depends(get_current_user),
+    user: dict = Depends(require_role("teacher", "admin")),
 ):
     """
     流式执行多智能体工作流。
@@ -90,7 +90,7 @@ async def generate_stream(
 @router.get("/workflow/{run_id}")
 async def get_workflow_status(
     run_id: str,
-    token: str = Depends(get_current_user),
+    user: dict = Depends(get_current_user_dep),
 ):
     """
     查询某个工作流运行的状态（从 Checkpoint 恢复）。
@@ -107,7 +107,7 @@ async def get_workflow_status(
 @router.post("/save-resource")
 async def save_resource(
     req: SaveResourceRequest,
-    token: str = Depends(get_current_user),
+    user: dict = Depends(require_role("teacher", "admin")),
 ):
     """保存生成的学习资源"""
     service = AgentService()

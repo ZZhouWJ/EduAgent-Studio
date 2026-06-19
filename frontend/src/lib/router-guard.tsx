@@ -4,11 +4,8 @@ import { useAuthStore } from '@/stores/auth'
 
 const PUBLIC_PATHS = ['/login']
 
-// ⚠️ 临时开关：开发期不带后端时跳过登录拦截（想看受保护页面时改为 true）
-const DEV_BYPASS = true
-
 const ROLE_ACCESS: Record<string, string[]> = {
-  '/student': ['student', 'admin'],
+  '/student': ['student_member', 'admin'],
   '/teacher': ['teacher', 'admin'],
   '/admin': ['admin'],
 }
@@ -19,15 +16,6 @@ export function useRouterGuard() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    if (DEV_BYPASS) {
-      // 注入一个虚拟 admin 身份，让所有角色路由都放行
-      useAuthStore.setState({
-        token: 'dev-bypass',
-        user: { id: 0, username: 'dev', full_name: 'Dev', roles: ['admin'] } as any,
-        initialized: true,
-      })
-      return
-    }
     if (initialized) return
     if (token) {
       fetchMe()
@@ -37,7 +25,6 @@ export function useRouterGuard() {
   }, [initialized, token, fetchMe])
 
   useEffect(() => {
-    if (DEV_BYPASS) return
     if (!initialized) return
     const isPublic = PUBLIC_PATHS.some((p) => location.pathname.startsWith(p))
     if (!token && !isPublic) {
@@ -45,8 +32,8 @@ export function useRouterGuard() {
       return
     }
     if (token && isPublic) {
-      const role = user?.roles?.[0] ?? 'student'
-      const home = role === 'admin' ? '/admin' : role === 'teacher' ? '/teacher' : '/student'
+      const roles = user?.roles ?? []
+      const home = roles.includes('admin') ? '/admin' : roles.includes('teacher') ? '/teacher' : '/student'
       navigate(home, { replace: true })
       return
     }
