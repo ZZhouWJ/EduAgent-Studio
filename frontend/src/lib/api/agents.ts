@@ -6,6 +6,8 @@ export interface AgentRequest {
   knowledge_point_ids: number[]
   resource_type: string
   difficulty: string
+  generation_goal?: string
+  enable_review?: boolean
 }
 
 export interface WorkflowResult {
