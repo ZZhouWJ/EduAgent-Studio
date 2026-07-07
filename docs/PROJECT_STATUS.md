@@ -241,11 +241,16 @@
 | test（阶段测验） | 测验卡片 |
 
 **功能清单**：
-- [ ] `ResourceRenderer` 按 `resource_type` 分发渲染
-- [ ] 讲义 Markdown 渲染
-- [ ] 题库题目卡片 + 答案折叠
-- [ ] 代码案例高亮 + 步骤
-- [ ] 证据来源可见
+- [x] `ResourceRenderer` 按 `resource_type` 分发渲染
+- [x] 讲义 Markdown 渲染
+- [x] 题库题目卡片 + 答案折叠
+- [x] 代码案例高亮 + 步骤
+- [x] 证据来源可见
+- [x] PPT 分镜卡片展示
+- [x] 视频脚本分段展示
+- [x] 思维导图树状结构
+- [x] 复习计划时间轴展示
+- [x] 测验卡片交互答题
 
 **验收标准**：
 - 至少 5 类资源有不同展示样式
@@ -519,6 +524,7 @@
 
 | 日期 | 更新内容 | 负责人 |
 |------|---------|--------|
+| 2026-07-08 | 完成模块四：ResourceRenderer 资源类型差异化渲染器 - 8类渲染器组件、ResourceLibrary 详情抽屉集成、EvidenceSources 证据来源组件 | Claude |
 | 2026-07-08 | 完成模块三：AgentWorkbench 执行闭环修复 - SSE done 事件返回完整结果、移除二次生成、学生下拉框、知识点 checkbox 列表、Markdown 渲染 | Claude |
 | 2026-07-08 | 完成模块一后端：数据库表 + KnowledgeRepo/Service/Router + parser.py + retriever.py | Claude |
 | 2026-07-08 | 完成模块一前端：knowledge API + TeacherKnowledgeBase 三栏布局 | Claude |
