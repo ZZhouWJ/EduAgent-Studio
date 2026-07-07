@@ -200,11 +200,11 @@
 - 资源结果 Markdown 渲染 + 证据来源 + 质量分 + 耗时
 
 **功能清单**：
-- [ ] SSE `done` 事件直接设置结果，不二次生成
-- [ ] 学生下拉框显示姓名、掌握度、薄弱点
-- [ ] 知识点完整 checkbox 列表
-- [ ] 生成结果 Markdown 渲染
-- [ ] 展示证据来源、质量评分、返工次数、生成耗时
+- [x] SSE `done` 事件直接设置结果，不二次生成
+- [x] 学生下拉框显示姓名、掌握度、薄弱点
+- [x] 知识点完整 checkbox 列表
+- [x] 生成结果 Markdown 渲染
+- [x] 展示证据来源、质量评分、返工次数、生成耗时
 - [ ] "保存资源"写入资源库
 - [ ] 保存后能在 `/teacher/resources` 查到
 
@@ -519,6 +519,7 @@
 
 | 日期 | 更新内容 | 负责人 |
 |------|---------|--------|
+| 2026-07-08 | 完成模块三：AgentWorkbench 执行闭环修复 - SSE done 事件返回完整结果、移除二次生成、学生下拉框、知识点 checkbox 列表、Markdown 渲染 | Claude |
 | 2026-07-08 | 完成模块一后端：数据库表 + KnowledgeRepo/Service/Router + parser.py + retriever.py | Claude |
 | 2026-07-08 | 完成模块一前端：knowledge API + TeacherKnowledgeBase 三栏布局 | Claude |
 | 2026-07-08 | 完成模块二前端：profilesApi 新增 dialog 方法 + StudentProfile 真实消息流 | Claude |

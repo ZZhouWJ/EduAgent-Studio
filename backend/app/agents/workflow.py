@@ -638,3 +638,27 @@ def stream_workflow(
             "step_history": node_state.get("step_history", []),
             "metadata": node_state.get("metadata", {}),
         }
+
+    # Yield final result on completion
+    final_state = graph.get_state(config)
+    if final_state and final_state.values:
+        result = final_state.values
+        result["metadata"] = {
+            **result.get("metadata", {}),
+            "total_duration_ms": result.get("metadata", {}).get("total_duration_ms", 0),
+            "revision_count": result.get("revision_count", 0),
+        }
+        result["current_step"] = "completed"
+        yield {
+            "type": "done",
+            "result": {
+                "diagnosis": result.get("diagnosis"),
+                "plan": result.get("learning_plan"),
+                "resource": result.get("generated_resource"),
+                "assessment": result.get("assessment"),
+                "teacher_review_suggestion": result.get("teacher_review"),
+                "metadata": result.get("metadata"),
+            },
+        }
+    else:
+        yield {"type": "done", "result": None}
