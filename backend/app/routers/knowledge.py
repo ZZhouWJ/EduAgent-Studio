@@ -154,10 +154,9 @@ def _get_file_type(filename: str) -> Optional[str]:
 def _get_user_id_from_token(token: str) -> int:
     """
     从 token 中提取用户 ID。
-
-    这里简化处理，实际应从 JWT 或 session 中解析。
-    暂时返回一个默认值，实际使用时应替换为真实逻辑。
     """
-    # 简化：直接返回 1（管理员），实际应解析 token
-    # TODO: 实现真实的用户 ID 解析
-    return 1
+    from app.services.auth_service import get_current_user
+    user = get_current_user(token)
+    if user is None:
+        return 0
+    return user.get("user_id", 0)

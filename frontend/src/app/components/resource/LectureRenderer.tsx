@@ -1,4 +1,5 @@
 import { marked } from "marked"
+import DOMPurify from "dompurify"
 import type { LearningResource } from "@/lib/api/resources"
 
 interface LectureRendererProps {
@@ -64,7 +65,7 @@ export function LectureRenderer({ resource }: LectureRendererProps) {
 
       <div
         className="prose prose-sm prose-slate max-w-none"
-        dangerouslySetInnerHTML={{ __html: marked(resource.content ?? "") }}
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked(resource.content ?? "")) }}
       />
 
       <EvidenceSources sources={resource.metadata?.evidence_refs} />

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { marked } from "marked";
+import DOMPurify from "dompurify";
 import {
   AlertCircle,
   ArrowRight,
@@ -710,7 +711,7 @@ export function AgentWorkbench() {
                   <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-3 max-h-48 overflow-y-auto">
                     <div
                       className="prose prose-sm prose-slate"
-                      dangerouslySetInnerHTML={{ __html: marked(result.resource.content) }}
+                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked(result.resource.content)) }}
                     />
                   </div>
                 )}

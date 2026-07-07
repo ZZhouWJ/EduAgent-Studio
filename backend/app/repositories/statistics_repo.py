@@ -454,8 +454,8 @@ def get_cost_stats(
     by_model_filter = project_filter
     by_model_date = date_filter
     by_model_member = member_filter
-    if project_id is not None:
-        by_model_filter = " AND cr.project_id = %s"
+    if project_id is None:
+        by_model_filter = ""
     by_model_sql = f"""
         SELECT
             cr.model_id,
