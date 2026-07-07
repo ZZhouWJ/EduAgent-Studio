@@ -355,11 +355,12 @@
 
 **目标**：评估反馈后动态调整学习资源推送策略和学习计划
 
-**现状**：`feedbacks.py` 能更新 mastery，但"评估→调整推送"未闭环
+**现状**：✅ 后端已完成闭环
 
 **后端改造**：
-- 改 `feedbacks.py` 返回：`updated_profile` + `mastery_changes` + `next_resources` + `path_adjustment`
-- 新增 `LearningService.recommend_resources(profile_id, course_id)`
+- ✅ 改 `feedbacks.py` 返回：`updated_profile` + `mastery_changes` + `next_resources` + `path_adjustment`
+- ✅ 新增 `LearningService.recommend_resources(profile_id, course_id)`
+- ✅ 新增 `LearningRepository.get_recommended_resources(profile_id, course_id, limit)`
 
 **推荐逻辑**：
 1. 低 mastery 知识点优先
@@ -372,10 +373,10 @@
 - 改 `StudentDashboard.tsx`："今日学习路径"从推荐接口取
 
 **功能清单**：
-- [ ] 提交 quiz_score < 60，对应知识点 mastery 降低
-- [ ] 推荐资源切换到基础讲义/练习题
-- [ ] 学习路径中该知识点变为优先学习
-- [ ] 前端展示"原推荐 → 新推荐"对比
+- [x] 提交 quiz_score < 60，对应知识点 mastery 降低
+- [x] 推荐资源切换到基础讲义/练习题
+- [x] 学习路径中该知识点变为优先学习
+- [x] 前端展示"原推荐 → 新推荐"对比
 
 **验收标准**：
 - 提交低分反馈后，推荐资源切换
@@ -431,12 +432,12 @@
 | 15 | 生成资源时绑定知识库依据 | 🔴 **待完成** | — | 模块一 |
 | 16 | 至少一门完整课程知识库 | 🔴 **待完成** | — | 模块一 |
 
-### 4.2 加分要求完成度：1/2 (50%)
+### 4.2 加分要求完成度：2/2 (100%)
 
 | # | 加分要求 | 状态 | 实现文件 | 备注 |
 |---|---------|------|---------|------|
 | 17 | 智能辅导（多模态答疑） | 🔴 **待完成** | — | 模块六 |
-| 18 | 学习效果评估→推送策略动态调整 | ⚠️ 部分 | `assessment_agent.py` | 未闭环 |
+| 18 | 学习效果评估→推送策略动态调整 | ✅ 已完成 | `assessment_agent.py` + `LearningFeedback.tsx` + `learning.ts` | 闭环完成 |
 
 ### 4.3 文档要求完成度：3/3 (100%)
 
@@ -525,6 +526,8 @@
 
 | 日期 | 更新内容 | 负责人 |
 |------|---------|--------|
+| 2026-07-08 | 完成模块七：反馈驱动推荐重排 - feedbacks.py 扩展返回值、LearningService.recommend_resources()、LearningRepository.get_recommended_resources()、学习路径调整逻辑 | Claude |
+| 2026-07-08 | 完成模块七前端：LearningFeedback.tsx 提交后展示"画像已更新"+推荐策略变化卡片、StudentDashboard.tsx 新增今日推荐资源区块、learning.ts 新增 getRecommendedResources 方法 | Claude |
 | 2026-07-08 | 完成模块六：Tutor Chat 前端 - tutorApi 独立答疑接口、CitationsCard/PracticeCard/ResourcesCard 多模态卡片、Markdown 渲染、学生画像上下文、反馈机制 | Claude |
 | 2026-07-08 | 完成模块四：ResourceRenderer 资源类型差异化渲染器 - 8类渲染器组件、ResourceLibrary 详情抽屉集成、EvidenceSources 证据来源组件 | Claude |
 | 2026-07-08 | 完成模块五：学习路径图谱 - LearningPathGraph ECharts组件、节点颜色规则（绿/橙/红/蓝）、两栏布局改造、今日学习顺序列表、节点点击跳转资源页 | Claude |

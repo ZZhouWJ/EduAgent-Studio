@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { learningApi, resourcesApi, statisticsApi } from "@/lib/api";
+import type { RecommendedResource } from "@/lib/api/learning";
 import { useAuthStore } from "@/stores/auth";
 import { SafeLottie } from "../components/SafeLottie";
 
@@ -74,6 +75,13 @@ export function StudentDashboard() {
   const { data: tasksData } = useApi(() => learningApi.listTasks({ page_size: 100 }), []);
   const { data: statsData } = useApi(() => statisticsApi.learningOverview(), []);
   const { data: resourcesData } = useApi(() => resourcesApi.list({ page_size: 4 }), []);
+
+  const courseId = learningData?.[0]?.id ?? 0;
+  const profileId = user?.user_id ?? 0;
+  const { data: recommendedResources } = useApi(
+    () => learningApi.getRecommendedResources(profileId, courseId),
+    [profileId, courseId]
+  );
 
   const courseName = learningData?.[0]?.name ?? "（未选课）";
   const tasks = tasksData?.items ?? [];
@@ -342,6 +350,49 @@ export function StudentDashboard() {
           </div>
         )}
       </section>
+
+      {/* ─── 今日推荐资源 ──────────────────────────── */}
+      {recommendedResources && recommendedResources.length > 0 && (
+        <section className="edu-card p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-[15px] font-semibold tracking-tight text-slate-900">今日推荐资源</h2>
+            <span className="rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-600">
+              基于最新画像
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {recommendedResources.map((r) => {
+              const Icon = resourceIcon(r.type ?? "");
+              return (
+                <Link
+                  key={r.resource_id}
+                  to={`/student/resources/${r.resource_id}`}
+                  className="ds-hover-lift ds-press group flex flex-col rounded-md border border-slate-200 bg-white p-3.5"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="grid h-7 w-7 place-items-center rounded bg-emerald-50 text-emerald-700">
+                      <Icon className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">
+                      {r.type}
+                    </span>
+                  </div>
+                  <div className="mt-3 line-clamp-2 text-[13px] font-medium leading-snug text-slate-900">
+                    {r.title}
+                  </div>
+                  {r.reason && (
+                    <div className="mt-2 text-[11px] text-emerald-600">{r.reason}</div>
+                  )}
+                  <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
+                    <span>{r.estimated_minutes ? `${r.estimated_minutes} 分钟` : ""}</span>
+                    <ArrowRight className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

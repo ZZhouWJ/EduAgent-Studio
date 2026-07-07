@@ -1,4 +1,5 @@
 import client from '../api'
+import type { MasteryChange, RecommendedResource } from './learning'
 
 export interface LearningFeedback {
   feedback_id: number
@@ -14,6 +15,12 @@ export interface LearningFeedback {
   self_mastery: number | null
   difficulty_rating: string | null
   created_at: string
+}
+
+export interface FeedbackResult {
+  mastery_changes: MasteryChange[]
+  next_resources: RecommendedResource[]
+  path_adjustment?: string
 }
 
 export const feedbackApi = {
@@ -34,6 +41,6 @@ export const feedbackApi = {
     self_mastery?: number
     difficulty_rating?: string
   }) {
-    return client.post('/learning/feedbacks', data)
+    return client.post<FeedbackResult>('/learning/feedbacks', data)
   },
 }
