@@ -274,7 +274,7 @@ export function Login() {
         ? "/admin"
         : user.roles?.includes("teacher")
         ? "/teacher"
-        : "/student";
+        : (user.roles?.includes("student_member") ? "/student" : "/student");
       setTimeout(() => navigate(redirect || home, { replace: true }), 450);
     } catch (err) {
       notify.error(err instanceof Error ? err.message : "登录失败");
@@ -292,7 +292,7 @@ export function Login() {
         ? "/admin"
         : user.roles?.includes("teacher")
         ? "/teacher"
-        : "/student";
+        : (user.roles?.includes("student_member") ? "/student" : "/student");
       setTimeout(() => navigate(home, { replace: true }), 450);
     } catch (err) {
       notify.error(err instanceof Error ? err.message : "登录失败");

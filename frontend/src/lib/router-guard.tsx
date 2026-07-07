@@ -8,8 +8,9 @@ const PUBLIC_PATHS = ['/login']
 const ENFORCE_ROLE_ISOLATION = true
 
 // 路由与允许角色的映射
+// 注意：角色值为后端返回的 role_code (student_member/teacher/admin)
 const ROLE_ACCESS: Record<string, string[]> = {
-  '/student': ['student'],
+  '/student': ['student_member'],
   '/teacher': ['teacher'],
   '/admin': ['admin'],
 }
@@ -17,10 +18,10 @@ const ROLE_ACCESS: Record<string, string[]> = {
 // 获取用户真实角色（从 user.roles 数组中匹配）
 function getUserRealRole(roles: string[] | undefined): string | null {
   if (!roles || roles.length === 0) return null
-  // 按优先级顺序检查：admin > teacher > student
+  // 按优先级顺序检查：admin > teacher > student_member
   if (roles.includes('admin')) return 'admin'
   if (roles.includes('teacher')) return 'teacher'
-  if (roles.includes('student')) return 'student'
+  if (roles.includes('student_member')) return 'student_member'
   return roles[0]
 }
 
@@ -29,7 +30,7 @@ function getHomePath(role: string): string {
   switch (role) {
     case 'admin': return '/admin'
     case 'teacher': return '/teacher'
-    case 'student': return '/student'
+    case 'student_member': return '/student'
     default: return '/login'
   }
 }

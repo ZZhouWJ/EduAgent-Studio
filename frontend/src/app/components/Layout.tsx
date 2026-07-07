@@ -173,6 +173,7 @@ function getRoleFromUser(user: { roles?: string[] } | null): RoleKey {
   if (!user?.roles) return "student";
   if (user.roles.includes("admin")) return "admin";
   if (user.roles.includes("teacher")) return "teacher";
+  if (user.roles.includes("student_member")) return "student";
   return "student";
 }
 
