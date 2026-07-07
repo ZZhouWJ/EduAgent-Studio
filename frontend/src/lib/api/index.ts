@@ -176,6 +176,9 @@ export {
 // Logs
 export { logsApi, type OperationLog, type LoginLog } from './logs'
 
+// Knowledge
+export { knowledgeApi, type Material, type MaterialChunk, type SearchResult } from './knowledge'
+
 // Statistics
 export {
   statisticsApi,
