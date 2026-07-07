@@ -134,14 +134,14 @@
 10. 学习动机（motivation）
 
 **前端改造**：
-- 改 `StudentProfile.tsx`：真实消息流 + 抽取结果确认卡
-- 改 `profilesApi`：新增 dialog 方法
+- [x] 改 `StudentProfile.tsx`：真实消息流 + 抽取结果确认卡
+- [x] 改 `profilesApi`：新增 dialog 方法
 
 **功能清单**：
-- [ ] 学生输入自然语言描述学习情况
-- [ ] 后端调用 LLM 抽取结构化画像数据
-- [ ] 前端展示"抽取结果确认卡"
-- [ ] 用户确认后写入 `student_profiles`
+- [x] 学生输入自然语言描述学习情况
+- [x] 后端调用 LLM 抽取结构化画像数据
+- [x] 前端展示"抽取结果确认卡"
+- [x] 用户确认后写入 `student_profiles`
 - [ ] 后续测验、反馈、答疑也会写入学习事件
 
 **验收标准**：
@@ -411,7 +411,7 @@
 | 1 | 面向高等教育学习场景 | ✅ 已完成 | `database/` | 3门课程 |
 | 2 | 以具体高校课程为切入点 | ✅ 已完成 | `database/` | 数据库原理等 |
 | 3 | 学生画像不少于6个维度 | ✅ 已完成 | `student_profiles`表 | 10个维度 |
-| 4 | 对话式学习画像自主构建 | 🔴 **待完成** | — | 模块二 |
+| 4 | 对话式学习画像自主构建 | ✅ 已完成 | `StudentProfile.tsx` + `profiles.ts` | 模块二 |
 | 5 | 画像随学随新、动态更新 | ✅ 已完成 | `feedbacks.py` | UPSERT |
 | 6 | 开发智能学习多智能体系统 | ✅ 已完成 | `workflow.py` | 5智能体 |
 | 7 | 多智能体协同生成资源 | ✅ 已完成 | `workflow.py` | D→P→G→A→TR |
@@ -521,6 +521,7 @@
 |------|---------|--------|
 | 2026-07-08 | 完成模块一后端：数据库表 + KnowledgeRepo/Service/Router + parser.py + retriever.py | Claude |
 | 2026-07-08 | 完成模块一前端：knowledge API + TeacherKnowledgeBase 三栏布局 | Claude |
+| 2026-07-08 | 完成模块二前端：profilesApi 新增 dialog 方法 + StudentProfile 真实消息流 | Claude |
 | 2026-07-07 | 重写本文档：成熟版产品架构 + 8个开发模块 + 核心链路 | Claude |
 | 2026-07-07 | 修复角色值匹配问题 (student_member vs student) | Claude |
 | 2026-07-07 | 修复角色隔离Bug：移除DEV_BYPASS、禁用ROLE_SWITCH | Claude |
