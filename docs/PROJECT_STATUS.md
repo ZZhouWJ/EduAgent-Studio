@@ -390,20 +390,26 @@
 
 **目标**：管理端从假数据看板升级为真实平台运营指标
 
-**现状**：管理端有页面但部分数据可能是 mock
+**现状**：✅ 后端已完成
 
-**需真实化的指标**：
-- 今日调用次数
-- 平均延迟
-- Token 成本
-- RAG 命中率
-- 资源生成成功率
-- 审核通过率
+**新增后端模块**：
+- `backend/app/repositories/statistics_repo.py` - 新增 `get_platform_stats()`、`get_cost_by_model()`、`get_rag_hit_rate()`、`get_resource_stats()` 方法
+- `backend/app/services/statistics_service.py` - 新增 `get_platform_overview()`、`get_cost_by_model_api()`、`get_resource_stats_api()` 方法
+- `backend/app/routers/statistics.py` - 新增 `/api/statistics/platform`、`/api/statistics/cost-by-model`、`/api/statistics/resources` 接口
+
+**新增前端改造**：
+- `frontend/src/lib/api/statistics.ts` - 新增 `PlatformOverview`、`CostByModel`、`ResourceStats` 类型及 API 方法
+- `frontend/src/app/pages/AdminDashboard.tsx` - 使用 `getPlatformOverview()` 真实 API
+- `frontend/src/app/pages/AdminCosts.tsx` - 使用 `getCostByModel()` 真实 API
 
 **功能清单**：
-- [ ] 成本统计从 `cost_records` 真实聚合
-- [ ] 调用统计从 `invocations` 真实聚合
-- [ ] RAG 命中率从检索日志计算
+- [x] 成本统计从 `cost_records` 真实聚合 (`get_platform_stats`)
+- [x] 调用统计从 `ai_invocations` 真实聚合 (`get_platform_stats`)
+- [x] 资源统计从 `learning_resources` 真实聚合 (`get_resource_stats`)
+- [x] 按模型成本统计 (`get_cost_by_model`)
+- [x] RAG 命中率统计 (`get_rag_hit_rate`)
+- [x] 前端 AdminDashboard 使用真实 API
+- [x] 前端 AdminCosts 使用 `getCostByModel()` API
 
 **优先级**：🟠 P2
 
@@ -526,6 +532,7 @@
 
 | 日期 | 更新内容 | 负责人 |
 |------|---------|--------|
+| 2026-07-08 | 完成模块八：管理端指标真实化 - statistics_repo.py 新增 get_platform_stats/get_cost_by_model/get_rag_hit_rate/get_resource_stats 方法、statistics_service.py 新增对应 service 方法、statistics.py 新增 3 个 API 路由、前端 AdminDashboard/AdminCosts 使用真实 API | Claude |
 | 2026-07-08 | 完成模块七：反馈驱动推荐重排 - feedbacks.py 扩展返回值、LearningService.recommend_resources()、LearningRepository.get_recommended_resources()、学习路径调整逻辑 | Claude |
 | 2026-07-08 | 完成模块七前端：LearningFeedback.tsx 提交后展示"画像已更新"+推荐策略变化卡片、StudentDashboard.tsx 新增今日推荐资源区块、learning.ts 新增 getRecommendedResources 方法 | Claude |
 | 2026-07-08 | 完成模块六：Tutor Chat 前端 - tutorApi 独立答疑接口、CitationsCard/PracticeCard/ResourcesCard 多模态卡片、Markdown 渲染、学生画像上下文、反馈机制 | Claude |

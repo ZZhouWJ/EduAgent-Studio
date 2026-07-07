@@ -142,6 +142,35 @@ export interface CostDistribution {
   ratio: number
 }
 
+export interface PlatformOverview {
+  invocation_count: number
+  total_tokens: number
+  total_cost: number
+  today_invocations: number
+  resource_count: number
+  pending_resources: number
+  student_count: number
+  course_count: number
+  avg_latency_ms: number
+  success_rate: number
+}
+
+export interface CostByModel {
+  model: string
+  call_count: number
+  total_tokens: number
+  total_cost: number
+}
+
+export interface ResourceStats {
+  total: number
+  approved: number
+  pending: number
+  rejected: number
+  draft: number
+  pass_rate: number
+}
+
 export const statisticsApi = {
   overview() {
     return client.get<StatisticsOverview>('/statistics/overview')
@@ -209,5 +238,18 @@ export const statisticsApi = {
 
   costDistribution() {
     return client.get<CostDistribution[]>('/statistics/cost-distribution')
+  },
+
+  // Module 8: 平台全局统计
+  getPlatformOverview() {
+    return client.get<PlatformOverview>('/statistics/platform')
+  },
+
+  getCostByModel() {
+    return client.get<CostByModel[]>('/statistics/cost-by-model')
+  },
+
+  getResourceStats() {
+    return client.get<ResourceStats>('/statistics/resources')
   },
 }

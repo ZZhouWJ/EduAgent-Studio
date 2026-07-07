@@ -94,12 +94,13 @@ export function AdminDashboard() {
   }, []);
 
   const overview = useApi(() => statisticsApi.overview(), []);
+  const platformOverview = useApi(() => statisticsApi.getPlatformOverview(), []);
   const recentActivities = useApi(() => statisticsApi.recentActivities({ limit: 10 }), []);
   const modelCalls = useApi(() => statisticsApi.modelCalls(), []);
   const costs = useApi(() => statisticsApi.costs(), []);
   const reviewsStats = useApi(() => statisticsApi.reviews(), []);
 
-  const loading = overview.loading || recentActivities.loading || modelCalls.loading || costs.loading;
+  const loading = overview.loading || platformOverview.loading || recentActivities.loading || modelCalls.loading || costs.loading;
 
   // RISKS derived from reviews top_issue_tags
   const riskItems = (reviewsStats.data?.top_issue_tags ?? []).slice(0, 4).map((t): [string, string, string] => [
@@ -113,43 +114,43 @@ export function AdminDashboard() {
 
   const stats = [
     {
-      label: "项目总数",
-      value: loading ? "-" : `${overview.data?.project_count ?? 0}`,
-      hint: `活跃 ${overview.data?.active_project_count ?? 0} 个`,
+      label: "课程总数",
+      value: loading ? "-" : `${platformOverview.data?.course_count ?? 0}`,
+      hint: `学生 ${platformOverview.data?.student_count ?? 0} 人`,
       icon: Users,
       tone: "blue",
     },
     {
-      label: "任务总数",
-      value: loading ? "-" : `${overview.data?.task_count ?? 0}`,
-      hint: "平台任务",
-      icon: Database,
-      tone: "slate",
-    },
-    {
       label: "学习资源总数",
-      value: loading ? "-" : `${overview.data?.artifact_count ?? 0}`,
-      hint: "生成资源",
+      value: loading ? "-" : `${platformOverview.data?.resource_count ?? 0}`,
+      hint: `待审核 ${platformOverview.data?.pending_resources ?? 0} 个`,
       icon: Library,
       tone: "emerald",
     },
     {
       label: "今日调用次数",
-      value: loading ? "-" : `${overview.data?.invocation_count ?? 0}`,
-      hint: `成功率 ${overview.data ? Math.round((overview.data.success_invocation_count / Math.max(overview.data.invocation_count, 1)) * 100) : 0}%`,
+      value: loading ? "-" : `${platformOverview.data?.today_invocations ?? 0}`,
+      hint: `总调用 ${platformOverview.data?.invocation_count ?? 0} 次`,
       icon: Bot,
       tone: "cyan",
     },
     {
       label: "Token 总消耗",
-      value: loading ? "-" : `${overview.data ? (overview.data.total_tokens / 1000).toFixed(1) + "K" : "-"}`,
+      value: loading ? "-" : `${platformOverview.data ? (platformOverview.data.total_tokens / 1000).toFixed(1) + "K" : "-"}`,
       hint: "输入 + 输出合计",
       icon: ActivitySquare,
       tone: "orange",
     },
     {
+      label: "总成本",
+      value: loading ? "-" : `¥${platformOverview.data?.total_cost?.toFixed(2) ?? "0.00"}`,
+      hint: "平台运营成本",
+      icon: Coins,
+      tone: "purple",
+    },
+    {
       label: "内容安全风险",
-      value: loading ? "-" : `${overview.data?.pending_review_count ?? 0}`,
+      value: loading ? "-" : `${platformOverview.data?.pending_resources ?? 0}`,
       hint: "待教师复核",
       icon: ShieldAlert,
       tone: "red",

@@ -233,3 +233,25 @@ def get_review_rate_by_course(user_token: str) -> list[dict]:
 
 def get_cost_distribution(user_token: str) -> list[dict]:
     return _get_learning_repo().get_cost_distribution()
+
+
+# =============================================================================
+# Module 8: 平台全局统计 (管理端指标真实化)
+# =============================================================================
+
+def get_platform_overview(token: str) -> Dict[str, Any]:
+    """平台总览"""
+    _require_auth(token)
+    return statistics_repo.get_platform_stats()
+
+
+def get_cost_by_model_api(token: str) -> List[Dict[str, Any]]:
+    """按模型成本 (Module 8)"""
+    _require_auth(token)
+    return statistics_repo.get_cost_by_model()
+
+
+def get_resource_stats_api(token: str) -> Dict[str, Any]:
+    """资源统计 (Module 8)"""
+    _require_auth(token)
+    return statistics_repo.get_resource_stats()
