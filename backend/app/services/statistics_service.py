@@ -208,30 +208,37 @@ def _get_learning_repo():
 
 
 def get_learning_overview(user_token: str) -> dict:
+    _require_auth(user_token)
     return _get_learning_repo().get_overview()
 
 
 def get_mastery_distribution(user_token: str) -> list[dict]:
+    _require_auth(user_token)
     return _get_learning_repo().get_mastery_distribution()
 
 
 def get_weak_knowledge_points(user_token: str, top_n: int = 10) -> list[dict]:
+    _require_auth(user_token)
     return _get_learning_repo().get_weak_knowledge_points(top_n)
 
 
 def get_resource_type_distribution(user_token: str) -> list[dict]:
+    _require_auth(user_token)
     return _get_learning_repo().get_resource_type_distribution()
 
 
 def get_invocation_trend(user_token: str, days: int = 14) -> list[dict]:
+    _require_auth(user_token)
     return _get_learning_repo().get_invocation_trend(days)
 
 
 def get_review_rate_by_course(user_token: str) -> list[dict]:
+    _require_auth(user_token)
     return _get_learning_repo().get_review_rate_by_course()
 
 
 def get_cost_distribution(user_token: str) -> list[dict]:
+    _require_auth(user_token)
     return _get_learning_repo().get_cost_distribution()
 
 
