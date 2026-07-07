@@ -32,7 +32,9 @@ export function StudentTutor() {
   const [draft, setDraft] = React.useState(suggestions[0]);
   const [tone, setTone] = React.useState("循序讲解");
   const [activePanel, setActivePanel] = React.useState<"context" | "chat" | "resources">("chat");
+  const [pendingAi, setPendingAi] = React.useState(false);
   const { toast, showToast } = useInlineToast();
+  const chatScrollRef = React.useRef<HTMLDivElement | null>(null);
 
   const { data: resourcesData } = useApi(() => resourcesApi.list({ page_size: 100 }), []);
 
@@ -45,6 +47,12 @@ export function StudentTutor() {
     }));
   }, [resourcesData]);
 
+  React.useEffect(() => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [messages, pendingAi]);
+
   const send = async () => {
     const text = draft.trim();
     if (!text) {
@@ -54,6 +62,7 @@ export function StudentTutor() {
     const userMessage = text;
     setMessages((items) => [...items, { from: "student" as const, text: userMessage }]);
     setDraft("");
+    setPendingAi(true);
 
     try {
       const { data } = await agentsApi.generate({
@@ -63,11 +72,13 @@ export function StudentTutor() {
         resource_type: "讲义",
         difficulty: "中等",
       });
-      const aiText = data.assessment.feedback || data.resource.content || "学习智能体已生成个性化回答";
+      const aiText = data.assessment.feedback || data.resource.content || "已收到回复";
       const refs = data.resource.title ? [data.resource.title] : [];
+      setPendingAi(false);
       setMessages((items) => [...items, { from: "ai" as const, text: aiText, refs }]);
-      showToast("学习智能体已生成个性化回答");
+      showToast("已收到回复");
     } catch {
+      setPendingAi(false);
       setMessages((items) => [
         ...items,
         {
@@ -76,18 +87,18 @@ export function StudentTutor() {
           refs: [],
         },
       ]);
-      showToast("学习智能体已生成个性化回答");
+      showToast("已收到回复");
     }
   };
 
   return (
     <PageShell>
       <PageHeader
-        eyebrow="AI Learning Tutor"
-        title="AI 学习辅导"
-        description="学习智能体基于课程知识库和学生画像提供个性化辅导，帮助你把薄弱知识点转化为可完成的学习任务。"
-        icon={Bot}
-        action={<button onClick={() => { setMessages(initialMessages); showToast("对话已恢复为课程推荐起点"); }} className={secondaryButton}><RefreshCcw className="h-4 w-4" />清空对话</button>}
+        eyebrow="学习辅导"
+        title="学习辅导对话"
+        description="结合你的课程知识库与学习画像，用对话的方式解答问题、梳理思路。"
+        icon={MessageSquare}
+        action={<button onClick={() => { setMessages(initialMessages); showToast("对话已重置"); }} className={secondaryButton}><RefreshCcw className="h-4 w-4" />清空对话</button>}
       />
 
       <div className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1 lg:hidden">
@@ -140,7 +151,11 @@ export function StudentTutor() {
               <div className="mb-2 text-xs font-bold text-slate-400">推荐提问</div>
               <div className="space-y-2">
                 {suggestions.map((item) => (
-                  <button key={item} onClick={() => setDraft(item)} className="w-full rounded-xl border border-slate-100 bg-white p-3 text-left text-xs font-semibold leading-5 text-slate-600 transition hover:border-blue-200 hover:bg-blue-50">
+                  <button
+                    key={item}
+                    onClick={() => setDraft(item)}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left text-xs font-semibold leading-5 text-slate-600 transition-all duration-200 hover:-translate-x-1 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+                  >
                     {item}
                   </button>
                 ))}
@@ -151,15 +166,18 @@ export function StudentTutor() {
 
         <main className={`edu-card min-w-0 flex-col rounded-2xl ${activePanel === "chat" ? "flex" : "hidden lg:flex"}`}>
           <div className="border-b border-slate-100 px-5 py-4">
-            <h2 className="flex items-center gap-2 text-base font-black text-slate-950">
-              <MessageSquare className="h-5 w-5 text-blue-700" />
-              AI 对话区
+            <h2 className="flex items-center gap-2 text-base font-semibold text-slate-950">
+              <MessageSquare className="h-5 w-5 text-slate-500" />
+              对话
             </h2>
             <p className="mt-1 text-xs font-semibold text-slate-400">当前模式：{tone}</p>
           </div>
-          <div className="custom-scrollbar flex-1 space-y-4 overflow-y-auto p-5">
+          <div ref={chatScrollRef} className="custom-scrollbar flex-1 space-y-4 overflow-y-auto p-5">
             {messages.map((message, index) => (
-              <div key={`${message.from}-${index}`} className={`flex ${message.from === "student" ? "justify-end" : "justify-start"}`}>
+              <div
+                key={`${message.from}-${index}`}
+                className={`flex ${message.from === "student" ? "justify-end" : "justify-start"} ${message.from === "student" ? "edu-bubble-user" : "edu-bubble-ai"}`}
+              >
                 <div className={`max-w-[92%] rounded-2xl p-4 sm:max-w-[78%] ${message.from === "student" ? "bg-blue-600 text-white" : "border border-slate-100 bg-slate-50 text-slate-700"}`}>
                   <p className="text-sm leading-6">{message.text}</p>
                   {message.refs && (
@@ -176,6 +194,16 @@ export function StudentTutor() {
                 </div>
               </div>
             ))}
+            {pendingAi && (
+              <div className="edu-bubble-ai flex justify-start">
+                <div className="flex items-center gap-1 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-slate-400">
+                  <span className="edu-typing-dot" />
+                  <span className="edu-typing-dot" />
+                  <span className="edu-typing-dot" />
+                  <span className="ml-2 text-xs font-semibold text-slate-400">正在整理回答…</span>
+                </div>
+              </div>
+            )}
           </div>
           <div className="border-t border-slate-100 p-4">
             <label className="mb-2 block text-xs font-bold text-slate-500">输入学习问题</label>
@@ -194,11 +222,15 @@ export function StudentTutor() {
             <h2 className="mb-4 text-base font-black text-slate-950">证据与推荐</h2>
             <div className="space-y-3">
               {recommendedResources.map((doc) => (
-                <Link key={doc.id} to="/student/resources" className="block rounded-xl border border-slate-100 bg-white p-3 transition hover:border-blue-200 hover:bg-blue-50">
-                  <div className="text-sm font-black text-slate-900">{doc.name}</div>
+                <Link
+                  key={doc.id}
+                  to="/student/resources"
+                  className="group block rounded-xl border border-slate-100 bg-white p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:shadow-md"
+                >
+                  <div className="text-sm font-black text-slate-900 group-hover:text-blue-800">{doc.name}</div>
                   <div className="mt-2 flex items-center justify-between text-xs">
                     <span className="font-semibold text-slate-500">命中片段 {doc.chunks}</span>
-                    <span className="font-black text-blue-700">{doc.coverage}%</span>
+                    <span className="font-black text-blue-700 tabular-nums">{doc.coverage}%</span>
                   </div>
                 </Link>
               ))}

@@ -30,6 +30,7 @@ export function StudentTasks() {
     status: string; priority: string; description: string; course_id: number;
   } | null>(null);
   const [completed, setCompleted] = React.useState<string[]>([]);
+  const [markingId, setMarkingId] = React.useState<string | null>(null);
 
   const { data: tasksData, loading, refetch } = useApi(
     () => learningApi.listTasks({ page_size: 100 }),
@@ -116,52 +117,60 @@ export function StudentTasks() {
                 <h2 className="text-lg font-black text-slate-950">{section}</h2>
                 <span className="text-xs font-bold text-slate-400">{sectionTasks.length} 项</span>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                {sectionTasks.map((task) => (
-                  <button
-                    key={task.id}
-                    onClick={() => setSelected({
-                      id: task.id,
-                      title: task.title,
-                      course_name: task.course_name,
-                      type: task.type,
-                      status: task.displayStatus,
-                      priority: task.priority,
-                      description: task.description,
-                      course_id: task.course_id,
-                    })}
-                    className="cursor-pointer rounded-2xl border border-slate-100 bg-white p-4 text-left transition hover:border-blue-200 hover:shadow-md"
-                  >
-                    <div className="mb-3 flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-base font-black text-slate-900">{task.title}</h3>
-                        <p className="mt-1 text-xs leading-5 text-slate-500">{task.course}</p>
+              <div className="edu-stagger grid grid-cols-2 gap-4">
+                {sectionTasks.map((task) => {
+                  const isDone = completed.includes(String(task.id)) || task.progress === 100;
+                  return (
+                    <button
+                      key={task.id}
+                      onClick={() => setSelected({
+                        id: task.id,
+                        title: task.title,
+                        course_name: task.course_name,
+                        type: task.type,
+                        status: task.displayStatus,
+                        priority: task.priority,
+                        description: task.description,
+                        course_id: task.course_id,
+                      })}
+                      className={`group cursor-pointer rounded-2xl border bg-white p-4 text-left transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-lg ${
+                        isDone
+                          ? "border-emerald-200 bg-emerald-50/40 hover:border-emerald-300"
+                          : "border-slate-100 hover:border-blue-200"
+                      }`}
+                    >
+                      <div className="mb-3 flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-base font-black text-slate-900">{task.title}</h3>
+                          <p className="mt-1 text-xs leading-5 text-slate-500">{task.course}</p>
+                        </div>
+                        <StatusBadge status={task.displayStatus} />
                       </div>
-                      <StatusBadge status={task.displayStatus} />
-                    </div>
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      <span className="rounded-lg bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">{task.knowledge}</span>
-                      {task.priority && task.priority !== "low" && (
-                        <span className={`rounded-lg px-2 py-1 text-xs font-bold ${task.priority === "high" ? "bg-red-50 text-red-700" : "bg-orange-50 text-orange-700"}`}>
-                          {task.priority === "high" ? "紧急" : "中等"}
-                        </span>
-                      )}
-                    </div>
-                    <p className="min-h-[40px] text-xs leading-5 text-slate-500">
-                      {task.description || "暂无描述"}
-                    </p>
-                    <div className="mt-4">
-                      <div className="mb-2 flex justify-between text-xs font-bold text-slate-500">
-                        <span>任务进度</span>
-                        <span>{completed.includes(String(task.id)) ? 100 : task.progress}%</span>
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        <span className="rounded-lg bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">{task.knowledge}</span>
+                        {task.priority && task.priority !== "low" && (
+                          <span className={`rounded-lg px-2 py-1 text-xs font-bold ${task.priority === "high" ? "bg-red-50 text-red-700" : "bg-orange-50 text-orange-700"}`}>
+                            {task.priority === "high" ? "紧急" : "中等"}
+                          </span>
+                        )}
                       </div>
-                      <ProgressBar
-                        value={completed.includes(String(task.id)) ? 100 : task.progress}
-                        tone={task.progress === 100 ? "emerald" : "blue"}
-                      />
-                    </div>
-                  </button>
-                ))}
+                      <p className="min-h-[40px] text-xs leading-5 text-slate-500">
+                        {task.description || "暂无描述"}
+                      </p>
+                      <div className="mt-4">
+                        <div className="mb-2 flex justify-between text-xs font-bold text-slate-500">
+                          <span>任务进度</span>
+                          <span className="tabular-nums transition-colors duration-300">{isDone ? 100 : task.progress}%</span>
+                        </div>
+                        <ProgressBar
+                          value={isDone ? 100 : task.progress}
+                          tone={isDone ? "emerald" : "blue"}
+                          animate={!isDone && task.progress > 0 && task.progress < 100}
+                        />
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </section>
           );
@@ -207,12 +216,19 @@ export function StudentTasks() {
               <Link to="/student/resources" className={`${primaryButton} cursor-pointer text-center`}>开始学习</Link>
               <button
                 onClick={() => {
-                  setCompleted((items) => Array.from(new Set([...items, String(selected.id)])));
+                  const id = String(selected.id);
+                  setCompleted((items) => Array.from(new Set([...items, id])));
+                  setMarkingId(id);
                   notify.success("任务已标记完成");
+                  window.setTimeout(() => setMarkingId(null), 1400);
                 }}
-                className={`${secondaryButton} cursor-pointer`}
+                className={`${secondaryButton} cursor-pointer transition-all duration-300 ${
+                  markingId === String(selected.id)
+                    ? "!bg-emerald-500 !text-white !ring-emerald-400"
+                    : ""
+                }`}
               >
-                标记完成
+                {markingId === String(selected.id) ? "已完成 ✓" : "标记完成"}
               </button>
               <Link to="/student/feedback" className={`${secondaryButton} flex cursor-pointer items-center justify-center gap-1`}>
                 <MessageSquare className="h-4 w-4" />

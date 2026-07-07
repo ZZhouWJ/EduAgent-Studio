@@ -32,23 +32,23 @@ const ROLE_ENTRIES = [
     role: "管理员",
     desc: "全平台管理、用户/角色、模型/智能体配置、调用审计与成本",
     account: "admin",
-    password: "Pass@1234",
+    password: "Admin@123",
     icon: ShieldCheck,
     accent: "from-indigo-500 via-violet-500 to-purple-500",
   },
   {
     role: "教师体验",
     desc: "管理课程、生成资源、审核 AI 内容和查看教学分析",
-    account: "teacher_li",
-    password: "Pass@1234",
+    account: "teacher01",
+    password: "Teacher@123",
     icon: BookOpenCheck,
     accent: "from-blue-500 via-cyan-500 to-teal-400",
   },
   {
     role: "学生体验",
     desc: "查看个性化学习路径、推荐资源和学习反馈",
-    account: "student_zhang",
-    password: "Pass@1234",
+    account: "student01",
+    password: "Student@123",
     icon: Bot,
     accent: "from-emerald-500 via-teal-400 to-cyan-500",
   },
@@ -56,7 +56,6 @@ const ROLE_ENTRIES = [
 
 /* ─── 满版左侧品牌：4 块面板 + 12 浮元素 + 8 上升粒子 ──── */
 function FloatingIcons() {
-  // 12 个浮动图标，覆盖全屏
   const items = [
     { Icon: Sparkles, x: "6%", y: "10%", size: 30, delay: 0, color: "text-amber-300/85", duration: 9 },
     { Icon: Zap, x: "86%", y: "12%", size: 34, delay: 0.5, color: "text-yellow-300/75", duration: 10 },
@@ -132,7 +131,6 @@ function RisingParticles() {
 function HeroVisual() {
   return (
     <div className="relative flex h-full w-full flex-col items-center justify-center px-12">
-      {/* 4 层光晕堆叠 */}
       <motion.div
         className="absolute h-[560px] w-[560px] rounded-full"
         style={{ background: "radial-gradient(circle, rgba(139,92,246,0.6) 0%, rgba(59,130,246,0.22) 35%, transparent 70%)" }}
@@ -158,7 +156,6 @@ function HeroVisual() {
         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 2 }}
       />
 
-      {/* 3 层旋转环 */}
       <motion.div
         className="absolute h-[360px] w-[360px] rounded-full border border-white/15"
         animate={{ rotate: 360 }}
@@ -175,7 +172,6 @@ function HeroVisual() {
         transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
       />
 
-      {/* 8 个外环浮点（更丰富） */}
       <motion.div
         className="absolute"
         animate={{ rotate: 360 }}
@@ -214,7 +210,6 @@ function HeroVisual() {
         </div>
       </motion.div>
 
-      {/* 中心核心方块 */}
       <motion.div
         initial={{ scale: 0, rotate: -45 }}
         animate={{ scale: 1, rotate: 0 }}
@@ -234,7 +229,6 @@ function HeroVisual() {
         <Bot className="h-16 w-16 text-white drop-shadow-[0_0_18px_rgba(255,255,255,0.55)]" strokeWidth={1.6} />
       </motion.div>
 
-      {/* 文案 */}
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
@@ -305,7 +299,6 @@ export function Login() {
     }
   };
 
-  // 入场错峰（左侧文案用）
   const leftFade = {
     hidden: { opacity: 0, y: 20 },
     visible: (i: number) => ({
@@ -319,7 +312,6 @@ export function Login() {
     <div className="relative flex min-h-dvh w-full overflow-hidden bg-slate-50 text-slate-900">
       {/* ════════════════ 左侧品牌区（更饱满） ════════════════ */}
       <section className="relative hidden w-[60%] min-w-[640px] flex-col overflow-hidden lg:flex">
-        {/* 多层渐变背景（流动） */}
         <motion.div
           className="absolute inset-0"
           style={{
@@ -331,7 +323,6 @@ export function Login() {
           transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
         />
 
-        {/* 4 层径向光斑（呼吸） */}
         <motion.div
           className="absolute -left-32 -top-32 h-[600px] w-[600px] rounded-full"
           style={{ background: "radial-gradient(circle, rgba(139,92,246,0.55) 0%, transparent 70%)" }}
@@ -357,7 +348,6 @@ export function Login() {
           transition={{ duration: 11, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
         />
 
-        {/* 网格纹理（漂移） */}
         <motion.div
           className="absolute inset-0 opacity-[0.08]"
           style={{
@@ -369,22 +359,18 @@ export function Login() {
           transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
         />
 
-        {/* 浮动图标 + 上升粒子 */}
         <FloatingIcons />
         <RisingParticles />
 
-        {/* 主视觉：满版居中 */}
         <div className="relative z-10 flex flex-1 items-center justify-center">
           <HeroVisual />
         </div>
 
-        {/* 底部饱满文案区 */}
         <motion.div
           initial="hidden"
           animate="visible"
           className="relative z-10 px-12 pb-10"
         >
-          {/* 标题（两行，加粗大字 + 渐变光） */}
           <motion.h2
             custom={0}
             variants={leftFade}
@@ -395,7 +381,6 @@ export function Login() {
             都更接近答案
           </motion.h2>
 
-          {/* 副标说明 */}
           <motion.p
             custom={1}
             variants={leftFade}
@@ -405,7 +390,6 @@ export function Login() {
             让每位教师拥有 AI 教学助理，让知识在被需要的时刻精准抵达。
           </motion.p>
 
-          {/* 数据行（4 项指标） */}
           <motion.div
             custom={2}
             variants={leftFade}
@@ -433,7 +417,6 @@ export function Login() {
             ))}
           </motion.div>
 
-          {/* 标签胶囊行 */}
           <motion.div
             custom={3}
             variants={leftFade}
@@ -455,10 +438,9 @@ export function Login() {
         </motion.div>
       </section>
 
-      {/* ════════════════ 右侧登录卡片（简洁，零动效） ════════════════ */}
+      {/* ════════════════ 右侧登录卡片 ════════════════ */}
       <section className="relative flex min-w-0 flex-1 items-center justify-center bg-gradient-to-br from-white via-slate-50 to-blue-50/40 px-6 py-10">
         <div className="w-full max-w-[400px]">
-          {/* 移动端品牌 */}
           <div className="mb-6 text-center lg:hidden">
             <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 shadow-lg shadow-blue-500/30">
               <Bot className="h-5 w-5 text-white" />
@@ -467,7 +449,6 @@ export function Login() {
           </div>
 
           <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-7 shadow-xl shadow-slate-200/60 backdrop-blur-xl sm:p-9">
-            {/* 表单头部 */}
             <div className="mb-6">
               <div className="mb-3 flex items-center gap-3">
                 <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 shadow-lg shadow-blue-500/30">
@@ -481,7 +462,6 @@ export function Login() {
             </div>
 
             <form onSubmit={handleLogin} className="space-y-4">
-              {/* 用户名 */}
               <div>
                 <label htmlFor="username" className="mb-1.5 block text-xs font-semibold text-slate-600">
                   用户名
@@ -510,7 +490,6 @@ export function Login() {
                 </div>
               </div>
 
-              {/* 密码 */}
               <div>
                 <label htmlFor="password" className="mb-1.5 block text-xs font-semibold text-slate-600">
                   密码
@@ -539,7 +518,6 @@ export function Login() {
                 </div>
               </div>
 
-              {/* 记住我 / 忘记密码 */}
               <div className="flex items-center justify-between pt-1">
                 <label className="flex cursor-pointer items-center gap-2">
                   <input
@@ -557,7 +535,6 @@ export function Login() {
                 </a>
               </div>
 
-              {/* 登录按钮（静态） */}
               <button
                 type="submit"
                 disabled={loading}
@@ -580,7 +557,6 @@ export function Login() {
               </button>
             </form>
 
-            {/* 角色体验入口 */}
             <div className="mt-6 border-t border-slate-100 pt-5">
               <p className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 <Sparkles className="h-3 w-3" />

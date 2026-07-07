@@ -2,6 +2,7 @@ import React from "react";
 import { Search, Filter, FileText, CheckCircle2, AlertCircle, PlayCircle, Code, ListTree, MoreVertical } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { learningApi, resourcesApi } from "@/lib/api";
+import { SafeLottie } from "../components/SafeLottie";
 
 function formatTimeAgo(dateStr: string): string {
   try {
@@ -141,7 +142,10 @@ export function ResourceLibrary() {
       {loading ? (
         <div className="flex items-center justify-center h-32 text-slate-400">加载中...</div>
       ) : filtered.length === 0 ? (
-        <div className="flex items-center justify-center h-32 text-slate-400">暂无资源</div>
+        <div className="flex flex-col items-center justify-center gap-3 py-10 text-slate-400">
+          <SafeLottie source="empty" className="h-24 w-32" speed={0.8} />
+          <span className="text-sm">暂无资源</span>
+        </div>
       ) : (
         <div className="auto-rows-max grid grid-cols-1 gap-4 overflow-y-auto min-h-0 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map((res) => {

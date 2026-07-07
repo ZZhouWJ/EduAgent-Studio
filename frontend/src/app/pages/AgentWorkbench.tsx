@@ -24,6 +24,7 @@ import {
   Send,
   Settings2,
   ShieldCheck,
+  Terminal,
   Sparkles,
   StopCircle,
   XCircle,
@@ -100,8 +101,8 @@ function stepClasses(state: string) {
   }
   if (state === "running") {
     return {
-      icon: "bg-[linear-gradient(135deg,#2563EB,#7C3AED)] text-white ring-blue-200 shadow-[0_12px_28px_rgba(37,99,235,0.24)]",
-      card: "border-blue-200 bg-[linear-gradient(135deg,rgba(239,246,255,0.9),rgba(245,243,255,0.82))]",
+      icon: "bg-blue-600 text-white ring-blue-200",
+      card: "border-blue-200 bg-blue-50/60",
       badge: "bg-blue-100 text-blue-700 ring-blue-200",
     };
   }
@@ -401,13 +402,13 @@ export function AgentWorkbench() {
     <div className="page-shell flex min-h-0 flex-col">
       <div className="flex shrink-0 flex-col items-stretch justify-between gap-4 lg:flex-row lg:items-start lg:gap-6">
         <div className="min-w-0">
-          <div className="mb-2 flex w-fit items-center gap-2 rounded-full border border-purple-100 bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700">
+          <div className="mb-2 flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
             <Network className="h-3.5 w-3.5" />
-            Multi-Agent Resource Generation
+            资源生成工作台
           </div>
-          <h1 className="text-2xl font-black text-slate-950">教师智能体工作台</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">资源生成工作台</h1>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-            面向课程、班级和重点学生群体，组织班级诊断、画像聚合、知识定位、路径规划、资源生成、测评生成与教师审核辅助智能体协同工作。
+            面向课程、班级和重点学生群体，组织班级诊断、画像聚合、知识定位、路径规划、资源生成、测评生成与教师审核辅助等环节协同工作。
           </p>
         </div>
 
@@ -431,9 +432,9 @@ export function AgentWorkbench() {
             <div className="mb-5 flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-2">
                 <Settings2 className="h-5 w-5 text-slate-700" />
-                <h2 className="text-base font-black text-slate-950">生成上下文</h2>
+                <h2 className="text-base font-semibold text-slate-900">生成上下文</h2>
               </div>
-              <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-700">教师端生成</span>
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">教师端</span>
             </div>
 
             <div className="space-y-4">
@@ -581,8 +582,8 @@ export function AgentWorkbench() {
           <div className="edu-card flex min-h-[540px] flex-col rounded-2xl p-5 xl:min-h-0 xl:flex-1">
             <div className="mb-5 flex flex-col items-start justify-between gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center">
               <div className="flex items-center gap-2">
-                <Bot className="h-5 w-5 text-purple-700" />
-                <h2 className="text-base font-black text-slate-950">多智能体执行链路</h2>
+                <Route className="h-5 w-5 text-slate-700" />
+                <h2 className="text-base font-semibold text-slate-900">执行链路</h2>
               </div>
               <div className="flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700 ring-1 ring-blue-100">
                 {workflowState === "running" && <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse" />}
@@ -625,10 +626,10 @@ export function AgentWorkbench() {
             </div>
           </div>
 
-          <div className="h-48 shrink-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-[0_18px_36px_rgba(15,23,42,0.18)]">
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-xs font-bold text-slate-400">
+          <div className="h-48 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-xs font-semibold text-slate-500">
               <span className="flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5 text-cyan-300" />
+                <Terminal className="h-3.5 w-3.5" />
                 实时生成日志
               </span>
               <span className={`rounded-full px-2 py-1 ring-1 ${workflowState === "running" ? "bg-blue-500/10 text-blue-200 ring-blue-400/20" : "bg-slate-700 text-slate-400 ring-slate-600"}`}>
@@ -656,34 +657,9 @@ export function AgentWorkbench() {
           <div className="edu-card rounded-2xl p-5">
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-blue-700" />
-                <h2 className="text-base font-black text-slate-950">生成资源预览</h2>
+                <FileText className="h-5 w-5 text-slate-700" />
+                <h2 className="text-base font-semibold text-slate-900">资源预览</h2>
               </div>
-              <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100">{resourceType}</span>
-            </div>
-
-            {result ? (
-              <>
-                <div className="rounded-2xl border border-blue-100 bg-[linear-gradient(180deg,#EFF6FF,#FFFFFF)] p-4">
-                  <h3 className="text-lg font-black leading-6 text-slate-950">{result.resource?.title || "未命名资源"}</h3>
-                  <div
-                    className="prose prose-sm prose-slate mt-2 max-w-none text-sm leading-6 text-slate-600"
-                    dangerouslySetInnerHTML={{ __html: result.resource?.content ? marked(result.resource.content.slice(0, 500)) : "资源内容加载中..." }}
-                  />
-                  {(result.resource?.content?.length || 0) > 500 && (
-                    <p className="mt-2 text-xs text-slate-400">...（篇幅限制，仅展示前500字符）</p>
-                  )}
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <span className="rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-100">
-                      {selectedCourse?.name || "课程"}
-                    </span>
-                    <span className="rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-100">
-                      {selectedKps.length} 个知识点
-                    </span>
-                    <span className="rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-100">
-                      {difficulty}
-                    </span>
-                  </div>
                 </div>
 
                 <div className="mt-4 grid grid-cols-2 gap-3">

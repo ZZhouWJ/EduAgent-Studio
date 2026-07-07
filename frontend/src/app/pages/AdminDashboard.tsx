@@ -4,6 +4,7 @@ import { ActivitySquare, ArrowRight, Bot, CheckCircle2, CircleAlert, Coins, Data
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useApi } from "@/lib/useApi";
 import { statisticsApi } from "@/lib/api";
+import { SafeLottie } from "../components/SafeLottie";
 
 interface ServiceItem {
   name: string;
@@ -31,7 +32,7 @@ const ENTRY = [
 
 const toneClass: Record<string, string> = {
   blue: "bg-blue-50 text-blue-700 ring-blue-100",
-  purple: "bg-purple-50 text-purple-700 ring-purple-100",
+  slate: "bg-slate-100 text-slate-700 ring-slate-200",
   emerald: "bg-emerald-50 text-emerald-700 ring-emerald-100",
   cyan: "bg-cyan-50 text-cyan-700 ring-cyan-100",
   orange: "bg-orange-50 text-orange-700 ring-orange-100",
@@ -123,12 +124,12 @@ export function AdminDashboard() {
       value: loading ? "-" : `${overview.data?.task_count ?? 0}`,
       hint: "平台任务",
       icon: Database,
-      tone: "purple",
+      tone: "slate",
     },
     {
       label: "学习资源总数",
       value: loading ? "-" : `${overview.data?.artifact_count ?? 0}`,
-      hint: "AI 生成资源",
+      hint: "生成资源",
       icon: Library,
       tone: "emerald",
     },
@@ -164,24 +165,25 @@ export function AdminDashboard() {
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
-      <section className="edu-card relative overflow-hidden rounded-[24px] p-7">
-        <div className="absolute inset-0 edu-grid-bg opacity-45" />
-        <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#0F172A,#2563EB,#10B981)]" />
-        <div className="relative flex items-start justify-between gap-6">
-          <div>
-            <div className="mb-4 flex w-fit cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
+      <section className="edu-card relative overflow-hidden rounded-2xl p-7">
+        <div className="relative flex items-center justify-between gap-6">
+          <div className="min-w-0">
+            <div className="mb-4 flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
               <LockKeyhole className="h-3.5 w-3.5" />
               系统运营总览
             </div>
-            <h1 className="text-[30px] font-black text-slate-950">管理员首页 / 系统运营面板</h1>
+            <h1 className="text-[30px] font-semibold text-slate-900">管理员首页 · 系统运营面板</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              面向平台运维和 AI 治理，集中监控用户、课程、资源、模型调用、成本和内容安全风险。
+              面向平台运维和内容治理，集中监控用户、课程、资源、模型调用、成本和内容安全风险。
             </p>
+            <Link to="/admin/governance" className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800">
+              查看治理面板
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
-          <Link to="/admin/governance" className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-slate-950 px-5 text-sm font-black text-white transition hover:bg-slate-800">
-            查看 AI 治理
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+          <div className="hidden h-40 w-40 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/60 lg:block">
+            <SafeLottie source="dashboard" className="h-full w-full" speed={0.7} />
+          </div>
         </div>
       </section>
 

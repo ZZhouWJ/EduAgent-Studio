@@ -2,6 +2,44 @@
 @import './tailwind.css';
 @import './theme.css';
 
+/* ─── Design Tokens：高级字体 / 角色色域 ─────────────────────── */
+:root {
+  /* Display / Body：保留中文 PingFang 链路，引入 Plus Jakarta Sans 作为标题备选 */
+  --edu-font-display: "Plus Jakarta Sans", "PingFang SC", "HarmonyOS Sans",
+    "Microsoft YaHei", "Noto Sans SC", Inter, ui-sans-serif, system-ui, sans-serif;
+  --edu-font-num: "SF Pro Display", "Inter", "PingFang SC", "HarmonyOS Sans",
+    "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+
+  /* 角色色域（Admin / Teacher / Student 各自一套 accent） */
+  --admin-ink: #0B1226;
+  --admin-ink-soft: #0F172A;
+  --admin-cyan: #38BDF8;
+  --admin-violet: #A78BFA;
+  --admin-amber: #FBBF24;
+
+  --teacher-purple: #7C3AED;
+  --teacher-amber: #F59E0B;
+  --teacher-emerald: #10B981;
+
+  --student-cyan: #06B6D4;
+  --student-emerald: #10B981;
+  --student-violet: #8B5CF6;
+}
+
+/* 标题优先使用 display 字体（粗体时更显锐利） */
+h1, h2, h3, h4, .edu-display {
+  font-family: var(--edu-font-display);
+  letter-spacing: -0.01em;
+}
+
+/* 数字大字号时使用 num 字体栈 */
+.edu-num {
+  font-family: var(--edu-font-num);
+  font-feature-settings: "tnum" 1, "ss01" 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ─── 通用动效工具类 ───────────────────────────────────── */
 
 /* 浮动 / 漂浮动效 */
@@ -228,4 +266,106 @@
 
 .edu-btn-shimmer:hover::after {
   transform: translateX(100%);
+}
+
+/* ─── 通用动效：错峰淡入 / 数字滚动 / 消息气泡 / 打字光标 ─── */
+
+/* 错峰淡入容器：子元素依次入场（每项间隔 70ms） */
+@keyframes edu-stagger-in {
+  0%   { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.edu-stagger > * {
+  opacity: 0;
+  animation: edu-stagger-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.edu-stagger > *:nth-child(1)  { animation-delay: 0ms; }
+.edu-stagger > *:nth-child(2)  { animation-delay: 70ms; }
+.edu-stagger > *:nth-child(3)  { animation-delay: 140ms; }
+.edu-stagger > *:nth-child(4)  { animation-delay: 210ms; }
+.edu-stagger > *:nth-child(5)  { animation-delay: 280ms; }
+.edu-stagger > *:nth-child(6)  { animation-delay: 350ms; }
+.edu-stagger > *:nth-child(7)  { animation-delay: 420ms; }
+.edu-stagger > *:nth-child(8)  { animation-delay: 490ms; }
+.edu-stagger > *:nth-child(n+9) { animation-delay: 560ms; }
+
+/* 数字滚动入场 */
+@keyframes edu-count-up {
+  0%   { opacity: 0; transform: translateY(8px); letter-spacing: 0.02em; }
+  100% { opacity: 1; transform: translateY(0); letter-spacing: -0.02em; }
+}
+.edu-count-up { animation: edu-count-up 0.65s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* 消息气泡错峰入场 */
+@keyframes edu-bubble-in-right {
+  0%   { opacity: 0; transform: translateY(10px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes edu-bubble-in-left {
+  0%   { opacity: 0; transform: translateY(10px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.edu-bubble-user { animation: edu-bubble-in-right 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: bottom right; }
+.edu-bubble-ai   { animation: edu-bubble-in-left  0.45s cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: bottom left; }
+
+/* 思考中：三点跳动 */
+@keyframes edu-dot-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.45; }
+  40%           { transform: translateY(-4px); opacity: 1; }
+}
+.edu-typing-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 2px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: edu-dot-bounce 1.2s ease-in-out infinite;
+}
+.edu-typing-dot:nth-child(2) { animation-delay: 0.18s; }
+.edu-typing-dot:nth-child(3) { animation-delay: 0.36s; }
+
+/* Logo 角标呼吸 */
+@keyframes edu-badge-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.55); }
+  50%      { box-shadow: 0 0 0 6px rgba(56, 189, 248, 0); }
+}
+.edu-badge-pulse { animation: edu-badge-pulse 2.4s ease-in-out infinite; }
+
+/* Sidebar 菜单指示器平移过渡（仅提供 transform 钩子） */
+.edu-nav-indicator {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 60%;
+  border-radius: 0 4px 4px 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.6));
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.4);
+  transform: translateY(-50%);
+  transition: top 280ms cubic-bezier(0.22, 1, 0.36, 1),
+              height 280ms cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 240ms ease;
+  pointer-events: none;
+  will-change: top, height;
+}
+
+/* 钩子：被标记的元素在挂载后会有一个轻微的进入动画 */
+.edu-mount-fade { animation: edu-stagger-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* 尊重用户的减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .edu-stagger > *,
+  .edu-count-up,
+  .edu-bubble-user,
+  .edu-bubble-ai,
+  .edu-mount-fade {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .edu-typing-dot,
+  .edu-badge-pulse {
+    animation: none !important;
+  }
 }

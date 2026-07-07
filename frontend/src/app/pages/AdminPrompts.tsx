@@ -1,5 +1,5 @@
 import React from "react";
-import { Copy, FileText, History, Play, Plus, Save, WandSparkles } from "lucide-react";
+import { Copy, FileText, History, Play, Plus, Save, ScrollText } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { promptsApi, PromptTaskType, PromptTemplate, PromptVersion } from "@/lib/api";
 import { DetailDrawer, ModalShell, PageHeader, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, notify } from "../components/common/ProductUI";
@@ -73,10 +73,9 @@ export function AdminPrompts() {
 
   const stats = [
     { label: "模板总数", value: `${templatesState.data?.total ?? "-"}`, hint: "覆盖主流程", icon: FileText, tone: "blue" as const },
-    { label: "已启用模板", value: `${templates.filter((p) => p.enabled).length}`, hint: "可被调用", icon: WandSparkles, tone: "emerald" as const },
-    { label: "最近更新", value: templates[0]?.updatedAt ?? "-", hint: "最新模板", icon: History, tone: "purple" as const },
-    { label: "关联智能体", value: `${taskTypeOptions.length - 1}`, hint: "多智能体链路", icon: Play, tone: "cyan" as const },
-    { label: "版本数量", value: `${versions.length}`, hint: "可追溯", icon: Copy, tone: "orange" as const },
+    { label: "已启用模板", value: `${templates.filter((p) => p.enabled).length}`, hint: "可被调用", icon: ScrollText, tone: "emerald" as const },
+    { label: "最近更新", value: templates[0]?.updatedAt ?? "-", hint: "最新模板", icon: History, tone: "slate" as const },
+    { label: "关联任务类型", value: `${taskTypeOptions.length - 1}`, hint: "覆盖范围", icon: Play, tone: "cyan" as const },
   ];
 
   const handleSelectTemplate = (t: ReturnType<typeof mapTemplate>) => {

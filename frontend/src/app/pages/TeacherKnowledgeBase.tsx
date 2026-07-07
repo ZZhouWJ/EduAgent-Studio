@@ -1,5 +1,5 @@
 import React from "react";
-import { Database, FileUp, GitBranch, Layers3, SearchCheck, Sparkles } from "lucide-react";
+import { Database, FileUp, GitBranch, Layers3, SearchCheck, AlertCircle } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { learningApi } from "@/lib/api";
 import { DetailDrawer, PageHeader, PageShell, ProgressBar, SearchInput, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast } from "../components/common/ProductUI";
@@ -20,7 +20,7 @@ export function TeacherKnowledgeBase() {
     { label: "知识片段", value: "128", hint: "可追溯引用", icon: Layers3, tone: "emerald" as const },
     { label: "最近检索", value: "42", hint: "今日", icon: SearchCheck, tone: "cyan" as const },
     { label: "引用覆盖率", value: "82%", hint: "高于阈值", icon: Database, tone: "orange" as const },
-    { label: "待补充资料", value: "2", hint: "实验说明", icon: Sparkles, tone: "red" as const },
+    { label: "待补充资料", value: "2", hint: "实验说明", icon: AlertCircle, tone: "red" as const },
   ];
 
   // TODO: 后端暂无知识文档端点，用课程列表做占位展示

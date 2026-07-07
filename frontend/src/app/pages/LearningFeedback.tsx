@@ -205,33 +205,33 @@ export function LearningFeedback() {
           </div>
         </div>
 
-        {/* Right: AI Profile Suggestions */}
+        {/* Right: Profile Suggestions */}
         <div className="w-full shrink-0 space-y-4 lg:w-[400px]">
-          <div className="rounded-2xl border border-indigo-800 bg-gradient-to-br from-indigo-900 to-slate-900 p-6 shadow-lg text-white">
-            <h3 className="mb-4 flex items-center gap-2 text-base font-black">
-              <RefreshCw className="h-5 w-5 cursor-pointer text-indigo-400" />
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-900">
+              <RefreshCw className="h-5 w-5 cursor-pointer text-slate-500" />
               画像更新建议
             </h3>
             {weakPoints && weakPoints.length > 0 ? (
-              <ul className="space-y-3 text-sm text-indigo-100">
+              <ul className="space-y-3 text-sm text-slate-700">
                 {weakPoints.map((kp) => (
                   <li key={kp.kp_id} className="flex items-start gap-2">
-                    <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer text-indigo-400" />
+                    <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer text-slate-400" />
                     <span>
-                      <span className="font-bold text-red-300">{kp.kp_name}</span> 掌握度
-                      <span className="font-bold text-red-300"> {Math.round(kp.avg_mastery * 100)}%</span>
+                      <span className="font-semibold text-red-600">{kp.kp_name}</span> 掌握度
+                      <span className="font-semibold text-red-600"> {Math.round(kp.avg_mastery * 100)}%</span>
                       ，建议优先复习
                     </span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-indigo-200">暂无薄弱知识点数据</p>
+              <p className="text-sm text-slate-500">暂无薄弱知识点数据</p>
             )}
-            <div className="mt-5 flex items-center justify-end border-t border-indigo-800 pt-4">
+            <div className="mt-5 flex items-center justify-end border-t border-slate-100 pt-4">
               <button
                 onClick={() => notify.success("画像已确认更新")}
-                className="flex h-8 cursor-pointer items-center gap-1 rounded bg-indigo-500 px-4 text-xs font-bold text-white transition hover:bg-indigo-400"
+                className="flex h-9 cursor-pointer items-center gap-1 rounded-lg bg-slate-900 px-4 text-xs font-semibold text-white transition-colors hover:bg-slate-800"
               >
                 <CheckCircle2 className="h-3.5 w-3.5" /> 确认更新画像
               </button>
