@@ -309,8 +309,9 @@
 **现状**：`StudentTutor.tsx` 调用 `agentsApi.generate()`，不是真正答疑
 
 **新增后端模块**：
-- `backend/app/services/tutor_service.py`
-- `backend/app/routers/tutor.py`
+- [x] `backend/app/services/tutor_service.py` - Tutor Service 实现 chat/feedback/sessions
+- [x] `backend/app/routers/tutor.py` - Tutor Router 实现 REST API
+- [x] `database/15_create_tutor_sessions.sql` - 答疑会话表
 
 **接口**：
 - `POST /api/tutor/chat` - 答疑
@@ -336,11 +337,11 @@
 - 练习题：返回题目 JSON
 
 **功能清单**：
-- [ ] 独立 Tutor Chat 接口
-- [ ] 结合画像和课程知识库回答
-- [ ] 回答带引用来源
-- [ ] "没理解"降低解释难度，推荐基础资源
-- [ ] 回答中出现图解/练习/代码之一
+- [x] 独立 Tutor Chat 接口 (`tutorApi.chat()`)
+- [x] 结合画像和课程知识库回答
+- [x] 回答带引用来源 (CitationsCard)
+- [x] "没理解"降低解释难度，推荐基础资源 (handleFeedback)
+- [x] 回答中出现图解/练习/代码之一 (PracticeCard, ResourcesCard)
 
 **验收标准**：
 - 学生问"可重复读和串行化区别"，回答带课程知识库引用
@@ -524,6 +525,7 @@
 
 | 日期 | 更新内容 | 负责人 |
 |------|---------|--------|
+| 2026-07-08 | 完成模块六：Tutor Chat 前端 - tutorApi 独立答疑接口、CitationsCard/PracticeCard/ResourcesCard 多模态卡片、Markdown 渲染、学生画像上下文、反馈机制 | Claude |
 | 2026-07-08 | 完成模块四：ResourceRenderer 资源类型差异化渲染器 - 8类渲染器组件、ResourceLibrary 详情抽屉集成、EvidenceSources 证据来源组件 | Claude |
 | 2026-07-08 | 完成模块五：学习路径图谱 - LearningPathGraph ECharts组件、节点颜色规则（绿/橙/红/蓝）、两栏布局改造、今日学习顺序列表、节点点击跳转资源页 | Claude |
 | 2026-07-08 | 完成模块三：AgentWorkbench 执行闭环修复 - SSE done 事件返回完整结果、移除二次生成、学生下拉框、知识点 checkbox 列表、Markdown 渲染 | Claude |
