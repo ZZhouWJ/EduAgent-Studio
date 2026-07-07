@@ -27,7 +27,11 @@ logs/
 backend/__pycache__/
 backend/*.pyc
 backend/.env
+backend/data/
 frontend/.env
+
+# Test files
+test_webapp.py
 
 # Uploads
 uploads/
