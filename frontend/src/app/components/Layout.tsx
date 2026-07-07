@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/auth";
 import { useRouterGuard } from "@/lib/router-guard";
@@ -166,11 +166,8 @@ const ROLE_CONFIG: Record<RoleKey, RoleConfig> = {
   },
 };
 
-const ROLE_SWITCH = [
-  { role: "student" as const, label: "学生", path: "/student" },
-  { role: "teacher" as const, label: "教师", path: "/teacher" },
-  { role: "admin" as const, label: "管理", path: "/admin" },
-];
+// 角色切换已禁用：强制角色隔离，不允许用户随意切换角色
+// 如需切换角色，请先退出登录再以其他账号登录
 
 function getRole(pathname: string): RoleKey {
   if (pathname.startsWith("/student")) return "student";
@@ -401,20 +398,6 @@ export function Layout() {
                 className="edu-focus-ring h-10 w-[312px] rounded-xl border border-slate-200 bg-slate-50/80 pl-10 pr-10 text-sm text-slate-700"
               />
               <Command className="pointer-events-none absolute right-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-300" />
-            </div>
-
-            <div className="hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-sm xl:flex">
-              {ROLE_SWITCH.map((item) => (
-                <Link
-                  key={item.role}
-                  to={item.path}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
-                    role === item.role ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
             </div>
 
             <button

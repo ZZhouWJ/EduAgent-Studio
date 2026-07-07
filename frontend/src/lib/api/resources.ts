@@ -8,6 +8,7 @@ export interface LearningResource {
   resource_type: string
   difficulty: string
   status: string
+  content?: string
   created_at: string
 }
 

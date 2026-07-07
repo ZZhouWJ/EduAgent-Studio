@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { marked } from "marked";
 import {
   AlertCircle,
   ArrowRight,
@@ -665,10 +666,13 @@ export function AgentWorkbench() {
               <>
                 <div className="rounded-2xl border border-blue-100 bg-[linear-gradient(180deg,#EFF6FF,#FFFFFF)] p-4">
                   <h3 className="text-lg font-black leading-6 text-slate-950">{result.resource?.title || "未命名资源"}</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                    {result.resource?.content?.slice(0, 200) || "资源内容加载中..."}
-                    {(result.resource?.content?.length || 0) > 200 && "..."}
-                  </p>
+                  <div
+                    className="prose prose-sm prose-slate mt-2 max-w-none text-sm leading-6 text-slate-600"
+                    dangerouslySetInnerHTML={{ __html: result.resource?.content ? marked(result.resource.content.slice(0, 500)) : "资源内容加载中..." }}
+                  />
+                  {(result.resource?.content?.length || 0) > 500 && (
+                    <p className="mt-2 text-xs text-slate-400">...（篇幅限制，仅展示前500字符）</p>
+                  )}
                   <div className="mt-4 flex flex-wrap gap-2">
                     <span className="rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-100">
                       {selectedCourse?.name || "课程"}
