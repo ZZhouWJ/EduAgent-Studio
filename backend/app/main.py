@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import test_connection
-from app.routers import auth, users, projects, tasks, prompts, models, invocations, reviews, artifacts, statistics, logs, profiles, agents, learning, feedbacks, resources, storage, knowledge
+from app.routers import auth, users, projects, tasks, prompts, models, invocations, reviews, artifacts, statistics, logs, profiles, agents, learning, feedbacks, resources, storage, knowledge, tutor
 from app.utils.exceptions import register_exception_handlers
 from app.utils.response import error_response, success_response
 
@@ -66,6 +66,7 @@ def create_app() -> FastAPI:
     app.include_router(storage.router, prefix="/api")
     app.include_router(feedbacks.router, prefix="/api")
     app.include_router(knowledge.router, prefix="/api")
+    app.include_router(tutor.router, prefix="/api")
 
     @app.get("/")
     async def root() -> dict:
