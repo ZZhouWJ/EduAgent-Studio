@@ -79,6 +79,28 @@ export interface CourseUpdateRequest {
   status: string
 }
 
+export interface RecommendedResource {
+  resource_id: number
+  title: string
+  type: string
+  reason: string
+  difficulty?: number
+  estimated_minutes?: number
+}
+
+export interface MasteryChange {
+  kp_id: number
+  kp_name: string
+  before: number
+  after: number
+}
+
+export interface FeedbackResult {
+  mastery_changes: MasteryChange[]
+  next_resources: RecommendedResource[]
+  path_adjustment?: string
+}
+
 export const learningApi = {
   listCourses() {
     return client.get<Course[]>('/learning/courses')
@@ -108,6 +130,12 @@ export const learningApi = {
   getLearningPath(course_id: number, profile_id?: number) {
     return client.get<LearningPathGraph>(`/learning/courses/${course_id}/learning-path`, {
       params: profile_id !== undefined ? { profile_id } : undefined,
+    })
+  },
+
+  getRecommendedResources(profile_id: number, course_id: number) {
+    return client.get<RecommendedResource[]>('/learning/recommend', {
+      params: { profile_id, course_id },
     })
   },
 }

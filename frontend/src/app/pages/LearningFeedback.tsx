@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { BookOpen, Clock, Target, Star, ChevronRight, HelpCircle, FileText, CheckCircle2, PlayCircle, PlusCircle, MessageSquare, RefreshCw, BookOpenCheck, ListTree } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { feedbackApi, resourcesApi, statisticsApi } from "@/lib/api";
+import type { MasteryChange, RecommendedResource } from "@/lib/api/learning";
 import { notify } from "@/lib/toast";
 
 function resourceIcon(type: string) {
@@ -28,6 +29,8 @@ export function LearningFeedback() {
   const [hasDoubt, setHasDoubt] = React.useState(true);
   const [notes, setNotes] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
+  const [masteryChanges, setMasteryChanges] = React.useState<MasteryChange[] | null>(null);
+  const [nextResources, setNextResources] = React.useState<RecommendedResource[] | null>(null);
 
   const { data: feedbackData, loading } = useApi(() => feedbackApi.list({ page: 1, page_size: 20 }), []);
   const { data: weakPoints } = useApi(() => statisticsApi.weakKnowledgePoints(5), []);
@@ -44,13 +47,17 @@ export function LearningFeedback() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      await feedbackApi.submit({
+      const result = await feedbackApi.submit({
         feedback_type: "self_assessment",
         content: notes,
         self_mastery: selfMastery === "较高" ? 3 : selfMastery === "一般" ? 2 : 1,
         difficulty_rating: rating >= 4 ? "appropriate" : rating >= 2 ? "appropriate" : "too_hard",
       });
       notify.success("反馈已提交，画像将自动更新");
+      if (result) {
+        setMasteryChanges(result.mastery_changes ?? []);
+        setNextResources(result.next_resources ?? []);
+      }
       setNotes("");
       setRating(3);
       setSelfMastery("一般");
@@ -202,6 +209,43 @@ export function LearningFeedback() {
             >
               {submitting ? "提交中..." : "提交反馈"}
             </button>
+
+            {/* 画像已更新 */}
+            {masteryChanges && masteryChanges.length > 0 && (
+              <div className="edu-card bg-emerald-50 p-4 mt-4">
+                <h4 className="font-bold text-emerald-800">✅ 画像已更新</h4>
+                <div className="mt-2 space-y-1">
+                  {masteryChanges.map((change, i) => (
+                    <div key={i} className="text-sm">
+                      <span className="font-medium">{change.kp_name}</span>
+                      <span className="text-slate-500">: </span>
+                      <span className="text-emerald-600">{Math.round(change.before * 100)}%</span>
+                      <span className="text-slate-400"> → </span>
+                      <span className="text-emerald-600 font-bold">{Math.round(change.after * 100)}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 推荐资源已调整 */}
+            {nextResources && nextResources.length > 0 && (
+              <div className="edu-card bg-blue-50 p-4 mt-4">
+                <h4 className="font-bold text-blue-800">📚 推荐资源已调整</h4>
+                <p className="text-sm text-blue-600 mt-1">基于你的反馈，系统推荐以下资源：</p>
+                <div className="mt-2 space-y-2">
+                  {nextResources.map((r) => (
+                    <div key={r.resource_id} className="flex items-center justify-between bg-white rounded-lg p-2">
+                      <div>
+                        <span className="font-medium text-slate-800">{r.title}</span>
+                        <span className="text-xs text-slate-500 ml-2">{r.type}</span>
+                      </div>
+                      <span className="text-xs text-blue-600">{r.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
