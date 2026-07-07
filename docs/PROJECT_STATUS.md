@@ -288,10 +288,10 @@
 - `/student/learning-path`：图谱 + 今日学习顺序 + 推荐资源
 
 **功能清单**：
-- [ ] 知识图谱可视化
-- [ ] 节点颜色反映掌握度
-- [ ] 点击薄弱点能看到推荐资源
-- [ ] 反馈后刷新，节点颜色能变化
+- [x] 知识图谱可视化
+- [x] 节点颜色反映掌握度
+- [x] 点击薄弱点能看到推荐资源
+- [x] 反馈后刷新，节点颜色能变化
 
 **验收标准**：
 - 学生端能看到知识点依赖图
@@ -525,6 +525,7 @@
 | 日期 | 更新内容 | 负责人 |
 |------|---------|--------|
 | 2026-07-08 | 完成模块四：ResourceRenderer 资源类型差异化渲染器 - 8类渲染器组件、ResourceLibrary 详情抽屉集成、EvidenceSources 证据来源组件 | Claude |
+| 2026-07-08 | 完成模块五：学习路径图谱 - LearningPathGraph ECharts组件、节点颜色规则（绿/橙/红/蓝）、两栏布局改造、今日学习顺序列表、节点点击跳转资源页 | Claude |
 | 2026-07-08 | 完成模块三：AgentWorkbench 执行闭环修复 - SSE done 事件返回完整结果、移除二次生成、学生下拉框、知识点 checkbox 列表、Markdown 渲染 | Claude |
 | 2026-07-08 | 完成模块一后端：数据库表 + KnowledgeRepo/Service/Router + parser.py + retriever.py | Claude |
 | 2026-07-08 | 完成模块一前端：knowledge API + TeacherKnowledgeBase 三栏布局 | Claude |
