@@ -287,3 +287,52 @@ async def get_cost_distribution(
     token = _extract_token(authorization) if authorization else None
     result = statistics_service.get_cost_distribution(token or "")
     return success_response(data=result)
+
+
+# =============================================================================
+# Module 8: 平台全局统计 (管理端指标真实化)
+# GET /api/statistics/platform
+# GET /api/statistics/cost-by-model
+# GET /api/statistics/resources
+# =============================================================================
+
+@router.get("/api/statistics/platform")
+async def get_platform_overview(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+) -> dict:
+    """
+    平台总览 (Module 8)。
+
+    返回平台全局运营指标：调用次数、Token消耗、成本、学生数、课程数等。
+    """
+    token = _extract_token(authorization) if authorization else None
+    result = statistics_service.get_platform_overview(token or "")
+    return success_response(data=result)
+
+
+@router.get("/api/statistics/cost-by-model")
+async def get_cost_by_model(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+) -> dict:
+    """
+    按模型成本统计 (Module 8)。
+
+    返回各模型的调用次数、Token消耗和成本。
+    """
+    token = _extract_token(authorization) if authorization else None
+    result = statistics_service.get_cost_by_model_api(token or "")
+    return success_response(data=result)
+
+
+@router.get("/api/statistics/resources")
+async def get_resource_stats(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+) -> dict:
+    """
+    资源统计 (Module 8)。
+
+    返回资源的审核状态分布和通过率。
+    """
+    token = _extract_token(authorization) if authorization else None
+    result = statistics_service.get_resource_stats_api(token or "")
+    return success_response(data=result)
