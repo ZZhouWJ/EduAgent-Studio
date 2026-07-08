@@ -83,3 +83,22 @@ async def get_learning_path(
         { nodes: [...], edges: [...], summary: {...} }
     """
     return learning_service.LearningService().get_learning_path(course_id, profile_id)
+
+
+@router.get("/recommend")
+async def get_recommended_resources(
+    profile_id: int = Query(..., gt=0),
+    course_id: int = Query(..., gt=0),
+    token: str = Depends(get_current_user),
+):
+    """
+    根据学生画像推荐学习资源。
+
+    - 低 mastery 知识点优先
+    - 匹配学生资源偏好
+    - 未学习过的资源
+    - 教师审核通过资源
+    """
+    service = learning_service.LearningService()
+    resources = service.recommend_resources(profile_id, course_id)
+    return {"code": 0, "message": "success", "data": resources}
