@@ -316,12 +316,12 @@ export function StudentTutor() {
               <div>
                 <div className="mb-2 text-xs font-bold text-slate-400">当前薄弱点</div>
                 <div className="flex flex-wrap gap-2">
-                  {currentProfile.weak_points.slice(0, 5).map((kp) => (
+                  {currentProfile.weak_points.slice(0, 5).map((kp, idx) => (
                     <span
-                      key={kp.kp_id}
+                      key={kp.kp_id ?? kp.name ?? idx}
                       className="rounded-lg bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-700 ring-1 ring-orange-100"
                     >
-                      {kp.kp_name ?? kp.name ?? `知识点${kp.kp_id}`}
+                      {kp.kp_name ?? kp.name ?? `知识点${kp.kp_id ?? idx}`}
                     </span>
                   ))}
                 </div>

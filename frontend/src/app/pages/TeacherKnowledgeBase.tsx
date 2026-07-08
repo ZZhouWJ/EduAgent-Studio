@@ -28,8 +28,13 @@ export function TeacherKnowledgeBase() {
     [courseList]
   );
 
-  // 资料列表
-  const { data: materials, loading: materialsLoading, refresh: refreshMaterials } = useApi(() => knowledgeApi.listMaterials(), []);
+  // 资料列表（有课程 ID 时才请求，返回 data 字段）
+  const { data: materialsData, loading: materialsLoading, refresh: refreshMaterials } = useApi(
+    () => courseList?.[0]?.id
+      ? knowledgeApi.listMaterials(courseList[0].id).then(r => r.data ?? [])
+      : Promise.resolve([]),
+    [courseList]
+  );
 
   // 知识点列表（依赖 courseList）
   const { data: knowledgePoints } = useApi(() => {
@@ -39,10 +44,10 @@ export function TeacherKnowledgeBase() {
 
   // 统计
   const stats = [
-    { label: "课程资料", value: String(materials?.length ?? 0), hint: "已上传", icon: FileUp, tone: "blue" as const },
+    { label: "课程资料", value: String(materialsData?.length ?? 0), hint: "已上传", icon: FileUp, tone: "blue" as const },
     { label: "知识点", value: String(knowledgePoints?.length ?? 0), hint: "含依赖关系", icon: GitBranch, tone: "purple" as const },
-    { label: "知识片段", value: String(materials?.reduce((acc, m) => acc + m.chunk_count, 0) ?? 0), hint: "可追溯引用", icon: Layers3, tone: "emerald" as const },
-    { label: "待解析", value: String(materials?.filter(m => m.status === 'pending').length ?? 0), hint: "需解析", icon: AlertCircle, tone: "orange" as const },
+    { label: "知识片段", value: String(materialsData?.reduce((acc, m) => acc + m.chunk_count, 0) ?? 0), hint: "可追溯引用", icon: Layers3, tone: "emerald" as const },
+    { label: "待解析", value: String(materialsData?.filter(m => m.status === 'pending').length ?? 0), hint: "需解析", icon: AlertCircle, tone: "orange" as const },
   ];
 
   // 状态映射
@@ -209,7 +214,7 @@ export function TeacherKnowledgeBase() {
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
               </div>
-            ) : materials?.length === 0 ? (
+            ) : materialsData?.length === 0 ? (
               <EmptyState
                 title="暂无资料"
                 description="上传 PDF、Markdown、Word 或 PPT 文档，系统将自动解析并构建知识库。"
@@ -228,7 +233,7 @@ export function TeacherKnowledgeBase() {
                 }
               />
             ) : (
-              materials?.map((doc) => (
+              materialsData?.map((doc) => (
                 <div key={doc.id} className="w-full rounded-2xl border p-4 text-left transition">
                   <button
                     onClick={() => handleViewMaterial(doc)}

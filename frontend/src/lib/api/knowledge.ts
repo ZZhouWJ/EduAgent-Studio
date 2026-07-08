@@ -72,19 +72,22 @@ export const knowledgeApi = {
     })
   },
 
-  // 资料列表
+  // 资料列表（返回 data.materials 数组）
   listMaterials(courseId?: number) {
-    return client.get<Material[]>('/knowledge/materials', { params: { course_id: courseId } })
+    return client.get<{ materials: Material[] }>('/knowledge/materials', { params: { course_id: courseId } })
+      .then(r => r.materials ?? [])
   },
 
-  // 资料详情
+  // 资料详情（返回 data）
   getMaterial(materialId: number) {
-    return client.get<Material>(`/knowledge/materials/${materialId}`)
+    return client.get<{ material: Material }>(`/knowledge/materials/${materialId}`)
+      .then(r => r.material)
   },
 
-  // 获取资料 chunks
+  // 获取资料 chunks（返回 data）
   getMaterialChunks(materialId: number) {
     return client.get<MaterialChunk[]>(`/knowledge/materials/${materialId}/chunks`)
+      .then(r => r ?? [])
   },
 
   // 解析资料

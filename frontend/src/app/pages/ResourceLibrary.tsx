@@ -45,11 +45,12 @@ export function ResourceLibrary() {
   const [drawerResource, setDrawerResource] = React.useState<any>(null);
 
   const { data: detailData, loading: detailLoading, execute: fetchDetail } = useApi(
-    (id: number) => resourcesApi.getById(id),
+    (id: number) => id ? resourcesApi.getById(id) : Promise.resolve(null),
     []
   );
 
   const handleResourceClick = async (resource: typeof resources[0]) => {
+    if (!resource?.id) return
     setSelectedResource(resource)
     const detail = await fetchDetail(resource.id)
     setDrawerResource(detail)
