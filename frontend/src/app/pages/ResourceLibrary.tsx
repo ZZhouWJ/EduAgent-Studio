@@ -58,10 +58,10 @@ export function ResourceLibrary() {
   const { data, loading } = useApi(
     () => resourcesApi.list({
       type: typeFilter || undefined,
-      course_id: courseFilter ? Number(courseFilter) : undefined,
+      course_id: Number(courseFilter) || undefined,
       page_size: 100,
     }),
-    [typeFilter, statusFilter, courseFilter]
+    [typeFilter, courseFilter]
   );
   const coursesState = useApi(() => learningApi.listCourses(), []);
 

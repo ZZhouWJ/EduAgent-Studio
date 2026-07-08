@@ -19,19 +19,19 @@ export function TeacherKnowledgeBase() {
   const { toast, showToast } = useInlineToast();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // 资料列表
-  const { data: materials, loading: materialsLoading, refresh: refreshMaterials } = useApi(() => knowledgeApi.listMaterials(), []);
+  // 课程列表（用于关联）
+  const { data: courseList } = useApi(() => learningApi.listCourses(), []);
 
-  // 待审核的知识点-Chunk匹配
+  // 待审核的知识点-Chunk匹配（依赖 courseList）
   const { data: pendingKpLinks, loading: linksLoading, refresh: refreshLinks } = useApi(
     () => knowledgeApi.getPendingKpChunkLinks(courseList?.[0]?.id),
     [courseList]
   );
 
-  // 课程列表（用于关联）
-  const { data: courseList } = useApi(() => learningApi.listCourses(), []);
+  // 资料列表
+  const { data: materials, loading: materialsLoading, refresh: refreshMaterials } = useApi(() => knowledgeApi.listMaterials(), []);
 
-  // 知识点列表
+  // 知识点列表（依赖 courseList）
   const { data: knowledgePoints } = useApi(() => {
     if (!courseList?.length) return Promise.resolve([]);
     return learningApi.getLearningPath(courseList[0].id).then(p => p.nodes);
