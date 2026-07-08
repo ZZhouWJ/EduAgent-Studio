@@ -6,7 +6,7 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, Path, Query, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Form, Path, Query, UploadFile
 
 from app.services.auth_service import get_current_user_dependency as get_current_user
 from app.services import knowledge_service
@@ -131,6 +131,99 @@ async def delete_material(
     """
     service = knowledge_service.KnowledgeService()
     return service.delete_material(material_id)
+
+
+# ================================================================
+# 证据链路 API
+# ================================================================
+
+@router.get("/kp-chunk-links/pending")
+async def get_pending_kp_chunk_links(
+    course_id: Optional[int] = Query(None, description="课程 ID"),
+    token: str = Depends(get_current_user),
+):
+    """
+    获取待审核的知识点-Chunk 匹配列表。
+
+    返回所有 status=pending 的匹配记录，供教师确认或拒绝。
+    """
+    try:
+        from app.repositories.evidence_repo import EvidenceRepository
+        repo = EvidenceRepository()
+        links = repo.get_pending_kp_chunk_links(course_id=course_id, limit=50)
+        return {"code": 0, "message": "success", "data": links}
+    except Exception as e:
+        return {"code": 500, "message": str(e), "data": None}
+
+
+@router.put("/kp-chunk-links/{link_id}/verify")
+async def verify_kp_chunk_link(
+    link_id: int = Path(..., gt=0, description="关联记录 ID"),
+    status: str = Body(..., description="confirmed 或 rejected"),
+    token: str = Depends(get_current_user),
+):
+    """
+    确认或拒绝一条知识点-Chunk 匹配。
+
+    status = 'confirmed'：该匹配通过，可用于资源生成
+    status = 'rejected'：该匹配不通过，忽略
+    """
+    if status not in ("confirmed", "rejected"):
+        return {"code": 400, "message": "status 必须是 confirmed 或 rejected", "data": None}
+    try:
+        from app.repositories.evidence_repo import EvidenceRepository
+        user_id = _get_user_id_from_token(token)
+        repo = EvidenceRepository()
+        success = repo.verify_kp_chunk_link(link_id, status, user_id)
+        if success:
+            return {"code": 0, "message": f"已{'确认' if status == 'confirmed' else '拒绝'}", "data": {"link_id": link_id}}
+        return {"code": 404, "message": "记录不存在", "data": None}
+    except Exception as e:
+        return {"code": 500, "message": str(e), "data": None}
+
+
+@router.get("/resource-evidence")
+async def get_resource_evidence(
+    resource_id: int = Query(..., gt=0, description="资源 ID"),
+    token: str = Depends(get_current_user),
+):
+    """
+    获取某资源的所有证据关联。
+
+    返回资源生成时引用的所有教材原文片段及其审核状态。
+    """
+    try:
+        from app.repositories.evidence_repo import EvidenceRepository
+        repo = EvidenceRepository()
+        evidence = repo.get_evidence_by_resource(resource_id)
+        return {"code": 0, "message": "success", "data": evidence}
+    except Exception as e:
+        return {"code": 500, "message": str(e), "data": None}
+
+
+@router.put("/resource-evidence/{link_id}/verify")
+async def verify_resource_evidence(
+    link_id: int = Path(..., gt=0, description="证据关联 ID"),
+    status: str = Body(..., description="verified 或 rejected"),
+    token: str = Depends(get_current_user),
+):
+    """
+    确认或拒绝一条资源证据。
+
+    教师审核时使用：确认后证据链完整，可发布给学生。
+    """
+    if status not in ("verified", "rejected"):
+        return {"code": 400, "message": "status 必须是 verified 或 rejected", "data": None}
+    try:
+        from app.repositories.evidence_repo import EvidenceRepository
+        user_id = _get_user_id_from_token(token)
+        repo = EvidenceRepository()
+        success = repo.verify_resource_evidence_link(link_id, status, user_id)
+        if success:
+            return {"code": 0, "message": f"已{'确认' if status == 'verified' else '拒绝'}", "data": {"link_id": link_id}}
+        return {"code": 404, "message": "记录不存在", "data": None}
+    except Exception as e:
+        return {"code": 500, "message": str(e), "data": None}
 
 
 def _get_file_type(filename: str) -> Optional[str]:

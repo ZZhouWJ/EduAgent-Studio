@@ -217,8 +217,8 @@ class KnowledgeRepository:
 
         sql = """
             INSERT INTO course_material_chunks
-                (material_id, course_id, title, content, source_page, source_paragraph, bm25_terms, chunk_index)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                (material_id, course_id, title, content, source_page, source_paragraph, bm25_terms, chunk_index, chunk_hash, material_version)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
 
         with get_db_cursor() as cursor:
@@ -232,6 +232,8 @@ class KnowledgeRepository:
                     chunk.get("source_paragraph"),
                     chunk.get("bm25_terms", ""),
                     idx,
+                    chunk.get("chunk_hash"),
+                    chunk.get("material_version", 1),
                 ))
             return len(chunks)
 
@@ -393,7 +395,7 @@ class KnowledgeRepository:
             if df == 0:
                 continue
             idf = math.log((N - df + 0.5) / (df + 0.5) + 1)
-            tf_component = (tf * (self.BM25_K + 1)) / (tf + self.BM25_K * (1 - self.BM25_B + self.BM25_B * dl / avgdl))
+            tf_component = (tf * (self.BM25_K + 1)) / (tf + self.BM25_K * (1 - self.BM25_B + self.BM25_B * dl / max(avgdl, 1)))
             score += idf * tf_component
         return score
 
@@ -516,6 +518,112 @@ class KnowledgeRepository:
                 "source_paragraph": row["source_paragraph"],
                 "bm25_terms": row["bm25_terms"],
                 "chunk_index": row["chunk_index"],
+                "created_at": str(row["created_at"]) if row["created_at"] else None,
+            }
+            for row in rows
+        ]
+
+    def delete_chunks_by_material_version(
+        self,
+        material_id: int,
+        material_version: int,
+    ) -> int:
+        """
+        软删除指定资料版本的 chunks。
+
+        Args:
+            material_id: 资料 ID
+            material_version: 资料版本号
+
+        Returns:
+            删除数量
+        """
+        sql = """
+            UPDATE course_material_chunks
+            SET is_deleted = 1
+            WHERE material_id = %s AND material_version = %s AND is_deleted = 0
+        """
+        with get_db_cursor() as cursor:
+            cursor.execute(sql, (material_id, material_version))
+            return cursor.rowcount
+
+    def get_chunk_id_by_index(
+        self,
+        material_id: int,
+        chunk_index: int,
+    ) -> Optional[int]:
+        """
+        根据资料 ID 和 chunk 顺序号获取 chunk_id。
+
+        Args:
+            material_id: 资料 ID
+            chunk_index: 顺序号
+
+        Returns:
+            chunk_id 或 None
+        """
+        sql = """
+            SELECT chunk_id FROM course_material_chunks
+            WHERE material_id = %s AND chunk_index = %s AND is_deleted = 0
+            LIMIT 1
+        """
+        with get_db_cursor() as cursor:
+            cursor.execute(sql, (material_id, chunk_index))
+            row = cursor.fetchone()
+            return row["chunk_id"] if row else None
+
+    def get_chunks_by_material_version(
+        self,
+        material_id: int,
+        material_version: int,
+    ) -> List[Dict[str, Any]]:
+        """
+        获取指定资料版本的 chunks。
+
+        Args:
+            material_id: 资料 ID
+            material_version: 资料版本号
+
+        Returns:
+            chunks 列表
+        """
+        sql = """
+            SELECT
+                chunk_id,
+                material_id,
+                course_id,
+                kp_id,
+                title,
+                content,
+                source_page,
+                source_paragraph,
+                bm25_terms,
+                chunk_index,
+                chunk_hash,
+                material_version,
+                created_at
+            FROM course_material_chunks
+            WHERE material_id = %s AND material_version = %s AND is_deleted = 0
+            ORDER BY chunk_index ASC
+        """
+        with get_db_cursor() as cursor:
+            cursor.execute(sql, (material_id, material_version))
+            rows = cursor.fetchall()
+
+        return [
+            {
+                "chunk_id": row["chunk_id"],
+                "material_id": row["material_id"],
+                "course_id": row["course_id"],
+                "kp_id": row["kp_id"],
+                "title": row["title"],
+                "content": row["content"],
+                "source_page": row["source_page"],
+                "source_paragraph": row["source_paragraph"],
+                "bm25_terms": row["bm25_terms"],
+                "chunk_index": row["chunk_index"],
+                "chunk_hash": row.get("chunk_hash"),
+                "material_version": row["material_version"],
                 "created_at": str(row["created_at"]) if row["created_at"] else None,
             }
             for row in rows

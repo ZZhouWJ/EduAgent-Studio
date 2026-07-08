@@ -1,7 +1,7 @@
 import React from "react";
-import { Database, FileUp, GitBranch, Layers3, SearchCheck, AlertCircle, Upload, FileText, Loader2, RefreshCw, Search } from "lucide-react";
+import { Database, FileUp, GitBranch, Layers3, SearchCheck, AlertCircle, Upload, FileText, Loader2, RefreshCw, Search, CheckCircle2, XCircle, Link2, BookOpen } from "lucide-react";
 import { useApi } from "@/lib/useApi";
-import { knowledgeApi, type Material, type SearchResult, type MaterialChunk } from "@/lib/api/knowledge";
+import { knowledgeApi, type Material, type SearchResult, type MaterialChunk, type KpChunkLink } from "@/lib/api/knowledge";
 import { learningApi } from "@/lib/api";
 import { DetailDrawer, PageHeader, PageShell, ProgressBar, SearchInput, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast, EmptyState } from "../components/common/ProductUI";
 
@@ -10,15 +10,23 @@ export function TeacherKnowledgeBase() {
   const [selectedMaterial, setSelectedMaterial] = React.useState<Material | null>(null);
   const [selectedChunks, setSelectedChunks] = React.useState<MaterialChunk[]>([]);
   const [searchResults, setSearchResults] = React.useState<SearchResult[]>([]);
-  const [activePanel, setActivePanel] = React.useState<"documents" | "graph" | "search">("documents");
+  const [activePanel, setActivePanel] = React.useState<"documents" | "graph" | "search" | "bindings">("documents");
   const [uploading, setUploading] = React.useState(false);
   const [parsing, setParsing] = React.useState<number | null>(null);
   const [searching, setSearching] = React.useState(false);
+  const [pendingLinks, setPendingLinks] = React.useState<KpChunkLink[]>([]);
+  const [verifying, setVerifying] = React.useState<number | null>(null);
   const { toast, showToast } = useInlineToast();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // 资料列表
   const { data: materials, loading: materialsLoading, refresh: refreshMaterials } = useApi(() => knowledgeApi.listMaterials(), []);
+
+  // 待审核的知识点-Chunk匹配
+  const { data: pendingKpLinks, loading: linksLoading, refresh: refreshLinks } = useApi(
+    () => knowledgeApi.getPendingKpChunkLinks(courseList?.[0]?.id),
+    [courseList]
+  );
 
   // 课程列表（用于关联）
   const { data: courseList } = useApi(() => learningApi.listCourses(), []);
@@ -132,6 +140,20 @@ export function TeacherKnowledgeBase() {
     }
   };
 
+  // 确认/拒绝知识点-Chunk绑定
+  const handleVerifyLink = async (linkId: number, status: 'confirmed' | 'rejected') => {
+    setVerifying(linkId);
+    try {
+      await knowledgeApi.verifyKpChunkLink(linkId, status);
+      showToast(status === 'confirmed' ? '已确认该绑定' : '已拒绝该绑定');
+      refreshLinks();
+    } catch (err) {
+      showToast('操作失败，请重试');
+    } finally {
+      setVerifying(null);
+    }
+  };
+
   return (
     <PageShell>
       <PageHeader
@@ -159,10 +181,11 @@ export function TeacherKnowledgeBase() {
         {stats.map((stat) => <StatCard key={stat.label} {...stat} />)}
       </section>
 
-      <div className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1 lg:hidden">
+      <div className="grid grid-cols-4 gap-1 rounded-2xl bg-slate-100 p-1 lg:hidden">
         {[
           ["documents", "文档"],
           ["graph", "结构"],
+          ["bindings", "绑定"],
           ["search", "检索"],
         ].map(([key, label]) => (
           <button
@@ -362,6 +385,77 @@ export function TeacherKnowledgeBase() {
             </div>
           ) : null}
         </div>
+      </section>
+
+      {/* 知识点绑定管理面板 */}
+      <section className={`edu-card rounded-2xl p-5 ${activePanel === "bindings" ? "block" : "hidden lg:block"}`}>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-base font-black text-slate-950 flex items-center gap-2">
+            <Link2 className="h-4 w-4" />
+            知识点-Chunk 绑定管理
+          </h2>
+          <span className="text-xs text-slate-500">
+            {pendingKpLinks?.length ?? 0} 条待审核
+          </span>
+        </div>
+
+        {linksLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+          </div>
+        ) : pendingKpLinks && pendingKpLinks.length > 0 ? (
+          <div className="custom-scrollbar max-h-[500px] space-y-3 overflow-y-auto pr-1">
+            {pendingKpLinks.map((link) => (
+              <div key={link.link_id} className="rounded-2xl border border-slate-100 bg-white p-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700">
+                      {link.kp_name}
+                    </span>
+                    <span className="text-xs text-slate-400">←</span>
+                    <span className="rounded bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 truncate max-w-[150px]">
+                      {link.material_filename}
+                    </span>
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                      link.match_method === 'bm25' ? 'bg-slate-100 text-slate-600' :
+                      link.match_method === 'embedding' ? 'bg-green-50 text-green-700' :
+                      'bg-orange-50 text-orange-700'
+                    }`}>
+                      {link.match_method}
+                    </span>
+                  </div>
+                  <span className="text-xs font-black text-blue-700">
+                    {Math.round(link.relevance_score * 100)}%
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleVerifyLink(link.link_id, 'confirmed')}
+                    disabled={verifying === link.link_id}
+                    className="flex items-center gap-1 rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
+                  >
+                    <CheckCircle2 className="h-3 w-3" />
+                    {verifying === link.link_id ? '处理中...' : '确认'}
+                  </button>
+                  <button
+                    onClick={() => handleVerifyLink(link.link_id, 'rejected')}
+                    disabled={verifying === link.link_id}
+                    className="flex items-center gap-1 rounded-xl bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+                  >
+                    <XCircle className="h-3 w-3" />
+                    拒绝
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-10 text-center">
+            <BookOpen className="mb-3 h-8 w-8 text-slate-300" />
+            <p className="text-sm text-slate-500">暂无待审核的绑定</p>
+            <p className="mt-1 text-xs text-slate-400">上传并解析课程资料后，系统将自动匹配知识点</p>
+          </div>
+        )}
       </section>
 
       {toast}

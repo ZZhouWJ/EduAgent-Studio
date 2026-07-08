@@ -697,7 +697,7 @@ export function AgentWorkbench() {
                     ["可信度评分", result.metadata?.quality_score ? `${Math.round(result.metadata.quality_score * 10)}%` : "—", result.metadata?.quality_score && result.metadata.quality_score >= 7 ? "text-emerald-700" : "text-orange-700"],
                     ["返工次数", String(result.metadata?.revision_count || 0), "text-slate-700"],
                     ["风险等级", result.metadata?.quality_score && result.metadata.quality_score >= 7 ? "低" : "中", result.metadata?.quality_score && result.metadata.quality_score >= 7 ? "text-emerald-700" : "text-orange-700"],
-                    ["教师复核", result.metadata?.quality_score && result.metadata.quality_score >= 7 ? "通过" : "建议", "text-orange-700"],
+                    ["教材依据", result.trustworthiness === 'draft' ? '草稿' : result.trustworthiness === 'high' ? '充分' : result.trustworthiness === 'medium' ? '部分' : '不足', result.trustworthiness === 'high' ? 'text-emerald-700' : result.trustworthiness === 'draft' ? 'text-red-700' : 'text-orange-700'],
                   ].map(([label, value, color]) => (
                     <div key={label} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
                       <div className="text-xs font-semibold text-slate-500">{label}</div>
@@ -708,9 +708,14 @@ export function AgentWorkbench() {
 
                 {result.resource?.content && (
                   <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-3 max-h-48 overflow-y-auto">
+                    {result.trustworthiness === 'draft' && (
+                      <div className="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
+                        ⚠️ 草稿：缺乏充分教材依据，生成内容未引用教材原文，标记为低可信度
+                      </div>
+                    )}
                     <div
                       className="prose prose-sm prose-slate"
-                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked(result.resource.content)) }}
+                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked(result.resource.content.replace(/\[引用:(\d+)\]/g, '<mark class="bg-blue-100 text-blue-800 px-0.5 rounded">[引用:$1]</mark>'))) }}
                     />
                   </div>
                 )}
@@ -744,36 +749,62 @@ export function AgentWorkbench() {
             </div>
 
             <div className="space-y-3">
-              {result?.diagnosis?.weak_points?.length ? (
-                result.diagnosis.weak_points.map((wp, index) => (
-                  <button key={wp.kp_id || index} className="flex w-full items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50">
-                    <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-xs font-black text-blue-700 ring-1 ring-blue-100">
-                      {index + 1}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-bold leading-5 text-slate-800">{wp.name}</div>
-                      <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-                        掌握度 {Math.round(wp.mastery_level * 100)}%
+              {/* 优先展示资源生成时引用的证据 chunks */}
+              {result?.evidence_links?.length ? (
+                <>
+                  <div className="mb-2 text-xs font-bold text-slate-500">
+                    引用了 {result.evidence_links.length} 条教材原文
+                  </div>
+                  {result.evidence_links.map((link: any, index: number) => (
+                    <div key={`ev-${link.chunk_id || index}`} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 text-xs font-bold text-blue-700">
+                          <Link2 className="h-3 w-3" />
+                          证据 {index + 1}
+                        </span>
+                        <span className="text-xs text-slate-400">
+                          chunk#{link.chunk_id}
+                        </span>
                       </div>
+                      <p className="line-clamp-3 text-xs leading-5 text-slate-600">
+                        {link.quote_text || link.content || '—'}
+                      </p>
                     </div>
-                    <ArrowRight className="mt-1 h-4 w-4 text-slate-300" />
-                  </button>
-                ))
+                  ))}
+                </>
               ) : (
-                selectedKps.map((kp, index) => (
-                  <button key={kp.id} className="flex w-full items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50">
-                    <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-xs font-black text-blue-700 ring-1 ring-blue-100">
-                      {index + 1}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-bold leading-5 text-slate-800">{kp.name}</div>
-                      <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-                        掌握度 {Math.round(kp.mastery_avg * 100)}%
+                /* fallback：展示知识点 */
+                result?.diagnosis?.weak_points?.length ? (
+                  result.diagnosis.weak_points.map((wp: any, index: number) => (
+                    <button key={wp.kp_id || index} className="flex w-full items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50">
+                      <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-xs font-black text-blue-700 ring-1 ring-blue-100">
+                        {index + 1}
                       </div>
-                    </div>
-                    <ArrowRight className="mt-1 h-4 w-4 text-slate-300" />
-                  </button>
-                ))
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-bold leading-5 text-slate-800">{wp.name}</div>
+                        <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                          掌握度 {Math.round(wp.mastery_level * 100)}%
+                        </div>
+                      </div>
+                      <ArrowRight className="mt-1 h-4 w-4 text-slate-300" />
+                    </button>
+                  ))
+                ) : (
+                  selectedKps.map((kp: any, index: number) => (
+                    <button key={kp.id} className="flex w-full items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50">
+                      <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-xs font-black text-blue-700 ring-1 ring-blue-100">
+                        {index + 1}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-bold leading-5 text-slate-800">{kp.name}</div>
+                        <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                          掌握度 {Math.round(kp.mastery_avg * 100)}%
+                        </div>
+                      </div>
+                      <ArrowRight className="mt-1 h-4 w-4 text-slate-300" />
+                    </button>
+                  ))
+                )
               )}
             </div>
 
