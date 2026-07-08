@@ -94,12 +94,20 @@ export const profilesApi = {
 
   // 获取对话历史
   getDialogHistory(profileId: number) {
-    return client.get<DialogMessage[]>(`/profiles/${profileId}/dialog`)
+    return client.get<{ profile_id: number; messages: DialogMessage[]; total: number }>(`/profiles/${profileId}/dialog`)
+      .then(res => res.messages)
   },
 
   // 发送对话消息
   sendDialogMessage(profileId: number, message: string) {
-    return client.post<DialogMessage>(`/profiles/${profileId}/dialog`, { message })
+    return client.post<any>(`/profiles/${profileId}/dialog`, { message })
+      .then(res => ({
+        id: Date.now(),
+        role: 'assistant' as const,
+        content: res.reply || res.content || '',
+        created_at: new Date().toISOString(),
+        extraction: res.extracted,
+      }))
   },
 
   // 应用抽取结果
