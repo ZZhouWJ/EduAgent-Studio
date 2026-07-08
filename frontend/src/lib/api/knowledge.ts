@@ -36,6 +36,34 @@ export interface SearchResult {
   knowledge_point_name: string | null
 }
 
+export interface KpChunkLink {
+  link_id: number
+  chunk_id: number
+  kp_id: number
+  kp_name: string
+  course_id: number
+  material_filename: string
+  material_course_id: number
+  match_method: 'bm25' | 'embedding' | 'llm_verify' | 'manual'
+  relevance_score: number
+  status: 'pending' | 'confirmed' | 'rejected'
+  created_at: string
+}
+
+export interface ResourceEvidence {
+  link_id: number
+  resource_id: number
+  resource_title: string
+  resource_type: string
+  kp_name: string
+  material_filename: string
+  quote_text: string
+  usage_type: 'direct_quote' | 'paraphrase' | 'conceptual' | 'example'
+  relevance_score: number
+  verified_status: 'pending' | 'verified' | 'rejected' | 'replaced'
+  created_at: string
+}
+
 export const knowledgeApi = {
   // 上传资料
   uploadMaterial(formData: FormData) {
@@ -67,5 +95,31 @@ export const knowledgeApi = {
   // 检索
   search(query: string, courseId?: number, kpId?: number) {
     return client.get<SearchResult[]>('/knowledge/search', { params: { query, course_id: courseId, kp_id: kpId } })
-  }
+  },
+
+  // === 证据链路 API ===
+
+  // 获取待审核的知识点-Chunk匹配
+  getPendingKpChunkLinks(courseId?: number) {
+    return client.get<KpChunkLink[]>('/knowledge/kp-chunk-links/pending', {
+      params: courseId ? { course_id: courseId } : {}
+    })
+  },
+
+  // 确认/拒绝知识点-Chunk匹配
+  verifyKpChunkLink(linkId: number, status: 'confirmed' | 'rejected') {
+    return client.put(`/knowledge/kp-chunk-links/${linkId}/verify`, { status })
+  },
+
+  // 获取资源的证据列表
+  getResourceEvidence(resourceId: number) {
+    return client.get<ResourceEvidence[]>('/knowledge/resource-evidence', {
+      params: { resource_id: resourceId }
+    })
+  },
+
+  // 确认/拒绝资源证据
+  verifyResourceEvidence(linkId: number, status: 'verified' | 'rejected') {
+    return client.put(`/knowledge/resource-evidence/${linkId}/verify`, { status })
+  },
 }

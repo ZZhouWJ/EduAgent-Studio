@@ -78,6 +78,8 @@ class WorkflowState(TypedDict, total=False):
     generated_resource: Optional[Dict[str, Any]]
     assessment: Optional[Dict[str, Any]]
     teacher_review: Optional[Dict[str, Any]]
+    evidence_links: Optional[List[Dict[str, Any]]]  # 资源-证据关联，待写入 DB
+    trustworthiness: Optional[str]  # 可信度等级：high/medium/low/draft
 
     # === 工作流控制 ===
     current_step: str
@@ -193,10 +195,18 @@ def _resource_generation_node(state: WorkflowState) -> Dict[str, Any]:
             resource_type=state.get("resource_type", "lecture"),
             difficulty=state.get("difficulty", "intermediate"),
             student_profile=state.get("student_profile") or {},
+            course_id=state.get("course_id"),
         )
         duration = int((time.time() - start) * 1000)
+
+        # 从生成结果中提取 evidence_links 和 trustworthiness
+        evidence_links = result.get("evidence_links", [])
+        trustworthiness = result.get("trustworthiness", "draft")
+
         return {
             "generated_resource": result,
+            "evidence_links": evidence_links,
+            "trustworthiness": trustworthiness,
             "current_step": WorkflowStep.GENERATION.value,
             "step_history": state.get("step_history", []) + [
                 _make_step_record(WorkflowStep.GENERATION, "success", duration_ms=duration)
@@ -317,10 +327,13 @@ def _revision_node(state: WorkflowState) -> Dict[str, Any]:
                 "_revision_context": enhanced_prompt_context,
                 "_original_content": original_content[:500],
             },
+            course_id=state.get("course_id"),
         )
         duration = int((time.time() - start) * 1000)
         return {
             "generated_resource": enhanced_resource,
+            "evidence_links": enhanced_resource.get("evidence_links", []),
+            "trustworthiness": enhanced_resource.get("trustworthiness", "draft"),
             "revision_count": revision_count,
             "current_step": WorkflowStep.REVISION.value,
             "step_history": state.get("step_history", []) + [
@@ -527,6 +540,7 @@ def run_workflow(
         "generated_resource": None,
         "assessment": None,
         "teacher_review": None,
+        "evidence_links": [],
         "current_step": WorkflowStep.INIT.value,
         "step_history": [],
         "revision_count": 0,
@@ -604,6 +618,7 @@ def stream_workflow(
         "generated_resource": None,
         "assessment": None,
         "teacher_review": None,
+        "evidence_links": [],
         "current_step": WorkflowStep.INIT.value,
         "step_history": [],
         "revision_count": 0,
@@ -657,6 +672,8 @@ def stream_workflow(
                 "resource": result.get("generated_resource"),
                 "assessment": result.get("assessment"),
                 "teacher_review_suggestion": result.get("teacher_review"),
+                "evidence_links": result.get("evidence_links", []),
+                "trustworthiness": result.get("trustworthiness", "draft"),
                 "metadata": result.get("metadata"),
             },
         }

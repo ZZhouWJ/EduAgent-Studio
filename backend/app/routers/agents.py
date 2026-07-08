@@ -28,6 +28,7 @@ class SaveResourceRequest(BaseModel):
     result: dict
     title: str
     course_id: int
+    user_id: int = 0
 
 
 @router.get("/list")
@@ -112,4 +113,4 @@ async def save_resource(
 ):
     """保存生成的学习资源"""
     service = AgentService()
-    return service.save_resource(req)
+    return service.save_resource(req, user_id=user.get("user_id"))
