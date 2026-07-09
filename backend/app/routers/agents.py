@@ -20,12 +20,15 @@ class GenerateRequest(BaseModel):
     knowledge_point_ids: List[int]
     resource_type: str
     difficulty: str
+    generation_goal: Optional[str] = None
+    enable_review: bool = True
 
 
 class SaveResourceRequest(BaseModel):
     result: dict
     title: str
     course_id: int
+    user_id: int = 0
 
 
 @router.get("/list")
@@ -71,7 +74,6 @@ async def generate_stream(
         try:
             for step_event in service.generate_stream(req):
                 yield f"data: {__import__('json').dumps(step_event, ensure_ascii=False)}\n\n"
-            yield f"data: {__import__('json').dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
         except Exception as e:
             logger.error(f"[Stream] {e}")
             yield f"data: {__import__('json').dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
@@ -111,4 +113,4 @@ async def save_resource(
 ):
     """保存生成的学习资源"""
     service = AgentService()
-    return service.save_resource(req)
+    return service.save_resource(req, user_id=user.get("user_id"))

@@ -1,8 +1,10 @@
 import React from "react";
-import { Search, Filter, FileText, CheckCircle2, AlertCircle, PlayCircle, Code, ListTree, MoreVertical } from "lucide-react";
+import { Search, Filter, FileText, CheckCircle2, AlertCircle, PlayCircle, Code, ListTree, MoreVertical, X, Calendar, BookOpen } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { learningApi, resourcesApi } from "@/lib/api";
 import { SafeLottie } from "../components/SafeLottie";
+import { ResourceRenderer } from "../components/resource/ResourceRenderer";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from "../components/ui/drawer";
 
 function formatTimeAgo(dateStr: string): string {
   try {
@@ -39,14 +41,28 @@ export function ResourceLibrary() {
   const [statusFilter, setStatusFilter] = React.useState("");
   const [courseFilter, setCourseFilter] = React.useState("");
   const [keyword, setKeyword] = React.useState("");
+  const [selectedResource, setSelectedResource] = React.useState<(typeof resources)[0] | null>(null);
+  const [drawerResource, setDrawerResource] = React.useState<any>(null);
+
+  const { data: detailData, loading: detailLoading, execute: fetchDetail } = useApi(
+    (id: number) => id ? resourcesApi.getById(id) : Promise.resolve(null),
+    []
+  );
+
+  const handleResourceClick = async (resource: typeof resources[0]) => {
+    if (!resource?.id) return
+    setSelectedResource(resource)
+    const detail = await fetchDetail(resource.id)
+    setDrawerResource(detail)
+  }
 
   const { data, loading } = useApi(
     () => resourcesApi.list({
       type: typeFilter || undefined,
-      course_id: courseFilter ? Number(courseFilter) : undefined,
+      course_id: Number(courseFilter) || undefined,
       page_size: 100,
     }),
-    [typeFilter, statusFilter, courseFilter]
+    [typeFilter, courseFilter]
   );
   const coursesState = useApi(() => learningApi.listCourses(), []);
 
@@ -156,7 +172,8 @@ export function ResourceLibrary() {
             return (
               <div
                 key={res.id}
-                className="group flex flex-col rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-1 hover:shadow-lg"
+                onClick={() => handleResourceClick(res)}
+                className="group flex flex-col rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-1 hover:shadow-lg cursor-pointer"
               >
                 <div className="mb-4 flex items-start justify-between">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
@@ -195,6 +212,44 @@ export function ResourceLibrary() {
           })}
         </div>
       )}
+
+      {/* Detail Drawer */}
+      <Drawer open={!!selectedResource} onOpenChange={(open) => !open && setSelectedResource(null)}>
+        <DrawerContent className="max-h-[85vh]">
+          <DrawerHeader>
+            <DrawerTitle className="text-lg font-black">{selectedResource?.title}</DrawerTitle>
+            <DrawerClose asChild>
+              <button className="absolute right-4 top-4 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+                <X className="h-5 w-5" />
+              </button>
+            </DrawerClose>
+          </DrawerHeader>
+          <div className="flex-1 overflow-y-auto p-4">
+            {detailLoading ? (
+              <div className="flex items-center justify-center h-32 text-slate-400">加载中...</div>
+            ) : drawerResource ? (
+              <>
+                <div className="mb-4 flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
+                    <BookOpen className="h-3 w-3" />
+                    {drawerResource.course_name}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-600">
+                    {drawerResource.resource_type}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
+                    <Calendar className="h-3 w-3" />
+                    {new Date(drawerResource.created_at).toLocaleDateString("zh-CN")}
+                  </span>
+                </div>
+                <ResourceRenderer resource={drawerResource} />
+              </>
+            ) : (
+              <div className="text-center text-slate-400 py-8">暂无详情</div>
+            )}
+          </div>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }

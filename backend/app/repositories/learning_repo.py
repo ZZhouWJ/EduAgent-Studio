@@ -502,3 +502,148 @@ class LearningRepository:
             )
             return dict(cursor.fetchone())
 
+    def get_recommended_resources(
+        self,
+        profile_id: int,
+        course_id: int,
+        limit: int = 5,
+    ) -> List[Dict[str, Any]]:
+        """
+        获取推荐资源。
+
+        排序逻辑:
+        1. 关联低 mastery 知识点的资源优先
+        2. 匹配学生资源偏好类型
+        3. 排除已学过的资源(查 learning_feedbacks)
+        4. 只取审核通过(approved)的资源
+
+        Returns:
+            List of resource dicts with resource_id, title, type, reason, etc.
+        """
+        with get_db_cursor() as cursor:
+            # 获取学生资源偏好
+            cursor.execute(
+                "SELECT resource_preferences FROM student_profiles WHERE profile_id = %s AND is_deleted = 0",
+                (profile_id,),
+            )
+            pref_row = cursor.fetchone()
+            resource_prefs = pref_row["resource_preferences"].split(",") if pref_row and pref_row["resource_preferences"] else []
+
+            # 获取低 mastery 知识点（< 0.5）
+            cursor.execute("""
+                SELECT kp.kp_id, kp.kp_name, skm.mastery_level
+                FROM student_knowledge_mastery skm
+                INNER JOIN knowledge_points kp ON skm.kp_id = kp.kp_id AND kp.is_deleted = 0
+                WHERE skm.profile_id = %s
+                  AND skm.is_deleted = 0
+                  AND skm.mastery_level < 0.5
+                ORDER BY skm.mastery_level ASC
+            """, (profile_id,))
+            low_mastery_kps = cursor.fetchall()
+
+            # 如果没有低 mastery 知识点，取所有知识点按 mastery 排序
+            if not low_mastery_kps:
+                cursor.execute("""
+                    SELECT kp.kp_id, kp.kp_name, COALESCE(skm.mastery_level, 0.5) AS mastery_level
+                    FROM knowledge_points kp
+                    LEFT JOIN student_knowledge_mastery skm
+                        ON kp.kp_id = skm.kp_id AND skm.profile_id = %s AND skm.is_deleted = 0
+                    WHERE kp.course_id = %s AND kp.is_deleted = 0
+                    ORDER BY mastery_level ASC
+                """, (profile_id, course_id))
+                low_mastery_kps = cursor.fetchall()
+
+            kp_ids = [row["kp_id"] for row in low_mastery_kps]
+            kp_names_map = {row["kp_id"]: row["kp_name"] for row in low_mastery_kps}
+
+            # 已学过的资源 ID（通过 feedback）
+            cursor.execute("""
+                SELECT DISTINCT resource_id
+                FROM learning_feedbacks
+                WHERE profile_id = %s AND resource_id IS NOT NULL AND is_deleted = 0
+            """, (profile_id,))
+            learned_resource_ids = [row["resource_id"] for row in cursor.fetchall()]
+
+        if not kp_ids:
+            return []
+
+        # 构建推荐资源查询
+        # 资源关联的知识点包含低 mastery 知识点，且未学过，且审核通过
+        placeholders_kp = ",".join(["%s"] * len(kp_ids))
+        learned_ids_placeholder = ",".join(["%s"] * len(learned_resource_ids)) if learned_resource_ids else "'-1'"
+
+        sql = f"""
+            SELECT DISTINCT
+                lr.resource_id,
+                lr.resource_title,
+                lr.resource_type,
+                lr.target_kp_ids,
+                lr.review_status,
+                kp.kp_name AS primary_kp_name,
+                kp.kp_id AS primary_kp_id,
+                COALESCE(skm.mastery_level, 0.5) AS kp_mastery
+            FROM learning_resources lr
+            INNER JOIN knowledge_points kp ON lr.target_kp_ids LIKE CONCAT('%%', kp.kp_id, '%%')
+            LEFT JOIN student_knowledge_mastery skm
+                ON kp.kp_id = skm.kp_id AND skm.profile_id = %s AND skm.is_deleted = 0
+            WHERE kp.kp_id IN ({placeholders_kp})
+              AND lr.is_deleted = 0
+              AND lr.review_status = 'approved'
+              {'AND lr.resource_id NOT IN (' + learned_ids_placeholder + ')' if learned_resource_ids else ''}
+            ORDER BY kp_mastery ASC, lr.created_at DESC
+            LIMIT %s
+        """
+
+        params = [profile_id] + kp_ids + (learned_resource_ids if learned_resource_ids else []) + [limit]
+
+        with get_db_cursor() as cursor:
+            cursor.execute(sql, params)
+            rows = cursor.fetchall()
+
+        # 构建推荐理由
+        results = []
+        for row in rows:
+            # 解析 target_kp_ids
+            target_kp_ids = []
+            if row["target_kp_ids"]:
+                target_kp_ids = [int(x.strip()) for x in row["target_kp_ids"].split(",") if x.strip()]
+
+            # 找出该资源关联的最低 mastery 知识点
+            min_mastery_kp_id = None
+            min_mastery = 1.0
+            for kp_id in target_kp_ids:
+                if kp_id in kp_names_map:
+                    cursor.execute("""
+                        SELECT mastery_level FROM student_knowledge_mastery
+                        WHERE profile_id = %s AND kp_id = %s AND is_deleted = 0
+                    """, (profile_id, kp_id))
+                    m_row = cursor.fetchone()
+                    mastery = m_row["mastery_level"] if m_row else 0.5
+                    if mastery < min_mastery:
+                        min_mastery = mastery
+                        min_mastery_kp_id = kp_id
+
+            kp_name = kp_names_map.get(min_mastery_kp_id, row["primary_kp_name"]) if min_mastery_kp_id else row["primary_kp_name"]
+
+            # 生成推荐理由
+            if min_mastery < 0.3:
+                reason = "巩固薄弱点"
+            elif min_mastery < 0.5:
+                reason = "加强易错点"
+            else:
+                reason = "复习已学内容"
+
+            # 匹配偏好
+            if resource_prefs and row["resource_type"] in resource_prefs:
+                reason = f"推荐{row['resource_type']}类型资源，" + reason
+
+            results.append({
+                "resource_id": row["resource_id"],
+                "title": row["resource_title"],
+                "type": row["resource_type"],
+                "reason": reason,
+                "kp_name": kp_name,
+            })
+
+        return results
+

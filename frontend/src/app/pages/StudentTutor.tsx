@@ -1,159 +1,341 @@
-import React from "react";
-import { Link } from "react-router-dom";
-import { Bot, BookOpenCheck, CheckCircle2, MessageSquare, RefreshCcw, Send, ThumbsDown, ThumbsUp } from "lucide-react";
-import { useApi } from "@/lib/useApi";
-import { agentsApi, resourcesApi } from "@/lib/api";
-import { PageHeader, PageShell, StatusBadge, primaryButton, secondaryButton, useInlineToast } from "../components/common/ProductUI";
+import React, { useState, useRef, useEffect } from "react"
+import { Link } from "react-router-dom"
+import ReactMarkdown from "react-markdown"
+import { BookOpenCheck, MessageSquare, RefreshCcw, Send, ThumbsDown, ThumbsUp } from "lucide-react"
+import { useApi } from "@/lib/useApi"
+import { tutorApi, profilesApi, type Citation, type PracticeQuestion, type RecommendedResource } from "@/lib/api"
+import { PageHeader, PageShell, secondaryButton, useInlineToast } from "../components/common/ProductUI"
+import { marked } from "marked"
 
+// 消息类型
+type Message = {
+  role: "student" | "assistant"
+  content: string
+  citations?: Citation[]
+  practice_questions?: PracticeQuestion[]
+  recommended_resources?: RecommendedResource[]
+}
+
+// 建议问题
 const suggestions = [
   "可重复读和串行化到底有什么区别？我总是混淆。",
   "多表连接什么时候应该使用 left join？",
   "事务隔离级别和锁机制有什么关系？",
   "如何把银行转账案例写成 FastAPI 接口？",
-];
+]
 
-type Message = {
-  from: "student" | "ai";
-  text: string;
-  refs?: string[];
-};
+/* ─── 引用来源卡片 ─────────────────────────────────────── */
+function CitationsCard({ citations }: { citations: Citation[] }) {
+  if (!citations?.length) return null
+  return (
+    <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 p-3">
+      <div className="mb-2 text-xs font-bold text-blue-700">引用来源</div>
+      <div className="space-y-2">
+        {citations.map((cite, i) => (
+          <div key={i} className="rounded-lg bg-white p-2 text-xs">
+            <div className="font-semibold text-slate-600">{cite.source}</div>
+            <div className="mt-1 text-slate-700">{cite.content}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
-const initialMessages: Message[] = [
-  { from: "student", text: "可重复读和串行化到底有什么区别？我总是混淆。" },
-  {
-    from: "ai",
-    text: "可以用银行转账案例理解：可重复读保证同一事务内再次读取同一行结果一致，但对新插入并满足条件的记录仍可能产生幻读；串行化会把并发事务效果变成像排队一样顺序执行，隔离性最强但性能成本最高。建议先看图解讲义，再完成 5 道判断题巩固概念。",
-    refs: ["第 6 章 事务与并发控制.pdf", "银行转账并发实验案例.md"],
-  },
-];
+/* ─── 练习题卡片 ─────────────────────────────────────── */
+function PracticeCard({ questions }: { questions: PracticeQuestion[] }) {
+  if (!questions?.length) return null
+  return (
+    <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+      <div className="mb-2 flex items-center gap-2 text-xs font-bold text-emerald-700">
+        <BookOpenCheck className="h-4 w-4" />
+        练习题
+      </div>
+      <div className="space-y-3">
+        {questions.map((q, i) => (
+          <div key={i} className="rounded-lg bg-white p-3">
+            <div className="text-sm font-medium text-slate-800">{q.question}</div>
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs font-bold text-emerald-600">查看答案</summary>
+              <div className="mt-1 rounded bg-emerald-50 p-2 text-xs text-slate-700">{q.answer}</div>
+            </details>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
+/* ─── 推荐资源卡片 ─────────────────────────────────────── */
+function ResourcesCard({ resources }: { resources: RecommendedResource[] }) {
+  if (!resources?.length) return null
+  return (
+    <div className="mt-3 rounded-xl border border-purple-100 bg-purple-50 p-3">
+      <div className="mb-2 text-xs font-bold text-purple-700">推荐学习资源</div>
+      <div className="space-y-2">
+        {resources.map((res) => (
+          <Link
+            key={res.resource_id}
+            to="/student/resources"
+            className="flex items-center justify-between rounded-lg bg-white p-2 text-xs transition hover:bg-purple-50"
+          >
+            <span className="font-medium text-slate-700">{res.title}</span>
+            <span className="rounded bg-purple-100 px-2 py-0.5 text-purple-700">{res.type}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ─── 消息气泡 ─────────────────────────────────────── */
+function MessageBubble({ message, onFeedback }: {
+  message: Message
+  onFeedback?: (helpful: boolean) => void
+  showFeedback?: boolean
+}) {
+  const isStudent = message.role === "student"
+  return (
+    <div className={`flex ${isStudent ? "justify-end" : "justify-start"}`}>
+      <div
+        className={`max-w-[85%] rounded-2xl p-4 ${
+          isStudent
+            ? "bg-blue-600 text-white"
+            : "border border-slate-100 bg-slate-50 text-slate-700"
+        }`}
+      >
+        <div className="prose prose-sm max-w-none">
+          <ReactMarkdown>{message.content}</ReactMarkdown>
+        </div>
+
+        {!isStudent && (
+          <>
+            <CitationsCard citations={message.citations} />
+            <PracticeCard questions={message.practice_questions} />
+            <ResourcesCard resources={message.recommended_resources} />
+          </>
+        )}
+
+        {!isStudent && onFeedback && (
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={() => onFeedback(true)}
+              className="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-slate-600 ring-1 ring-slate-100 hover:bg-green-50 hover:text-green-700"
+            >
+              <ThumbsUp className="mr-1 inline h-3.5 w-3.5" />
+              有帮助
+            </button>
+            <button
+              onClick={() => onFeedback(false)}
+              className="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-slate-600 ring-1 ring-slate-100 hover:bg-orange-50 hover:text-orange-700"
+            >
+              <ThumbsDown className="mr-1 inline h-3.5 w-3.5" />
+              没理解
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ─── 主页面 ─────────────────────────────────────── */
 export function StudentTutor() {
-  const [messages, setMessages] = React.useState<Message[]>(initialMessages);
-  const [draft, setDraft] = React.useState(suggestions[0]);
-  const [tone, setTone] = React.useState("循序讲解");
-  const [activePanel, setActivePanel] = React.useState<"context" | "chat" | "resources">("chat");
-  const [pendingAi, setPendingAi] = React.useState(false);
-  const { toast, showToast } = useInlineToast();
-  const chatScrollRef = React.useRef<HTMLDivElement | null>(null);
+  const [messages, setMessages] = useState<Message[]>([])
+  const [input, setInput] = useState("")
+  const [pendingAi, setPendingAi] = useState(false)
+  const [currentProfileId, setCurrentProfileId] = useState<number>(1)
+  const [currentCourseId, setCurrentCourseId] = useState<number>(1)
+  const [lastSessionId, setLastSessionId] = useState<number | null>(null)
+  const [activePanel, setActivePanel] = useState<"context" | "chat" | "resources">("chat")
+  const { toast, showToast } = useInlineToast()
+  const chatScrollRef = useRef<HTMLDivElement>(null)
 
-  const { data: resourcesData } = useApi(() => resourcesApi.list({ page_size: 100 }), []);
+  // 获取学生画像
+  const { data: profilesData } = useApi(() => profilesApi.list({ page_size: 100 }), [])
+  const currentProfile = profilesData?.items?.[0]
 
-  const recommendedResources = React.useMemo(() => {
-    return (resourcesData?.items ?? []).slice(0, 3).map((r) => ({
-      id: r.resource_id.toString(),
-      name: r.resource_title,
-      chunks: Math.floor(Math.random() * 5) + 1,
-      coverage: Math.floor(Math.random() * 30) + 70,
-    }));
-  }, [resourcesData]);
-
-  React.useEffect(() => {
-    const el = chatScrollRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [messages, pendingAi]);
-
-  const send = async () => {
-    const text = draft.trim();
-    if (!text) {
-      showToast("请输入一个学习问题");
-      return;
+  useEffect(() => {
+    if (currentProfile) {
+      setCurrentProfileId(currentProfile.profile_id)
+      setCurrentCourseId(currentProfile.course_id)
     }
-    const userMessage = text;
-    setMessages((items) => [...items, { from: "student" as const, text: userMessage }]);
-    setDraft("");
-    setPendingAi(true);
+  }, [currentProfile])
+
+  // 配置 marked
+  useEffect(() => {
+    marked.setOptions({
+      breaks: true,
+      gfm: true,
+    })
+  }, [])
+
+  // 滚动到底部
+  useEffect(() => {
+    const el = chatScrollRef.current
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+    }
+  }, [messages, pendingAi])
+
+  const lastMessage = messages[messages.length - 1]
+
+  // 发送消息
+  async function handleSend(question: string) {
+    const text = question.trim()
+    if (!text || pendingAi) return
+
+    // 1. 添加用户消息
+    setMessages((prev) => [...prev, { role: "student", content: text }])
+    setInput("")
+    setPendingAi(true)
 
     try {
-      const { data } = await agentsApi.generate({
-        student_id: 1,
-        course_id: 1,
-        knowledge_point_ids: [],
-        resource_type: "讲义",
-        difficulty: "中等",
-      });
-      const aiText = data.assessment.feedback || data.resource.content || "已收到回复";
-      const refs = data.resource.title ? [data.resource.title] : [];
-      setPendingAi(false);
-      setMessages((items) => [...items, { from: "ai" as const, text: aiText, refs }]);
-      showToast("已收到回复");
-    } catch {
-      setPendingAi(false);
-      setMessages((items) => [
-        ...items,
+      // 2. 调用 tutorApi.chat()
+      const response = await tutorApi.chat({
+        profile_id: currentProfileId,
+        course_id: currentCourseId,
+        question: text,
+      })
+
+      // 3. 添加助手回复
+      setMessages((prev) => [
+        ...prev,
         {
-          from: "ai" as const,
-          text: "我会结合你的薄弱点和课程知识库来解释。核心思路是先辨认概念边界，再放进项目场景验证。",
-          refs: [],
+          role: "assistant",
+          content: response.answer,
+          citations: response.citations,
+          practice_questions: response.practice_questions,
+          recommended_resources: response.recommended_resources,
         },
-      ]);
-      showToast("已收到回复");
+      ])
+
+      // 保存 session_id 用于反馈
+      if (response.session_id) {
+        setLastSessionId(response.session_id)
+      }
+
+      showToast("已收到回复")
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "抱歉，我现在无法回答这个问题。请稍后再试或尝试其他问题。",
+        },
+      ])
+      showToast("回复失败")
+    } finally {
+      setPendingAi(false)
     }
-  };
+  }
+
+  // 反馈
+  async function handleFeedback(helpful: boolean) {
+    if (!lastSessionId) {
+      showToast(helpful ? "感谢反馈：有帮助" : "感谢反馈：没理解")
+      return
+    }
+
+    try {
+      await tutorApi.feedback({
+        session_id: lastSessionId,
+        helpful,
+      })
+      showToast(helpful ? "感谢反馈：回答有帮助" : "感谢反馈：后续会简化解释")
+    } catch {
+      showToast("反馈发送失败")
+    }
+  }
+
+  // 重置对话
+  function handleReset() {
+    setMessages([])
+    setLastSessionId(null)
+    showToast("对话已重置")
+  }
 
   return (
     <PageShell>
       <PageHeader
         eyebrow="学习辅导"
-        title="学习辅导对话"
-        description="结合你的课程知识库与学习画像，用对话的方式解答问题、梳理思路。"
+        title="Tutor 智能答疑"
+        description="结合你的学习画像和课程知识库，解答问题、推荐资源、巩固练习。"
         icon={MessageSquare}
-        action={<button onClick={() => { setMessages(initialMessages); showToast("对话已重置"); }} className={secondaryButton}><RefreshCcw className="h-4 w-4" />清空对话</button>}
+        action={
+          <button onClick={handleReset} className={secondaryButton}>
+            <RefreshCcw className="h-4 w-4" />
+            清空对话
+          </button>
+        }
       />
 
+      {/* 移动端 tab 切换 */}
       <div className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1 lg:hidden">
-        {[
-          ["context", "上下文"],
-          ["chat", "对话"],
-          ["resources", "推荐"],
-        ].map(([key, label]) => (
+        {(["context", "chat", "resources"] as const).map((key) => (
           <button
             key={key}
-            onClick={() => setActivePanel(key as typeof activePanel)}
+            onClick={() => setActivePanel(key)}
             className={`min-h-11 rounded-xl text-sm font-black transition ${
               activePanel === key ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"
             }`}
           >
-            {label}
+            {key === "context" ? "上下文" : key === "chat" ? "对话" : "推荐"}
           </button>
         ))}
       </div>
 
       <section className="grid min-h-0 grid-cols-1 gap-4 lg:min-h-[720px] lg:grid-cols-[280px_1fr_320px] lg:gap-6">
-        <aside className={`edu-card rounded-2xl p-5 ${activePanel === "context" ? "block" : "hidden lg:block"}`}>
+        {/* 左侧上下文面板 */}
+        <aside
+          className={`edu-card rounded-2xl p-5 ${
+            activePanel === "context" ? "block" : "hidden lg:block"
+          }`}
+        >
           <h2 className="mb-4 text-base font-black text-slate-950">学习上下文</h2>
           <div className="space-y-4 text-sm">
+            {/* 当前课程 */}
             <div className="rounded-2xl bg-slate-50 p-4">
               <div className="text-xs font-bold text-slate-400">当前课程</div>
-              <div className="mt-1 font-black text-slate-900">数据库系统原理与 Web 项目实践</div>
-            </div>
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <div className="text-xs font-bold text-slate-400">当前学生</div>
-              <div className="mt-1 font-black text-slate-900">李明 / 大二</div>
-            </div>
-            <div>
-              <div className="mb-2 text-xs font-bold text-slate-400">当前薄弱点</div>
-              <div className="flex flex-wrap gap-2">
-                {["事务隔离级别", "SQL 多表连接", "接口字段设计"].map((item) => (
-                  <span key={item} className="rounded-lg bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-700 ring-1 ring-orange-100">{item}</span>
-                ))}
+              <div className="mt-1 font-black text-slate-900">
+                {currentProfile?.course_name ?? "数据库系统原理"}
               </div>
             </div>
-            <div>
-              <label className="mb-2 block text-xs font-bold text-slate-400">回答方式</label>
-              <select value={tone} onChange={(event) => setTone(event.target.value)} className="edu-focus-ring h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-700">
-                <option>循序讲解</option>
-                <option>项目案例优先</option>
-                <option>测验巩固优先</option>
-              </select>
+
+            {/* 当前学生 */}
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <div className="text-xs font-bold text-slate-400">当前学生</div>
+              <div className="mt-1 font-black text-slate-900">
+                {currentProfile?.student_name ?? "李明"} /{" "}
+                {currentProfile?.current_level ?? "大二"}
+              </div>
             </div>
+
+            {/* 薄弱点 */}
+            {currentProfile?.weak_points?.length ? (
+              <div>
+                <div className="mb-2 text-xs font-bold text-slate-400">当前薄弱点</div>
+                <div className="flex flex-wrap gap-2">
+                  {currentProfile.weak_points.slice(0, 5).map((kp, idx) => (
+                    <span
+                      key={kp.kp_id ?? kp.name ?? idx}
+                      className="rounded-lg bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-700 ring-1 ring-orange-100"
+                    >
+                      {kp.kp_name ?? kp.name ?? `知识点${kp.kp_id ?? idx}`}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {/* 建议提问 */}
             <div>
-              <div className="mb-2 text-xs font-bold text-slate-400">推荐提问</div>
+              <div className="mb-2 text-xs font-bold text-slate-400">建议提问</div>
               <div className="space-y-2">
                 {suggestions.map((item) => (
                   <button
                     key={item}
-                    onClick={() => setDraft(item)}
+                    onClick={() => setInput(item)}
                     className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left text-xs font-semibold leading-5 text-slate-600 transition-all duration-200 hover:-translate-x-1 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
                   >
                     {item}
@@ -164,52 +346,76 @@ export function StudentTutor() {
           </div>
         </aside>
 
-        <main className={`edu-card min-w-0 flex-col rounded-2xl ${activePanel === "chat" ? "flex" : "hidden lg:flex"}`}>
+        {/* 中间对话区域 */}
+        <main
+          className={`edu-card min-w-0 flex-col rounded-2xl ${
+            activePanel === "chat" ? "flex" : "hidden lg:flex"
+          }`}
+        >
           <div className="border-b border-slate-100 px-5 py-4">
             <h2 className="flex items-center gap-2 text-base font-semibold text-slate-950">
               <MessageSquare className="h-5 w-5 text-slate-500" />
               对话
             </h2>
-            <p className="mt-1 text-xs font-semibold text-slate-400">当前模式：{tone}</p>
+            <p className="mt-1 text-xs font-semibold text-slate-400">
+              {messages.length === 0 ? "输入问题开始答疑" : `${messages.length} 条消息`}
+            </p>
           </div>
+
+          {/* 消息列表 */}
           <div ref={chatScrollRef} className="custom-scrollbar flex-1 space-y-4 overflow-y-auto p-5">
-            {messages.map((message, index) => (
-              <div
-                key={`${message.from}-${index}`}
-                className={`flex ${message.from === "student" ? "justify-end" : "justify-start"} ${message.from === "student" ? "edu-bubble-user" : "edu-bubble-ai"}`}
-              >
-                <div className={`max-w-[92%] rounded-2xl p-4 sm:max-w-[78%] ${message.from === "student" ? "bg-blue-600 text-white" : "border border-slate-100 bg-slate-50 text-slate-700"}`}>
-                  <p className="text-sm leading-6">{message.text}</p>
-                  {message.refs && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {message.refs.map((ref) => <span key={ref} className="rounded-lg bg-white px-2 py-1 text-[11px] font-bold text-blue-700 ring-1 ring-blue-100">{ref}</span>)}
-                    </div>
-                  )}
-                  {message.from === "ai" && (
-                    <div className="mt-3 flex gap-2">
-                      <button onClick={() => showToast("已记录：这个回答有帮助")} className="rounded-lg bg-white px-2 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-100"><ThumbsUp className="mr-1 inline h-3.5 w-3.5" />有帮助</button>
-                      <button onClick={() => showToast("已记录：后续会降低解释难度")} className="rounded-lg bg-white px-2 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-100"><ThumbsDown className="mr-1 inline h-3.5 w-3.5" />没理解</button>
-                    </div>
-                  )}
+            {messages.length === 0 && !pendingAi && (
+              <div className="flex h-full items-center justify-center">
+                <div className="text-center text-slate-400">
+                  <MessageSquare className="mx-auto h-12 w-12 opacity-20" />
+                  <p className="mt-2 text-sm">输入问题，AI Tutor 帮你解答</p>
                 </div>
               </div>
+            )}
+
+            {messages.map((message, index) => (
+              <MessageBubble
+                key={index}
+                message={message}
+                showFeedback={index === messages.length - 1 && message.role === "assistant"}
+                onFeedback={handleFeedback}
+              />
             ))}
+
+            {/* 加载状态 */}
             {pendingAi && (
-              <div className="edu-bubble-ai flex justify-start">
+              <div className="flex justify-start">
                 <div className="flex items-center gap-1 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-slate-400">
                   <span className="edu-typing-dot" />
                   <span className="edu-typing-dot" />
                   <span className="edu-typing-dot" />
-                  <span className="ml-2 text-xs font-semibold text-slate-400">正在整理回答…</span>
+                  <span className="ml-2 text-xs font-semibold text-slate-400">正在思考…</span>
                 </div>
               </div>
             )}
           </div>
+
+          {/* 输入框 */}
           <div className="border-t border-slate-100 p-4">
             <label className="mb-2 block text-xs font-bold text-slate-500">输入学习问题</label>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <textarea value={draft} onChange={(event) => setDraft(event.target.value)} className="edu-focus-ring h-20 flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700" />
-              <button onClick={send} className={`${primaryButton} min-h-11 px-6 sm:h-20`}>
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSend(input)
+                  }
+                }}
+                placeholder="输入你的学习问题，按 Enter 发送..."
+                className="edu-focus-ring h-20 flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700"
+              />
+              <button
+                onClick={() => handleSend(input)}
+                disabled={pendingAi || !input.trim()}
+                className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
                 <Send className="h-4 w-4" />
                 发送
               </button>
@@ -217,42 +423,55 @@ export function StudentTutor() {
           </div>
         </main>
 
-        <aside className={`flex-col gap-4 ${activePanel === "resources" ? "flex" : "hidden lg:flex"}`}>
-          <div className="edu-card rounded-2xl p-5">
-            <h2 className="mb-4 text-base font-black text-slate-950">证据与推荐</h2>
-            <div className="space-y-3">
-              {recommendedResources.map((doc) => (
-                <Link
-                  key={doc.id}
-                  to="/student/resources"
-                  className="group block rounded-xl border border-slate-100 bg-white p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:shadow-md"
-                >
-                  <div className="text-sm font-black text-slate-900 group-hover:text-blue-800">{doc.name}</div>
-                  <div className="mt-2 flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-500">命中片段 {doc.chunks}</span>
-                    <span className="font-black text-blue-700 tabular-nums">{doc.coverage}%</span>
-                  </div>
-                </Link>
-              ))}
+        {/* 右侧推荐资源面板 */}
+        <aside
+          className={`flex-col gap-4 ${activePanel === "resources" ? "flex" : "hidden lg:flex"}`}
+        >
+          {/* 推荐资源 */}
+          {lastMessage?.recommended_resources?.length ? (
+            <div className="edu-card rounded-2xl p-5">
+              <h2 className="mb-4 text-base font-black text-slate-950">当前推荐资源</h2>
+              <div className="space-y-3">
+                {lastMessage.recommended_resources.map((res) => (
+                  <Link
+                    key={res.resource_id}
+                    to="/student/resources"
+                    className="group block rounded-xl border border-slate-100 bg-white p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:shadow-md"
+                  >
+                    <div className="text-sm font-black text-slate-900 group-hover:text-blue-800">
+                      {res.title}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-xs">
+                      <span className="rounded bg-purple-100 px-2 py-0.5 font-semibold text-purple-700">
+                        {res.type}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
             </div>
-          </div>
-          <div className="edu-card rounded-2xl p-5">
-            <h2 className="mb-4 flex items-center gap-2 text-base font-black text-slate-950">
-              <BookOpenCheck className="h-5 w-5 text-emerald-700" />
-              下一步学习建议
-            </h2>
-            <div className="space-y-3">
-              {["阅读图解讲义", "完成判断题", "查看并发案例"].map((item, index) => (
-                <div key={item} className="flex items-center justify-between rounded-xl bg-slate-50 p-3">
-                  <span className="text-sm font-bold text-slate-700">{item}</span>
-                  {index === 0 ? <StatusBadge status="进行中" /> : <StatusBadge status="待处理" />}
-                </div>
-              ))}
+          ) : (
+            <div className="edu-card rounded-2xl p-5">
+              <h2 className="mb-4 text-base font-black text-slate-950">推荐资源</h2>
+              <p className="text-sm text-slate-400">开始对话后这里会显示推荐资源</p>
             </div>
-          </div>
+          )}
+
+          {/* 练习题提示 */}
+          {lastMessage?.practice_questions?.length ? (
+            <div className="edu-card rounded-2xl p-5">
+              <h2 className="mb-4 flex items-center gap-2 text-base font-black text-slate-950">
+                <BookOpenCheck className="h-5 w-5 text-emerald-700" />
+                练习题
+              </h2>
+              <p className="text-sm text-slate-600">
+                当前回答包含 {lastMessage.practice_questions.length} 道练习题，请查看上方回答卡片
+              </p>
+            </div>
+          ) : null}
         </aside>
       </section>
       {toast}
     </PageShell>
-  );
+  )
 }

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { marked } from "marked";
+import DOMPurify from "dompurify";
 import {
   AlertCircle,
   ArrowRight,
@@ -30,10 +31,11 @@ import {
   XCircle,
 } from "lucide-react";
 import { useApi } from "@/lib/useApi";
-import { agentsApi, learningApi, modelsApi, client, getToken } from "@/lib/api";
+import { agentsApi, learningApi, modelsApi, profilesApi, client, getToken } from "@/lib/api";
 import { useInlineToast } from "../components/common/ProductUI";
 import type { AgentRequest, WorkflowResult } from "@/lib/api/agents";
 import type { Course, KnowledgePoint } from "@/lib/api/learning";
+import type { ProfileDetail } from "@/lib/api/profiles";
 
 const RESOURCE_TYPES = [
   "课程讲义", "思维导图", "分层练习题", "代码实操案例",
@@ -139,10 +141,17 @@ export function AgentWorkbench() {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<number>(1);
   const [selectedKps, setSelectedKps] = useState<KnowledgePoint[]>([]);
+  const [allCourseKps, setAllCourseKps] = useState<KnowledgePoint[]>([]);
   const [resourceType, setResourceType] = useState(RESOURCE_TYPES[0]);
   const [difficulty, setDifficulty] = useState("基础");
   const [generationGoal, setGenerationGoal] = useState("");
   const [enableReview, setEnableReview] = useState(true);
+
+  // 学生列表（按课程筛选）
+  const { data: profilesData } = useApi(
+    () => selectedCourse ? profilesApi.list({ course_id: selectedCourse.id }) : Promise.resolve(null),
+    [selectedCourse]
+  );
 
   // === 工作流状态 ===
   const [workflowState, setWorkflowState] = useState<"idle" | "running" | "done" | "error">("idle");
@@ -163,14 +172,19 @@ export function AgentWorkbench() {
     }
   }, [courseList, selectedCourse]);
 
-  // 课程变更时加载知识点
+  // 课程变更时加载所有知识点
   useEffect(() => {
     if (selectedCourse) {
       learningApi.getCourse(selectedCourse.id).then((course) => {
         if (course.knowledge_points && course.knowledge_points.length > 0) {
+          setAllCourseKps(course.knowledge_points);
+          // 默认选中前3个
           setSelectedKps(course.knowledge_points.slice(0, 3));
         }
       }).catch(() => {});
+    } else {
+      setAllCourseKps([]);
+      setSelectedKps([]);
     }
   }, [selectedCourse]);
 
@@ -220,6 +234,8 @@ export function AgentWorkbench() {
       knowledge_point_ids: selectedKps.map((kp) => kp.id),
       resource_type: RESOURCE_TYPE_KEY_MAP[resourceType] || "lecture",
       difficulty: DIFFICULTY_MAP[difficulty] || "intermediate",
+      generation_goal: generationGoal || undefined,
+      enable_review: enableReview,
     };
 
     abortControllerRef.current = new AbortController();
@@ -267,6 +283,10 @@ export function AgentWorkbench() {
 
             if (event.type === "done") {
               addLog("生成流程已完成");
+              if (event.result) {
+                setResult(event.result);
+                addLog("资源生成完毕，结果已就绪");
+              }
               setWorkflowState("done");
               break;
             }
@@ -351,16 +371,6 @@ export function AgentWorkbench() {
         }
       }
 
-      // 完成后获取完整结果
-      if (workflowState !== "error") {
-        try {
-          const finalResult = await agentsApi.generate(request);
-          setResult(finalResult);
-          addLog("资源生成完毕，结果已就绪");
-        } catch (e) {
-          console.error("获取最终结果失败:", e);
-        }
-      }
     } catch (e: any) {
       if (e.name === "AbortError" || e.name === "CanceledError") {
         addLog("生成流程已取消");
@@ -371,7 +381,7 @@ export function AgentWorkbench() {
       }
       console.error("SSE流式读取失败:", e);
     }
-  }, [selectedCourse, selectedStudentId, selectedKps, resourceType, difficulty, addLog, resetWorkflow, updateStepState, showToast, workflowState]);
+  }, [selectedCourse, selectedStudentId, selectedKps, resourceType, difficulty, generationGoal, enableReview, addLog, resetWorkflow, updateStepState, showToast]);
 
   const handleSaveResource = useCallback(async () => {
     if (!result || !selectedCourse) {
@@ -457,38 +467,56 @@ export function AgentWorkbench() {
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-bold text-slate-700">指定学生 ID</label>
-                <input
-                  type="number"
+                <label className="mb-1.5 block text-sm font-bold text-slate-700">选择学生</label>
+                <select
                   className="edu-focus-ring h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700"
                   value={selectedStudentId}
                   onChange={(e) => setSelectedStudentId(Number(e.target.value))}
-                  min={1}
-                />
+                >
+                  <option value="">请选择学生</option>
+                  {profilesData?.items?.map((p: ProfileDetail) => (
+                    <option key={p.student_id} value={p.student_id}>
+                      {p.student_name} - 掌握度: {Math.round(p.mastery_score)}%
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label className="mb-2 block text-sm font-bold text-slate-700">选择知识点</label>
-                <div className="space-y-2">
-                  {selectedKps.length > 0 ? (
-                    selectedKps.map((kp) => (
-                      <label key={kp.id} className="flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-blue-100 bg-blue-50/60 px-3">
+                <div className="flex flex-wrap gap-2">
+                  {allCourseKps.length > 0 ? (
+                    allCourseKps.map((kp) => (
+                      <label
+                        key={kp.id}
+                        className={`flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border px-3 text-sm font-semibold transition ${
+                          selectedKps.some((k) => k.id === kp.id)
+                            ? "border-blue-200 bg-blue-50 text-blue-700"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-blue-200"
+                        }`}
+                      >
                         <input
                           type="checkbox"
-                          checked
-                          onChange={() => {
-                            setSelectedKps((prev) => prev.filter((k) => k.id !== kp.id));
+                          checked={selectedKps.some((k) => k.id === kp.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedKps((prev) => [...prev, kp]);
+                            } else {
+                              setSelectedKps((prev) => prev.filter((k) => k.id !== kp.id));
+                            }
                           }}
-                          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                         />
-                        <span className="flex-1 text-sm font-semibold text-slate-700">{kp.name}</span>
-                        <span className="text-[11px] font-bold text-blue-700">{Math.round(kp.mastery_avg * 100)}%</span>
+                        {kp.name}
                       </label>
                     ))
                   ) : (
                     <p className="text-sm text-slate-400">请先选择课程</p>
                   )}
                 </div>
+                {selectedKps.length > 0 && (
+                  <p className="mt-1.5 text-xs text-slate-500">已选择 {selectedKps.length} 个知识点</p>
+                )}
               </div>
 
               <div>
@@ -660,14 +688,16 @@ export function AgentWorkbench() {
                 <FileText className="h-5 w-5 text-slate-700" />
                 <h2 className="text-base font-semibold text-slate-900">资源预览</h2>
               </div>
-                </div>
+            </div>
 
+            {result ? (
+              <>
                 <div className="mt-4 grid grid-cols-2 gap-3">
                   {[
                     ["可信度评分", result.metadata?.quality_score ? `${Math.round(result.metadata.quality_score * 10)}%` : "—", result.metadata?.quality_score && result.metadata.quality_score >= 7 ? "text-emerald-700" : "text-orange-700"],
                     ["返工次数", String(result.metadata?.revision_count || 0), "text-slate-700"],
                     ["风险等级", result.metadata?.quality_score && result.metadata.quality_score >= 7 ? "低" : "中", result.metadata?.quality_score && result.metadata.quality_score >= 7 ? "text-emerald-700" : "text-orange-700"],
-                    ["教师复核", result.metadata?.quality_score && result.metadata.quality_score >= 7 ? "通过" : "建议", "text-orange-700"],
+                    ["教材依据", result.trustworthiness === 'draft' ? '草稿' : result.trustworthiness === 'high' ? '充分' : result.trustworthiness === 'medium' ? '部分' : '不足', result.trustworthiness === 'high' ? 'text-emerald-700' : result.trustworthiness === 'draft' ? 'text-red-700' : 'text-orange-700'],
                   ].map(([label, value, color]) => (
                     <div key={label} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
                       <div className="text-xs font-semibold text-slate-500">{label}</div>
@@ -676,6 +706,24 @@ export function AgentWorkbench() {
                   ))}
                 </div>
               </div>
+
+                {result.resource?.content && (
+                  <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-3 max-h-48 overflow-y-auto">
+                    {result.trustworthiness === 'draft' && (
+                      <div className="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
+                        ⚠️ 草稿：缺乏充分教材依据，生成内容未引用教材原文，标记为低可信度
+                      </div>
+                    )}
+                    <div
+                      className="prose prose-sm prose-slate"
+                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked(result.resource.content.replace(/\[引用:(\d+)\]/g, '<mark class="bg-blue-100 text-blue-800 px-0.5 rounded">[引用:$1]</mark>'))) }}
+                    />
+                  </div>
+                )}
+
+                {result?.metadata?.total_duration_ms && (
+                  <p className="mt-2 text-xs text-slate-500">生成耗时: {result.metadata.total_duration_ms}ms</p>
+                )}
 
                 {result.teacher_review_suggestion?.suggestions && result.teacher_review_suggestion.suggestions.length > 0 && (
                   <div className="mt-4 rounded-2xl border border-orange-100 bg-orange-50 p-3">
@@ -695,36 +743,62 @@ export function AgentWorkbench() {
             </div>
 
             <div className="space-y-3">
-              {result?.diagnosis?.weak_points?.length ? (
-                result.diagnosis.weak_points.map((wp, index) => (
-                  <button key={wp.kp_id || index} className="flex w-full items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50">
-                    <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-xs font-black text-blue-700 ring-1 ring-blue-100">
-                      {index + 1}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-bold leading-5 text-slate-800">{wp.name}</div>
-                      <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-                        掌握度 {Math.round(wp.mastery_level * 100)}%
+              {/* 优先展示资源生成时引用的证据 chunks */}
+              {result?.evidence_links?.length ? (
+                <>
+                  <div className="mb-2 text-xs font-bold text-slate-500">
+                    引用了 {result.evidence_links.length} 条教材原文
+                  </div>
+                  {result.evidence_links.map((link: any, index: number) => (
+                    <div key={`ev-${link.chunk_id || index}`} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 text-xs font-bold text-blue-700">
+                          <Link2 className="h-3 w-3" />
+                          证据 {index + 1}
+                        </span>
+                        <span className="text-xs text-slate-400">
+                          chunk#{link.chunk_id}
+                        </span>
                       </div>
+                      <p className="line-clamp-3 text-xs leading-5 text-slate-600">
+                        {link.quote_text || link.content || '—'}
+                      </p>
                     </div>
-                    <ArrowRight className="mt-1 h-4 w-4 text-slate-300" />
-                  </button>
-                ))
+                  ))}
+                </>
               ) : (
-                selectedKps.map((kp, index) => (
-                  <button key={kp.id} className="flex w-full items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50">
-                    <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-xs font-black text-blue-700 ring-1 ring-blue-100">
-                      {index + 1}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-bold leading-5 text-slate-800">{kp.name}</div>
-                      <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-                        掌握度 {Math.round(kp.mastery_avg * 100)}%
+                /* fallback：展示知识点 */
+                result?.diagnosis?.weak_points?.length ? (
+                  result.diagnosis.weak_points.map((wp: any, index: number) => (
+                    <button key={wp.kp_id || index} className="flex w-full items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50">
+                      <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-xs font-black text-blue-700 ring-1 ring-blue-100">
+                        {index + 1}
                       </div>
-                    </div>
-                    <ArrowRight className="mt-1 h-4 w-4 text-slate-300" />
-                  </button>
-                ))
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-bold leading-5 text-slate-800">{wp.name}</div>
+                        <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                          掌握度 {Math.round(wp.mastery_level * 100)}%
+                        </div>
+                      </div>
+                      <ArrowRight className="mt-1 h-4 w-4 text-slate-300" />
+                    </button>
+                  ))
+                ) : (
+                  selectedKps.map((kp: any, index: number) => (
+                    <button key={kp.id} className="flex w-full items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50">
+                      <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-xs font-black text-blue-700 ring-1 ring-blue-100">
+                        {index + 1}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-bold leading-5 text-slate-800">{kp.name}</div>
+                        <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                          掌握度 {Math.round(kp.mastery_avg * 100)}%
+                        </div>
+                      </div>
+                      <ArrowRight className="mt-1 h-4 w-4 text-slate-300" />
+                    </button>
+                  ))
+                )
               )}
             </div>
 

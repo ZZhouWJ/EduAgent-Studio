@@ -44,6 +44,29 @@ export interface ProfileDetail {
   }>
 }
 
+// 对话消息结构
+export interface DialogMessage {
+  id: number
+  role: 'student' | 'assistant'
+  content: string
+  created_at: string
+  extraction?: ProfileExtraction
+}
+
+// 抽取结果结构
+export interface ProfileExtraction {
+  knowledge_base?: string
+  current_level?: string
+  weak_points?: string[]
+  learning_goal?: string
+  resource_preferences?: string[]
+  cognitive_style?: string
+  time_constraints?: string
+  practice_level?: string
+  motivation?: string
+  error_prone_points?: string[]
+}
+
 export const profilesApi = {
   list(params?: {
     page?: number
@@ -67,5 +90,28 @@ export const profilesApi = {
     data: { kp_id: number; mastery: number; update_reason?: string }
   ) {
     return client.post(`/profiles/${profile_id}/mastery`, data)
+  },
+
+  // 获取对话历史
+  getDialogHistory(profileId: number) {
+    return client.get<{ profile_id: number; messages: DialogMessage[]; total: number }>(`/profiles/${profileId}/dialog`)
+      .then(res => res.messages)
+  },
+
+  // 发送对话消息
+  sendDialogMessage(profileId: number, message: string) {
+    return client.post<any>(`/profiles/${profileId}/dialog`, { message })
+      .then(res => ({
+        id: Date.now(),
+        role: 'assistant' as const,
+        content: res.reply || res.content || '',
+        created_at: new Date().toISOString(),
+        extraction: res.extracted,
+      }))
+  },
+
+  // 应用抽取结果
+  applyExtraction(profileId: number, extraction: ProfileExtraction) {
+    return client.post<ProfileDetail>(`/profiles/${profileId}/apply-extraction`, extraction)
   },
 }

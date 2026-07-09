@@ -28,6 +28,7 @@ export function AdminCosts() {
 
   const costsState = useApi(() => statisticsApi.costs(), []);
   const distributionState = useApi(() => statisticsApi.costDistribution(), []);
+  const costByModelState = useApi(() => statisticsApi.getCostByModel(), []);
   const coursesState = useApi(() => learningApi.listCourses(), []);
   const modelsState = useApi(() => modelsApi.getModels({ page_size: 50 }), []);
 
@@ -133,19 +134,21 @@ export function AdminCosts() {
         </div>
       </section>
       <section className="edu-card overflow-hidden rounded-2xl">
-        {costs?.cost_by_model && costs.cost_by_model.length > 0 ? (
+        {costByModelState.data && costByModelState.data.length > 0 ? (
           <>
             <h3 className="px-4 pt-4 text-sm font-black text-slate-600">按模型成本排行</h3>
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs font-black text-slate-500">
-                <tr>{["模型", "成本", "占比"].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr>
+                <tr>{["模型", "调用次数", "Token消耗", "成本", "占比"].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {costs.cost_by_model.map((row) => (
-                  <tr key={row.model_name} className="cursor-pointer bg-white hover:bg-blue-50/40">
-                    <td className="max-w-[280px] truncate px-4 py-4 font-black text-slate-900">{row.model_name}</td>
-                    <td className="px-4 py-4 font-black text-blue-700">¥{(row.cost ?? 0).toFixed(2)}</td>
-                    <td className="px-4 py-4">{(((row.cost ?? 0) / Math.max(costs.total_cost, 1)) * 100).toFixed(1)}%</td>
+                {costByModelState.data.map((row) => (
+                  <tr key={row.model} className="cursor-pointer bg-white hover:bg-blue-50/40">
+                    <td className="max-w-[280px] truncate px-4 py-4 font-black text-slate-900">{row.model}</td>
+                    <td className="px-4 py-4">{row.call_count ?? 0}</td>
+                    <td className="px-4 py-4">{(row.total_tokens ?? 0).toLocaleString()}</td>
+                    <td className="px-4 py-4 font-black text-blue-700">¥{(row.total_cost ?? 0).toFixed(4)}</td>
+                    <td className="px-4 py-4">{(((row.total_cost ?? 0) / Math.max(costs?.total_cost ?? 1, 1)) * 100).toFixed(1)}%</td>
                   </tr>
                 ))}
               </tbody>

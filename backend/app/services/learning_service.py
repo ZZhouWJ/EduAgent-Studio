@@ -1,6 +1,6 @@
 """学习服务 — 课程、知识点、学习任务"""
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from app.repositories import LearningRepository
 
@@ -57,3 +57,19 @@ class LearningService:
             return {"code": 0, "message": "success", "data": path_data}
         except Exception as e:
             return {"code": 500, "message": f"获取学习路径失败: {e}", "data": None}
+
+    def recommend_resources(self, profile_id: int, course_id: int) -> List[Dict[str, Any]]:
+        """
+        根据画像推荐资源。
+
+        排序逻辑:
+        1. 低 mastery 知识点优先
+        2. 匹配学生资源偏好
+        3. 未学习过的资源
+        4. 教师审核通过资源
+        """
+        try:
+            resources = self._repo.get_recommended_resources(profile_id, course_id)
+            return resources
+        except Exception as e:
+            return []

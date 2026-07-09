@@ -57,6 +57,8 @@ def _map_workflow_result(raw: Dict[str, Any]) -> Dict[str, Any]:
         "resource": raw.get("generated_resource"),
         "assessment": raw.get("assessment"),
         "teacher_review_suggestion": raw.get("teacher_review"),
+        "evidence_links": raw.get("evidence_links", []),
+        "trustworthiness": raw.get("trustworthiness", "draft"),
         "metadata": metadata,
         "_raw": raw,
     }
@@ -160,13 +162,40 @@ class AgentService:
             return {"code": 0, "message": "success", "data": _map_workflow_result(state.values)}
         return {"code": 404, "message": "未找到运行记录", "data": None}
 
-    def save_resource(self, req: Any) -> Dict[str, Any]:
+    def save_resource(self, req: Any, user_id: int = 0) -> Dict[str, Any]:
         raw = req.result.get("_raw", {})
         resource = raw.get("generated_resource") or {}
+        evidence_links = raw.get("evidence_links", [])
+        trustworthiness = raw.get("trustworthiness", "draft")
 
         title = req.title or resource.get("title", "学习资源")
         content = resource.get("content", "")
 
+        # 保存到 learning_resources 表（主表，有 resource_id）
+        try:
+            from app.repositories.learning_resource_repo import LearningResourceRepository
+            lr_repo = LearningResourceRepository()
+            db_resource = lr_repo.create_resource(
+                data={
+                    "course_id": req.course_id,
+                    "resource_title": title,
+                    "resource_type": req.result.get("resource", {}).get("type", "lecture"),
+                    "difficulty": resource.get("difficulty", "intermediate"),
+                    "content": content,
+                    "target_kp_ids": resource.get("knowledge_points", []),
+                    "generation_model": resource.get("generation_metadata", {}).get("model"),
+                    "generation_agent": resource.get("generation_metadata", {}).get("agent"),
+                    "status": "pending_review",
+                },
+                created_by=user_id,
+            )
+            saved_resource_id = db_resource.get("resource_id")
+            logger.info(f"[AgentService] 资源写入 learning_resources: resource_id={saved_resource_id}")
+        except Exception as e:
+            logger.warning(f"[AgentService] 写入 learning_resources 失败: {e}")
+            saved_resource_id = None
+
+        # 同时保存到文件存储（保留原有逻辑）
         saved = save_resource_content(
             title=title,
             content=content,
@@ -179,10 +208,24 @@ class AgentService:
                 "generation_model": resource.get("generation_metadata", {}).get("model"),
                 "quality_score": raw.get("quality_score"),
                 "step_history": raw.get("step_history", []),
+                "trustworthiness": trustworthiness,
+                "db_resource_id": saved_resource_id,
             },
         )
 
-        return {"code": 0, "message": "资源已保存到学习资源库", "data": saved}
+        # 如果有 db_resource_id，则写入 evidence_links
+        if saved_resource_id and evidence_links:
+            try:
+                from app.repositories.evidence_repo import EvidenceRepository
+                ev_repo = EvidenceRepository()
+                for link in evidence_links:
+                    link["resource_id"] = saved_resource_id
+                ev_repo.insert_resource_evidence_links(evidence_links)
+                logger.info(f"[AgentService] 写入 {len(evidence_links)} 条 evidence_links，resource_id={saved_resource_id}")
+            except Exception as e:
+                logger.warning(f"[AgentService] 写入 evidence_links 失败: {e}")
+
+        return {"code": 0, "message": "资源已保存到学习资源库", "data": {**saved, "db_resource_id": saved_resource_id}}
 
     def list_saved_resources(self, course_id: int = None, page: int = 1, page_size: int = 20) -> Dict[str, Any]:
         result = list_storage_files(course_id=course_id, page=page, page_size=page_size)
