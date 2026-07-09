@@ -12,12 +12,10 @@ import { AdminModelConfig } from "./pages/AdminModelConfig";
 import { AdminPrompts } from "./pages/AdminPrompts";
 import { AdminUsers } from "./pages/AdminUsers";
 import { AgentWorkbench } from "./pages/AgentWorkbench";
-import { DesignSystemUpdate } from "./pages/DesignSystemUpdate";
 import { LearningAnalytics } from "./pages/LearningAnalytics";
 import { LearningFeedback } from "./pages/LearningFeedback";
 import { NotFound } from "./pages/NotFound";
 import { ResourceLibrary } from "./pages/ResourceLibrary";
-import { RolePermissionMap } from "./pages/RolePermissionMap";
 import { StudentDashboard } from "./pages/StudentDashboard";
 import { StudentLearningPath } from "./pages/StudentLearningPath";
 import { StudentProfile } from "./pages/StudentProfile";
@@ -62,7 +60,6 @@ export const router = createBrowserRouter(
 
         { path: "admin", Component: AdminDashboard },
         { path: "admin/users", Component: AdminUsers },
-        { path: "admin/roles", Component: RolePermissionMap },
         { path: "admin/courses", Component: AdminCourses },
         { path: "admin/resources", Component: ResourceLibrary },
         { path: "admin/model-config", Component: AdminModelConfig },
@@ -72,7 +69,6 @@ export const router = createBrowserRouter(
         { path: "admin/costs", Component: AdminCosts },
         { path: "admin/governance", Component: AdminGovernance },
         { path: "admin/logs", Component: AdminLogs },
-        { path: "admin/design-system", Component: DesignSystemUpdate },
 
         { path: "agent-workbench", element: <Navigate to="/teacher/agent-workbench" replace /> },
         { path: "student-profile", element: <Navigate to="/student/profile" replace /> },

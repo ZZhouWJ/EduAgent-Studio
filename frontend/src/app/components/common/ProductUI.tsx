@@ -4,7 +4,7 @@ import { notify } from "@/lib/toast";
 
 export { notify };
 
-type IconComponent = React.ComponentType<{ className?: string; strokeWidth?: number }>;
+type IconComponent = React.ComponentType<{ className?: string; strokeWidth?: number | string }>;
 
 type PageHeaderProps = {
   eyebrow?: string;

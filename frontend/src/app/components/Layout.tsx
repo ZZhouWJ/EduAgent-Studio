@@ -47,7 +47,7 @@ type RoleKey = "student" | "teacher" | "admin";
 type MenuItem = {
   path: string;
   label: string;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number | string }>;
 };
 
 type RoleConfig = {

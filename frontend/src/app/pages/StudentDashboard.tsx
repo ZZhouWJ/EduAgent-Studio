@@ -75,6 +75,7 @@ export function StudentDashboard() {
   const { data: tasksData } = useApi(() => learningApi.listTasks({ page_size: 100 }), []);
   const { data: statsData } = useApi(() => statisticsApi.learningOverview(), []);
   const { data: resourcesData } = useApi(() => resourcesApi.list({ page_size: 4 }), []);
+  const { data: weakPoints } = useApi(() => statisticsApi.weakKnowledgePoints(5), []);
 
   const courseId = learningData?.[0]?.id ?? 0;
   const profileId = user?.user_id ?? 0;
@@ -269,35 +270,35 @@ export function StudentDashboard() {
             </Link>
           </div>
           <ul className="edu-stagger divide-y divide-slate-100">
-            {[
-              { name: "事务隔离级别", score: 32, hint: "概念边界不清" },
-              { name: "SQL 多表连接", score: 46, hint: "复杂查询仍需练习" },
-              { name: "接口字段设计", score: 61, hint: "项目迁移易错" },
-            ].map((w) => {
+            {(weakPoints ?? []).length > 0 ? (weakPoints ?? []).map((wp) => {
+              const score = Math.round(wp.avg_mastery * 100);
               const tone =
-                w.score < 45 ? "rose" : w.score < 60 ? "amber" : "emerald";
+                score < 45 ? "rose" : score < 60 ? "amber" : "emerald";
               const toneMap: Record<string, string> = {
                 rose: "bg-rose-50 text-rose-700",
                 amber: "bg-amber-50 text-amber-700",
                 emerald: "bg-emerald-50 text-emerald-700",
               };
+              const hint = score < 45 ? "急需加强" : score < 60 ? "仍需练习" : "接近掌握";
               return (
                 <li
-                  key={w.name}
+                  key={wp.kp_id}
                   className="ds-row-hover flex items-center justify-between rounded-md -mx-2 px-2 py-2.5"
                 >
                   <div>
-                    <div className="text-[13px] font-medium text-slate-900">{w.name}</div>
-                    <div className="mt-0.5 text-xs text-slate-500">{w.hint}</div>
+                    <div className="text-[13px] font-medium text-slate-900">{wp.kp_name}</div>
+                    <div className="mt-0.5 text-xs text-slate-500">{hint}</div>
                   </div>
                   <div
                     className={`grid h-9 w-12 place-items-center rounded text-[12px] font-semibold tabular-nums ${toneMap[tone]}`}
                   >
-                    {w.score}%
+                    {score}%
                   </div>
                 </li>
               );
-            })}
+            }) : (
+              <li className="flex items-center justify-center py-6 text-sm text-slate-400">暂无薄弱点数据</li>
+            )}
           </ul>
         </div>
       </section>

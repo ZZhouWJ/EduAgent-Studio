@@ -705,7 +705,6 @@ export function AgentWorkbench() {
                     </div>
                   ))}
                 </div>
-              </div>
 
                 {result.resource?.content && (
                   <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-3 max-h-48 overflow-y-auto">
@@ -735,6 +734,13 @@ export function AgentWorkbench() {
                     </div>
                   </div>
                 )}
+              </>
+            ) : (
+              <div className="py-12 text-center text-sm text-slate-400">
+                点击"开始生成"创建学习资源
+              </div>
+            )}
+          </div>
 
           <div className="edu-card flex-1 rounded-2xl p-5">
             <div className="mb-4 flex items-center gap-2">

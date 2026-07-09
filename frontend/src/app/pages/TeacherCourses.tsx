@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { BarChart3, BookOpen, Bot, Database, FileText, GraduationCap, Library, Users } from "lucide-react";
 import { useApi } from "@/lib/useApi";
-import { learningApi } from "@/lib/api";
+import { learningApi, statisticsApi } from "@/lib/api";
 import { DetailDrawer, PageHeader, ProgressBar, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast } from "../components/common/ProductUI";
 
 interface Course {
@@ -27,6 +27,7 @@ export function TeacherCourses() {
   const { toast, showToast } = useInlineToast();
 
   const { data: courseList, loading } = useApi(() => learningApi.listCourses(), []);
+  const { data: overview } = useApi(() => statisticsApi.learningOverview(), []);
 
   // 后端返回 snake_case，映射到 UI 期望的字段
   const mappedCourses: Array<{
@@ -52,12 +53,12 @@ export function TeacherCourses() {
   const list = mappedCourses.filter((course) => (status === "全部" || course.status === status) && `${course.name}${course.code}`.toLowerCase().includes(query.toLowerCase()));
 
   const stats = [
-    { label: "管理课程数", value: "3", hint: "本学期", icon: BookOpen, tone: "blue" as const },
-    { label: "学生总数", value: "308", hint: "4 个班级", icon: Users, tone: "slate" as const },
-    { label: "知识点数量", value: "56", hint: "已结构化", icon: Database, tone: "emerald" as const },
-    { label: "已生成资源", value: "1,246", hint: "生成率 72%", icon: Library, tone: "cyan" as const },
-    { label: "平均掌握度", value: "72%", hint: "较上周 +2%", icon: BarChart3, tone: "orange" as const },
-    { label: "待审核资源", value: "12", hint: "3 个高优先级", icon: FileText, tone: "red" as const },
+    { label: "管理课程数", value: overview ? `${overview.course_count}` : "—", hint: "本学期", icon: BookOpen, tone: "blue" as const },
+    { label: "学生总数", value: overview ? `${overview.student_count}` : "—", hint: `${overview?.course_count ?? "—"} 个班级`, icon: Users, tone: "slate" as const },
+    { label: "反馈数", value: overview ? `${overview.feedback_count}` : "—", hint: "近 7 天", icon: Database, tone: "emerald" as const },
+    { label: "学习资源", value: overview ? `${overview.resource_count}` : "—", hint: `审核通过率 ${overview ? Math.round((overview.review_pass_rate ?? 0) * 100) : "—"}%`, icon: Library, tone: "cyan" as const },
+    { label: "平均掌握度", value: overview ? `${Math.round((overview.avg_mastery ?? 0) * 100)}%` : "—", hint: "全班统计", icon: BarChart3, tone: "orange" as const },
+    { label: "活跃任务", value: overview ? `${overview.active_tasks}` : "—", hint: "进行中", icon: FileText, tone: "red" as const },
   ];
 
   return (
