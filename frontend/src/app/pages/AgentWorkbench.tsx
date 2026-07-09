@@ -675,6 +675,7 @@ export function AgentWorkbench() {
                     </div>
                   ))}
                 </div>
+              </div>
 
                 {result.teacher_review_suggestion?.suggestions && result.teacher_review_suggestion.suggestions.length > 0 && (
                   <div className="mt-4 rounded-2xl border border-orange-100 bg-orange-50 p-3">
@@ -686,13 +687,6 @@ export function AgentWorkbench() {
                     </div>
                   </div>
                 )}
-              </>
-            ) : (
-              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-8 text-center text-slate-400">
-                <p className="text-sm">生成资源将在流程完成后显示</p>
-              </div>
-            )}
-          </div>
 
           <div className="edu-card flex-1 rounded-2xl p-5">
             <div className="mb-4 flex items-center gap-2">
