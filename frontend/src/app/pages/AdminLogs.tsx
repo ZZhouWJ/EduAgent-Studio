@@ -98,7 +98,7 @@ export function AdminLogs() {
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
-      <PageHeader eyebrow="Operation Logs" title="操作日志" description="记录用户登录、资源生成、教师审核、画像更新和系统配置变更。" icon={FileClock}
+      <PageHeader title="操作日志" description="记录用户登录、资源生成、教师审核、画像更新和系统配置变更。" icon={FileClock}
         action={<button onClick={handleExport} className={`${primaryButton} cursor-pointer`}><Download className="h-4 w-4" />导出日志</button>}
       />
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">{stats.map((stat) => <StatCard key={stat.label} {...stat} />)}</section>

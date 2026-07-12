@@ -80,7 +80,6 @@ export function StudentTasks() {
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
       <PageHeader
-        eyebrow="Student Learning Tasks"
         title="学习任务"
         description="根据你的学习画像和课程进度，系统为你安排了个性化学习任务。"
         icon={BookOpenCheck}

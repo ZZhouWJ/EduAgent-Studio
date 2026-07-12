@@ -68,6 +68,27 @@ class ProfileService:
         except Exception as e:
             return {"code": 500, "message": f"查询失败: {e}", "data": None}
 
+    def get_my_profile(self, user: Any) -> Dict[str, Any]:
+        """
+        获取当前登录用户自己的学生画像。
+
+        Args:
+            user: 当前登录用户，期望包含 user_id 字段
+
+        Returns:
+            标准响应 dict：{code, message, data: profile}
+        """
+        try:
+            user_id = user.get("user_id")
+            if not user_id:
+                return {"code": 401, "message": "无法获取用户身份", "data": None}
+            profile = self._repo.get_profile_by_student_id(int(user_id))
+            if profile is None:
+                return {"code": 404, "message": "您还没有创建学生画像，请先通过学习反馈或教师导入建立画像", "data": None}
+            return {"code": 0, "message": "success", "data": profile}
+        except Exception as e:
+            return {"code": 500, "message": f"查询失败: {e}", "data": None}
+
     def update_profile(
         self, profile_id: int, data: Dict[str, Any], user: Any
     ) -> Dict[str, Any]:

@@ -410,18 +410,7 @@ export function AgentWorkbench() {
 
   return (
     <div className="page-shell flex min-h-0 flex-col">
-      <div className="flex shrink-0 flex-col items-stretch justify-between gap-4 lg:flex-row lg:items-start lg:gap-6">
-        <div className="min-w-0">
-          <div className="mb-2 flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
-            <Network className="h-3.5 w-3.5" />
-            资源生成工作台
-          </div>
-          <h1 className="text-2xl font-semibold text-slate-900">资源生成工作台</h1>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-            面向课程、班级和重点学生群体，组织班级诊断、画像聚合、知识定位、路径规划、资源生成、测评生成与教师审核辅助等环节协同工作。
-          </p>
-        </div>
-
+      <div className="flex shrink-0 flex-col items-stretch justify-end gap-4 lg:flex-row lg:items-start lg:gap-6">
         <div className="grid shrink-0 grid-cols-1 gap-2 text-sm sm:grid-cols-3 lg:max-w-[620px]">
           {[
             ["当前课程", selectedCourse?.name || "未选择"],

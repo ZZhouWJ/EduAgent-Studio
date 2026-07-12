@@ -133,7 +133,7 @@ export function AdminUsers() {
 
   return (
     <PageShell>
-      <PageHeader eyebrow="Admin Users" title="用户管理" description="管理学生、教师和管理员账号，维护角色权限和账号状态。" icon={Users} action={<button onClick={() => setOpen(true)} className={`${primaryButton} cursor-pointer`}><Plus className="h-4 w-4" />新增用户</button>} />
+      <PageHeader title="用户管理" description="管理学生、教师和管理员账号，维护角色权限和账号状态。" icon={Users} action={<button onClick={() => setOpen(true)} className={`${primaryButton} cursor-pointer`}><Plus className="h-4 w-4" />新增用户</button>} />
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6 xl:gap-4">{stats.map((stat) => <StatCard key={stat.label} {...stat} />)}</section>
       <section className="edu-card rounded-2xl p-4">
         <div className="flex flex-wrap items-end gap-4">

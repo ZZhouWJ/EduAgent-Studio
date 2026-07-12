@@ -73,7 +73,7 @@ export function AdminCosts() {
 
   return (
     <PageShell>
-      <PageHeader eyebrow="Cost Analytics" title="成本统计" description="按模型、智能体、课程和角色分析大模型调用成本。" icon={Coins}
+      <PageHeader title="成本统计" description="按模型、智能体、课程和角色分析大模型调用成本。" icon={Coins}
         action={<div className="flex flex-col gap-3 sm:flex-row">
           <button onClick={() => setOpen(true)} className={`${secondaryButton} cursor-pointer`}>设置预算提醒</button>
           <button onClick={handleExport} className={`${primaryButton} cursor-pointer`}><Download className="h-4 w-4" />导出报表</button>

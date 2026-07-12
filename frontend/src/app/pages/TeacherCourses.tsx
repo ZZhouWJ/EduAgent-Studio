@@ -64,7 +64,7 @@ export function TeacherCourses() {
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
       <PageHeader
-        eyebrow="Teacher Courses"
+        eyebrow=""
         title="我的课程"
         description="管理课程知识体系、学生学习进度和个性化资源生成策略。"
         icon={GraduationCap}

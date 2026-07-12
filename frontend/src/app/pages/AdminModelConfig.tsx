@@ -100,7 +100,6 @@ export function AdminModelConfig() {
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
       <PageHeader
-        eyebrow="Model Configuration"
         title="模型配置"
         description="统一管理平台接入的大模型服务、API Key、模型能力和连接状态。"
         icon={Settings2}

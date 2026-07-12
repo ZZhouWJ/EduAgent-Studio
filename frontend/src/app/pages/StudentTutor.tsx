@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from "react"
 import { Link } from "react-router-dom"
 import ReactMarkdown from "react-markdown"
-import { BookOpenCheck, MessageSquare, RefreshCcw, Send, ThumbsDown, ThumbsUp } from "lucide-react"
+import { BookOpenCheck, MessageSquare, Send, ThumbsDown, ThumbsUp } from "lucide-react"
 import { useApi } from "@/lib/useApi"
 import { tutorApi, profilesApi, type Citation, type PracticeQuestion, type RecommendedResource } from "@/lib/api"
-import { PageHeader, PageShell, secondaryButton, useInlineToast } from "../components/common/ProductUI"
+import { PageShell, useInlineToast } from "../components/common/ProductUI"
 import { marked } from "marked"
 
 // 消息类型
@@ -152,8 +152,8 @@ export function StudentTutor() {
   const chatScrollRef = useRef<HTMLDivElement>(null)
 
   // 获取学生画像
-  const { data: profilesData } = useApi(() => profilesApi.list({ page_size: 100 }), [])
-  const currentProfile = profilesData?.items?.[0]
+  const { data: profileData } = useApi(() => profilesApi.getMyProfile(), [])
+  const currentProfile = profileData
 
   useEffect(() => {
     if (currentProfile) {
@@ -257,19 +257,6 @@ export function StudentTutor() {
 
   return (
     <PageShell>
-      <PageHeader
-        eyebrow="学习辅导"
-        title="Tutor 智能答疑"
-        description="结合你的学习画像和课程知识库，解答问题、推荐资源、巩固练习。"
-        icon={MessageSquare}
-        action={
-          <button onClick={handleReset} className={secondaryButton}>
-            <RefreshCcw className="h-4 w-4" />
-            清空对话
-          </button>
-        }
-      />
-
       {/* 移动端 tab 切换 */}
       <div className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1 lg:hidden">
         {(["context", "chat", "resources"] as const).map((key) => (

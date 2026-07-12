@@ -134,7 +134,7 @@ export function AdminCourses() {
 
   return (
     <PageShell>
-      <PageHeader eyebrow="Admin Courses" title="课程管理" description="查看和维护平台内高校课程、知识库和资源建设状态。" icon={BookOpen} action={
+      <PageHeader title="课程管理" description="查看和维护平台内高校课程、知识库和资源建设状态。" icon={BookOpen} action={
         <button onClick={handleHealthCheck} className={`${primaryButton} cursor-pointer`}>
           运行建设巡检
         </button>

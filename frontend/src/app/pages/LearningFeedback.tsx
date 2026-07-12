@@ -73,11 +73,6 @@ export function LearningFeedback() {
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6 pb-6">
-      <div>
-        <h1 className="text-2xl font-black text-slate-900">学习反馈与测评</h1>
-        <p className="mt-1 text-sm text-slate-500">跟踪学生学习效果，驱动画像更新和个性化资源推荐。</p>
-      </div>
-
       {/* Current Feedback / Latest */}
       <div className="relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
         <div className="absolute top-0 right-0 h-full w-64 bg-gradient-to-l from-blue-50 to-transparent pointer-events-none" />

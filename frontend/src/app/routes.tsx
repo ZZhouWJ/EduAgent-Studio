@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from "react-router-dom";
+import { createBrowserRouter, Navigate, useNavigate } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { Login } from "./pages/Login";
 import { AdminAgentConfig } from "./pages/AdminAgentConfig";
@@ -26,6 +26,17 @@ import { TeacherDashboard } from "./pages/TeacherDashboard";
 import { TeacherKnowledgeBase } from "./pages/TeacherKnowledgeBase";
 import { TeacherReview } from "./pages/TeacherReview";
 import { TeacherTasks } from "./pages/TeacherTasks";
+import { useAuthStore } from "@/stores/auth";
+
+function RootRedirect() {
+  const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  const roles = user?.roles ?? [];
+  if (roles.includes("admin")) { navigate("/admin", { replace: true }); }
+  else if (roles.includes("teacher")) { navigate("/teacher", { replace: true }); }
+  else { navigate("/student", { replace: true }); }
+  return null;
+}
 
 export const router = createBrowserRouter(
   [
@@ -37,9 +48,10 @@ export const router = createBrowserRouter(
       path: "/",
       Component: Layout,
       children: [
-        { index: true, element: <Navigate to="/teacher" replace /> },
+        { index: true, element: <RootRedirect /> },
 
-        { path: "student", Component: StudentDashboard },
+        { path: "student", Component: StudentTutor },
+        { path: "student/home", Component: StudentDashboard },
         { path: "student/profile", Component: StudentProfile },
         { path: "student/learning-path", Component: StudentLearningPath },
         { path: "student/tasks", Component: StudentTasks },
@@ -87,4 +99,3 @@ export const router = createBrowserRouter(
     },
   },
 );
-

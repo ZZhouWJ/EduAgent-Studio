@@ -14,7 +14,7 @@ import {
   Timer,
 } from "lucide-react";
 import { useApi } from "@/lib/useApi";
-import { learningApi, resourcesApi, statisticsApi } from "@/lib/api";
+import { learningApi, resourcesApi, statisticsApi, profilesApi } from "@/lib/api";
 import type { RecommendedResource } from "@/lib/api/learning";
 import { useAuthStore } from "@/stores/auth";
 import { SafeLottie } from "../components/SafeLottie";
@@ -76,11 +76,12 @@ export function StudentDashboard() {
   const { data: statsData } = useApi(() => statisticsApi.learningOverview(), []);
   const { data: resourcesData } = useApi(() => resourcesApi.list({ page_size: 4 }), []);
   const { data: weakPoints } = useApi(() => statisticsApi.weakKnowledgePoints(5), []);
+  const { data: profileData } = useApi(() => profilesApi.getMyProfile(), []);
 
-  const courseId = learningData?.[0]?.id ?? 0;
-  const profileId = user?.user_id ?? 0;
+  const profileId = profileData?.profile_id ?? 0;
+  const courseId = profileData?.course_id ?? 0;
   const { data: recommendedResources } = useApi(
-    () => learningApi.getRecommendedResources(profileId, courseId),
+    () => (profileId && courseId ? learningApi.getRecommendedResources(profileId, courseId) : Promise.resolve(null)),
     [profileId, courseId]
   );
 
@@ -103,37 +104,6 @@ export function StudentDashboard() {
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6 ds-stagger">
-      {/* ─── 标题区 ───────────────────────────────────── */}
-      <header className="flex items-end justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-            <BookOpenCheck className="h-3.5 w-3.5" />
-            我的学习空间
-          </div>
-          <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-slate-900">
-            {greetingName}，继续学习「{courseName}」
-          </h1>
-          <p className="mt-1.5 max-w-2xl text-sm text-slate-500">
-            系统已根据你的画像和最近测评结果，更新了本周学习路径。今天优先处理薄弱知识点。
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            to="/student/tutor"
-            className="ds-press inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3.5 text-[13px] font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
-          >
-            向 AI 提问
-          </Link>
-          <Link
-            to="/student/learning-path"
-            className="ds-press inline-flex h-9 items-center gap-1.5 rounded-md bg-slate-900 px-3.5 text-[13px] font-medium text-white transition-colors hover:bg-slate-800"
-          >
-            继续学习当前路径
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-      </header>
-
       {/* ─── KPI ──────────────────────────────────────── */}
       <section className="edu-stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
@@ -165,9 +135,9 @@ export function StudentDashboard() {
           tone="amber"
         />
         <StatCard
-          label="本周反馈"
+          label="累计反馈"
           value={String(statsData?.feedback_count ?? "—")}
-          hint="近 7 天"
+          hint="历史反馈总数"
           icon={Library}
           tone="rose"
         />

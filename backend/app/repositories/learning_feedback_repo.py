@@ -110,6 +110,65 @@ class LearningFeedbackRepository:
             "page_size": page_size,
         }
 
+    def get_feedback_history_by_profile(
+        self,
+        profile_id: int,
+        limit: int = 20,
+    ) -> List[Dict[str, Any]]:
+        """
+        获取指定画像的学习反馈历史（用于展示画像更新记录）。
+
+        Returns:
+            反馈记录列表，每条包含 feedback_id, feedback_type, quiz_score,
+            self_mastery, difficulty_rating, content, created_at, resource_title
+        """
+        with get_db_cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    lf.feedback_id,
+                    lf.feedback_type,
+                    lf.quiz_score,
+                    lf.self_mastery,
+                    lf.difficulty_rating,
+                    lf.content,
+                    lf.created_at,
+                    lr.resource_title,
+                    c.course_name
+                FROM learning_feedbacks lf
+                LEFT JOIN learning_resources lr ON lf.resource_id = lr.resource_id AND lr.is_deleted = 0
+                INNER JOIN courses c ON lf.course_id = c.course_id AND c.is_deleted = 0
+                WHERE lf.profile_id = %s AND lf.is_deleted = 0
+                ORDER BY lf.created_at DESC
+                LIMIT %s
+            """, (profile_id, limit))
+            rows = cursor.fetchall()
+
+        items = []
+        for row in rows:
+            feedback_type_labels = {
+                "quiz_result": "测验结果",
+                "self_report": "自评反馈",
+                "study_note": "学习笔记",
+                "question": "问题提问",
+            }
+            items.append({
+                "feedback_id": row["feedback_id"],
+                "feedback_type": row["feedback_type"] or "self_report",
+                "feedback_type_label": feedback_type_labels.get(row["feedback_type"], row["feedback_type"] or "反馈"),
+                "quiz_score": row["quiz_score"],
+                "self_mastery": row["self_mastery"],
+                "difficulty_rating": row["difficulty_rating"],
+                "content": row["content"],
+                "created_at": (
+                    row["created_at"].isoformat()
+                    if isinstance(row["created_at"], datetime)
+                    else str(row["created_at"])
+                ),
+                "resource_title": row["resource_title"],
+                "course_name": row["course_name"] or "",
+            })
+        return items
+
     def create_feedback(
         self,
         data: Dict[str, Any],

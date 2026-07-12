@@ -81,6 +81,11 @@ export const profilesApi = {
     return client.get<ProfileDetail>(`/profiles/${profile_id}`)
   },
 
+  // 获取当前登录学生的画像
+  getMyProfile() {
+    return client.get<ProfileDetail>(`/profiles/me`)
+  },
+
   update(profile_id: number, data: Record<string, unknown>) {
     return client.put(`/profiles/${profile_id}`, data)
   },
@@ -113,5 +118,21 @@ export const profilesApi = {
   // 应用抽取结果
   applyExtraction(profileId: number, extraction: ProfileExtraction) {
     return client.post<ProfileDetail>(`/profiles/${profileId}/apply-extraction`, extraction)
+  },
+
+  // 获取画像更新记录（学习反馈历史）
+  getFeedbackHistory(profileId: number, limit = 20) {
+    return client.get<Array<{
+      feedback_id: number
+      feedback_type: string
+      feedback_type_label: string
+      quiz_score: number | null
+      self_mastery: number | null
+      difficulty_rating: string | null
+      content: string | null
+      created_at: string
+      resource_title: string | null
+      course_name: string
+    }>>(`/profiles/${profileId}/feedback-history`, { params: { limit } })
   },
 }

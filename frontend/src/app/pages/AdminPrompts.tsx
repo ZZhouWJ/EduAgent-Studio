@@ -156,7 +156,6 @@ export function AdminPrompts() {
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
       <PageHeader
-        eyebrow="Prompt Templates"
         title="提示词模板"
         description="管理资源生成、画像诊断、教师审核和防幻觉检查等场景的提示词模板。"
         icon={FileText}

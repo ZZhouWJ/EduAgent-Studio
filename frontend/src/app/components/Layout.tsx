@@ -84,12 +84,12 @@ const ROLE_CONFIG: Record<RoleKey, RoleConfig> = {
       {
         title: "我的学习",
         items: [
-          { path: "/student", label: "我的学习首页", icon: LayoutDashboard },
+          { path: "/student", label: "AI 学习辅导", icon: Bot },
+          { path: "/student/home", label: "学习中心", icon: LayoutDashboard },
           { path: "/student/profile", label: "我的画像", icon: UserSquare2 },
           { path: "/student/learning-path", label: "学习路径", icon: Route },
           { path: "/student/tasks", label: "学习任务", icon: ListTodo },
           { path: "/student/resources", label: "推荐资源", icon: Library },
-          { path: "/student/tutor", label: "AI 学习辅导", icon: Bot },
           { path: "/student/feedback", label: "测评与反馈", icon: MessageSquare },
           { path: "/student/report", label: "学习报告", icon: LineChart },
         ],

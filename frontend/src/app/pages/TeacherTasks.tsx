@@ -66,7 +66,7 @@ export function TeacherTasks() {
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
       <PageHeader
-        eyebrow="Teacher Task Management"
+        eyebrow=""
         title="学习任务管理"
         description="面向班级或学生个体发布学习任务，并跟踪完成情况。"
         icon={ClipboardList}

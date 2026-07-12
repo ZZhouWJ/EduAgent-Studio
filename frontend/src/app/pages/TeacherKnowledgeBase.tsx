@@ -162,7 +162,7 @@ export function TeacherKnowledgeBase() {
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Course Knowledge Base"
+        eyebrow=""
         title="课程知识库"
         description="管理课程文档、知识点、知识片段和检索证据，为智能体生成资源提供可信依据。"
         icon={Database}

@@ -43,7 +43,7 @@ export interface LearningPathNode {
   name: string
   kp_name: string
   kp_code: string
-  difficulty_level: number
+  difficulty_level: string
   description: string
   estimated_hours: number
   mastery_level: number

@@ -413,6 +413,7 @@ class LearningRepository:
         edges = []
         mastered = 0
         weak = 0
+        found_current = False
 
         for row in rows:
             mastery = float(row["mastery_level"])
@@ -434,6 +435,12 @@ class LearningRepository:
             else:
                 node_color = "#909399"
                 status_label = "未学习"
+
+            # 第一个非"已掌握"的节点标记为"当前学习点"
+            if not found_current and status_label != "已掌握":
+                status_label = "当前学习点"
+                node_color = "#2563eb"  # 蓝色高亮
+                found_current = True
 
             # 节点大小按难度和掌握度调整
             size_base = 60
@@ -577,10 +584,12 @@ class LearningRepository:
                 lr.resource_id,
                 lr.resource_title,
                 lr.resource_type,
+                lr.difficulty,
                 lr.target_kp_ids,
                 lr.review_status,
                 kp.kp_name AS primary_kp_name,
                 kp.kp_id AS primary_kp_id,
+                kp.estimated_hours,
                 COALESCE(skm.mastery_level, 0.5) AS kp_mastery
             FROM learning_resources lr
             INNER JOIN knowledge_points kp ON lr.target_kp_ids LIKE CONCAT('%%', kp.kp_id, '%%')
@@ -637,11 +646,17 @@ class LearningRepository:
             if resource_prefs and row["resource_type"] in resource_prefs:
                 reason = f"推荐{row['resource_type']}类型资源，" + reason
 
+            # estimated_minutes: 从知识点 estimated_hours 计算（小时 * 60）
+            estimated_hours = row.get("estimated_hours") or 1
+            estimated_minutes = round(float(estimated_hours) * 60)
+
             results.append({
                 "resource_id": row["resource_id"],
                 "title": row["resource_title"],
                 "type": row["resource_type"],
+                "difficulty": row.get("difficulty") or "basic",
                 "reason": reason,
+                "estimated_minutes": estimated_minutes,
                 "kp_name": kp_name,
             })
 

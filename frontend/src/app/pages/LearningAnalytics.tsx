@@ -6,11 +6,16 @@ import { statisticsApi, learningApi } from "@/lib/api";
 
 const RESOURCE_COLORS: Record<string, string> = {
   lecture: "#3b82f6",
+  ppt: "#8b5cf6",
+  quiz: "#ef4444",
+  case: "#10b981",
+  review: "#f59e0b",
+  test: "#06b6d4",
   exercise: "#8b5cf6",
   code: "#10b981",
   slides: "#f59e0b",
   reference: "#06b6d4",
-  quiz: "#ef4444",
+  other: "#6b7280",
   default: "#6b7280",
 };
 
@@ -76,11 +81,6 @@ export function LearningAnalytics() {
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto pb-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">学习分析看板</h1>
-        <p className="text-slate-500 mt-1 text-sm">基于学生画像、资源使用、测评反馈和智能体调用数据分析学习效果。</p>
-      </div>
-
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         {kpiCards.map((item, i) => {

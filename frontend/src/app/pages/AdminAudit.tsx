@@ -80,7 +80,7 @@ export function AdminAudit() {
 
   return (
     <PageShell>
-      <PageHeader eyebrow="AI Audit" title="调用审计" description="追踪每一次智能体调用、模型使用、Token 消耗、响应时间和风险状态。" icon={ActivitySquare}
+      <PageHeader title="调用审计" description="追踪每一次智能体调用、模型使用、Token 消耗、响应时间和风险状态。" icon={ActivitySquare}
         action={<button onClick={handleExport} className={`${primaryButton} cursor-pointer`}><Download className="h-4 w-4" />导出审计日志</button>}
       />
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6 xl:gap-4">{stats.map((stat) => <StatCard key={stat.label} {...stat} />)}</section>

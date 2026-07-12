@@ -8,6 +8,13 @@ from app.services.profile_dialog_service import ProfileDialogService
 router = APIRouter(prefix="/profiles", tags=["学生画像"])
 
 
+@router.get("/me")
+async def get_my_profile(user: dict = Depends(get_current_user_dep)):
+    """获取当前登录用户自己的学生画像（所有角色均可访问）"""
+    service = ProfileService()
+    return service.get_my_profile(user)
+
+
 @router.get("/")
 async def list_profiles(
     page: int = Query(1, ge=1),
@@ -16,7 +23,7 @@ async def list_profiles(
     keyword: Optional[str] = None,
     user: dict = Depends(get_current_user_dep),
 ):
-    """获取学生画像列表（登录用户均可访问）"""
+    """获取学生画像列表（教师/管理员可访问，学生应使用 /profiles/me）"""
     service = ProfileService()
     return service.list_profiles(user, page, page_size, course_id, keyword)
 
@@ -26,6 +33,19 @@ async def get_profile(profile_id: int, user: dict = Depends(get_current_user_dep
     """获取学生画像详情（登录用户均可访问）"""
     service = ProfileService()
     return service.get_profile(profile_id, user)
+
+
+@router.get("/{profile_id}/feedback-history")
+async def get_profile_feedback_history(
+    profile_id: int = Path(..., gt=0, description="画像 ID"),
+    limit: int = Query(20, ge=1, le=50, description="返回条数限制"),
+    user: dict = Depends(get_current_user_dep),
+):
+    """获取画像更新记录（学习反馈历史）"""
+    from app.repositories.learning_feedback_repo import LearningFeedbackRepository
+    repo = LearningFeedbackRepository()
+    items = repo.get_feedback_history_by_profile(profile_id, limit)
+    return {"code": 0, "message": "success", "data": items}
 
 
 @router.put("/{profile_id}")

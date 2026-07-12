@@ -146,11 +146,7 @@ export function TeacherReview() {
 
   return (
     <div className="page-shell flex min-h-0 flex-col pb-6">
-      <div className="shrink-0">
-        <h1 className="text-2xl font-black text-slate-900">教师审核中心</h1>
-        <p className="mt-1 text-sm text-slate-500">对生成的学习资源进行准确性、适配性和安全性审核。</p>
-      </div>
-
+      {/* 页面内容直接开始 */}
       <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:gap-6">
         {/* Left: Pending Review List */}
         <div className="flex w-full shrink-0 flex-col gap-4 lg:w-[400px]">

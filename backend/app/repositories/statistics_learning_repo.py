@@ -70,11 +70,20 @@ class StatisticsLearningRepository:
                 round(approved_count / resource_count, 3) if resource_count > 0 else 0.0
             )
 
+            # 智能体调用次数（真实统计）
+            try:
+                cursor.execute(
+                    "SELECT COUNT(*) AS cnt FROM ai_invocations WHERE is_deleted = 0"
+                )
+                invocation_count = cursor.fetchone()["cnt"]
+            except Exception:
+                invocation_count = 0
+
         return {
             "course_count": course_count,
             "student_count": student_count,
             "resource_count": resource_count,
-            "invocation_count": 0,
+            "invocation_count": invocation_count,
             "avg_mastery": avg_mastery,
             "review_pass_rate": review_pass_rate,
             "feedback_count": feedback_count,

@@ -92,11 +92,6 @@ export function ResourceLibrary() {
 
   return (
     <div className="mx-auto flex h-full max-w-[1400px] flex-col space-y-6 pb-6">
-      <div className="shrink-0">
-        <h1 className="text-2xl font-black text-slate-900">学习资源库</h1>
-        <p className="mt-1 text-sm text-slate-500">统一管理由多智能体生成并经教师审核的个性化学习资源。</p>
-      </div>
-
       {/* Filters */}
       <div className="flex shrink-0 items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
         <div className="flex items-center gap-2 flex-1">
