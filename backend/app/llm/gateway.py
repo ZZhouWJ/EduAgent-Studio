@@ -41,6 +41,8 @@ class LLMConfig:
     temperature: float = 0.7
     max_tokens: int = 2048
     timeout: int = 60
+    api_secret: Optional[str] = None  # 讯飞星火认证用
+    app_id: Optional[str] = None      # 讯飞星火认证用
 
 
 class LLMGateway:

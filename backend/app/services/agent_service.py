@@ -8,6 +8,7 @@ from app.config import get_settings
 from app.llm.mock_provider import MockProvider
 from app.llm.openai_compatible_provider import OpenAICompatibleProvider
 from app.llm.minimax_provider import MiniMaxProvider
+from app.llm.iflytek_provider import IFlyTekProvider
 from app.llm.gateway import llm_gateway
 from app.services.storage_service import (
     save_resource_content,
@@ -29,6 +30,15 @@ if not _llm_registered:
         base_url=settings.llm_base_url,
         api_key=settings.llm_api_key,
     ))
+    # 讯飞星火（当 LLM_PROVIDER=iflytek 时由 gateway 路由至此）
+    if settings.iflytek_app_id and settings.iflytek_api_key:
+        llm_gateway.register_provider("iflytek", IFlyTekProvider(
+            model_name=settings.llm_model,        # 星火 domain，如 "general"
+            api_key=settings.iflytek_api_key,
+            api_secret=settings.iflytek_api_secret,
+            app_id=settings.iflytek_app_id,
+        ))
+        logger.info(f"[IFlyTek] Registered: app_id={settings.iflytek_app_id}, model={settings.llm_model}")
     _llm_registered = True
 
 from app.agents.workflow import run_workflow, stream_workflow, get_compiled_graph

@@ -4,6 +4,7 @@ from typing import Any, Dict
 from app.llm.mock_provider import MockProvider
 from app.llm.openai_compatible_provider import OpenAICompatibleProvider
 from app.llm.minimax_provider import MiniMaxProvider
+from app.llm.iflytek_provider import IFlyTekProvider
 
 logger = logging.getLogger(__name__)
 

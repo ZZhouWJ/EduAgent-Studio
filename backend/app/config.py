@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     llm_base_url: str = Field(default="https://api.deepseek.com/v1", alias="LLM_BASE_URL")
     llm_model: str = Field(default="deepseek-chat", alias="LLM_MODEL")
 
+    # --- 讯飞星火配置（当 LLM_PROVIDER=iflytek 时生效）---
+    iflytek_app_id: str = Field(default="", alias="IFLYTEK_APP_ID")
+    iflytek_api_key: str = Field(default="", alias="IFLYTEK_API_KEY")
+    iflytek_api_secret: str = Field(default="", alias="IFLYTEK_API_SECRET")
+    iflytek_doc_id: str = Field(default="", alias="IFLYTEK_DOC_ID")
+
     # --- PostgreSQL 配置（pgvector） ---
     postgres_url: str = Field(default="", alias="POSTGRES_URL")
 
@@ -81,6 +87,8 @@ class Settings(BaseSettings):
             temperature=0.7,
             max_tokens=2048,
             timeout=60,
+            api_secret=self.iflytek_api_secret,
+            app_id=self.iflytek_app_id,
         )
 
 
