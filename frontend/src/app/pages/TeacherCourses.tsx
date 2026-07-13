@@ -115,7 +115,7 @@ export function TeacherCourses() {
             <div className="mt-5 grid grid-cols-2 gap-2">
               <button onClick={() => setSelected(course)} className={secondaryButton}>查看详情</button>
               <Link to="/teacher/knowledge-base" className={secondaryButton}>进入知识库</Link>
-              <Link to="/teacher/agent-workbench" className={primaryButton}>生成资源</Link>
+              <Link to="/teacher/review" className={primaryButton}>去审核</Link>
               <Link to="/teacher/analytics" className={secondaryButton}>查看分析</Link>
             </div>
           </article>

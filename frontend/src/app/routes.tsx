@@ -11,7 +11,6 @@ import { AdminLogs } from "./pages/AdminLogs";
 import { AdminModelConfig } from "./pages/AdminModelConfig";
 import { AdminPrompts } from "./pages/AdminPrompts";
 import { AdminUsers } from "./pages/AdminUsers";
-import { AgentWorkbench } from "./pages/AgentWorkbench";
 import { LearningAnalytics } from "./pages/LearningAnalytics";
 import { LearningFeedback } from "./pages/LearningFeedback";
 import { NotFound } from "./pages/NotFound";
@@ -64,7 +63,6 @@ export const router = createBrowserRouter(
         { path: "teacher", Component: TeacherDashboard },
         { path: "teacher/courses", Component: TeacherCourses },
         { path: "teacher/students", Component: TeacherStudents },
-        { path: "teacher/agent-workbench", Component: AgentWorkbench },
         { path: "teacher/resources", Component: ResourceLibrary },
         { path: "teacher/review", Component: TeacherReview },
         { path: "teacher/tasks", Component: TeacherTasks },
@@ -83,7 +81,6 @@ export const router = createBrowserRouter(
         { path: "admin/governance", Component: AdminGovernance },
         { path: "admin/logs", Component: AdminLogs },
 
-        { path: "agent-workbench", element: <Navigate to="/teacher/agent-workbench" replace /> },
         { path: "student-profile", element: <Navigate to="/student/profile" replace /> },
         { path: "resource-library", element: <Navigate to="/teacher/resources" replace /> },
         { path: "teacher-review", element: <Navigate to="/teacher/review" replace /> },

@@ -76,8 +76,8 @@ export function TeacherDashboard() {
                 : ""}
             </p>
             <div className="mt-6 flex gap-3">
-              <Link to="/teacher/agent-workbench" className="inline-flex h-10 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800">
-                前往工作台
+              <Link to="/teacher/knowledge-base" className="inline-flex h-10 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800">
+                管理知识库
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link to="/teacher/review" className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50">
@@ -179,13 +179,13 @@ export function TeacherDashboard() {
           <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
             资源生成建议
           </h3>
-          <Link to="/teacher/agent-workbench" className="text-sm font-semibold text-slate-700 hover:text-slate-900">进入工作台</Link>
+          <Link to="/teacher/knowledge-base" className="text-sm font-semibold text-slate-700 hover:text-slate-900">进入知识库</Link>
         </div>
         <div className="grid grid-cols-4 gap-4">
           {taskSuggestions.map((item, index) => (
             <Link
               key={`${item.title}-${index}`}
-              to="/teacher/agent-workbench"
+              to="/teacher/knowledge-base"
               className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:shadow-sm"
             >
               <div className="mb-3 flex items-center justify-between">
