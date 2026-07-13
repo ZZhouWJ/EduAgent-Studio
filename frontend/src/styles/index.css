@@ -369,3 +369,15 @@ h1, h2, h3, h4, .edu-display {
     animation: none !important;
   }
 }
+
+/* ─── 内嵌内容块样式 ─────────────────────────── */
+.content-block.embedded {
+  border-radius: 0.75rem;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 0;
+}
+.content-block.embedded > *:first-child {
+  margin-top: 0;
+}
+

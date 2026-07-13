@@ -9,6 +9,8 @@ import { ResourceRenderer } from "../resource/ResourceRenderer"
 interface ContentBlockRendererProps {
   block: ContentBlock
   expanded?: boolean
+  /** 嵌入模式：不显示 block 类型 badge，更融入正文 */
+  embedded?: boolean
 }
 
 // 将 ContentBlock 适配为 ResourceRenderer 期望的格式
@@ -143,8 +145,8 @@ function GenericBlock({ block }: { block: ContentBlock }) {
   )
 }
 
-export function ContentBlockRenderer({ block, expanded = true }: ContentBlockRendererProps) {
-  const blockClass = `content-block content-block-${block.block_type}`
+export function ContentBlockRenderer({ block, expanded = true, embedded = false }: ContentBlockRendererProps) {
+  const blockClass = `content-block content-block-${block.block_type} ${embedded ? "embedded" : ""}`
 
   const content = (() => {
     switch (block.block_type) {
@@ -165,40 +167,42 @@ export function ContentBlockRenderer({ block, expanded = true }: ContentBlockRen
 
   return (
     <div className={blockClass}>
-      {/* 区块标签 */}
-      <div className="mb-2 flex items-center gap-2">
-        <span
-          className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-bold ${
-            block.block_type === "mindmap"
-              ? "bg-purple-100 text-purple-700"
+      {/* 区块标签 — 嵌入模式下隐藏 */}
+      {!embedded && (
+        <div className="mb-2 flex items-center gap-2">
+          <span
+            className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-bold ${
+              block.block_type === "mindmap"
+                ? "bg-purple-100 text-purple-700"
+                : block.block_type === "quiz"
+                ? "bg-emerald-100 text-emerald-700"
+                : block.block_type === "code_case"
+                ? "bg-blue-100 text-blue-700"
+                : block.block_type === "ppt"
+                ? "bg-orange-100 text-orange-700"
+                : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            {block.block_type === "mindmap"
+              ? "🗺 思维导图"
               : block.block_type === "quiz"
-              ? "bg-emerald-100 text-emerald-700"
+              ? "📝 练习题"
               : block.block_type === "code_case"
-              ? "bg-blue-100 text-blue-700"
+              ? "💻 代码案例"
               : block.block_type === "ppt"
-              ? "bg-orange-100 text-orange-700"
-              : "bg-slate-100 text-slate-600"
-          }`}
-        >
-          {block.block_type === "mindmap"
-            ? "🗺 思维导图"
-            : block.block_type === "quiz"
-            ? "📝 练习题"
-            : block.block_type === "code_case"
-            ? "💻 代码案例"
-            : block.block_type === "ppt"
-            ? "📊 PPT大纲"
-            : block.block_type === "video_script"
-            ? "🎬 视频脚本"
-            : block.title}
-        </span>
-        {block.trustworthiness === "high" && (
-          <span className="text-xs text-emerald-600">✓ 已验证</span>
-        )}
-        {block.trustworthiness === "draft" && (
-          <span className="text-xs text-orange-600">⚠ 草稿</span>
-        )}
-      </div>
+              ? "📊 PPT大纲"
+              : block.block_type === "video_script"
+              ? "🎬 视频脚本"
+              : block.title}
+          </span>
+          {block.trustworthiness === "high" && (
+            <span className="text-xs text-emerald-600">✓ 已验证</span>
+          )}
+          {block.trustworthiness === "draft" && (
+            <span className="text-xs text-orange-600">⚠ 草稿</span>
+          )}
+        </div>
+      )}
       {content}
     </div>
   )

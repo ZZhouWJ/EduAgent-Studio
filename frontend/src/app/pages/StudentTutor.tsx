@@ -166,6 +166,41 @@ function ResourcesCard({ resources }: { resources: RecommendedResource[] }) {
   )
 }
 
+/* ─── 内嵌内容块解析 ──────────────────────────────── */
+// 将 ":::quiz:block_abc:::这是一段文字 :::code_case:block_def:::" 解析为片段数组
+type ContentSegment =
+  | { type: "text"; content: string }
+  | { type: "embed"; blockType: string; blockId: string }
+
+const EMBED_REGEX = /:::(quiz|code_case|mindmap|lecture|ppt|video_script|error_analysis|learning_card):([^:]+):::/g
+
+function parseInlineBlocks(content: string, blocks: ContentBlock[]): ContentSegment[] {
+  if (!content) return []
+  const segments: ContentSegment[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  EMBED_REGEX.lastIndex = 0
+  while ((match = EMBED_REGEX.exec(content)) !== null) {
+    // 文本片段（两个嵌入标记之间的内容）
+    if (match.index > lastIndex) {
+      segments.push({ type: "text", content: content.slice(lastIndex, match.index) })
+    }
+    // 嵌入标记：验证 block 是否存在
+    const blockId = match[2]
+    const block = blocks.find((b) => b.block_id === blockId)
+    if (block) {
+      segments.push({ type: "embed", blockType: match[1], blockId })
+    }
+    lastIndex = match.index + match[0].length
+  }
+  // 剩余文本
+  if (lastIndex < content.length) {
+    segments.push({ type: "text", content: content.slice(lastIndex) })
+  }
+  return segments
+}
+
 /* ─── 消息气泡 ─────────────────────────────────────── */
 function MessageBubble({ message, onFeedback, executionEvents }: {
   message: Message
@@ -187,6 +222,21 @@ function MessageBubble({ message, onFeedback, executionEvents }: {
     image_agent: "生成图片",
   }
 
+  // 解析内嵌块
+  const segments = !isStudent && message.content && message.content_blocks
+    ? parseInlineBlocks(message.content, message.content_blocks)
+    : null
+  // 是否使用了内嵌语法
+  const hasInlineEmbeds = segments && segments.some((s) => s.type === "embed")
+  // 未被引用的 content_blocks（作为兜底在末尾显示）
+  const unusedBlocks = !isStudent && message.content_blocks
+    ? message.content_blocks.filter((b) => {
+        // 检查是否有嵌入标记引用了这个 block
+        if (!segments) return true
+        return !segments.some((s) => s.type === "embed" && s.blockId === b.block_id)
+      })
+    : []
+
   return (
     <div className={`flex ${isStudent ? "justify-end" : "justify-start"}`}>
       <div
@@ -196,8 +246,27 @@ function MessageBubble({ message, onFeedback, executionEvents }: {
             : "border border-slate-100 bg-slate-50 text-slate-700"
         }`}
       >
+        {/* 消息内容：内嵌卡片模式优先 */}
         <div className="prose prose-sm max-w-none">
-          <ReactMarkdown>{message.content}</ReactMarkdown>
+          {hasInlineEmbeds && segments ? (
+            // 内嵌卡片模式：交替渲染文本片段和内容块卡片
+            <div className="space-y-3">
+              {segments.map((seg, i) =>
+                seg.type === "text" ? (
+                  <ReactMarkdown key={i}>{seg.content}</ReactMarkdown>
+                ) : (
+                  <ContentBlockRenderer
+                    key={i}
+                    block={message.content_blocks!.find((b) => b.block_id === seg.blockId)!}
+                    embedded
+                  />
+                )
+              )}
+            </div>
+          ) : (
+            // 传统模式：直接渲染 markdown
+            <ReactMarkdown>{message.content}</ReactMarkdown>
+          )}
         </div>
 
         {!isStudent && (
@@ -207,8 +276,8 @@ function MessageBubble({ message, onFeedback, executionEvents }: {
               <ExecutionTrace events={executionEvents} tool_labels={toolLabels} />
             )}
 
-            {/* 已生成内容块标签 */}
-            {message.content_blocks && message.content_blocks.length > 0 && (
+            {/* 已生成内容块标签 — 仅在非内嵌模式下显示 */}
+            {!hasInlineEmbeds && message.content_blocks && message.content_blocks.length > 0 && (
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className="text-xs text-slate-500">已生成：</span>
                 {message.content_blocks.map((block) => (
@@ -238,10 +307,10 @@ function MessageBubble({ message, onFeedback, executionEvents }: {
               </div>
             )}
 
-            {/* 多模态内容块 */}
-            {message.content_blocks && message.content_blocks.length > 0 && (
+            {/* 多模态内容块（未嵌入的兜底渲染） */}
+            {unusedBlocks.length > 0 && (
               <div className="mt-4 space-y-3">
-                {message.content_blocks.map((block) => (
+                {unusedBlocks.map((block) => (
                   <ContentBlockRenderer key={block.block_id} block={block} />
                 ))}
               </div>
