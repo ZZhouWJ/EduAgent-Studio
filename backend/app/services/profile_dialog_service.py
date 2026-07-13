@@ -25,26 +25,24 @@ EXTRACTION_PROMPT = """你是一个学生学习画像分析助手。请从学生
 学生描述：
 {user_message}
 
-请从学生描述中抽取以下10个维度的信息，并以JSON格式返回：
+请抽取以下字段（只返回有信息支持的字段，无信息的字段填 null 或空列表）：
 
 {{
-    "knowledge_base": "学生已有的知识基础描述",
-    "current_level": "学生当前的学习水平",
-    "weak_points": ["薄弱知识点1", "薄弱知识点2"],
+    "knowledge_base": "学生已有知识基础的描述（null表示未知）",
+    "current_level": "当前学习水平：基础/一般/较好",
+    "learning_goal": "学生的学习目标（null表示未知）",
+    "weak_points": ["薄弱知识点名称1", "薄弱知识点名称2"],
     "error_prone_points": ["易错点1", "易错点2"],
-    "learning_goal": "学生的学习目标",
-    "cognitive_style": "学生的认知风格偏好",
-    "resource_preferences": ["资源偏好1", "资源偏好2"],
-    "time_constraints": "学习时间约束",
-    "practice_level": "实践能力水平",
-    "motivation": "学习动机"
+    "interests": ["兴趣方向1", "兴趣方向2"],
+    "resource_preferences": ["资源偏好类型1", "资源偏好类型2"],
+    "weekly_hours": 每周可学习小时数（数字，null表示未知）
 }}
 
 注意：
-1. 如果学生在某个维度没有提供信息，请使用null或空列表
-2. weak_points 和 error_prone_points 应该是数组
-3. resource_preferences 应该考虑学生喜欢的学习资源类型
-4. 你的回复应该只包含JSON，不要包含其他文字说明
+1. 只填写真实从学生描述中能推断出的信息，不要编造
+2. weak_points、error_prone_points、interests、resource_preferences 为数组（可为空列表 []）
+3. weekly_hours 为数字，如"每周3小时"则填 3
+4. 只返回 JSON，不要有其他文字
 """
 
 

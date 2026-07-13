@@ -1,5 +1,5 @@
 """学习任务 API — 课程、知识点、学习任务、学习路径"""
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Path, Query
 from pydantic import BaseModel, Field
@@ -8,6 +8,15 @@ from app.services.auth_service import get_current_user_dependency as get_current
 from app.services import learning_service
 
 router = APIRouter(prefix="/learning", tags=["学习任务"])
+
+
+class CreateLearningTaskRequest(BaseModel):
+    course_id: int = Field(..., gt=0)
+    title: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = Field(None, max_length=2000)
+    target_kp_ids: Optional[list[int]] = Field(None)
+    assignee_id: Optional[int] = Field(None)
+    due_date: Optional[str] = Field(None)  # "YYYY-MM-DD" 格式
 
 
 class UpdateCourseStatusRequest(BaseModel):
@@ -60,6 +69,26 @@ async def get_learning_task(
 ):
     """获取学习任务详情"""
     return learning_service.LearningService().get_task(task_id)
+
+
+@router.post("/tasks")
+async def create_learning_task(
+    body: CreateLearningTaskRequest,
+    token: str = Depends(get_current_user),
+):
+    """创建学习任务"""
+    from app.services.auth_service import get_current_user as get_user
+    user = get_user(token)
+    creator_id = user.get("user_id", 0) if user else 0
+    return learning_service.LearningService().create_task(
+        course_id=body.course_id,
+        title=body.title,
+        description=body.description,
+        target_kp_ids=body.target_kp_ids,
+        assignee_id=body.assignee_id,
+        due_date=body.due_date,
+        creator_id=creator_id,
+    )
 
 
 # =============================================================================

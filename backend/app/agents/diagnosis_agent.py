@@ -33,22 +33,22 @@ PROMPT_DIAGNOSIS = """你是一个专业的学习诊断智能体。请根据以�
 请以 JSON 格式输出诊断结果：
 {{
   "weak_points": [
-    {{"kp_id": 1, "name": "知识点名称", "mastery_level": 0.3, "reason": "诊断理由"}}
+    {{"kp_id": 3, "name": "SQL多表连接", "mastery_level": 0.3, "reason": "诊断理由"}}
   ],
   "strength_points": [
-    {{"kp_id": 2, "name": "知识点名称", "mastery_level": 0.85}}
+    {{"kp_id": 7, "name": "数据库设计基础", "mastery_level": 0.85}}
   ],
   "learning_difficulties": ["学习困难1", "学习困难2"],
-  "resource_needs": ["资源需求1", "资源需求2"],
+  "resource_needs": ["讲义", "练习题", "案例分析"],
   "suggested_difficulty": "intermediate"
 }}
 
 要求：
-- weak_points 列出 mastery_level < 0.5 的知识点，并给出简短诊断理由
-- strength_points 列出 mastery_level >= 0.5 的知识点
-- learning_difficulties 描述 2-3 个具体的学习困难
-- resource_needs 建议 2-3 种学习资源类型
-- suggested_difficulty 从 "basic" / "intermediate" / "advanced" 中选择
+- weak_points：mastery_level < 0.5 的知识点，必填 kp_id 和 reason
+- strength_points：mastery_level >= 0.5 的知识点
+- learning_difficulties：2-3 个具体学习困难描述
+- resource_needs：2-3 种资源类型（讲义/习题/案例/代码/视频）
+- suggested_difficulty："basic" / "intermediate" / "advanced"
 - 只输出 JSON，不要有其他内容
 """
 

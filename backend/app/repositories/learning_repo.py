@@ -338,6 +338,31 @@ class LearningRepository:
         }
 
     @staticmethod
+    def create_task(
+        self,
+        course_id: int,
+        title: str,
+        description: Optional[str] = None,
+        target_kp_ids: Optional[List[int]] = None,
+        assignee_id: Optional[int] = None,
+        due_date: Optional[str] = None,
+        creator_id: int = 0,
+    ) -> Dict[str, Any]:
+        """创建学习任务。"""
+        kp_str = ",".join(str(k) for k in target_kp_ids) if target_kp_ids else None
+        due_dt = due_date if due_date else None
+        with get_db_cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO learning_tasks
+                    (course_id, title, description, target_kp_ids, assignee_id, due_date, creator_id, status, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, 'assigned', NOW(), NOW())
+                """,
+                (course_id, title, description, kp_str, assignee_id, due_dt, creator_id),
+            )
+            task_id = cursor.lastrowid
+        return self.get_task(task_id) or {"id": task_id, "course_id": course_id, "title": title}
+
     def _detect_task_type(title: str) -> str:
         """根据标题关键词检测任务类型。"""
         title_lower = title.lower()

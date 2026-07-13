@@ -43,6 +43,9 @@ class LLMConfig:
     timeout: int = 60
     api_secret: Optional[str] = None  # 讯飞星火认证用
     app_id: Optional[str] = None      # 讯飞星火认证用
+    # Tool Calling 支持
+    tools: Optional[List[Dict[str, Any]]] = None  # OpenAI tool schema 格式
+    tool_choice: Optional[str] = None  # "auto" | "required" | None
 
 
 class LLMGateway:
@@ -60,7 +63,7 @@ class LLMGateway:
         self,
         messages: List[Dict[str, str]],
         config: LLMConfig,
-        **kwargs
+        **kwargs,
     ) -> LLMCallResult:
         """统一生成接口"""
         start_time = time.time()

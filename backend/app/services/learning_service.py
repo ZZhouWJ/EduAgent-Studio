@@ -39,6 +39,30 @@ class LearningService:
             return {"code": 404, "message": "任务不存在", "data": None}
         return {"code": 0, "message": "success", "data": task}
 
+    def create_task(
+        self,
+        course_id: int,
+        title: str,
+        description: Optional[str] = None,
+        target_kp_ids: Optional[list] = None,
+        assignee_id: Optional[int] = None,
+        due_date: Optional[str] = None,
+        creator_id: int = 0,
+    ) -> Dict[str, Any]:
+        try:
+            result = self._repo.create_task(
+                course_id=course_id,
+                title=title,
+                description=description,
+                target_kp_ids=target_kp_ids,
+                assignee_id=assignee_id,
+                due_date=due_date,
+                creator_id=creator_id,
+            )
+            return {"code": 0, "message": "任务创建成功", "data": result}
+        except Exception as e:
+            return {"code": 500, "message": f"创建任务失败: {e}", "data": None}
+
     def update_course_status(self, course_id: int, status: str) -> Dict[str, Any]:
         try:
             result = self._repo.update_course_status(course_id, status)

@@ -161,6 +161,7 @@ def _planning_node(state: WorkflowState) -> Dict[str, Any]:
             diagnosis=state.get("diagnosis") or {},
             learning_goal=state.get("student_profile", {}).get("learning_goal", ""),
             course_outline=state.get("knowledge_points") or [],
+            student_profile=state.get("student_profile") or {},
         )
         duration = int((time.time() - start) * 1000)
         return {

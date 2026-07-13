@@ -127,6 +127,17 @@ export const learningApi = {
     return client.get<LearningTask>(`/learning/tasks/${task_id}`)
   },
 
+  createTask(data: {
+    course_id: number
+    title: string
+    description?: string
+    target_kp_ids?: number[]
+    assignee_id?: number
+    due_date?: string
+  }) {
+    return client.post<{ code: number; message: string; data: LearningTask }>('/learning/tasks', data)
+  },
+
   getLearningPath(course_id: number, profile_id?: number) {
     return client.get<LearningPathGraph>(`/learning/courses/${course_id}/learning-path`, {
       params: profile_id !== undefined ? { profile_id } : undefined,

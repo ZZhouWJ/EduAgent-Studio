@@ -14,32 +14,49 @@ logger = logging.getLogger(__name__)
 
 PROMPT_TEACHER_REVIEW = """你是一个专业的教学审核辅助智能体。请对以下学习资源进行质量评估。
 
-## 资源标题：{resource_title}
-## 资源类型：{resource_type}
-## 难度要求：{difficulty}
-## 资源正文：
+## 资源信息
+- 标题：{resource_title}
+- 类型：{resource_type}
+- 难度：{difficulty}
+
+## 课程教学目标
+{course_objectives}
+
+## 资源正文（仅供审核，不要照抄）：
 {content}
+
+## 审核维度（6项必检）
+1. 准确性：知识概念是否正确，有无事实性错误
+2. 完整性：是否覆盖教学目标要求的所有要点
+3. 逻辑性：内容组织是否符合认知规律，由浅入深
+4. 规范性：术语使用是否标准，格式是否规范
+5. 可操作性：练习题是否可做，代码是否可运行
+6. 难度适配性：内容深度是否与目标难度匹配
 
 请以 JSON 格式输出审核建议：
 {{
   "quality_score": 8.5,
   "quality_checks": [
-    {{"check": "检查项名称", "passed": true, "note": "检查说明"}},
-    {{"check": "检查项名称", "passed": false, "note": "检查说明"}}
+    {{"check": "准确性", "passed": true, "note": "..."}},
+    {{"check": "完整性", "passed": false, "note": "缺少xxx要点"}},
+    {{"check": "逻辑性", "passed": true, "note": "..."}},
+    {{"check": "规范性", "passed": true, "note": "..."}},
+    {{"check": "可操作性", "passed": true, "note": "..."}},
+    {{"check": "难度适配性", "passed": false, "note": "偏难/偏易"}}
   ],
   "risk_alerts": [
-    {{"level": "info", "message": "提示信息"}}
+    {{"level": "warning", "message": "存在xxx知识性风险"}}
   ],
-  "suggestions": ["建议1", "建议2"],
-  "overall_comment": "总体评价"
+  "suggestions": ["建议1（不超过20字）", "建议2（不超过20字）"],
+  "overall_comment": "一句话总体评价（不超过30字）"
 }}
 
 要求：
-- quality_score: 0-10 分，基于以下6维度评分：准确性、完整性、逻辑性、规范性、可用性、难度适配性
-- quality_checks: 至少包含6个检查项，passed 为 true/false
-- risk_alerts: 标注知识性错误或内容风险，level 为 info/warning/error
-- suggestions: 给出2-3条具体修改建议
-- overall_comment: 一句话总体评价
+- quality_score：0-10 分，综合6个维度给出一个总分
+- quality_checks：6个维度各一个检查结果，passed 为 true/false，note 简述（不超过30字）
+- risk_alerts：知识性错误必填，level 为 info/warning/error
+- suggestions：2-3条具体修改建议，每条不超过20字
+- overall_comment：不超过30字
 - 只输出 JSON，不要有其他内容
 """
 
@@ -63,6 +80,10 @@ class TeacherReviewAgent:
         logger.info(f"[{self.AGENT_NAME}] 生成审核建议")
 
         content = generated_resource.get("content", "")[:3000]
+        course_obj_text = (
+            "\n".join(f"- {obj}" for obj in course_objectives)
+            if course_objectives else "（暂无课程教学目标信息）"
+        )
 
         messages = [
             {
@@ -71,6 +92,7 @@ class TeacherReviewAgent:
                     resource_title=generated_resource.get("title", "未知"),
                     resource_type=generated_resource.get("type", "未知"),
                     difficulty=difficulty_requirement,
+                    course_objectives=course_obj_text,
                     content=content or "（无正文内容）",
                 )
             }

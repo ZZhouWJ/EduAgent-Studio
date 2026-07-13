@@ -68,8 +68,12 @@ export function TeacherDashboard() {
               {greetingName}，欢迎回到课堂
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              当前课程《数据库系统原理与 Web 项目实践》。
-              系统检测到"事务隔离级别"和"SQL 多表连接"是班级主要薄弱点，建议生成针对性资源并安排阶段测评。
+              {learningData?.course_count
+                ? `当前管理 ${learningData.course_count} 门课程，${learningData.student_count ?? 0} 名学生。`
+                : "正在加载课程信息..."}
+              {(weakPoints ?? []).length > 0
+                ? ` 系统检测到"${weakPoints[0]?.kp_name}"等知识点为班级主要薄弱点，建议生成针对性资源并安排阶段测评。`
+                : ""}
             </p>
             <div className="mt-6 flex gap-3">
               <Link to="/teacher/agent-workbench" className="inline-flex h-10 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800">

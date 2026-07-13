@@ -26,8 +26,8 @@ export function TeacherCourses() {
   const [selected, setSelected] = React.useState<Course | null>(null);
   const { toast, showToast } = useInlineToast();
 
-  const { data: courseList, loading } = useApi(() => learningApi.listCourses(), []);
-  const { data: overview } = useApi(() => statisticsApi.learningOverview(), []);
+  const { data: courseList, loading, reload: reloadCourses } = useApi(() => learningApi.listCourses(), []);
+  const { data: overview, reload: reloadOverview } = useApi(() => statisticsApi.learningOverview(), []);
 
   // 后端返回 snake_case，映射到 UI 期望的字段
   const mappedCourses: Array<{
@@ -42,7 +42,7 @@ export function TeacherCourses() {
     students: c.student_count,
     knowledgePoints: c.knowledge_point_count,
     resources: c.task_count,
-    mastery: 0,
+    mastery: overview ? Math.round((overview.avg_mastery ?? 0) * 100) : 0,
     status: c.status,
     updatedAt: "—",
     classes: [],
@@ -68,7 +68,7 @@ export function TeacherCourses() {
         title="我的课程"
         description="管理课程知识体系、学生学习进度和个性化资源生成策略。"
         icon={GraduationCap}
-        action={<button onClick={() => showToast("已同步课程建设状态")} className={primaryButton}>同步课程数据</button>}
+        action={<button onClick={() => { reloadCourses(); reloadOverview(); showToast("课程数据已刷新"); }} className={primaryButton}>同步课程数据</button>}
       />
 
       <section className="grid grid-cols-6 gap-4">

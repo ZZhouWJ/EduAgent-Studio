@@ -18,6 +18,7 @@ import { NotFound } from "./pages/NotFound";
 import { ResourceLibrary } from "./pages/ResourceLibrary";
 import { StudentDashboard } from "./pages/StudentDashboard";
 import { StudentLearningPath } from "./pages/StudentLearningPath";
+import { TeacherStudents } from "./pages/TeacherStudents";
 import { StudentProfile } from "./pages/StudentProfile";
 import { StudentTasks } from "./pages/StudentTasks";
 import { StudentTutor } from "./pages/StudentTutor";
@@ -62,7 +63,7 @@ export const router = createBrowserRouter(
 
         { path: "teacher", Component: TeacherDashboard },
         { path: "teacher/courses", Component: TeacherCourses },
-        { path: "teacher/students", Component: StudentProfile },
+        { path: "teacher/students", Component: TeacherStudents },
         { path: "teacher/agent-workbench", Component: AgentWorkbench },
         { path: "teacher/resources", Component: ResourceLibrary },
         { path: "teacher/review", Component: TeacherReview },

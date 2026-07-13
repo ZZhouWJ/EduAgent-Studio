@@ -1,19 +1,34 @@
-import React, { useState, useRef, useEffect } from "react"
+import React, { useState, useRef, useEffect, useCallback } from "react"
 import { Link } from "react-router-dom"
 import ReactMarkdown from "react-markdown"
-import { BookOpenCheck, MessageSquare, Send, ThumbsDown, ThumbsUp } from "lucide-react"
+import { BookOpenCheck, Bot, CheckCircle2, ChevronRight, Clock3, Loader2, MessageSquare, Send, ThumbsDown, ThumbsUp, XCircle } from "lucide-react"
 import { useApi } from "@/lib/useApi"
-import { tutorApi, profilesApi, type Citation, type PracticeQuestion, type RecommendedResource } from "@/lib/api"
+import { tutorApi, profilesApi } from "@/lib/api"
+import type { Citation, PracticeQuestion, RecommendedResource, ContentBlock, IntentResult, SSEEvent } from "@/lib/api/tutor"
 import { PageShell, useInlineToast } from "../components/common/ProductUI"
 import { marked } from "marked"
+import { ContentBlockRenderer } from "../components/tutor/ContentBlockRenderer"
 
 // 消息类型
 type Message = {
+  id: string
   role: "student" | "assistant"
   content: string
   citations?: Citation[]
   practice_questions?: PracticeQuestion[]
   recommended_resources?: RecommendedResource[]
+  content_blocks?: ContentBlock[]
+  intent?: IntentResult
+}
+
+// 执行轨迹事件
+type ExecutionEvent = {
+  id: string
+  step: number
+  tool: string
+  status: "started" | "completed" | "error"
+  duration_ms?: number
+  result_summary?: string
 }
 
 // 建议问题
@@ -23,6 +38,75 @@ const suggestions = [
   "事务隔离级别和锁机制有什么关系？",
   "如何把银行转账案例写成 FastAPI 接口？",
 ]
+
+/* ─── 执行轨迹展示 ───────────────────────────────────── */
+function ExecutionTrace({ events, tool_labels }: { events: ExecutionEvent[]; tool_labels: Record<string, string> }) {
+  if (!events.length) return null
+
+  return (
+    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <div className="mb-3 flex items-center gap-2 text-xs font-bold text-slate-500">
+        <Bot className="h-4 w-4" />
+        AI 执行轨迹
+      </div>
+      <div className="space-y-2">
+        {events.map((evt, i) => (
+          <div key={evt.id} className="flex items-center gap-3 text-sm">
+            {/* 状态图标 */}
+            <div className={`shrink-0 rounded-full p-1 ${
+              evt.status === "completed"
+                ? "bg-emerald-100 text-emerald-600"
+                : evt.status === "error"
+                ? "bg-red-100 text-red-600"
+                : "bg-blue-100 text-blue-600"
+            }`}>
+              {evt.status === "completed" ? (
+                <CheckCircle2 className="h-3 w-3" />
+              ) : evt.status === "error" ? (
+                <XCircle className="h-3 w-3" />
+              ) : (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              )}
+            </div>
+
+            {/* 步骤序号 */}
+            <span className="shrink-0 text-xs font-mono text-slate-400 w-4">{evt.step + 1}</span>
+
+            {/* 工具名称 */}
+            <span className="font-semibold text-slate-700">
+              {tool_labels[evt.tool] || evt.tool}
+            </span>
+
+            {/* 结果摘要 */}
+            {evt.status === "completed" && evt.result_summary && (
+              <>
+                <ChevronRight className="h-3 w-3 shrink-0 text-slate-300" />
+                <span className="truncate max-w-[200px] text-xs text-slate-500">
+                  {evt.result_summary}
+                </span>
+              </>
+            )}
+
+            {evt.status === "error" && (
+              <>
+                <ChevronRight className="h-3 w-3 shrink-0 text-slate-300" />
+                <span className="text-xs text-red-500">{evt.result_summary || "执行失败"}</span>
+              </>
+            )}
+
+            {/* 耗时 */}
+            {evt.duration_ms && evt.status === "completed" && (
+              <span className="ml-auto shrink-0 text-xs text-slate-400">
+                <Clock3 className="mr-0.5 inline h-3 w-3" />
+                {evt.duration_ms}ms
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 /* ─── 引用来源卡片 ─────────────────────────────────────── */
 function CitationsCard({ citations }: { citations: Citation[] }) {
@@ -89,12 +173,26 @@ function ResourcesCard({ resources }: { resources: RecommendedResource[] }) {
 }
 
 /* ─── 消息气泡 ─────────────────────────────────────── */
-function MessageBubble({ message, onFeedback }: {
+function MessageBubble({ message, onFeedback, executionEvents }: {
   message: Message
   onFeedback?: (helpful: boolean) => void
   showFeedback?: boolean
+  executionEvents?: ExecutionEvent[]
 }) {
   const isStudent = message.role === "student"
+  const toolLabels: Record<string, string> = {
+    retrieve_knowledge: "检索知识库",
+    quiz_agent: "生成练习题",
+    code_case_agent: "生成代码案例",
+    mindmap_agent: "生成思维导图",
+    planning_agent: "规划学习路径",
+    error_analysis_agent: "错因分析",
+    explanation_skill: "自适应讲解",
+    ppt_agent: "生成 PPT",
+    tts_tool: "语音合成",
+    image_agent: "生成图片",
+  }
+
   return (
     <div className={`flex ${isStudent ? "justify-end" : "justify-start"}`}>
       <div
@@ -110,6 +208,51 @@ function MessageBubble({ message, onFeedback }: {
 
         {!isStudent && (
           <>
+            {/* 执行轨迹 */}
+            {executionEvents && executionEvents.length > 0 && (
+              <ExecutionTrace events={executionEvents} tool_labels={toolLabels} />
+            )}
+
+            {/* 已生成内容块标签 */}
+            {message.content_blocks && message.content_blocks.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="text-xs text-slate-500">已生成：</span>
+                {message.content_blocks.map((block) => (
+                  <span
+                    key={block.block_id}
+                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                      block.block_type === "mindmap"
+                        ? "bg-purple-100 text-purple-700"
+                        : block.block_type === "quiz"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : block.block_type === "code_case"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {block.block_type === "mindmap"
+                      ? "🗺 思维导图"
+                      : block.block_type === "quiz"
+                      ? "📝 练习题"
+                      : block.block_type === "code_case"
+                      ? "💻 代码案例"
+                      : block.block_type === "ppt"
+                      ? "📊 PPT"
+                      : block.title}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* 多模态内容块 */}
+            {message.content_blocks && message.content_blocks.length > 0 && (
+              <div className="mt-4 space-y-3">
+                {message.content_blocks.map((block) => (
+                  <ContentBlockRenderer key={block.block_id} block={block} />
+                ))}
+              </div>
+            )}
+
             <CitationsCard citations={message.citations} />
             <PracticeCard questions={message.practice_questions} />
             <ResourcesCard resources={message.recommended_resources} />
@@ -148,8 +291,12 @@ export function StudentTutor() {
   const [currentCourseId, setCurrentCourseId] = useState<number>(1)
   const [lastSessionId, setLastSessionId] = useState<number | null>(null)
   const [activePanel, setActivePanel] = useState<"context" | "chat" | "resources">("chat")
+  // 执行轨迹状态（当前活跃消息的轨迹）
+  const [activeEvents, setActiveEvents] = useState<ExecutionEvent[]>([])
+  const [isStreaming, setIsStreaming] = useState(false)
   const { toast, showToast } = useInlineToast()
   const chatScrollRef = useRef<HTMLDivElement>(null)
+  const abortRef = useRef<(() => void) | null>(null)
 
   // 获取学生画像
   const { data: profileData } = useApi(() => profilesApi.getMyProfile(), [])
@@ -180,54 +327,125 @@ export function StudentTutor() {
 
   const lastMessage = messages[messages.length - 1]
 
-  // 发送消息
-  async function handleSend(question: string) {
+  // 发送消息（SSE 流式）
+  function handleSend(question: string) {
     const text = question.trim()
     if (!text || pendingAi) return
 
+    const msgId = `msg_${Date.now()}`
+
     // 1. 添加用户消息
-    setMessages((prev) => [...prev, { role: "student", content: text }])
+    setMessages((prev) => [...prev, { id: msgId, role: "student", content: text }])
+    // 添加一条占位助手消息
+    const assistantMsgId = `asst_${Date.now()}`
+    setMessages((prev) => [...prev, {
+      id: assistantMsgId,
+      role: "assistant",
+      content: "",
+      content_blocks: [],
+      citations: [],
+    }])
     setInput("")
     setPendingAi(true)
+    setIsStreaming(true)
+    setActiveEvents([])  // 重置轨迹
 
-    try {
-      // 2. 调用 tutorApi.chat()
-      const response = await tutorApi.chat({
+    // 2. SSE 流式调用
+    const cancel = tutorApi.chatStream(
+      {
         profile_id: currentProfileId,
         course_id: currentCourseId,
         question: text,
-      })
-
-      // 3. 添加助手回复
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: response.answer,
-          citations: response.citations,
-          practice_questions: response.practice_questions,
-          recommended_resources: response.recommended_resources,
+      },
+      {
+        onEvent: (event: SSEEvent) => {
+          if (event.type === "supervisor.tool_choice") {
+            // 模型选择了工具
+            setActiveEvents((prev) => [
+              ...prev,
+              {
+                id: `evt_${Date.now()}`,
+                step: event.step,
+                tool: event.chosen_tools?.join(", ") || "",
+                status: "started",
+              },
+            ])
+          } else if (event.type === "tool.started") {
+            setActiveEvents((prev) => [
+              ...prev,
+              {
+                id: `evt_${Date.now()}_${Math.random()}`,
+                step: event.step,
+                tool: event.tool,
+                status: "started",
+              },
+            ])
+          } else if (event.type === "tool.completed") {
+            // 更新对应事件为 completed
+            setActiveEvents((prev) => {
+              const updated = [...prev]
+              const lastPending = [...updated].reverse().find((e) => e.tool === event.tool && e.status === "started")
+              if (lastPending) {
+                lastPending.status = "completed"
+                lastPending.duration_ms = event.duration_ms
+                lastPending.result_summary = event.result_summary || ""
+              } else {
+                updated.push({
+                  id: `evt_${Date.now()}`,
+                  step: event.step,
+                  tool: event.tool,
+                  status: "completed",
+                  duration_ms: event.duration_ms,
+                  result_summary: event.result_summary || "",
+                })
+              }
+              return updated
+            })
+          } else if (event.type === "tool.error") {
+            setActiveEvents((prev) => {
+              const updated = [...prev]
+              const lastPending = [...updated].reverse().find((e) => e.tool === event.tool && e.status === "started")
+              if (lastPending) {
+                lastPending.status = "error"
+                lastPending.result_summary = event.result_summary || "执行失败"
+              }
+              return updated
+            })
+          }
         },
-      ])
 
-      // 保存 session_id 用于反馈
-      if (response.session_id) {
-        setLastSessionId(response.session_id)
+        onFinal: (answer: string, contentBlocks: ContentBlock[], citations: Citation[]) => {
+          // 更新助手消息
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsgId
+                ? { ...m, content: answer, content_blocks: contentBlocks, citations }
+                : m
+            )
+          )
+          setIsStreaming(false)
+          setPendingAi(false)
+          setActiveEvents([])
+          showToast("已收到回复")
+        },
+
+        onError: (error: string) => {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsgId
+                ? { ...m, content: `抱歉，发生错误：${error}` }
+                : m
+            )
+          )
+          setIsStreaming(false)
+          setPendingAi(false)
+          setActiveEvents([])
+          showToast("回复失败")
+        },
       }
+    )
 
-      showToast("已收到回复")
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "抱歉，我现在无法回答这个问题。请稍后再试或尝试其他问题。",
-        },
-      ])
-      showToast("回复失败")
-    } finally {
-      setPendingAi(false)
-    }
+    abortRef.current = cancel
   }
 
   // 反馈
@@ -250,8 +468,12 @@ export function StudentTutor() {
 
   // 重置对话
   function handleReset() {
+    abortRef.current?.()
     setMessages([])
     setLastSessionId(null)
+    setActiveEvents([])
+    setIsStreaming(false)
+    setPendingAi(false)
     showToast("对话已重置")
   }
 
@@ -362,21 +584,28 @@ export function StudentTutor() {
 
             {messages.map((message, index) => (
               <MessageBubble
-                key={index}
+                key={message.id || index}
                 message={message}
                 showFeedback={index === messages.length - 1 && message.role === "assistant"}
                 onFeedback={handleFeedback}
+                executionEvents={
+                  isStreaming && message.role === "assistant" && index === messages.length - 1
+                    ? activeEvents
+                    : undefined
+                }
               />
             ))}
 
             {/* 加载状态 */}
             {pendingAi && (
               <div className="flex justify-start">
-                <div className="flex items-center gap-1 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-slate-400">
-                  <span className="edu-typing-dot" />
-                  <span className="edu-typing-dot" />
-                  <span className="edu-typing-dot" />
-                  <span className="ml-2 text-xs font-semibold text-slate-400">正在思考…</span>
+                <div className="flex items-center gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-blue-600">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-xs font-semibold">
+                    {isStreaming && activeEvents.length > 0
+                      ? `正在调用 ${activeEvents[activeEvents.length - 1]?.tool || "工具"}...`
+                      : "正在分析问题..."}
+                  </span>
                 </div>
               </div>
             )}

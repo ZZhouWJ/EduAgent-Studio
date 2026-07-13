@@ -19,13 +19,13 @@ PROMPT_ASSESSMENT = """你是一个专业的学习评测反馈智能体。请根
 - 当前掌握度：{mastery_score:.0%}
 - AI 建议：{ai_suggestions}
 
-## 测验结果（若有）
+## 测验结果
 {test_results}
 
-## 学习反馈（若有）
+## 学习反馈
 {learning_feedback}
 
-## 生成的资源（已完成学习）
+## 生成的资源
 - 标题：{resource_title}
 
 请以 JSON 格式输出评测反馈：
@@ -34,14 +34,15 @@ PROMPT_ASSESSMENT = """你是一个专业的学习评测反馈智能体。请根
   "mastery_updates": [
     {{"kp_id": 5, "old_mastery": 0.3, "new_mastery": 0.55, "change_reason": "测验正确率70%，有明显提升"}}
   ],
-  "feedback": "整体学习效果评语",
-  "suggestions": ["建议1", "建议2"],
-  "next_resource_recommendation": "下一个推荐资源类型"
+  "feedback": "整体学习效果评语（30字以内）",
+  "suggestions": ["建议1", "建议2", "建议3"],
+  "next_resource_recommendation": "讲义|习题|案例|代码"
 }}
 
 要求：
-- mastery_updates 中 new_mastery 基于 old_mastery 和 accuracy_rate 计算
-- suggestions 给出 2-3 条具体可行的改进建议
+- 若无真实测验数据，test_results 字段填 null，mastery_updates 也填 []
+- suggestions：给出 2-3 条具体可行的改进建议（不超过 20 字/条）
+- next_resource_recommendation：从"讲义/习题/案例/代码"中选最合适的类型
 - 只输出 JSON，不要有其他内容
 """
 
@@ -68,19 +69,15 @@ class AssessmentAgent:
         if student_profile is None:
             student_profile = {}
 
-        accuracy = 0.7
-        total = 10
-        correct = 7
+        has_real_test_data = test_results and test_results.get("total_questions", 0) > 0
 
-        if test_results:
+        if has_real_test_data:
             total = test_results.get("total_questions", 10)
             accuracy = test_results.get("accuracy_rate", 0.7)
             correct = int(total * accuracy)
-
-        test_text = (
-            f"总题数：{total}，正确数：{correct}，正确率：{accuracy:.0%}"
-            if test_results else "（暂无测验数据）"
-        )
+            test_text = f"总题数：{total}，正确数：{correct}，正确率：{accuracy:.0%}"
+        else:
+            test_text = "（暂无测验数据，仅依据资源学习完成情况评估）"
 
         feedback_text = (
             learning_feedback.get("content", "")[:200]

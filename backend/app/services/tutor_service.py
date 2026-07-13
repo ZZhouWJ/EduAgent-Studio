@@ -32,44 +32,50 @@ TUTOR_PROMPT = """你是一个专业、耐心的学习辅导 Tutor。请根据�
 - 资源偏好：{resource_preferences}
 - 综合掌握度：{mastery_score}
 
-## 课程知识点
+## 课程知识点（含 ID，用于 profile_updates）
 {knowledge_points}
 
-## 知识库检索结果（可作为参考依据）
+## 知识库检索结果（可作为参考依据，务必引用）
 {context}
 
 ## 学生问题
 {question}
 
-请以 Markdown 格式回答，要求：
-1. 回答专业、准确、通俗易懂
-2. 结合学生画像提供个性化解释
-3. 适当引用知识库中的证据来源
-4. 包含图解说明（Mermaid 格式）或代码示例或练习题（至少一种多模态内容）
-5. 推荐相关学习资源
+回答要求：
+1. 回答专业、准确、通俗易懂，结合学生当前水平调整解释深度
+2. **必须引用知识库来源**，在关键陈述后加 [引用:chunk_id]，chunk_id 来自上述检索结果
+3. 包含以下至少一种多模态内容：Mermaid 图解 / 代码示例 / 练习题
+4. 推荐 1-2 个相关学习资源
+5. 根据对话内容评估学生对相关知识点的掌握程度，据此更新 profile_updates
+
+**重要：profile_updates 中 JSON 的 key 必须是知识点的数字 ID（字符串形式），value 是 0.0~1.0 的掌握度。**
+示例：如果学生问的是 ID=3 和 ID=7 的知识点，理解较好则返回 {{"3": 0.85, "7": 0.60}}
 
 请生成 JSON 格式的回答：
 {{
-  "answer": "Markdown 正文，包含解释和引用",
-  "explanation_level": "basic/intermediate/advanced（根据学生当前水平选择）",
+  "answer": "Markdown 正文，引用格式 [引用:chunk_id]，不超过 800 字",
+  "explanation_level": "basic/intermediate/advanced",
   "citations": [
-    {{"chunk_id": 1, "content": "引用的证据片段（不超过100字）", "source": "来源说明"}}
+    {{"chunk_id": 3, "content": "引用知识库原文片段（不超过80字）", "source": "来源"}}
   ],
   "diagram": {{
     "type": "flowchart|sequence|class|state",
-    "content": "Mermaid 格式的图表代码"
+    "content": "Mermaid 代码"
   }},
   "code_example": {{
-    "language": "编程语言",
-    "code": "代码内容"
+    "language": "语言",
+    "code": "代码"
   }},
   "practice_questions": [
-    {{"question": "练习题题目", "answer": "参考答案"}}
+    {{"question": "题目", "answer": "参考答案"}}
   ],
   "recommended_resources": [
-    {{"resource_id": 1, "title": "资源标题", "type": "lecture/quiz/code_case"}}
-  ]
+    {{"resource_id": 1, "title": "资源标题", "type": "lecture|quiz|case"}}
+  ],
+  "profile_updates": {{"3": 0.85, "7": 0.60}}
 }}
+
+注意：如果对话未涉及具体知识点的掌握度变化，profile_updates 应为空对象 {{}}。
 """
 
 
@@ -87,6 +93,7 @@ class TutorService:
         course_id: int,
         question: str,
         user: Optional[Dict[str, Any]] = None,
+        requested_content_types: Optional[list[str]] = None,
     ) -> Dict[str, Any]:
         """
         处理学生答疑请求。
@@ -96,9 +103,10 @@ class TutorService:
             course_id: 课程 ID
             question: 学生问题
             user: 当前用户信息（可选）
+            requested_content_types: 指定的内容类型（可选）
 
         Returns:
-            统一响应格式，包含 TutorAnswer
+            统一响应格式，包含 TutorAnswer + 多模态 content_blocks
         """
         try:
             # 1. 读取学生画像
@@ -119,12 +127,13 @@ class TutorService:
             # 4. 构建上下文
             context = self._build_context(chunks)
 
-            # 5. 调用 LLM 生成回答
-            answer_data = self._generate_answer(
+            # 5. 调用多 Agent 编排器生成回答
+            answer_data = self._generate_answer_multi_agent(
                 profile=profile,
                 knowledge_points=knowledge_points,
                 context=context,
                 question=question,
+                requested_content_types=requested_content_types,
             )
 
             # 6. 保存会话记录
@@ -135,14 +144,21 @@ class TutorService:
                 answer_data=answer_data,
             )
 
-            # 7. 组装响应
+            # 7. 应用画像更新（根据 LLM 评估的知识点掌握度变化）
+            self._apply_profile_updates(
+                profile_id=profile_id,
+                profile_updates=answer_data.get("profile_updates", {}),
+                knowledge_points=knowledge_points,
+            )
+
+            # 8. 组装响应
             result = {
                 "session_id": session_id,
-                "answer": answer_data.get("answer", ""),
+                "answer": answer_data.get("main_answer", answer_data.get("answer", "")),
                 "explanation_level": answer_data.get("explanation_level", "intermediate"),
                 "citations": answer_data.get("citations", []),
-                "diagram": answer_data.get("diagram"),
-                "code_example": answer_data.get("code_example"),
+                "content_blocks": answer_data.get("content_blocks", []),
+                "intent": answer_data.get("intent"),
                 "practice_questions": answer_data.get("practice_questions", []),
                 "recommended_resources": answer_data.get("recommended_resources", []),
                 "profile_updates": answer_data.get("profile_updates", {}),
@@ -322,9 +338,9 @@ class TutorService:
     ) -> Dict[str, Any]:
         """调用 LLM 生成回答"""
 
-        # 构建知识点文本
+        # 构建知识点文本（包含 kp_id，便于 LLM 返回 profile_updates）
         kp_text = "\n".join(
-            f"- {kp['name']}（{kp['difficulty']}难度）"
+            f"- ID:{kp['kp_id']} {kp['name']}（{kp['difficulty']}难度）"
             for kp in knowledge_points
         ) or "（暂无课程知识点）"
 
@@ -393,6 +409,59 @@ class TutorService:
         except Exception as e:
             logger.error(f"LLM generate failed: {e}")
             return self._fallback_answer(question, weak_points_str)
+
+    def _generate_answer_multi_agent(
+        self,
+        profile: Dict[str, Any],
+        knowledge_points: List[Dict[str, Any]],
+        context: str,
+        question: str,
+        requested_content_types: Optional[list[str]] = None,
+    ) -> Dict[str, Any]:
+        """调用 TutorSupervisor 生成回答（Tool Calling 循环）"""
+        try:
+            from app.services.tutor_supervisor import TutorSupervisor
+
+            course_id = profile.get("course_id", 1)
+
+            supervisor = TutorSupervisor(self._llm_gateway)
+
+            # 同步执行 Supervisor 循环
+            import asyncio
+            result = asyncio.run(
+                supervisor.run(
+                    question=question,
+                    profile=profile,
+                    course_id=course_id,
+                    knowledge_context=context,
+                )
+            )
+
+            logger.info(
+                f"[Supervisor] final_answer len={len(result.final_answer)}, "
+                f"tool_calls={len(result.tool_calls)}, blocks={len(result.content_blocks)}"
+            )
+
+            return {
+                "main_answer": result.final_answer,
+                "content_blocks": result.content_blocks,
+                "intent": None,
+                "citations": result.citations,
+                "explanation_level": "intermediate",
+                "practice_questions": [],
+                "recommended_resources": [],
+                "profile_updates": {},
+                "_execution_trace": result.execution_trace,
+            }
+
+        except Exception as e:
+            logger.error(f"Supervisor run failed: {e}")
+            return self._generate_answer(
+                profile=profile,
+                knowledge_points=knowledge_points,
+                context=context,
+                question=question,
+            )
 
     def _fallback_answer(self, question: str, weak_points: str) -> Dict[str, Any]:
         """回退回答（LLM 不可用时）"""
@@ -484,6 +553,49 @@ flowchart LR
         except Exception as e:
             logger.error(f"Failed to save session: {e}")
             return 0
+
+    def _apply_profile_updates(
+        self,
+        profile_id: int,
+        profile_updates: Dict[str, Any],
+        knowledge_points: List[Dict[str, Any]],
+    ) -> None:
+        """
+        将 LLM 返回的知识点掌握度变化应用到数据库。
+
+        Args:
+            profile_id: 画像 ID
+            profile_updates: LLM 返回的 {kp_id: mastery_level} 字典
+            knowledge_points: 当前课程的知识点列表（含 kp_id → name 映射）
+        """
+        if not profile_updates:
+            return
+
+        # 构建 kp_name 查找表
+        kp_name_map = {str(kp["kp_id"]): kp["name"] for kp in knowledge_points}
+
+        for kp_id_str, mastery_level in profile_updates.items():
+            try:
+                kp_id = int(kp_id_str)
+            except (ValueError, TypeError):
+                logger.warning(f"[ProfileUpdate] invalid kp_id: {kp_id_str}")
+                continue
+
+            if not isinstance(mastery_level, (int, float)) or not (0 <= mastery_level <= 1):
+                logger.warning(f"[ProfileUpdate] invalid mastery_level for kp_id={kp_id}: {mastery_level}")
+                continue
+
+            kp_name = kp_name_map.get(str(kp_id), f"kp#{kp_id}")
+            try:
+                self._profile_repo.update_mastery(
+                    profile_id=profile_id,
+                    kp_id=kp_id,
+                    mastery_level=float(mastery_level),
+                    update_reason=f"[Tutor答疑] 自动更新 — {kp_name}",
+                )
+                logger.info(f"[ProfileUpdate] kp={kp_name}(id={kp_id}) → mastery={mastery_level:.2f}")
+            except Exception as e:
+                logger.error(f"[ProfileUpdate] failed for kp_id={kp_id}: {e}")
 
     def _adjust_explanation_level(self, session_id: int) -> None:
         """根据反馈调整解释难度"""

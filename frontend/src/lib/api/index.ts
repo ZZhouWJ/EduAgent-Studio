@@ -180,7 +180,7 @@ export { logsApi, type OperationLog, type LoginLog } from './logs'
 export { knowledgeApi, type Material, type MaterialChunk, type SearchResult } from './knowledge'
 
 // Tutor
-export { tutorApi, type TutorChatResponse, type Citation, type PracticeQuestion, type RecommendedResource } from './tutor'
+export { tutorApi, type TutorChatResponse, type Citation, type PracticeQuestion, type RecommendedResource, type ContentBlock, type IntentResult, type ResourceType } from './tutor'
 
 // Statistics
 export {
