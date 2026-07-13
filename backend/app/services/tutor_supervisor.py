@@ -151,6 +151,8 @@ class TutorSupervisor:
             if not tool_calls:
                 # 无工具调用，回答完毕
                 final_answer = assistant_message.get("content", "")
+                if not final_answer and content_blocks:
+                    final_answer = _build_embed_answer(content_blocks)
                 logger.info(f"[Supervisor] step={step} final_answer length={len(final_answer)}")
                 break
 
@@ -222,6 +224,8 @@ class TutorSupervisor:
         else:
             # 达到最大步数
             final_answer = "（处理超时，已达到最大执行步骤）"
+            if content_blocks:
+                final_answer = _build_embed_answer(content_blocks)
             execution_trace.append({"event": "max_steps_reached"})
 
         return SupervisorResult(
@@ -271,6 +275,9 @@ class TutorSupervisor:
 
             if not tool_calls:
                 final_answer = assistant_message.get("content", "")
+                # 当有内容块但 final_answer 为空时，自动生成引用嵌入语法
+                if not final_answer and content_blocks:
+                    final_answer = _build_embed_answer(content_blocks)
                 yield self._sse_event("supervisor.final", {
                     "content": final_answer,
                     "content_blocks": content_blocks,
@@ -343,11 +350,13 @@ class TutorSupervisor:
                 })
         else:
             final_answer = "（处理超时，已达到最大执行步骤）"
-            yield self._sse_event("supervisor.max_steps", {"content": final_answer})
+            if content_blocks:
+                final_answer = _build_embed_answer(content_blocks)
+            yield self._sse_event("supervisor.max_steps", {"content": final_answer, "content_blocks": content_blocks})
             return
 
         yield self._sse_event("supervisor.final", {
-            "content": final_answer,
+            "content": final_answer or (content_blocks and _build_embed_answer(content_blocks)) or "",
             "content_blocks": content_blocks,
             "citations": citations,
         })
@@ -504,6 +513,32 @@ def _result_to_content_block(tool_id: str, result: Dict[str, Any]) -> Optional[D
         "quality_score": result.get("quality_score"),
         "trustworthiness": result.get("trustworthiness"),
     }
+
+
+def _build_embed_answer(content_blocks: List[Dict[str, Any]]) -> str:
+    """根据内容块列表生成带有嵌入语法的回答文本"""
+    if not content_blocks:
+        return ""
+
+    label_map = {
+        "quiz": "练习题",
+        "code_case": "代码案例",
+        "mindmap": "思维导图",
+        "lecture": "学习规划",
+        "ppt": "PPT",
+        "video_script": "视频脚本",
+        "error_analysis": "错因分析",
+        "learning_card": "知识卡片",
+    }
+
+    parts = []
+    for block in content_blocks:
+        block_type = block.get("block_type", "")
+        block_id = block.get("block_id", "")
+        label = label_map.get(block_type, block.get("title", "内容"))
+        parts.append(f"{label}：:::{block_type}:{block_id}:::")
+
+    return " ".join(parts)
 
 
 def _summarize_result(result: Any) -> str:
