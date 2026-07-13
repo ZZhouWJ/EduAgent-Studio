@@ -217,7 +217,7 @@ class TutorSupervisor:
                     "role": "tool",
                     "tool_call_id": tc.get("id", ""),
                     "name": tool_id,
-                    "content": json.dumps(result, ensure_ascii=False),
+                    "content": _summarize_result(result),
                 })
 
                 logger.info(f"[Supervisor] step={step} tool={tool_id} duration={duration_ms}ms success={success}")
@@ -346,7 +346,7 @@ class TutorSupervisor:
                     "role": "tool",
                     "tool_call_id": tc.get("id", ""),
                     "name": tool_id,
-                    "content": json.dumps(result, ensure_ascii=False),
+                    "content": _summarize_result(result),
                 })
         else:
             final_answer = "（处理超时，已达到最大执行步骤）"
