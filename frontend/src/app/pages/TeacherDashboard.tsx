@@ -1,11 +1,10 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, BookOpen, CheckSquare, Database, FileText, Library, MessageSquare, ShieldAlert, Target, Users } from "lucide-react";
+import { AlertTriangle, ArrowRight, BookOpen, CheckSquare, Database, FileText, GraduationCap, Library, MessageSquare, ShieldAlert, Target, Users } from "lucide-react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useApi } from "@/lib/useApi";
 import { reviewsApi, statisticsApi, learningApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
-import { SafeLottie } from "../components/SafeLottie";
 
 const toneClass: Record<string, string> = {
   blue: "bg-blue-50 text-blue-700 ring-blue-100",
@@ -86,8 +85,9 @@ export function TeacherDashboard() {
             </div>
           </div>
           <div className="flex flex-col gap-3">
-            <div className="relative h-32 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/60">
-              <SafeLottie source="teaching" className="h-full w-full" speed={0.8} />
+            <div className="flex h-32 items-center justify-center rounded-xl border border-slate-200 bg-gradient-to-br from-blue-50 to-slate-50">
+              <GraduationCap className="h-14 w-14 text-blue-200" strokeWidth={1} />
+            </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {[
