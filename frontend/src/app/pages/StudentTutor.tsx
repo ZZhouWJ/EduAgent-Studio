@@ -263,8 +263,11 @@ function MessageBubble({ message, onFeedback, executionEvents }: {
                 )
               )}
             </div>
-          ) : (
-            // 传统模式：直接渲染 markdown
+          ) : message.content && message.content.trim() ? (
+            // 有 markdown 内容，正常渲染
+            <ReactMarkdown>{message.content}</ReactMarkdown>
+          ) : null}
+        </div>
             <ReactMarkdown>{message.content}</ReactMarkdown>
           )}
         </div>
