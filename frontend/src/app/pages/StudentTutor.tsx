@@ -268,9 +268,6 @@ function MessageBubble({ message, onFeedback, executionEvents }: {
             <ReactMarkdown>{message.content}</ReactMarkdown>
           ) : null}
         </div>
-            <ReactMarkdown>{message.content}</ReactMarkdown>
-          )}
-        </div>
 
         {!isStudent && (
           <>
