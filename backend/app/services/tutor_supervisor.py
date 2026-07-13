@@ -18,6 +18,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 from app.llm.gateway import LLMGateway, LLMConfig, llm_gateway as _default_llm
 from app.config import get_settings
 
+settings = get_settings()
 logger = logging.getLogger(__name__)
 
 # =============================================================================
@@ -416,6 +417,9 @@ class TutorSupervisor:
             result = self._llm.generate(
                 messages=messages,
                 config=LLMConfig(
+                    model_id=0,
+                    model_name=settings.llm_model,
+                    provider=settings.llm_provider,
                     temperature=0.7,
                     max_tokens=2000,
                     tools=tools if tools else None,
