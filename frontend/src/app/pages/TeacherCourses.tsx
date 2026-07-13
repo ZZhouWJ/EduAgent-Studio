@@ -26,8 +26,8 @@ export function TeacherCourses() {
   const [selected, setSelected] = React.useState<Course | null>(null);
   const { toast, showToast } = useInlineToast();
 
-  const { data: courseList, loading, reload: reloadCourses } = useApi(() => learningApi.listCourses(), []);
-  const { data: overview, reload: reloadOverview } = useApi(() => statisticsApi.learningOverview(), []);
+  const { data: courseList, loading, refetch: reloadCourses } = useApi(() => learningApi.listCourses(), []);
+  const { data: overview, refetch: reloadOverview } = useApi(() => statisticsApi.learningOverview(), []);
 
   // 后端返回 snake_case，映射到 UI 期望的字段
   const mappedCourses: Array<{

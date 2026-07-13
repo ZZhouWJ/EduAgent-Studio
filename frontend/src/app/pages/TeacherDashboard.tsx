@@ -87,9 +87,8 @@ export function TeacherDashboard() {
           <div className="flex flex-col gap-3">
             <div className="flex h-32 items-center justify-center rounded-xl border border-slate-200 bg-gradient-to-br from-blue-50 to-slate-50">
               <GraduationCap className="h-14 w-14 text-blue-200" strokeWidth={1} />
-            </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
+          </div>
+          <div className="grid grid-cols-2 gap-2">
               {[
                 ["今日待办", String((pendingReviews?.total ?? 0) + (tasksData?.items?.filter((t) => t.status === "in_progress").length ?? 0)), "按优先级处理"],
                 ["重点学生", String(lowMasteryCount), "掌握度低于 50%"],

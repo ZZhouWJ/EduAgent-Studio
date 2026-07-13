@@ -5,7 +5,7 @@ import { profilesApi } from "@/lib/api";
 
 export function StudentProfile() {
   // 学生端：直接获取当前登录用户的画像，不暴露选择器
-  const { data: profile, loading: profileLoading, reload: reloadProfile } = useApi(
+  const { data: profile, loading: profileLoading, refetch: reloadProfile } = useApi(
     () => profilesApi.getMyProfile(),
     []
   );

@@ -26,7 +26,7 @@ export function TeacherTasks() {
   });
   const [submitting, setSubmitting] = React.useState(false);
 
-  const { data: taskData, loading: loadingTasks, reload: reloadTasks } = useApi(
+  const { data: taskData, loading: loadingTasks, refetch: reloadTasks } = useApi(
     () => learningApi.listTasks({ page_size: 50 }),
     []
   );
