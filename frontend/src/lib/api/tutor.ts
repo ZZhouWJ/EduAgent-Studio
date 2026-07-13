@@ -95,10 +95,6 @@ export const tutorApi = {
     return client.post<TutorChatResponse>('/tutor/chat', data)
   },
 
-  /**
-   * SSE 流式答疑
-   * 返回 EventSource 或 WebSocket 风格的流式消费函数
-   */
   chatStream(
     data: { profile_id: number; course_id: number; question: string },
     callbacks: {
@@ -176,8 +172,13 @@ export const tutorApi = {
         }
       })
 
-    // 返回取消函数
     return () => controller.abort()
+  },
+
+  getSuggestions(courseId: number, profileId?: number) {
+    return client.get<{ suggestions: string[] }>('/tutor/suggestions', {
+      params: { course_id: courseId, ...(profileId ? { profile_id: profileId } : {}) },
+    })
   },
 
   feedback(data: FeedbackRequest) {

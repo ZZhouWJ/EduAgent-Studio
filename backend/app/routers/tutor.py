@@ -149,6 +149,28 @@ async def tutor_chat_stream(
     )
 
 
+@router.get("/suggestions")
+async def get_suggestions(
+    course_id: int = Query(..., description="课程 ID"),
+    profile_id: Optional[int] = Query(None, description="学生画像 ID（可选）"),
+    token: str = Depends(get_current_user),
+):
+    """
+    根据学生画像和课程知识点，动态生成学习建议问题。
+
+    读取学生的薄弱点和课程知识点列表，由 LLM 生成 4 条针对性强的问题。
+    """
+    from app.services.tutor_service import TutorService
+
+    service = TutorService()
+    result = service.get_suggestions(course_id=course_id, profile_id=profile_id)
+
+    if result.get("code") != 0:
+        return error_response(message=result.get("message", "获取建议失败"), code=result.get("code", 500))
+
+    return success_response(data=result.get("data"), message="success")
+
+
 @router.post("/feedback")
 async def tutor_feedback(
     data: FeedbackRequest,

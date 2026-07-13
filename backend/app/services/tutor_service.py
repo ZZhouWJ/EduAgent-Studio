@@ -632,3 +632,94 @@ flowchart LR
 
         except Exception as e:
             logger.error(f"Failed to adjust explanation level: {e}")
+
+    def get_suggestions(
+        self,
+        course_id: int,
+        profile_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """根据学生画像和课程知识点，动态生成学习建议问题"""
+        try:
+            # 获取学生画像
+            profile = None
+            if profile_id:
+                profile = self._profile_repo.get_profile(profile_id)
+
+            # 获取课程知识点
+            knowledge_points = self._get_course_knowledge_points(course_id)
+            kp_names = [kp["name"] for kp in knowledge_points[:8]]
+            weak_points: list[str] = []
+            if profile:
+                wps = profile.get("weak_points", [])
+                if isinstance(wps, list):
+                    weak_points = [
+                        wp.get("kp_name", "") if isinstance(wp, dict) else str(wp)
+                        for wp in wps[:3]
+                    ]
+
+            # 构建 prompt
+            weak_str = "、".join(weak_points) if weak_points else "暂无薄弱点记录"
+            kp_str = "、".join(kp_names) if kp_names else "暂无知识点数据"
+
+            prompt = f"""你是一个学习助手。请根据以下信息，生成4条学生最可能问的学习问题。
+
+## 课程知识点
+{kp_str}
+
+## 学生薄弱知识点
+{weak_str}
+
+## 要求
+1. 结合薄弱知识点和课程内容，生成针对性强的问题
+2. 问题要具体、实用，是学生真实会问的
+3. 每条问题不超过30字
+4. 只输出 JSON 数组，不要其他内容
+
+输出格式：
+["问题1", "问题2", "问题3", "问题4"]"""
+
+            if self._llm_gateway is None:
+                return {
+                    "code": 0,
+                    "data": {
+                        "suggestions": [
+                            f"{kp_names[0] if kp_names else '课程内容'}的核心概念是什么？",
+                            f"如何理解{kp_names[1] if len(kp_names) > 1 else '相关知识点'}？",
+                            "有哪些典型应用场景？",
+                            "常见错误和注意事项有哪些？",
+                        ]
+                        if kp_names else []
+                    },
+                }
+
+            result = self._llm_gateway.generate(
+                messages=[{"role": "user", "content": prompt}],
+                config={"temperature": 0.8, "max_tokens": 500},
+            )
+
+            content = result.content.strip() if hasattr(result, "content") else "[]"
+            # 提取 JSON
+            import re
+            m = re.search(r"\[[\s\S]*\]", content)
+            if m:
+                import json
+                suggestions = json.loads(m.group())
+                if isinstance(suggestions, list):
+                    return {"code": 0, "data": {"suggestions": suggestions[:4]}}
+
+            return {
+                "code": 0,
+                "data": {
+                    "suggestions": [
+                        f"{kp_names[0] if kp_names else '课程'}的核心概念是什么？",
+                        "有哪些典型应用场景？",
+                        "常见错误和注意事项有哪些？",
+                        "如何系统地学习这部分内容？",
+                    ]
+                    if kp_names else []
+                },
+            }
+
+        except Exception as e:
+            logger.error(f"get_suggestions failed: {e}")
+            return {"code": 0, "data": {"suggestions": []}}

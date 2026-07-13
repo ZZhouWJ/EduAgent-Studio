@@ -31,13 +31,7 @@ type ExecutionEvent = {
   result_summary?: string
 }
 
-// 建议问题
-const suggestions = [
-  "可重复读和串行化到底有什么区别？我总是混淆。",
-  "多表连接什么时候应该使用 left join？",
-  "事务隔离级别和锁机制有什么关系？",
-  "如何把银行转账案例写成 FastAPI 接口？",
-]
+// 建议问题（动态加载）
 
 /* ─── 执行轨迹展示 ───────────────────────────────────── */
 function ExecutionTrace({ events, tool_labels }: { events: ExecutionEvent[]; tool_labels: Record<string, string> }) {
@@ -294,6 +288,7 @@ export function StudentTutor() {
   // 执行轨迹状态（当前活跃消息的轨迹）
   const [activeEvents, setActiveEvents] = useState<ExecutionEvent[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
+  const [suggestions, setSuggestions] = useState<string[]>([])
   const { toast, showToast } = useInlineToast()
   const chatScrollRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<(() => void) | null>(null)
@@ -306,6 +301,10 @@ export function StudentTutor() {
     if (currentProfile) {
       setCurrentProfileId(currentProfile.profile_id)
       setCurrentCourseId(currentProfile.course_id)
+      // 加载动态建议
+      tutorApi.getSuggestions(currentProfile.course_id, currentProfile.profile_id)
+        .then((res: any) => setSuggestions(res.suggestions || []))
+        .catch(() => setSuggestions([]))
     }
   }, [currentProfile])
 
