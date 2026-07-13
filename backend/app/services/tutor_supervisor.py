@@ -427,11 +427,14 @@ class TutorSupervisor:
                 ),
             )
 
+            if hasattr(result, "tool_calls") and result.tool_calls:
+                # Provider 返回了 tool_calls（来自 OpenAI/讯飞等支持 function calling 的模型）
+                return {"message": {"content": result.content or "", "tool_calls": result.tool_calls}}
+
             if hasattr(result, "content"):
-                # 尝试解析 tool_calls
+                # 兜底：尝试解析 content 中的 tool_calls（某些 provider 可能放这里）
                 content = result.content
                 try:
-                    # 如果 content 是 JSON，解析 tool_calls
                     parsed = json.loads(content)
                     if isinstance(parsed, dict):
                         return {"message": parsed}
