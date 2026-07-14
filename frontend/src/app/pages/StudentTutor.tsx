@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react"
 import { Link } from "react-router-dom"
 import ReactMarkdown from "react-markdown"
-import { BookOpenCheck, Bot, CheckCircle2, ChevronRight, Clock3, Loader2, MessageSquare, Send, ThumbsDown, ThumbsUp, XCircle } from "lucide-react"
+import { BookOpenCheck, Bot, CheckCircle2, ChevronRight, Clock3, Image, Loader2, MessageSquare, Send, ThumbsDown, ThumbsUp, X, XCircle } from "lucide-react"
 import { useApi } from "@/lib/useApi"
 import { tutorApi, profilesApi } from "@/lib/api"
 import type { Citation, PracticeQuestion, RecommendedResource, ContentBlock, IntentResult, SSEEvent } from "@/lib/api/tutor"
@@ -14,6 +14,7 @@ type Message = {
   id: string
   role: "student" | "assistant"
   content: string
+  imageBase64?: string  // 压缩后的图片base64，用于在气泡中展示
   citations?: Citation[]
   practice_questions?: PracticeQuestion[]
   recommended_resources?: RecommendedResource[]
@@ -196,6 +197,17 @@ function MessageBubble({ message, onFeedback, executionEvents }: {
             : "border border-slate-100 bg-slate-50 text-slate-700"
         }`}
       >
+        {/* 图片缩略图 */}
+        {isStudent && message.imageBase64 && (
+          <div className="mt-2 overflow-hidden rounded-lg">
+            <img
+              src={`data:image/jpeg;base64,${message.imageBase64}`}
+              alt="上传的图片"
+              className="max-w-[200px] max-h-[200px] object-cover rounded-lg border border-white/20"
+            />
+          </div>
+        )}
+
         <div className="prose prose-sm max-w-none">
           <ReactMarkdown>{message.content}</ReactMarkdown>
         </div>
@@ -280,7 +292,9 @@ function MessageBubble({ message, onFeedback, executionEvents }: {
 export function StudentTutor() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
+  const [selectedImage, setSelectedImage] = useState<{ base64: string; filename: string } | null>(null)
   const [pendingAi, setPendingAi] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [currentProfileId, setCurrentProfileId] = useState<number>(1)
   const [currentCourseId, setCurrentCourseId] = useState<number>(1)
   const [lastSessionId, setLastSessionId] = useState<number | null>(null)
@@ -326,35 +340,90 @@ export function StudentTutor() {
 
   const lastMessage = messages[messages.length - 1]
 
+  // 图片选择 + 压缩处理
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const img = new window.Image()
+    img.onload = () => {
+      // 压缩：最长边不超过 1024px
+      const maxDim = 1024
+      let w = img.width, h = img.height
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim }
+        else { w = Math.round(w * maxDim / h); h = maxDim }
+      }
+      const canvas = document.createElement("canvas")
+      canvas.width = w; canvas.height = h
+      const ctx = canvas.getContext("2d")!
+      ctx.drawImage(img, 0, 0, w, h)
+      const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7).split(",")[1]
+      setSelectedImage({ base64: compressedBase64, filename: file.name })
+    }
+    img.src = URL.createObjectURL(file)
+  }
+
   // 发送消息（SSE 流式）
-  function handleSend(question: string) {
-    const text = question.trim()
-    if (!text || pendingAi) return
+  async function handleSend(question: string) {
+    let text = question.trim()
+    if ((!text && !selectedImage) || pendingAi) return
+    if (!text && selectedImage) text = "详细描述这张图片的内容"
+
+    const imageInfo = selectedImage
+    setSelectedImage(null)
 
     const msgId = `msg_${Date.now()}`
 
-    // 1. 添加用户消息
-    setMessages((prev) => [...prev, { id: msgId, role: "student", content: text }])
-    // 添加一条占位助手消息
+    // 1. 立即显示用户消息（含图片缩略图）
+    const displayText = imageInfo ? text : text
+    setMessages((prev) => [...prev, {
+      id: msgId,
+      role: "student",
+      content: displayText,
+      imageBase64: imageInfo?.base64,
+    }])
+    // 添加占位助手消息（显示加载状态）
     const assistantMsgId = `asst_${Date.now()}`
     setMessages((prev) => [...prev, {
       id: assistantMsgId,
       role: "assistant",
-      content: "",
+      content: imageInfo ? "正在分析图片..." : "",
       content_blocks: [],
       citations: [],
     }])
     setInput("")
     setPendingAi(true)
     setIsStreaming(true)
-    setActiveEvents([])  // 重置轨迹
+    setActiveEvents([])
 
-    // 2. SSE 流式调用
+    // 2. 后台分析图片（不阻塞 UI）
+    let imageResult = ""
+    if (imageInfo) {
+      try {
+        const byteChars = atob(imageInfo.base64)
+        const byteNums = new Array(byteChars.length)
+        for (let i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i)
+        const byteArr = new Uint8Array(byteNums)
+        const formData = new FormData()
+        formData.append("file", new Blob([byteArr], { type: "image/png" }), imageInfo.filename)
+        formData.append("question", text)
+
+        const resp = await fetch("/api/multimodal/image/understand", { method: "POST", body: formData })
+        const data = await resp.json()
+        if (data.success) imageResult = "[图片分析结果] " + data.content + "\n\n"
+      } catch {
+        imageResult = "[图片分析失败]\n\n"
+      }
+    }
+    const fullQuestion = imageResult + text
+
+    // 3. SSE 流式调用（图片分析完成后才发，确保上下文完整）
     const cancel = tutorApi.chatStream(
       {
         profile_id: currentProfileId,
         course_id: currentCourseId,
-        question: text,
+        question: fullQuestion,
       },
       {
         onEvent: (event: SSEEvent) => {
@@ -612,7 +681,27 @@ export function StudentTutor() {
 
           {/* 输入框 */}
           <div className="border-t border-slate-100 p-4">
-            <label className="mb-2 block text-xs font-bold text-slate-500">输入学习问题</label>
+            {/* 图片预览 */}
+            {selectedImage && (
+              <div className="mb-3 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+                <Image className="h-4 w-4 text-blue-500" />
+                <span className="flex-1 text-xs text-slate-600 truncate">{selectedImage.filename}</span>
+                <button onClick={() => setSelectedImage(null)} className="text-slate-400 hover:text-red-500">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+            {/* 隐藏的文件选择器 */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+            <label className="mb-2 block text-xs font-bold text-slate-500">
+              {selectedImage ? "已选择图片，输入问题或直接发送" : "输入学习问题"}
+            </label>
             <div className="flex flex-col gap-3 sm:flex-row">
               <textarea
                 value={input}
@@ -623,17 +712,25 @@ export function StudentTutor() {
                     handleSend(input)
                   }
                 }}
-                placeholder="输入你的学习问题，按 Enter 发送..."
+                placeholder={selectedImage ? "对图片的问题（可选）..." : "输入你的学习问题，按 Enter 发送..."}
                 className="edu-focus-ring h-20 flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700"
               />
-              <button
-                onClick={() => handleSend(input)}
-                disabled={pendingAi || !input.trim()}
-                className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Send className="h-4 w-4" />
-                发送
-              </button>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 font-bold text-sm text-slate-600 transition hover:border-blue-200 hover:text-blue-700"
+                  title="上传图片"
+                >
+                  <Image className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => handleSend(input)}
+                  disabled={pendingAi || (!input.trim() && !selectedImage)}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Send className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </div>
         </main>
