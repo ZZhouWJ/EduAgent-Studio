@@ -314,6 +314,57 @@ async def explanation_skill(
 
 
 # =============================================================================
+# Multimodal 实现
+# =============================================================================
+
+
+async def image_agent(
+    prompt: str,
+    style: str = "教学插画",
+) -> Dict[str, Any]:
+    """图片生成 Agent — 接入讯飞多模态生成 API"""
+    try:
+        from app.config import get_settings
+        settings = get_settings()
+
+        if not settings.iflytek_app_id or not settings.iflytek_api_key:
+            logger.warning("[image_agent] 讯飞凭证未配置")
+            return {
+                "image_url": "",
+                "prompt": prompt,
+                "error": "图片生成服务未配置（讯飞凭证缺失）",
+            }
+
+        from app.services.iflytek_multimodal import generate_image
+        img_base64 = generate_image(
+            prompt=prompt,
+            style=style,
+            resolution="1024*1024",
+            app_id=settings.iflytek_app_id,
+            api_key=settings.iflytek_api_key,
+            api_secret=settings.iflytek_api_secret,
+        )
+
+        if not img_base64:
+            return {
+                "image_url": "",
+                "prompt": prompt,
+                "error": "图片生成失败（讯飞返回空）",
+            }
+
+        # 转为 data URL 供前端直接渲染
+        data_url = f"data:image/png;base64,{img_base64}"
+        return {
+            "image_url": data_url,
+            "prompt": prompt,
+            "style": style,
+        }
+    except Exception as e:
+        logger.error(f"image_agent failed: {e}")
+        return {"image_url": "", "prompt": prompt, "error": str(e)}
+
+
+# =============================================================================
 # 辅助函数
 # =============================================================================
 

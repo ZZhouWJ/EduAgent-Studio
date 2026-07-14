@@ -258,6 +258,7 @@ def _build_registry() -> ToolRegistry:
         planning_agent,
         error_analysis_agent,
         explanation_skill,
+        image_agent,
     )
 
     registry = ToolRegistry()
@@ -282,8 +283,8 @@ def _build_registry() -> ToolRegistry:
     registry.register_tool(
         id="image_agent",
         name="图片生成",
-        description="根据文本描述生成示意图、流程图或知识配图。",
-        handler=lambda prompt, style="教学插画": {"image_url": "", "prompt": prompt},
+        description="根据文本描述生成示意图、流程图或知识配图。适用于学生要求看图、示意图、流程图等场景。",
+        handler=image_agent,
         tags=["tool", "multimodal"],
     )
 
