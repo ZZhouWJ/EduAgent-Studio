@@ -318,6 +318,103 @@ async def explanation_skill(
 # =============================================================================
 
 
+async def tts_tool(
+    text: str,
+    voice: str = "xiaoyan",
+) -> Dict[str, Any]:
+    """语音合成工具 — 接入讯飞 TTS API"""
+    try:
+        from app.config import get_settings
+        settings = get_settings()
+
+        if not settings.iflytek_app_id or not settings.iflytek_api_key:
+            logger.warning("[tts_tool] 讯飞凭证未配置")
+            return {"audio_url": "", "text_length": len(text), "error": "语音合成服务未配置"}
+
+        from app.services.iflytek_multimodal import text_to_speech
+        audio_bytes = text_to_speech(
+            text=text,
+            voice=voice,
+            app_id=settings.iflytek_app_id,
+            api_key=settings.iflytek_api_key,
+            api_secret=settings.iflytek_api_secret,
+        )
+
+        if not audio_bytes:
+            return {"audio_url": "", "text_length": len(text), "error": "语音合成失败（讯飞返回空）"}
+
+        import base64
+        audio_b64 = base64.b64encode(audio_bytes).decode()
+        data_url = f"data:audio/mpeg;base64,{audio_b64}"
+        return {"audio_url": data_url, "text_length": len(text), "voice": voice}
+    except Exception as e:
+        logger.error(f"tts_tool failed: {e}")
+        return {"audio_url": "", "text_length": len(text), "error": str(e)}
+
+
+async def ppt_agent(
+    course_id: int,
+    topic: str,
+    audience: str = "学生",
+    slide_count: int = 8,
+) -> Dict[str, Any]:
+    """PPT 生成 Agent — 生成结构化课件大纲（JSON 格式）"""
+    try:
+        from app.config import get_settings
+        from app.llm.gateway import LLMGateway
+
+        settings = get_settings()
+        llm = LLMGateway()
+
+        prompt = f"""你是一个专业的课件设计师。请为"{topic}"生成一份 PPT 大纲。
+
+## 要求
+- 受众：{audience}
+- 幻灯片数量：{slide_count} 页
+- 每页结构：标题 + 要点（3-5条）+ 备注（讲解要点）
+
+## 输出格式（严格 JSON）
+[
+  {{
+    "slide_number": 1,
+    "title": "封面标题",
+    "bullets": ["要点1", "要点2", ...],
+    "notes": "讲解备注"
+  }},
+  ...
+]
+
+只输出 JSON，不要有其他文字。
+"""
+        messages = [{"role": "user", "content": prompt}]
+        result = llm.generate(
+            messages=messages,
+            config=settings.llm_config(),
+        )
+        content = result.content if hasattr(result, "content") else ""
+        # 尝试解析 JSON
+        import json
+        try:
+            # 去掉可能的 markdown 代码块
+            if "```" in content:
+                content = content.split("```")[1]
+                if content.startswith("json"):
+                    content = content[4:]
+            slides_data = json.loads(content.strip())
+        except Exception:
+            slides_data = [{"slide_number": 1, "title": topic, "bullets": [content[:200]], "notes": ""}]
+
+        return {
+            "content": json.dumps(slides_data, ensure_ascii=False),
+            "slide_count": len(slides_data) if isinstance(slides_data, list) else 0,
+            "topic": topic,
+            "quality_score": 0.8,
+        }
+    except Exception as e:
+        logger.error(f"ppt_agent failed: {e}")
+        return {"content": f"PPT 生成失败：{e}", "slide_count": 0, "topic": topic, "quality_score": 0}
+
+
 async def image_agent(
     prompt: str,
     style: str = "教学插画",
