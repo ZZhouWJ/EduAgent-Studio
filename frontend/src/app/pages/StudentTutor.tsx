@@ -3,7 +3,9 @@ import { Link } from "react-router-dom"
 import ReactMarkdown from "react-markdown"
 import { BookOpenCheck, Bot, CheckCircle2, ChevronRight, Clock3, Loader2, MessageSquare, Send, ThumbsDown, ThumbsUp, XCircle } from "lucide-react"
 import { useApi } from "@/lib/useApi"
-import { tutorApi, profilesApi } from "@/lib/api"
+import { tutorApi, profilesApi, learningApi } from "@/lib/api"
+import type { LearningPathNode } from "@/lib/api/learning"
+import { LearningPathGraph } from "../components/learning/LearningPathGraph"
 import type { Citation, PracticeQuestion, RecommendedResource, ContentBlock, IntentResult, SSEEvent } from "@/lib/api/tutor"
 import { PageShell, useInlineToast } from "../components/common/ProductUI"
 import { marked } from "marked"
@@ -478,6 +480,29 @@ export function StudentTutor() {
   const { data: profileData } = useApi(() => profilesApi.getMyProfile(), [])
   const currentProfile = profileData
 
+  // 获取学习路径图谱数据
+  const { data: pathData } = useApi(
+    () => (currentProfile?.course_id && currentProfile?.profile_id
+      ? learningApi.getLearningPath(currentProfile.course_id, currentProfile.profile_id)
+      : Promise.resolve(null)),
+    [currentProfile?.course_id, currentProfile?.profile_id]
+  )
+
+  // 转换图谱节点格式
+  const graphNodes = React.useMemo(() => {
+    if (!pathData?.nodes) return []
+    return pathData.nodes.map((node: LearningPathNode) => ({
+      kp_id: node.kp_id,
+      kp_name: node.kp_name || (node as any).name || "",
+      mastery: node.mastery_level ?? 0,
+      difficulty_level: node.difficulty_level,
+      description: (node as any).description || "",
+      dependencies: pathData.edges
+        .filter((e: any) => e.target === node.kp_id)
+        .map((e: any) => e.source),
+    }))
+  }, [pathData])
+
   useEffect(() => {
     if (currentProfile) {
       setCurrentProfileId(currentProfile.profile_id)
@@ -723,6 +748,16 @@ export function StudentTutor() {
                       {kp.kp_name ?? kp.name ?? `知识点${kp.kp_id ?? idx}`}
                     </span>
                   ))}
+                </div>
+              </div>
+            ) : null}
+
+            {/* 学习路径图谱 */}
+            {graphNodes.length > 0 ? (
+              <div>
+                <div className="mb-2 text-xs font-bold text-slate-400">学习路径图谱</div>
+                <div className="rounded-xl border border-slate-200 overflow-hidden tutor-graph-chart" style={{ height: 180 }}>
+                  <LearningPathGraph nodes={graphNodes} />
                 </div>
               </div>
             ) : null}

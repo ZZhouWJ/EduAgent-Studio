@@ -389,3 +389,8 @@ h1, h2, h3, h4, .edu-display {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* ─── Tutor 页学习路径图谱固定高度 ─────────────── */
+.tutor-graph-chart .w-full.h-80 {
+  height: 180px !important;
+}
