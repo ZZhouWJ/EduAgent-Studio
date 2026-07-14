@@ -28,6 +28,7 @@ class LLMCallResult:
     cost: float
     status: str = "success"
     error: Optional[str] = None
+    tool_calls: Optional[List[Dict[str, Any]]] = None
 
 
 @dataclass
@@ -91,7 +92,8 @@ class LLMGateway:
                 total_tokens=result.get("input_tokens", 0) + result.get("output_tokens", 0),
                 latency_ms=latency_ms,
                 cost=result.get("cost", 0.0),
-                status="success"
+                status="success",
+                tool_calls=result.get("tool_calls"),
             )
         except Exception as e:
             logger.error(f"LLM call failed: {e}")

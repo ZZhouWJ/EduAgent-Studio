@@ -50,13 +50,21 @@ class OpenAICompatibleProvider:
             "max_tokens": kwargs.get("max_tokens", config.max_tokens),
         }
 
+        # Tool Calling 支持
+        if config.tools:
+            payload["tools"] = config.tools
+            if config.tool_choice:
+                payload["tool_choice"] = config.tool_choice
+
         start_time = time.time()
         try:
             response = self._client.post(url, headers=headers, json=payload)
             response.raise_for_status()
             data = response.json()
 
-            content = data["choices"][0]["message"]["content"]
+            message = data["choices"][0]["message"]
+            content = message.get("content") or ""
+            tool_calls = message.get("tool_calls") or []
             usage = data.get("usage", {})
             input_tokens = usage.get("prompt_tokens", 0)
             output_tokens = usage.get("completion_tokens", 0)
@@ -64,6 +72,7 @@ class OpenAICompatibleProvider:
 
             return {
                 "content": content,
+                "tool_calls": tool_calls,
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens,
                 "cost": cost,

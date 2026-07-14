@@ -115,6 +115,12 @@ class IFlyTekProvider:
             "max_tokens": max_tokens,
         }
 
+        # Tool Calling 支持
+        if config.tools:
+            payload["tools"] = config.tools
+            if config.tool_choice:
+                payload["tool_choice"] = config.tool_choice
+
         headers = {
             "Content-Type": "application/json",
             "Authorization": auth_header,
@@ -130,7 +136,9 @@ class IFlyTekProvider:
 
             # OpenAI 兼容响应格式：choices[0].message.content
             choice = data.get("choices", [{}])[0]
-            content = choice.get("message", {}).get("content", "")
+            message = choice.get("message", {})
+            content = message.get("content") or ""
+            tool_calls = message.get("tool_calls") or []
 
             usage = data.get("usage", {})
             input_tokens = usage.get("prompt_tokens", 0)
@@ -140,6 +148,7 @@ class IFlyTekProvider:
 
             return {
                 "content": content,
+                "tool_calls": tool_calls,
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens,
                 "cost": cost,

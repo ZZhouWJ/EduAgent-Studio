@@ -369,3 +369,28 @@ h1, h2, h3, h4, .edu-display {
     animation: none !important;
   }
 }
+
+/* ─── 内嵌内容块样式 ─────────────────────────── */
+.content-block.embedded {
+  border-radius: 0.75rem;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 0;
+}
+.content-block.embedded > *:first-child {
+  margin-top: 0;
+}
+
+/* ─── ThinkingBar 滚动条隐藏 ─────────────────────── */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ─── Tutor 页学习路径图谱固定高度 ─────────────── */
+.tutor-graph-chart .w-full.h-80 {
+  height: 180px !important;
+}

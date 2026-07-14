@@ -3,7 +3,9 @@ import { Link } from "react-router-dom"
 import ReactMarkdown from "react-markdown"
 import { BookOpenCheck, Bot, CheckCircle2, ChevronRight, Clock3, Image, Loader2, MessageSquare, Send, ThumbsDown, ThumbsUp, X, XCircle } from "lucide-react"
 import { useApi } from "@/lib/useApi"
-import { tutorApi, profilesApi } from "@/lib/api"
+import { tutorApi, profilesApi, learningApi } from "@/lib/api"
+import type { LearningPathNode } from "@/lib/api/learning"
+import { LearningPathGraph } from "../components/learning/LearningPathGraph"
 import type { Citation, PracticeQuestion, RecommendedResource, ContentBlock, IntentResult, SSEEvent } from "@/lib/api/tutor"
 import { PageShell, useInlineToast } from "../components/common/ProductUI"
 import { marked } from "marked"
@@ -34,8 +36,130 @@ type ExecutionEvent = {
 
 // 建议问题（动态加载）
 
+/* ─── 工具图标映射 ───────────────────────────────────── */
+const TOOL_ICONS: Record<string, string> = {
+  retrieve_knowledge: "🔍",
+  quiz_agent: "📝",
+  code_case_agent: "💻",
+  mindmap_agent: "🧠",
+  planning_agent: "🗺️",
+  ppt_agent: "📊",
+  tts_tool: "🔊",
+  image_agent: "🖼️",
+  error_analysis_agent: "❌",
+  explanation_skill: "📖",
+  default: "⚙️",
+}
+
+const TOOL_LABELS: Record<string, string> = {
+  retrieve_knowledge: "检索知识库",
+  quiz_agent: "生成练习题",
+  code_case_agent: "生成代码案例",
+  mindmap_agent: "生成思维导图",
+  planning_agent: "规划学习路径",
+  ppt_agent: "生成 PPT",
+  tts_tool: "语音合成",
+  image_agent: "生成图片",
+  error_analysis_agent: "错因分析",
+  explanation_skill: "自适应讲解",
+}
+
+/* ─── GPT/Gemini 风格思考动画条 ─────────────────────── */
+function ThinkingBar({ events, isFirstThinking }: { events: ExecutionEvent[]; isFirstThinking: boolean }) {
+  const currentEvent = events.find((e) => e.status === "started")
+  const completedCount = events.filter((e) => e.status === "completed").length
+  const errorCount = events.filter((e) => e.status === "error").length
+  const totalCount = events.length
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-white via-white to-white/95 pt-4 pb-4 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] border-t border-slate-100">
+      <div className="mx-auto max-w-3xl px-4">
+        {/* 思考标题行 */}
+        <div className="mb-3 flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600">
+            <Bot className="h-3.5 w-3.5 text-white" />
+          </div>
+          <span className="text-sm font-bold text-slate-700">
+            {isFirstThinking ? (
+              <ThinkingDots />
+            ) : currentEvent ? (
+              <span className="flex items-center gap-1.5">
+                <span className="text-blue-600">{TOOL_LABELS[currentEvent.tool] || currentEvent.tool}</span>
+                <span className="text-slate-400 font-normal">执行中...</span>
+              </span>
+            ) : (
+              <span className="text-emerald-600 flex items-center gap-1.5">
+                <CheckCircle2 className="h-4 w-4" />
+                已完成 {completedCount} 个步骤
+                {errorCount > 0 && <span className="text-red-500">，{errorCount} 个失败</span>}
+              </span>
+            )}
+          </span>
+          {totalCount > 0 && (
+            <span className="ml-auto text-xs text-slate-400 font-mono">
+              {completedCount}/{totalCount}
+            </span>
+          )}
+        </div>
+
+        {/* 工具步骤条 */}
+        {events.length > 0 && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            {events.map((evt, i) => (
+              <div
+                key={evt.id}
+                className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-300 ${
+                  evt.status === "completed"
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    : evt.status === "error"
+                    ? "bg-red-50 text-red-600 border border-red-200"
+                    : evt.status === "started"
+                    ? "bg-blue-50 text-blue-700 border border-blue-200 shadow-sm"
+                    : "bg-slate-50 text-slate-400 border border-slate-200"
+                }`}
+              >
+                {/* 状态图标 */}
+                {evt.status === "completed" ? (
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                ) : evt.status === "error" ? (
+                  <XCircle className="h-3.5 w-3.5 shrink-0 text-red-500" />
+                ) : evt.status === "started" ? (
+                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-blue-600" />
+                ) : (
+                  <span className="h-3.5 w-3.5 shrink-0 flex items-center justify-center text-slate-300">
+                    {TOOL_ICONS[evt.tool] || TOOL_ICONS.default}
+                  </span>
+                )}
+
+                <span className="whitespace-nowrap">{TOOL_LABELS[evt.tool] || evt.tool}</span>
+
+                {/* 耗时 */}
+                {evt.duration_ms && evt.status === "completed" && (
+                  <span className="text-slate-400 font-mono ml-0.5">{evt.duration_ms}ms</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ─── 思考中动画 ───────────────────────────────────── */
+function ThinkingDots() {
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      正在思考
+      <span className="edu-typing-dot" />
+      <span className="edu-typing-dot" />
+      <span className="edu-typing-dot" />
+    </span>
+  )
+}
+
 /* ─── 执行轨迹展示 ───────────────────────────────────── */
-function ExecutionTrace({ events, tool_labels }: { events: ExecutionEvent[]; tool_labels: Record<string, string> }) {
+function ExecutionTrace({ events }: { events: ExecutionEvent[] }) {
   if (!events.length) return null
 
   return (
@@ -69,7 +193,7 @@ function ExecutionTrace({ events, tool_labels }: { events: ExecutionEvent[]; too
 
             {/* 工具名称 */}
             <span className="font-semibold text-slate-700">
-              {tool_labels[evt.tool] || evt.tool}
+              {TOOL_LABELS[evt.tool] || evt.tool}
             </span>
 
             {/* 结果摘要 */}
@@ -167,6 +291,41 @@ function ResourcesCard({ resources }: { resources: RecommendedResource[] }) {
   )
 }
 
+/* ─── 内嵌内容块解析 ──────────────────────────────── */
+// 将 ":::quiz:block_abc:::这是一段文字 :::code_case:block_def:::" 解析为片段数组
+type ContentSegment =
+  | { type: "text"; content: string }
+  | { type: "embed"; blockType: string; blockId: string }
+
+const EMBED_REGEX = /:::(quiz|code_case|mindmap|lecture|ppt|video_script|error_analysis|learning_card):([^:]+):::/g
+
+function parseInlineBlocks(content: string, blocks: ContentBlock[]): ContentSegment[] {
+  if (!content) return []
+  const segments: ContentSegment[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  EMBED_REGEX.lastIndex = 0
+  while ((match = EMBED_REGEX.exec(content)) !== null) {
+    // 文本片段（两个嵌入标记之间的内容）
+    if (match.index > lastIndex) {
+      segments.push({ type: "text", content: content.slice(lastIndex, match.index) })
+    }
+    // 嵌入标记：验证 block 是否存在
+    const blockId = match[2]
+    const block = blocks.find((b) => b.block_id === blockId)
+    if (block) {
+      segments.push({ type: "embed", blockType: match[1], blockId })
+    }
+    lastIndex = match.index + match[0].length
+  }
+  // 剩余文本
+  if (lastIndex < content.length) {
+    segments.push({ type: "text", content: content.slice(lastIndex) })
+  }
+  return segments
+}
+
 /* ─── 消息气泡 ─────────────────────────────────────── */
 function MessageBubble({ message, onFeedback, executionEvents }: {
   message: Message
@@ -175,18 +334,21 @@ function MessageBubble({ message, onFeedback, executionEvents }: {
   executionEvents?: ExecutionEvent[]
 }) {
   const isStudent = message.role === "student"
-  const toolLabels: Record<string, string> = {
-    retrieve_knowledge: "检索知识库",
-    quiz_agent: "生成练习题",
-    code_case_agent: "生成代码案例",
-    mindmap_agent: "生成思维导图",
-    planning_agent: "规划学习路径",
-    error_analysis_agent: "错因分析",
-    explanation_skill: "自适应讲解",
-    ppt_agent: "生成 PPT",
-    tts_tool: "语音合成",
-    image_agent: "生成图片",
-  }
+
+  // 解析内嵌块
+  const segments = !isStudent && message.content && message.content_blocks
+    ? parseInlineBlocks(message.content, message.content_blocks)
+    : null
+  // 是否使用了内嵌语法
+  const hasInlineEmbeds = segments && segments.some((s) => s.type === "embed")
+  // 未被引用的 content_blocks（作为兜底在末尾显示）
+  const unusedBlocks = !isStudent && message.content_blocks
+    ? message.content_blocks.filter((b) => {
+        // 检查是否有嵌入标记引用了这个 block
+        if (!segments) return true
+        return !segments.some((s) => s.type === "embed" && s.blockId === b.block_id)
+      })
+    : []
 
   return (
     <div className={`flex ${isStudent ? "justify-end" : "justify-start"}`}>
@@ -197,30 +359,49 @@ function MessageBubble({ message, onFeedback, executionEvents }: {
             : "border border-slate-100 bg-slate-50 text-slate-700"
         }`}
       >
-        {/* 图片缩略图 */}
+        {/* 图片缩略图（学生上传的图片） */}
         {isStudent && message.imageBase64 && (
           <div className="mt-2 overflow-hidden rounded-lg">
             <img
               src={`data:image/jpeg;base64,${message.imageBase64}`}
-              alt="上传的图片"
+              alt="uploaded"
               className="max-w-[200px] max-h-[200px] object-cover rounded-lg border border-white/20"
             />
           </div>
         )}
 
+        {/* 消息内容：内嵌卡片模式优先 */}
         <div className="prose prose-sm max-w-none">
-          <ReactMarkdown>{message.content}</ReactMarkdown>
+          {hasInlineEmbeds && segments ? (
+            // 内嵌卡片模式：交替渲染文本片段和内容块卡片
+            <div className="space-y-3">
+              {segments.map((seg, i) =>
+                seg.type === "text" ? (
+                  <ReactMarkdown key={i}>{seg.content}</ReactMarkdown>
+                ) : (
+                  <ContentBlockRenderer
+                    key={i}
+                    block={message.content_blocks!.find((b) => b.block_id === seg.blockId)!}
+                    embedded
+                  />
+                )
+              )}
+            </div>
+          ) : message.content && message.content.trim() ? (
+            // 有 markdown 内容，正常渲染
+            <ReactMarkdown>{message.content}</ReactMarkdown>
+          ) : null}
         </div>
 
         {!isStudent && (
           <>
             {/* 执行轨迹 */}
             {executionEvents && executionEvents.length > 0 && (
-              <ExecutionTrace events={executionEvents} tool_labels={toolLabels} />
+              <ExecutionTrace events={executionEvents} />
             )}
 
-            {/* 已生成内容块标签 */}
-            {message.content_blocks && message.content_blocks.length > 0 && (
+            {/* 已生成内容块标签 — 仅在非内嵌模式下显示 */}
+            {!hasInlineEmbeds && message.content_blocks && message.content_blocks.length > 0 && (
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className="text-xs text-slate-500">已生成：</span>
                 {message.content_blocks.map((block) => (
@@ -250,10 +431,10 @@ function MessageBubble({ message, onFeedback, executionEvents }: {
               </div>
             )}
 
-            {/* 多模态内容块 */}
-            {message.content_blocks && message.content_blocks.length > 0 && (
+            {/* 多模态内容块（未嵌入的兜底渲染） */}
+            {unusedBlocks.length > 0 && (
               <div className="mt-4 space-y-3">
-                {message.content_blocks.map((block) => (
+                {unusedBlocks.map((block) => (
                   <ContentBlockRenderer key={block.block_id} block={block} />
                 ))}
               </div>
@@ -302,6 +483,8 @@ export function StudentTutor() {
   // 执行轨迹状态（当前活跃消息的轨迹）
   const [activeEvents, setActiveEvents] = useState<ExecutionEvent[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
+  // 是否处于"正在思考"阶段（还未开始调用工具）
+  const [isFirstThinking, setIsFirstThinking] = useState(false)
   const [suggestions, setSuggestions] = useState<string[]>([])
   const { toast, showToast } = useInlineToast()
   const chatScrollRef = useRef<HTMLDivElement>(null)
@@ -310,6 +493,29 @@ export function StudentTutor() {
   // 获取学生画像
   const { data: profileData } = useApi(() => profilesApi.getMyProfile(), [])
   const currentProfile = profileData
+
+  // 获取学习路径图谱数据
+  const { data: pathData } = useApi(
+    () => (currentProfile?.course_id && currentProfile?.profile_id
+      ? learningApi.getLearningPath(currentProfile.course_id, currentProfile.profile_id)
+      : Promise.resolve(null)),
+    [currentProfile?.course_id, currentProfile?.profile_id]
+  )
+
+  // 转换图谱节点格式
+  const graphNodes = React.useMemo(() => {
+    if (!pathData?.nodes) return []
+    return pathData.nodes.map((node: LearningPathNode) => ({
+      kp_id: node.kp_id,
+      kp_name: node.kp_name || (node as any).name || "",
+      mastery: node.mastery_level ?? 0,
+      difficulty_level: node.difficulty_level,
+      description: (node as any).description || "",
+      dependencies: pathData.edges
+        .filter((e: any) => e.target === node.kp_id)
+        .map((e: any) => e.source),
+    }))
+  }, [pathData])
 
   useEffect(() => {
     if (currentProfile) {
@@ -395,7 +601,8 @@ export function StudentTutor() {
     setInput("")
     setPendingAi(true)
     setIsStreaming(true)
-    setActiveEvents([])
+    setActiveEvents([])  // 重置轨迹
+    setIsFirstThinking(true)
 
     // 2. 后台分析图片（不阻塞 UI）
     let imageResult = ""
@@ -439,6 +646,7 @@ export function StudentTutor() {
               },
             ])
           } else if (event.type === "tool.started") {
+            setIsFirstThinking(false) // 开始调用工具，不再显示"正在思考"
             setActiveEvents((prev) => [
               ...prev,
               {
@@ -494,6 +702,7 @@ export function StudentTutor() {
           setIsStreaming(false)
           setPendingAi(false)
           setActiveEvents([])
+          setIsFirstThinking(false)
           showToast("已收到回复")
         },
 
@@ -508,6 +717,7 @@ export function StudentTutor() {
           setIsStreaming(false)
           setPendingAi(false)
           setActiveEvents([])
+          setIsFirstThinking(false)
           showToast("回复失败")
         },
       }
@@ -542,11 +752,17 @@ export function StudentTutor() {
     setActiveEvents([])
     setIsStreaming(false)
     setPendingAi(false)
+    setIsFirstThinking(false)
     showToast("对话已重置")
   }
 
   return (
     <PageShell>
+      {/* GPT/Gemini 风格底部思考动画条 */}
+      {(pendingAi || activeEvents.length > 0) && (
+        <ThinkingBar events={activeEvents} isFirstThinking={isFirstThinking} />
+      )}
+
       {/* 移动端 tab 切换 */}
       <div className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1 lg:hidden">
         {(["context", "chat", "resources"] as const).map((key) => (
@@ -562,7 +778,7 @@ export function StudentTutor() {
         ))}
       </div>
 
-      <section className="grid min-h-0 grid-cols-1 gap-4 lg:min-h-[720px] lg:grid-cols-[280px_1fr_320px] lg:gap-6">
+      <section className={`grid min-h-0 grid-cols-1 gap-4 lg:min-h-[720px] lg:grid-cols-[280px_1fr_320px] lg:gap-6 ${pendingAi || activeEvents.length > 0 ? "pb-20" : ""}`}>
         {/* 左侧上下文面板 */}
         <aside
           className={`edu-card rounded-2xl p-5 ${
@@ -601,6 +817,16 @@ export function StudentTutor() {
                       {kp.kp_name ?? kp.name ?? `知识点${kp.kp_id ?? idx}`}
                     </span>
                   ))}
+                </div>
+              </div>
+            ) : null}
+
+            {/* 学习路径图谱 */}
+            {graphNodes.length > 0 ? (
+              <div>
+                <div className="mb-2 text-xs font-bold text-slate-400">学习路径图谱</div>
+                <div className="rounded-xl border border-slate-200 overflow-hidden tutor-graph-chart" style={{ height: 180 }}>
+                  <LearningPathGraph nodes={graphNodes} />
                 </div>
               </div>
             ) : null}
