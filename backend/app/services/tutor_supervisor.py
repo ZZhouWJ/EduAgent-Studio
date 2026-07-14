@@ -153,8 +153,9 @@ class TutorSupervisor:
             if not tool_calls:
                 # 无工具调用，回答完毕
                 final_answer = assistant_message.get("content", "")
-                if not final_answer and content_blocks:
-                    final_answer = _build_embed_answer(content_blocks)
+                # 当有内容块时，确保嵌入语法出现在回答中
+                if content_blocks:
+                    final_answer = _inject_embed_syntax(final_answer, content_blocks)
                 logger.info(f"[Supervisor] step={step} final_answer length={len(final_answer)}")
                 break
 
@@ -279,9 +280,9 @@ class TutorSupervisor:
 
             if not tool_calls:
                 final_answer = assistant_message.get("content", "")
-                # 当有内容块但 final_answer 为空时，自动生成引用嵌入语法
-                if not final_answer and content_blocks:
-                    final_answer = _build_embed_answer(content_blocks)
+                # 当有内容块时，确保嵌入语法出现在回答中
+                if content_blocks:
+                    final_answer = _inject_embed_syntax(final_answer, content_blocks)
                 yield self._sse_event("supervisor.final", {
                     "content": final_answer,
                     "content_blocks": content_blocks,
@@ -512,6 +513,44 @@ def _result_to_content_block(tool_id: str, result: Dict[str, Any]) -> Optional[D
         "quality_score": result.get("quality_score"),
         "trustworthiness": result.get("trustworthiness"),
     }
+
+
+def _inject_embed_syntax(final_answer: str, content_blocks: List[Dict[str, Any]]) -> str:
+    """
+    当 LLM 回答文本中没有内嵌语法时，自动追加引用标记。
+    检查 final_answer 是否已包含每个 block 的 :::type:block_id::: 引用，
+    如有遗漏则追加。
+    """
+    if not content_blocks:
+        return final_answer
+
+    # 检查已有引用
+    referenced_ids = set()
+    import re
+    for m in re.finditer(r":::(?:\w+):([\w_-]+):::", final_answer):
+        referenced_ids.add(m.group(1))
+
+    label_map = {
+        "quiz": "练习题",
+        "code_case": "代码案例",
+        "mindmap": "思维导图",
+        "lecture": "学习规划",
+        "ppt": "PPT",
+        "video_script": "视频脚本",
+        "error_analysis": "错因分析",
+        "learning_card": "知识卡片",
+        "image": "图片",
+    }
+
+    missing = [
+        f"{label_map.get(b.get('block_type', ''), b.get('title', '内容'))}：:::{b.get('block_type', '')}:{b.get('block_id', '')}:::"
+        for b in content_blocks
+        if b.get("block_id", "") not in referenced_ids
+    ]
+
+    if missing:
+        return final_answer + "\n\n" + " ".join(missing)
+    return final_answer
 
 
 def _build_embed_answer(content_blocks: List[Dict[str, Any]]) -> str:
