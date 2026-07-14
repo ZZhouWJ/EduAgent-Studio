@@ -129,6 +129,8 @@ class TutorSupervisor:
         # 构建消息历史
         messages = [
             {"role": "system", "content": system_prompt},
+            # 知识库上下文作为独立 system 消息注入，确保不被截断
+            {"role": "system", "content": f"## 知识库上下文\n{knowledge_context}"},
             {"role": "user", "content": question},
         ]
 
@@ -260,6 +262,8 @@ class TutorSupervisor:
 
         messages = [
             {"role": "system", "content": system_prompt},
+            # 知识库上下文作为独立 system 消息注入，确保不被截断
+            {"role": "system", "content": f"## 知识库上下文\n{knowledge_context}"},
             {"role": "user", "content": question},
         ]
 
@@ -382,8 +386,6 @@ class TutorSupervisor:
             student_name = "同学"
             current_level = "未知"
 
-        ctx = knowledge_context or "（暂无相关知识库内容）"
-
         return f"""你是一个专业的 AI 学习辅导老师。你的职责是根据学生的问题，自主判断是否需要调用工具来生成更丰富的内容。
 
 ## 学生画像
@@ -391,9 +393,6 @@ class TutorSupervisor:
 - 当前水平：{current_level}
 - 薄弱知识点：{weak_str}
 - 资源偏好：{resource_prefs}
-
-## 知识库上下文
-{ctx}
 
 ## 可用工具（请根据问题选择合适的工具）
 - retrieve_knowledge：检索课程教材和讲义（几乎所有问题都需要先用这个）
