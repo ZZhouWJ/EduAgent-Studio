@@ -381,3 +381,11 @@ h1, h2, h3, h4, .edu-display {
   margin-top: 0;
 }
 
+/* ─── ThinkingBar 滚动条隐藏 ─────────────────────── */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
