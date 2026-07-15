@@ -7,9 +7,19 @@
 
 import json
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from app.database import get_db_cursor
+from app.database import get_db_cursor, get_db_transaction
+from app.repositories.profile_repo import PROFILE_MUTABLE_FIELDS
+
+
+def _json_default(value: Any) -> Any:
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
 class ProfileDialogRepository:
@@ -199,6 +209,104 @@ class ProfileDialogRepository:
                 change_summary,
             ))
             return cursor.lastrowid
+
+    def apply_profile_patch(
+        self,
+        profile_id: int,
+        message_id: int,
+        profile_patch: Dict[str, Any],
+        change_summary: str,
+    ) -> bool:
+        """原子应用对话抽取结果，并同步写入画像历史。"""
+        fields = [
+            field
+            for field in PROFILE_MUTABLE_FIELDS
+            if field in profile_patch and profile_patch[field] is not None
+        ]
+        snapshot_fields = ", ".join(PROFILE_MUTABLE_FIELDS)
+
+        with get_db_transaction() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT message_id
+                    FROM profile_dialog_messages
+                    WHERE message_id = %s
+                      AND profile_id = %s
+                      AND is_deleted = 0
+                      AND is_applied = 0
+                      AND extracted_json IS NOT NULL
+                    FOR UPDATE
+                    """,
+                    (message_id, profile_id),
+                )
+                if cursor.fetchone() is None:
+                    return False
+
+                cursor.execute(
+                    f"""
+                    SELECT {snapshot_fields}
+                    FROM student_profiles
+                    WHERE profile_id = %s AND is_deleted = 0
+                    FOR UPDATE
+                    """,
+                    (profile_id,),
+                )
+                before_json = cursor.fetchone()
+                if before_json is None:
+                    return False
+
+                if fields:
+                    assignments = ", ".join(f"{field} = %s" for field in fields)
+                    params = [profile_patch[field] for field in fields]
+                    params.append(profile_id)
+                    cursor.execute(
+                        f"""
+                        UPDATE student_profiles
+                        SET {assignments}, updated_at = NOW()
+                        WHERE profile_id = %s AND is_deleted = 0
+                        """,
+                        params,
+                    )
+
+                cursor.execute(
+                    f"""
+                    SELECT {snapshot_fields}
+                    FROM student_profiles
+                    WHERE profile_id = %s AND is_deleted = 0
+                    """,
+                    (profile_id,),
+                )
+                after_json = cursor.fetchone()
+
+                cursor.execute(
+                    """
+                    INSERT INTO profile_update_history
+                        (profile_id, update_type, before_json, after_json, change_summary)
+                    VALUES (%s, 'dialog', %s, %s, %s)
+                    """,
+                    (
+                        profile_id,
+                        json.dumps(before_json, ensure_ascii=False, default=_json_default),
+                        json.dumps(after_json, ensure_ascii=False, default=_json_default),
+                        change_summary,
+                    ),
+                )
+                cursor.execute(
+                    """
+                    UPDATE profile_dialog_messages
+                    SET is_applied = 1
+                    WHERE message_id = %s
+                      AND profile_id = %s
+                      AND is_deleted = 0
+                      AND is_applied = 0
+                    """,
+                    (message_id, profile_id),
+                )
+                if cursor.rowcount != 1:
+                    raise RuntimeError("画像确认状态更新失败")
+
+        return True
 
     def get_update_history(
         self, profile_id: int, limit: int = 20

@@ -1,7 +1,9 @@
 import json
 import unittest
 from decimal import Decimal
+from unittest.mock import Mock
 
+from app.repositories.profile_dialog_repo import _json_default
 from app.services.profile_dialog_service import ProfileDialogService
 
 
@@ -41,16 +43,33 @@ class ProfileDialogPatchTests(unittest.TestCase):
             168,
         )
 
-    def test_history_snapshot_converts_decimal_values(self):
-        snapshot = self.service._profile_to_history_format(
+    def test_apply_extraction_delegates_to_atomic_repository_operation(self):
+        self.service._repo = Mock()
+        self.service._profile_repo = Mock()
+        self.service._repo.get_pending_extractions.return_value = [
             {
-                "mastery_score": Decimal("0.350"),
-                "error_prone_points": ["边界条件"],
+                "message_id": 9,
+                "extracted_json": {"learning_goal": "通过期末考试"},
             }
+        ]
+        self.service._repo.apply_profile_patch.return_value = True
+        self.service._profile_repo.get_profile.return_value = {
+            "profile_id": 3,
+            "learning_goal": "通过期末考试",
+        }
+
+        result = self.service.apply_extraction(profile_id=3, message_id=9)
+
+        self.assertEqual(result["code"], 0)
+        self.service._repo.apply_profile_patch.assert_called_once_with(
+            profile_id=3,
+            message_id=9,
+            profile_patch={"learning_goal": "通过期末考试"},
+            change_summary="更新学习目标: 通过期末考试",
         )
 
-        self.assertEqual(snapshot["mastery_score"], 0.35)
-        json.dumps(snapshot)
+    def test_repository_history_serializer_handles_decimal_values(self):
+        self.assertEqual(_json_default(Decimal("0.350")), 0.35)
 
 
 if __name__ == "__main__":

@@ -6,6 +6,22 @@ from typing import Any, Dict, List, Optional, Tuple
 from app.database import get_db_cursor
 
 
+PROFILE_MUTABLE_FIELDS = (
+    "learning_goal",
+    "knowledge_base",
+    "current_level",
+    "cognitive_style",
+    "time_constraints",
+    "practice_level",
+    "motivation",
+    "error_prone_points",
+    "interests",
+    "resource_preferences",
+    "weekly_hours",
+    "mastery_score",
+)
+
+
 def _serialize_profile(raw: Dict[str, Any]) -> Dict[str, Any]:
     """
     将数据库原始行转换为前端期望的 profile 字典结构。
@@ -355,24 +371,10 @@ class ProfileRepository:
         return int(row["student_id"]) if row else None
 
     def update_profile(self, profile_id: int, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        allowed_fields = {
-            "learning_goal",
-            "knowledge_base",
-            "current_level",
-            "cognitive_style",
-            "time_constraints",
-            "practice_level",
-            "motivation",
-            "error_prone_points",
-            "interests",
-            "resource_preferences",
-            "weekly_hours",
-            "mastery_score",
-        }
         fields = []
         params: List[Any] = []
 
-        for field in allowed_fields:
+        for field in PROFILE_MUTABLE_FIELDS:
             if field in data and data[field] is not None:
                 fields.append(f"{field} = %s")
                 params.append(data[field])

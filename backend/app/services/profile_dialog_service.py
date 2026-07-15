@@ -10,7 +10,6 @@
 
 import json
 import logging
-from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from app.config import get_settings
@@ -20,16 +19,6 @@ from app.repositories.profile_repo import ProfileRepository
 
 logger = logging.getLogger(__name__)
 
-
-def _json_safe(value: Any) -> Any:
-    """将数据库值转换为可稳定写入 JSON 历史的基础类型。"""
-    if isinstance(value, Decimal):
-        return float(value)
-    if isinstance(value, dict):
-        return {key: _json_safe(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_json_safe(item) for item in value]
-    return value
 
 # 画像抽取 Prompt 模板
 EXTRACTION_PROMPT = """你是一个学生学习画像分析助手。请从学生的描述中抽取结构化的画像信息。
@@ -254,37 +243,23 @@ class ProfileDialogService:
                     "data": None,
                 }
 
-            # 获取当前画像数据（用于历史记录）
-            current_profile = self._profile_repo.get_profile(profile_id)
-            before_json = self._profile_to_history_format(current_profile)
-
             # 构建更新数据
             profile_patch = self._build_profile_patch(extracted)
-
-            # 更新画像
-            updated_profile = self._profile_repo.update_profile(profile_id, profile_patch)
-
-            if updated_profile is None:
+            change_summary = self._generate_change_summary(extracted)
+            applied = self._repo.apply_profile_patch(
+                profile_id=profile_id,
+                message_id=message_id,
+                profile_patch=profile_patch,
+                change_summary=change_summary,
+            )
+            if not applied:
                 return {
                     "code": 404,
-                    "message": "画像不存在",
+                    "message": "消息不存在、已应用或画像不存在",
                     "data": None,
                 }
 
-            # 创建历史记录
-            after_json = self._profile_to_history_format(updated_profile)
-            change_summary = self._generate_change_summary(extracted)
-
-            self._repo.create_update_history(
-                profile_id=profile_id,
-                update_type="dialog",
-                before_json=before_json,
-                after_json=after_json,
-                change_summary=change_summary,
-            )
-
-            # 标记消息为已应用
-            self._repo.mark_as_applied(message_id)
+            updated_profile = self._profile_repo.get_profile(profile_id)
 
             return {
                 "code": 0,
@@ -464,30 +439,6 @@ class ProfileDialogService:
             )
 
         return patch
-
-    def _profile_to_history_format(
-        self, profile: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """
-        将画像转换为历史记录格式。
-        """
-        if not profile:
-            return {}
-
-        return _json_safe({
-            "learning_goal": profile.get("learning_goal", ""),
-            "knowledge_base": profile.get("knowledge_base", ""),
-            "current_level": profile.get("current_level", ""),
-            "cognitive_style": profile.get("cognitive_style", ""),
-            "time_constraints": profile.get("time_constraints", ""),
-            "practice_level": profile.get("practice_level", ""),
-            "motivation": profile.get("motivation", ""),
-            "error_prone_points": profile.get("error_prone_points", []),
-            "resource_preferences": profile.get("resource_preferences", ""),
-            "interests": profile.get("interests", ""),
-            "weekly_hours": profile.get("weekly_hours", 0),
-            "mastery_score": profile.get("mastery_score", 0.0),
-        })
 
     def _generate_change_summary(
         self, extracted_data: Dict[str, Any]
