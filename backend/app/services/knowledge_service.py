@@ -15,7 +15,7 @@ from app.config import get_settings
 from app.database import get_db_cursor
 from app.repositories.knowledge_repo import KnowledgeRepository
 from app.repositories.evidence_repo import EvidenceRepository
-from app.rag.parser import parse_document, extract_bm25_terms
+from app.rag.parser import extract_bm25_terms, parse_document_file
 
 logger = logging.getLogger(__name__)
 MAX_MATERIAL_SIZE = 20 * 1024 * 1024
@@ -50,7 +50,7 @@ def validate_material_upload(
         expected_entry = "word/document.xml" if normalized_type == "word" else "ppt/presentation.xml"
         if expected_entry not in names:
             raise ValueError("Office 文件内容与扩展名不一致")
-    if normalized_type in {"markdown", "text"}:
+    if normalized_type in {"markdown", "md", "text", "txt"}:
         if b"\x00" in file_content:
             raise ValueError("文本文件包含无效二进制内容")
         try:
@@ -181,17 +181,8 @@ class KnowledgeService:
                 )
                 return {"code": 404, "message": "文件不存在", "data": None}
 
-            with open(storage_path, "r", encoding="utf-8", errors="ignore") as f:
-                content = f.read()
-
-            if not content.strip():
-                self._repo.update_material_status(
-                    material_id, "failed", error_message="文件内容为空"
-                )
-                return {"code": 400, "message": "文件内容为空", "data": None}
-
             # 解析文档
-            chunks_data = parse_document(content, material["file_type"])
+            chunks_data = parse_document_file(storage_path, material["file_type"])
 
             if not chunks_data:
                 self._repo.update_material_status(
@@ -217,6 +208,8 @@ class KnowledgeService:
                     "material_version": material_version,
                 })
 
+            total_chars = sum(len(chunk["content"]) for chunk in final_chunks)
+
             # 批量插入 chunks
             inserted = self._repo.insert_chunks(
                 material_id=material_id,
@@ -228,7 +221,7 @@ class KnowledgeService:
             self._repo.update_material_status(
                 material_id, "parsed", total_chunks=inserted
             )
-            self._update_material_version(material_id, material_version, len(content))
+            self._update_material_version(material_id, material_version, total_chars)
 
             # 知识点预匹配
             match_result = self._match_knowledge_points(material_id, material["course_id"], material_version)
@@ -354,17 +347,8 @@ class KnowledgeService:
                 )
                 return {"code": 404, "message": "文件不存在", "data": None}
 
-            with open(storage_path, "r", encoding="utf-8", errors="ignore") as f:
-                content = f.read()
-
-            if not content.strip():
-                self._repo.update_material_status(
-                    material_id, "failed", error_message="文件内容为空"
-                )
-                return {"code": 400, "message": "文件内容为空", "data": None}
-
             # 重新解析
-            chunks_data = parse_document(content, material["file_type"])
+            chunks_data = parse_document_file(storage_path, material["file_type"])
             if not chunks_data:
                 self._repo.update_material_status(
                     material_id, "failed", error_message="未能提取有效内容"
@@ -388,6 +372,8 @@ class KnowledgeService:
                     "material_version": new_version,
                 })
 
+            total_chars = sum(len(chunk["content"]) for chunk in final_chunks)
+
             inserted = self._repo.insert_chunks(
                 material_id=material_id,
                 course_id=material["course_id"],
@@ -397,7 +383,7 @@ class KnowledgeService:
             self._repo.update_material_status(
                 material_id, "parsed", total_chunks=inserted
             )
-            self._update_material_version(material_id, new_version, len(content))
+            self._update_material_version(material_id, new_version, total_chars)
 
             # 知识点预匹配（使用新版本号）
             match_result = self._match_knowledge_points(material_id, material["course_id"], new_version)

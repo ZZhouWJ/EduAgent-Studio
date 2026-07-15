@@ -43,3 +43,7 @@ websocket-client>=1.8.0
 
 # Learning artifact export
 python-pptx>=1.0.2
+
+# Course material parsing
+pypdf>=5.0.0
+python-docx>=1.1.2

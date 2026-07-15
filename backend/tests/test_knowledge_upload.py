@@ -32,6 +32,10 @@ class KnowledgeUploadValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "格式"):
             validate_material_upload(b"not-a-zip", "lesson.docx", "word")
 
+    def test_rejects_binary_content_in_txt_upload(self):
+        with self.assertRaisesRegex(ValueError, "二进制"):
+            validate_material_upload(b"lesson\x00payload", "lesson.txt", "txt")
+
     def test_distinguishes_word_and_powerpoint_archives(self):
         word = office_archive("word/document.xml")
         self.assertEqual(

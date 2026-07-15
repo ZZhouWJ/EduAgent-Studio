@@ -23,7 +23,7 @@ async def upload_material(
     """
     上传课程资料文件。
 
-    支持 PDF、Markdown、Word、PPT、TXT 格式。
+    支持 PDF、Markdown、DOCX、PPTX、TXT 格式。
     上传后状态为 pending，需要调用 /parse 接口触发解析。
     """
     # 读取文件内容
@@ -36,7 +36,7 @@ async def upload_material(
     if file_type is None:
         return {
             "code": 400,
-            "message": "不支持的文件类型，支持: pdf, markdown, word, ppt, txt",
+            "message": "不支持的文件类型，支持: PDF、Markdown、DOCX、PPTX、TXT",
             "data": None,
         }
 
@@ -229,9 +229,9 @@ def _get_file_type(filename: str) -> Optional[str]:
         return "pdf"
     elif filename_lower.endswith((".md", ".markdown")):
         return "markdown"
-    elif filename_lower.endswith((".doc", ".docx")):
+    elif filename_lower.endswith(".docx"):
         return "word"
-    elif filename_lower.endswith((".ppt", ".pptx")):
+    elif filename_lower.endswith(".pptx"):
         return "ppt"
     elif filename_lower.endswith((".txt", ".text")):
         return "txt"

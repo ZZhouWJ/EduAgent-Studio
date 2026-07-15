@@ -1,7 +1,7 @@
 """
 文档解析器模块。
 
-支持解析 Markdown 和纯文本文件，生成结构化 chunks。
+支持解析 PDF、DOCX、PPTX、Markdown 和纯文本文件，生成结构化 chunks。
 提供 BM25 关键词提取功能。
 """
 
@@ -206,5 +206,101 @@ def parse_document(content: str, file_type: str) -> List[Dict[str, Any]]:
     elif file_type in ("text", "txt"):
         return parse_text(content)
     else:
-        # 默认当作纯文本处理
         return parse_text(content)
+
+
+def parse_document_file(file_path: str, file_type: str) -> List[Dict[str, Any]]:
+    """从真实文件格式提取文本，并生成带页码来源的知识片段。"""
+    normalized_type = file_type.lower()
+    if normalized_type in {"markdown", "md", "text", "txt"}:
+        with open(file_path, "r", encoding="utf-8") as file:
+            return parse_document(file.read(), normalized_type)
+    if normalized_type == "pdf":
+        return _parse_pdf_file(file_path)
+    if normalized_type == "word":
+        return _parse_docx_file(file_path)
+    if normalized_type == "ppt":
+        return _parse_pptx_file(file_path)
+    raise ValueError(f"不支持的文档类型: {normalized_type}")
+
+
+def _parse_pdf_file(file_path: str) -> List[Dict[str, Any]]:
+    from pypdf import PdfReader
+
+    chunks: List[Dict[str, Any]] = []
+    reader = PdfReader(file_path)
+    for page_number, page in enumerate(reader.pages, start=1):
+        text = (page.extract_text() or "").strip()
+        if not text:
+            continue
+        page_chunks = parse_text(text)
+        for chunk in page_chunks:
+            chunk["title"] = f"第 {page_number} 页 - {chunk['title']}"
+            chunk["source_page"] = page_number
+            chunks.append(chunk)
+    return chunks
+
+
+def _parse_docx_file(file_path: str) -> List[Dict[str, Any]]:
+    from docx import Document
+
+    document = Document(file_path)
+    lines: List[str] = []
+    for paragraph in document.paragraphs:
+        text = paragraph.text.strip()
+        if not text:
+            continue
+        style_name = paragraph.style.name.lower() if paragraph.style else ""
+        if style_name.startswith("heading"):
+            level_match = re.search(r"(\d+)", style_name)
+            level = min(6, int(level_match.group(1))) if level_match else 2
+            lines.append(f"{'#' * level} {text}")
+        else:
+            lines.append(text)
+
+    for table in document.tables:
+        for row in table.rows:
+            cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+            if cells:
+                lines.append(" | ".join(cells))
+
+    content = "\n\n".join(lines)
+    if not content:
+        return []
+    return parse_markdown(content) if any(line.startswith("#") for line in lines) else parse_text(content)
+
+
+def _parse_pptx_file(file_path: str) -> List[Dict[str, Any]]:
+    from pptx import Presentation
+
+    presentation = Presentation(file_path)
+    chunks: List[Dict[str, Any]] = []
+    for slide_number, slide in enumerate(presentation.slides, start=1):
+        lines: List[str] = []
+        title = ""
+        if slide.shapes.title and slide.shapes.title.text:
+            title = slide.shapes.title.text.strip()
+
+        for shape in slide.shapes:
+            if shape == slide.shapes.title:
+                continue
+            if getattr(shape, "has_text_frame", False):
+                text = shape.text.strip()
+                if text:
+                    lines.append(text)
+            if getattr(shape, "has_table", False):
+                for row in shape.table.rows:
+                    cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                    if cells:
+                        lines.append(" | ".join(cells))
+
+        content = "\n\n".join(lines).strip()
+        if not title and not content:
+            continue
+        chunks.append({
+            "title": title or f"第 {slide_number} 页",
+            "content": content or title,
+            "source_page": slide_number,
+            "source_paragraph": 0,
+        })
+    return chunks
