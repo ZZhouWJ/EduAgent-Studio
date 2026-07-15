@@ -1,9 +1,12 @@
 """学生画像 Service"""
+import logging
 from typing import Any, Dict, Optional
 
 from app.repositories.profile_repo import ProfileRepository
 from app.services.course_access_service import CourseAccessService
 from app.utils.exceptions import ForbiddenException, NotFoundException
+
+logger = logging.getLogger(__name__)
 
 
 class ProfileService:
@@ -62,10 +65,11 @@ class ProfileService:
             }
         except (ForbiddenException, NotFoundException):
             raise
-        except Exception as e:
+        except Exception:
+            logger.exception("查询学生画像列表失败")
             return {
                 "code": 500,
-                "message": f"查询失败: {e}",
+                "message": "查询失败，请稍后重试",
                 "data": None,
             }
 
@@ -81,8 +85,9 @@ class ProfileService:
             return {"code": 0, "message": "success", "data": profile}
         except (ForbiddenException, NotFoundException):
             raise
-        except Exception as e:
-            return {"code": 500, "message": f"查询失败: {e}", "data": None}
+        except Exception:
+            logger.exception("查询学生画像失败: profile_id=%s", profile_id)
+            return {"code": 500, "message": "查询失败，请稍后重试", "data": None}
 
     def get_my_profile(self, user: Any) -> Dict[str, Any]:
         """
@@ -102,8 +107,9 @@ class ProfileService:
             if profile is None:
                 return {"code": 404, "message": "您还没有创建学生画像，请先通过学习反馈或教师导入建立画像", "data": None}
             return {"code": 0, "message": "success", "data": profile}
-        except Exception as e:
-            return {"code": 500, "message": f"查询失败: {e}", "data": None}
+        except Exception:
+            logger.exception("查询本人学生画像失败")
+            return {"code": 500, "message": "查询失败，请稍后重试", "data": None}
 
     def update_profile(
         self, profile_id: int, data: Dict[str, Any], user: Any
@@ -119,8 +125,9 @@ class ProfileService:
             return {"code": 0, "message": "更新成功", "data": updated}
         except (ForbiddenException, NotFoundException):
             raise
-        except Exception as e:
-            return {"code": 500, "message": f"更新失败: {e}", "data": None}
+        except Exception:
+            logger.exception("更新学生画像失败: profile_id=%s", profile_id)
+            return {"code": 500, "message": "更新失败，请稍后重试", "data": None}
 
     def update_mastery(
         self, profile_id: int, data: Dict[str, Any], user: Any
@@ -162,5 +169,6 @@ class ProfileService:
             }
         except (ForbiddenException, NotFoundException):
             raise
-        except Exception as e:
-            return {"code": 500, "message": f"掌握度更新失败: {e}", "data": None}
+        except Exception:
+            logger.exception("更新学生掌握度失败: profile_id=%s", profile_id)
+            return {"code": 500, "message": "掌握度更新失败，请稍后重试", "data": None}

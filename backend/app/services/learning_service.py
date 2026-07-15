@@ -1,9 +1,13 @@
 """学习服务 — 课程、知识点、学习任务"""
 
+import logging
+
 from typing import Any, Dict, List, Optional
 
 from app.repositories import LearningRepository
 from app.services.course_access_service import CourseAccessService
+
+logger = logging.getLogger(__name__)
 
 
 class LearningService:
@@ -77,8 +81,9 @@ class LearningService:
                 creator_id=creator_id,
             )
             return {"code": 0, "message": "任务创建成功", "data": result}
-        except Exception as e:
-            return {"code": 500, "message": f"创建任务失败: {e}", "data": None}
+        except Exception:
+            logger.exception("创建学习任务失败: course_id=%s", course_id)
+            return {"code": 500, "message": "创建任务失败，请稍后重试", "data": None}
 
     def update_course_status(self, course_id: int, status: str) -> Dict[str, Any]:
         try:
@@ -88,16 +93,18 @@ class LearningService:
             return {"code": 0, "message": "课程状态已更新", "data": result}
         except ValueError as e:
             return {"code": 400, "message": str(e), "data": None}
-        except Exception as e:
-            return {"code": 500, "message": f"更新课程状态失败: {e}", "data": None}
+        except Exception:
+            logger.exception("更新课程状态失败: course_id=%s", course_id)
+            return {"code": 500, "message": "更新课程状态失败，请稍后重试", "data": None}
 
     def get_learning_path(self, course_id: int, profile_id: Optional[int] = None) -> Dict[str, Any]:
         """获取课程知识点学习路径图谱（含掌握度）。"""
         try:
             path_data = self._repo.get_learning_path(course_id, profile_id=profile_id)
             return {"code": 0, "message": "success", "data": path_data}
-        except Exception as e:
-            return {"code": 500, "message": f"获取学习路径失败: {e}", "data": None}
+        except Exception:
+            logger.exception("获取学习路径失败: course_id=%s", course_id)
+            return {"code": 500, "message": "获取学习路径失败，请稍后重试", "data": None}
 
     def recommend_resources(self, profile_id: int, course_id: int) -> List[Dict[str, Any]]:
         """
@@ -112,5 +119,10 @@ class LearningService:
         try:
             resources = self._repo.get_recommended_resources(profile_id, course_id)
             return resources
-        except Exception as e:
+        except Exception:
+            logger.exception(
+                "获取推荐资源失败: profile_id=%s course_id=%s",
+                profile_id,
+                course_id,
+            )
             return []

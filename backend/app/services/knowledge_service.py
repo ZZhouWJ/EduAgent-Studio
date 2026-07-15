@@ -269,8 +269,9 @@ class KnowledgeService:
                 },
             }
 
-        except Exception as e:
-            return {"code": 500, "message": f"检索失败: {str(e)}", "data": None}
+        except Exception:
+            logger.exception("知识库检索失败: course_id=%s", course_id)
+            return {"code": 500, "message": "检索失败，请稍后重试", "data": None}
 
     @staticmethod
     def _prepare_chunks(chunks_data: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], int]:
@@ -451,8 +452,9 @@ class KnowledgeService:
                     "materials": materials,
                 },
             }
-        except Exception as e:
-            return {"code": 500, "message": f"获取资料列表失败: {str(e)}", "data": None}
+        except Exception:
+            logger.exception("获取课程资料列表失败: course_id=%s", course_id)
+            return {"code": 500, "message": "获取资料列表失败，请稍后重试", "data": None}
 
     def get_material_detail(self, material_id: int) -> Dict[str, Any]:
         """
@@ -479,8 +481,9 @@ class KnowledgeService:
                     "chunks": chunks,
                 },
             }
-        except Exception as e:
-            return {"code": 500, "message": f"获取资料详情失败: {str(e)}", "data": None}
+        except Exception:
+            logger.exception("获取资料详情失败: material_id=%s", material_id)
+            return {"code": 500, "message": "获取资料详情失败，请稍后重试", "data": None}
 
     def delete_material(self, material_id: int) -> Dict[str, Any]:
         """
@@ -503,5 +506,6 @@ class KnowledgeService:
             else:
                 return {"code": 500, "message": "删除失败", "data": None}
 
-        except Exception as e:
-            return {"code": 500, "message": f"删除失败: {str(e)}", "data": None}
+        except Exception:
+            logger.exception("删除课程资料失败: material_id=%s", material_id)
+            return {"code": 500, "message": "删除失败，请稍后重试", "data": None}

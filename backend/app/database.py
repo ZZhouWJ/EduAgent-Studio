@@ -138,13 +138,13 @@ def test_connection() -> Dict[str, Any]:
         logger.warning("数据库连接测试失败: %s", e)
         return {
             "connected": False,
-            "message": f"数据库连接失败: {e.args[1] if len(e.args) > 1 else str(e)}",
+            "message": "数据库连接失败",
             "server_version": None,
         }
     except Exception as e:
         logger.warning("数据库连接测试异常: %s", e)
         return {
             "connected": False,
-            "message": f"数据库连接异常: {str(e)}",
+            "message": "数据库连接异常",
             "server_version": None,
         }

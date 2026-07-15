@@ -4,6 +4,7 @@
 提供资料上传、解析、检索、列表、详情等接口。
 """
 
+import logging
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, File, Form, Path, Query, UploadFile
@@ -15,6 +16,7 @@ from app.utils.dependencies import get_current_user_dep, require_role
 from app.utils.exceptions import ForbiddenException
 
 router = APIRouter(prefix="/knowledge", tags=["课程知识库"])
+logger = logging.getLogger(__name__)
 
 
 class KpLinkVerifyRequest(BaseModel):
@@ -171,8 +173,9 @@ async def get_pending_kp_chunk_links(
         repo = EvidenceRepository()
         links = repo.get_pending_kp_chunk_links(course_id=course_id, limit=50)
         return {"code": 0, "message": "success", "data": links}
-    except Exception as e:
-        return {"code": 500, "message": str(e), "data": None}
+    except Exception:
+        logger.exception("查询待审核知识点关联失败: course_id=%s", course_id)
+        return {"code": 500, "message": "查询失败，请稍后重试", "data": None}
 
 
 @router.put("/kp-chunk-links/{link_id}/verify")
@@ -196,8 +199,9 @@ async def verify_kp_chunk_link(
         if success:
             return {"code": 0, "message": f"已{'确认' if status == 'confirmed' else '拒绝'}", "data": {"link_id": link_id}}
         return {"code": 404, "message": "记录不存在", "data": None}
-    except Exception as e:
-        return {"code": 500, "message": str(e), "data": None}
+    except Exception:
+        logger.exception("审核知识点关联失败: link_id=%s", link_id)
+        return {"code": 500, "message": "审核失败，请稍后重试", "data": None}
 
 
 @router.get("/resource-evidence")
@@ -216,8 +220,9 @@ async def get_resource_evidence(
         repo = EvidenceRepository()
         evidence = repo.get_evidence_by_resource(resource_id)
         return {"code": 0, "message": "success", "data": evidence}
-    except Exception as e:
-        return {"code": 500, "message": str(e), "data": None}
+    except Exception:
+        logger.exception("查询资源证据失败: resource_id=%s", resource_id)
+        return {"code": 500, "message": "查询失败，请稍后重试", "data": None}
 
 
 @router.put("/resource-evidence/{link_id}/verify")
@@ -240,8 +245,9 @@ async def verify_resource_evidence(
         if success:
             return {"code": 0, "message": f"已{'确认' if status == 'verified' else '拒绝'}", "data": {"link_id": link_id}}
         return {"code": 404, "message": "记录不存在", "data": None}
-    except Exception as e:
-        return {"code": 500, "message": str(e), "data": None}
+    except Exception:
+        logger.exception("审核资源证据失败: link_id=%s", link_id)
+        return {"code": 500, "message": "审核失败，请稍后重试", "data": None}
 
 
 def _get_file_type(filename: str) -> Optional[str]:

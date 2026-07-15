@@ -8,6 +8,7 @@ PUT  /api/auth/me/password - 修改密码
 POST /api/auth/logout  - 登出
 """
 
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, Body, Header, HTTPException, Request, status
@@ -18,6 +19,16 @@ from app.utils.exceptions import UnauthorizedException
 from app.utils.response import error_response, success_response
 
 router = APIRouter(prefix="/auth", tags=["认证"])
+logger = logging.getLogger(__name__)
+
+
+def _unexpected_auth_error(action: str, exc: Exception):
+    logger.exception("认证操作失败: action=%s error=%s", action, exc)
+    return error_response(
+        message="操作失败，请稍后重试",
+        code=5000,
+        status_code=500,
+    )
 
 
 class LoginRequest(BaseModel):
@@ -183,7 +194,7 @@ async def register(request: Request, body: RegisterRequest) -> dict:
     except Exception as e:
         if hasattr(e, "code") and hasattr(e, "message"):
             return error_response(message=e.message, code=e.code)
-        return error_response(message=str(e), code=4000)
+        return _unexpected_auth_error("register", e)
 
 
 @router.put("/me")
@@ -215,7 +226,7 @@ async def update_my_profile(
     except Exception as e:
         if hasattr(e, "code") and hasattr(e, "message"):
             return error_response(message=e.message, code=e.code)
-        return error_response(message=str(e), code=4000)
+        return _unexpected_auth_error("update_profile", e)
 
 
 @router.patch("/me/roles")
@@ -244,7 +255,7 @@ async def update_my_roles(
     except Exception as e:
         if hasattr(e, "code") and hasattr(e, "message"):
             return error_response(message=e.message, code=e.code)
-        return error_response(message=str(e), code=4000)
+        return _unexpected_auth_error("update_roles", e)
 
 
 @router.put("/me/password")
@@ -272,7 +283,7 @@ async def update_my_password(
     except Exception as e:
         if hasattr(e, "code") and hasattr(e, "message"):
             return error_response(message=e.message, code=e.code)
-        return error_response(message=str(e), code=4000)
+        return _unexpected_auth_error("update_password", e)
 
 
 @router.get("/roles")
