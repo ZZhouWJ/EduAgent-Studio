@@ -4,6 +4,7 @@
 处理 AI 模型调用、输出版本写入，成本记录相关业务逻辑。
 """
 
+import logging
 from typing import Any, Dict, List, Optional
 
 from app.adapters import get_adapter_by_model_name
@@ -15,6 +16,8 @@ from app.utils.exceptions import (
     UnauthorizedException,
     ValidationException,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -150,6 +153,7 @@ def generate_task_outputs(
             try:
                 adapter = get_adapter_by_model_name(model_name)
             except ValueError as e:
+                logger.warning("模型适配器不可用: model=%s error=%s", model_name, e)
                 invocation_id = invocation_repo.create_invocation(
                     project_id=project_id,
                     task_id=task_id,
@@ -158,7 +162,7 @@ def generate_task_outputs(
                     prompt_version_id=prompt_version_id,
                     input_text=input_text.strip(),
                     output_text=None,
-                    error_message=str(e),
+                    error_message="模型适配器不可用",
                     input_tokens=0,
                     output_tokens=0,
                     latency_ms=0,
@@ -186,7 +190,7 @@ def generate_task_outputs(
                     "model_name": model_name,
                     "invocation_id": invocation_id,
                     "status": "failed",
-                    "error_message": str(e),
+                    "error_message": "模型适配器不可用",
                 })
                 continue
 
@@ -271,6 +275,11 @@ def generate_task_outputs(
                 })
 
             else:
+                logger.warning(
+                    "模型调用失败: model=%s error=%s",
+                    model_name,
+                    model_result.error_message,
+                )
                 invocation_id = invocation_repo.create_invocation(
                     project_id=project_id,
                     task_id=task_id,
@@ -279,7 +288,7 @@ def generate_task_outputs(
                     prompt_version_id=prompt_version_id,
                     input_text=input_text.strip(),
                     output_text=None,
-                    error_message=model_result.error_message,
+                    error_message="模型调用失败",
                     input_tokens=0,
                     output_tokens=0,
                     latency_ms=model_result.latency_ms,
@@ -307,7 +316,7 @@ def generate_task_outputs(
                     "model_name": model_name,
                     "invocation_id": invocation_id,
                     "status": "failed",
-                    "error_message": model_result.error_message,
+                    "error_message": "模型调用失败",
                 })
 
         user_repo.insert_operation_log_with_conn(

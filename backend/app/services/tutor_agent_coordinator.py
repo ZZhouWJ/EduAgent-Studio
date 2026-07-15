@@ -284,8 +284,8 @@ class TutorAgentCoordinator:
                 "block_id": f"block_{resource_type}_error",
                 "block_type": resource_type,
                 "title": self._type_to_title(resource_type),
-                "content": f"生成失败：{str(e)}",
-                "metadata": {"error": str(e)},
+                "content": "生成失败，请稍后重试",
+                "metadata": {"error": "resource_generation_failed"},
                 "quality_score": 0,
                 "trustworthiness": "draft",
             }

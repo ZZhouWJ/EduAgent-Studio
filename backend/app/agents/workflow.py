@@ -143,9 +143,9 @@ def _diagnosis_node(state: WorkflowState) -> Dict[str, Any]:
             "diagnosis": None,
             "current_step": WorkflowStep.FAILED.value,
             "step_history": state.get("step_history", []) + [
-                _make_step_record(WorkflowStep.DIAGNOSIS, "failed", str(e), duration)
+                _make_step_record(WorkflowStep.DIAGNOSIS, "failed", "诊断执行失败", duration)
             ],
-            "metadata": {**state.get("metadata", {}), "diagnosis_error": str(e)},
+            "metadata": {**state.get("metadata", {}), "diagnosis_error": "diagnosis_failed"},
         }
 
 
@@ -177,9 +177,9 @@ def _planning_node(state: WorkflowState) -> Dict[str, Any]:
         return {
             "current_step": WorkflowStep.FAILED.value,
             "step_history": state.get("step_history", []) + [
-                _make_step_record(WorkflowStep.PLANNING, "failed", str(e), duration)
+                _make_step_record(WorkflowStep.PLANNING, "failed", "规划执行失败", duration)
             ],
-            "metadata": {**state.get("metadata", {}), "planning_error": str(e)},
+            "metadata": {**state.get("metadata", {}), "planning_error": "planning_failed"},
         }
 
 
@@ -219,9 +219,9 @@ def _resource_generation_node(state: WorkflowState) -> Dict[str, Any]:
         return {
             "current_step": WorkflowStep.FAILED.value,
             "step_history": state.get("step_history", []) + [
-                _make_step_record(WorkflowStep.GENERATION, "failed", str(e), duration)
+                _make_step_record(WorkflowStep.GENERATION, "failed", "资源生成失败", duration)
             ],
-            "metadata": {**state.get("metadata", {}), "generation_error": str(e)},
+            "metadata": {**state.get("metadata", {}), "generation_error": "generation_failed"},
         }
 
 
@@ -253,9 +253,9 @@ def _assessment_node(state: WorkflowState) -> Dict[str, Any]:
         return {
             "current_step": WorkflowStep.FAILED.value,
             "step_history": state.get("step_history", []) + [
-                _make_step_record(WorkflowStep.ASSESSMENT, "failed", str(e), duration)
+                _make_step_record(WorkflowStep.ASSESSMENT, "failed", "评测执行失败", duration)
             ],
-            "metadata": {**state.get("metadata", {}), "assessment_error": str(e)},
+            "metadata": {**state.get("metadata", {}), "assessment_error": "assessment_failed"},
         }
 
 
@@ -291,9 +291,9 @@ def _teacher_review_node(state: WorkflowState) -> Dict[str, Any]:
         return {
             "current_step": WorkflowStep.FAILED.value,
             "step_history": state.get("step_history", []) + [
-                _make_step_record(WorkflowStep.TEACHER_REVIEW, "failed", str(e), duration)
+                _make_step_record(WorkflowStep.TEACHER_REVIEW, "failed", "审核执行失败", duration)
             ],
-            "metadata": {**state.get("metadata", {}), "review_error": str(e)},
+            "metadata": {**state.get("metadata", {}), "review_error": "review_failed"},
         }
 
 
@@ -348,9 +348,9 @@ def _revision_node(state: WorkflowState) -> Dict[str, Any]:
             "revision_count": revision_count,
             "current_step": WorkflowStep.FAILED.value,
             "step_history": state.get("step_history", []) + [
-                _make_step_record(WorkflowStep.REVISION, "failed", str(e), duration)
+                _make_step_record(WorkflowStep.REVISION, "failed", "修订执行失败", duration)
             ],
-            "metadata": {**state.get("metadata", {}), "revision_error": str(e)},
+            "metadata": {**state.get("metadata", {}), "revision_error": "revision_failed"},
         }
 
 

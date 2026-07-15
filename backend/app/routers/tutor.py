@@ -10,6 +10,7 @@ Tutor API 路由
 
 import asyncio
 import json
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -25,6 +26,7 @@ from app.repositories.knowledge_repo import KnowledgeRepository
 from app.utils.response import success_response, error_response
 
 router = APIRouter(prefix="/tutor", tags=["学习辅导"])
+logger = logging.getLogger(__name__)
 
 
 class ChatRequest(BaseModel):
@@ -141,8 +143,9 @@ async def tutor_chat_stream(
             ):
                 yield sse_line
 
-        except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+        except Exception:
+            logger.exception("流式答疑失败")
+            yield f"data: {json.dumps({'type': 'error', 'message': '答疑失败，请稍后重试'}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         event_stream(),

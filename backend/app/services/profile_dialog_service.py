@@ -129,10 +129,10 @@ class ProfileDialogService:
             }
 
         except Exception as e:
-            logger.error(f"Profile dialog error: {e}")
+            logger.exception("学生画像对话处理失败")
             return {
                 "code": 500,
-                "message": f"对话处理失败: {str(e)}",
+                "message": "对话处理失败，请稍后重试",
                 "data": None,
             }
 
@@ -161,10 +161,10 @@ class ProfileDialogService:
                 },
             }
         except Exception as e:
-            logger.error(f"Get dialog history error: {e}")
+            logger.exception("获取学生画像对话历史失败")
             return {
                 "code": 500,
-                "message": f"获取对话历史失败: {str(e)}",
+                "message": "获取对话历史失败，请稍后重试",
                 "data": None,
             }
 
@@ -199,10 +199,10 @@ class ProfileDialogService:
                 },
             }
         except Exception as e:
-            logger.error(f"Get pending extractions error: {e}")
+            logger.exception("获取待应用画像抽取结果失败")
             return {
                 "code": 500,
-                "message": f"获取待应用抽取结果失败: {str(e)}",
+                "message": "获取待应用抽取结果失败，请稍后重试",
                 "data": None,
             }
 
@@ -273,10 +273,10 @@ class ProfileDialogService:
             }
 
         except Exception as e:
-            logger.error(f"Apply extraction error: {e}")
+            logger.exception("应用画像抽取结果失败")
             return {
                 "code": 500,
-                "message": f"应用抽取结果失败: {str(e)}",
+                "message": "应用抽取结果失败，请稍后重试",
                 "data": None,
             }
 

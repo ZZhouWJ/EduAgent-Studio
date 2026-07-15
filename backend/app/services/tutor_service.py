@@ -173,9 +173,9 @@ class TutorService:
                 "data": result,
             }
 
-        except Exception as e:
-            logger.error(f"Tutor chat failed: {e}")
-            return {"code": 500, "message": f"答疑失败: {str(e)}", "data": None}
+        except Exception:
+            logger.exception("Tutor 答疑失败")
+            return {"code": 500, "message": "答疑失败，请稍后重试", "data": None}
 
     def submit_feedback(
         self,
@@ -217,9 +217,9 @@ class TutorService:
 
             return {"code": 0, "message": "反馈已提交", "data": {"session_id": session_id}}
 
-        except Exception as e:
-            logger.error(f"Tutor feedback failed: {e}")
-            return {"code": 500, "message": f"反馈提交失败: {str(e)}", "data": None}
+        except Exception:
+            logger.exception("Tutor 反馈提交失败")
+            return {"code": 500, "message": "反馈提交失败，请稍后重试", "data": None}
 
     def get_sessions(
         self,
@@ -293,9 +293,9 @@ class TutorService:
                 },
             }
 
-        except Exception as e:
-            logger.error(f"Get sessions failed: {e}")
-            return {"code": 500, "message": f"获取会话历史失败: {str(e)}", "data": None}
+        except Exception:
+            logger.exception("获取 Tutor 会话历史失败")
+            return {"code": 500, "message": "获取会话历史失败，请稍后重试", "data": None}
 
     def _get_course_knowledge_points(self, course_id: int) -> List[Dict[str, Any]]:
         """获取课程知识点列表"""

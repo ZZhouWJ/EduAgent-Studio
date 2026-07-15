@@ -182,7 +182,7 @@ class TutorSupervisor:
                     result = await self.tool_registry.execute(tool_id, arguments)
                 except Exception as e:
                     logger.error(f"Tool [{tool_id}] raised: {e}")
-                    result = {"error": str(e)}
+                    result = {"error": "工具执行失败"}
 
                 duration_ms = int((time.time() - t0) * 1000)
                 success = "error" not in result
@@ -324,7 +324,7 @@ class TutorSupervisor:
                     result = await self.tool_registry.execute(tool_id, arguments)
                 except Exception as e:
                     logger.error(f"Tool [{tool_id}] raised: {e}")
-                    result = {"error": str(e)}
+                    result = {"error": "工具执行失败"}
 
                 duration_ms = int((time.time() - t0) * 1000)
                 success = "error" not in result
@@ -469,7 +469,7 @@ class TutorSupervisor:
             return {"message": {"content": str(result), "tool_calls": []}}
         except Exception as e:
             logger.error(f"LLM call failed: {e}")
-            return {"message": {"content": f"LLM 调用失败：{e}", "tool_calls": []}}
+            return {"message": {"content": "模型调用失败，请稍后重试", "tool_calls": []}}
 
     def _sse_event(self, event_type: str, data: Dict[str, Any]) -> str:
         """生成 SSE 格式事件"""

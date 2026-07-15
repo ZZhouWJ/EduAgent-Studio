@@ -50,7 +50,7 @@ async def retrieve_knowledge(
         }
     except Exception as e:
         logger.error(f"retrieve_knowledge failed: {e}")
-        return {"chunks": [], "count": 0, "error": str(e)}
+        return {"chunks": [], "count": 0, "error": "知识检索失败"}
 
 
 # =============================================================================
@@ -93,7 +93,7 @@ async def quiz_agent(
         }
     except Exception as e:
         logger.error(f"quiz_agent failed: {e}")
-        return {"content": f"题目生成失败：{e}", "questions": [], "quality_score": 0}
+        return {"content": "题目生成失败，请稍后重试", "questions": [], "quality_score": 0}
 
 
 async def code_case_agent(
@@ -130,7 +130,7 @@ async def code_case_agent(
         }
     except Exception as e:
         logger.error(f"code_case_agent failed: {e}")
-        return {"content": f"代码案例生成失败：{e}", "language": language, "quality_score": 0}
+        return {"content": "代码案例生成失败，请稍后重试", "language": language, "quality_score": 0}
 
 
 async def mindmap_agent(
@@ -165,7 +165,7 @@ async def mindmap_agent(
         }
     except Exception as e:
         logger.error(f"mindmap_agent failed: {e}")
-        return {"content": f"思维导图生成失败：{e}", "quality_score": 0}
+        return {"content": "思维导图生成失败，请稍后重试", "quality_score": 0}
 
 
 async def planning_agent(
@@ -215,7 +215,7 @@ async def planning_agent(
         }
     except Exception as e:
         logger.error(f"planning_agent failed: {e}")
-        return {"content": f"学习路径规划失败：{e}", "quality_score": 0}
+        return {"content": "学习路径规划失败，请稍后重试", "quality_score": 0}
 
 
 async def error_analysis_agent(
@@ -264,7 +264,7 @@ async def error_analysis_agent(
         }
     except Exception as e:
         logger.error(f"error_analysis_agent failed: {e}")
-        return {"content": f"错因分析失败：{e}", "error_type": "unknown", "suggestions": []}
+        return {"content": "错因分析失败，请稍后重试", "error_type": "unknown", "suggestions": []}
 
 
 # =============================================================================
@@ -310,7 +310,7 @@ async def explanation_skill(
         return {"content": content, "quality_score": 0.8}
     except Exception as e:
         logger.error(f"explanation_skill failed: {e}")
-        return {"content": f"讲解生成失败：{e}", "quality_score": 0}
+        return {"content": "讲解生成失败，请稍后重试", "quality_score": 0}
 
 
 # =============================================================================
@@ -349,7 +349,7 @@ async def tts_tool(
         return {"audio_url": data_url, "text_length": len(text), "voice": voice}
     except Exception as e:
         logger.error(f"tts_tool failed: {e}")
-        return {"audio_url": "", "text_length": len(text), "error": str(e)}
+        return {"audio_url": "", "text_length": len(text), "error": "语音生成失败"}
 
 
 async def ppt_agent(
@@ -412,7 +412,7 @@ async def ppt_agent(
         }
     except Exception as e:
         logger.error(f"ppt_agent failed: {e}")
-        return {"content": f"PPT 生成失败：{e}", "slide_count": 0, "topic": topic, "quality_score": 0}
+        return {"content": "PPT 生成失败，请稍后重试", "slide_count": 0, "topic": topic, "quality_score": 0}
 
 
 async def image_agent(
@@ -460,7 +460,7 @@ async def image_agent(
         }
     except Exception as e:
         logger.error(f"image_agent failed: {e}")
-        return {"image_url": "", "prompt": prompt, "error": str(e)}
+        return {"image_url": "", "prompt": prompt, "error": "图片生成失败"}
 
 
 # =============================================================================

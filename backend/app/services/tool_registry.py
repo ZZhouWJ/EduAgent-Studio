@@ -230,7 +230,7 @@ class ToolRegistry:
                 return handler(**arguments)
         except Exception as e:
             logger.error(f"Tool execution failed [{tool_id}]: {e}")
-            return {"error": str(e), "tool_id": tool_id}
+            return {"error": "工具执行失败", "tool_id": tool_id}
 
 
 # =============================================================================

@@ -77,7 +77,7 @@ class LLMGateway:
                     content="", model=config.model_name, provider=config.provider,
                     input_tokens=0, output_tokens=0, total_tokens=0,
                     latency_ms=0, cost=0.0, status="failed",
-                    error=f"Provider '{config.provider}' not found"
+                    error="模型服务不可用"
                 )
 
         try:
@@ -101,7 +101,7 @@ class LLMGateway:
                 content="", model=config.model_name, provider=config.provider,
                 input_tokens=0, output_tokens=0, total_tokens=0,
                 latency_ms=int((time.time() - start_time) * 1000),
-                cost=0.0, status="failed", error=str(e)
+                cost=0.0, status="failed", error="模型调用失败"
             )
 
 
