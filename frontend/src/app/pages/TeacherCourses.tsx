@@ -1,38 +1,36 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { BarChart3, BookOpen, Bot, Database, FileText, GraduationCap, Library, Users } from "lucide-react";
+import { BarChart3, BookOpen, Database, FileText, GraduationCap, Library, Users } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { learningApi, statisticsApi } from "@/lib/api";
 import { DetailDrawer, PageHeader, ProgressBar, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast } from "../components/common/ProductUI";
 
-interface Course {
+interface CourseView {
   id: number
   name: string
   code: string
-  description: string
-  teacher: string
-  semester: string
+  owner: string
+  department: string
+  summary: string
+  students: number
+  knowledgePoints: number
+  tasks: number
+  mastery: number
   status: string
-  knowledge_point_count: number
-  student_count: number
-  task_count: number
-  cover_color: string
-  tags: string[]
 }
 
 export function TeacherCourses() {
   const [query, setQuery] = React.useState("");
   const [status, setStatus] = React.useState("全部");
-  const [selected, setSelected] = React.useState<Course | null>(null);
+  const [selected, setSelected] = React.useState<CourseView | null>(null);
   const { toast, showToast } = useInlineToast();
 
   const { data: courseList, loading, refetch: reloadCourses } = useApi(() => learningApi.listCourses(), []);
   const { data: overview, refetch: reloadOverview } = useApi(() => statisticsApi.learningOverview(), []);
 
   // 后端返回 snake_case，映射到 UI 期望的字段
-  const mappedCourses: Array<{
-    id: string | number; name: string; code: string; owner: string; department: string; summary: string; students: number; knowledgePoints: number; resources: number; mastery: number; status: string; updatedAt: string; classes: string[]; chapters: string[]; weakPoints: string[]
-  }> = (courseList ?? []).map((c) => ({
+  const statusLabels: Record<string, string> = { active: "活跃", inactive: "停用", observing: "观察" };
+  const mappedCourses: CourseView[] = (courseList ?? []).map((c) => ({
     id: c.id,
     name: c.name,
     code: c.code,
@@ -41,13 +39,9 @@ export function TeacherCourses() {
     summary: c.description,
     students: c.student_count,
     knowledgePoints: c.knowledge_point_count,
-    resources: c.task_count,
+    tasks: c.task_count,
     mastery: overview ? Math.round((overview.avg_mastery ?? 0) * 100) : 0,
-    status: c.status,
-    updatedAt: "—",
-    classes: [],
-    chapters: [],
-    weakPoints: [],
+    status: statusLabels[c.status] ?? c.status,
   }));
 
   const list = mappedCourses.filter((course) => (status === "全部" || course.status === status) && `${course.name}${course.code}`.toLowerCase().includes(query.toLowerCase()));
@@ -78,11 +72,15 @@ export function TeacherCourses() {
       <section className="edu-card rounded-2xl p-4">
         <div className="flex flex-wrap items-end gap-4">
           <SearchInput label="搜索课程名称或代码" value={query} onChange={setQuery} />
-          <SegmentedControl value={status} options={["全部", "活跃", "观察"]} onChange={setStatus} />
+          <SegmentedControl value={status} options={["全部", "活跃", "停用", "观察"]} onChange={setStatus} />
         </div>
       </section>
 
-      <section className="grid grid-cols-3 gap-5">
+      {loading ? (
+        <div className="flex min-h-48 items-center justify-center text-sm text-slate-400">课程加载中...</div>
+      ) : list.length === 0 ? (
+        <div className="flex min-h-48 items-center justify-center rounded-2xl border border-dashed border-slate-200 text-sm text-slate-400">暂无符合条件的课程</div>
+      ) : <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         {list.map((course) => (
           <article key={course.id} className="edu-card edu-card-hover rounded-2xl p-5">
             <div className="mb-4 flex items-start justify-between gap-3">
@@ -97,7 +95,7 @@ export function TeacherCourses() {
               {[
                 ["学生", course.students],
                 ["知识点", course.knowledgePoints],
-                ["资源", course.resources],
+                ["任务", course.tasks],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-xl bg-slate-50 p-3">
                   <div className="text-xs font-bold text-slate-400">{label}</div>
@@ -120,7 +118,7 @@ export function TeacherCourses() {
             </div>
           </article>
         ))}
-      </section>
+      </section>}
 
       {selected && <DetailDrawer title={selected.name} subtitle={`${selected.code} / ${selected.owner}`} open={!!selected} onClose={() => setSelected(null)}>
         <div className="space-y-5">
