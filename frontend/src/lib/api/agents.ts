@@ -117,6 +117,12 @@ export interface SaveResourceResponse {
   file_size: number
 }
 
+export interface PptExportSlide {
+  title: string
+  points: string[]
+  notes?: string
+}
+
 export const agentsApi = {
   listAgents() {
     return client.get<Array<{ id: string; name: string; description: string; type: string }>>(
@@ -140,5 +146,9 @@ export const agentsApi = {
 
   saveResource(data: { result: WorkflowResult; title: string; course_id: number }) {
     return client.post<SaveResourceResponse>('/agents/save-resource', data)
+  },
+
+  exportPptx(data: { title: string; slides: PptExportSlide[] }) {
+    return client.post<Blob>('/agents/export/pptx', data, { responseType: 'blob' })
   },
 }

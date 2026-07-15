@@ -1,10 +1,11 @@
 """智能体工作台 API — LangGraph 标准版"""
 import logging
-from typing import Optional
+from typing import Annotated, Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, Field, StringConstraints
 from typing import List
 
 from app.services.agent_service import AgentService
@@ -29,6 +30,24 @@ class SaveResourceRequest(BaseModel):
     title: str
     course_id: int
     user_id: int = 0
+
+
+PptText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+
+
+class PptSlideRequest(BaseModel):
+    title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+    points: List[PptText] = Field(
+        default_factory=list,
+        max_length=12,
+        validation_alias=AliasChoices("points", "bullets"),
+    )
+    notes: Optional[Annotated[str, StringConstraints(max_length=2000)]] = None
+
+
+class ExportPptxRequest(BaseModel):
+    title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+    slides: List[PptSlideRequest] = Field(..., min_length=1, max_length=40)
 
 
 @router.get("/list")
@@ -114,3 +133,29 @@ async def save_resource(
     """保存生成的学习资源"""
     service = AgentService()
     return service.save_resource(req, user_id=user.get("user_id"))
+
+
+@router.post("/export/pptx")
+async def export_pptx(
+    req: ExportPptxRequest,
+    user: dict = Depends(get_current_user_dep),
+):
+    """将已生成的结构化课件导出为可编辑的 PPTX 文件。"""
+    from app.services.ppt_export_service import build_presentation
+
+    output = build_presentation(
+        req.title,
+        [slide.model_dump() for slide in req.slides],
+    )
+    safe_name = "".join(
+        char for char in req.title if char not in '\\/:*?"<>|'
+    ).strip() or "EduAgent课件"
+    encoded_name = quote(f"{safe_name}.pptx")
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_name}",
+            "Cache-Control": "no-store",
+        },
+    )

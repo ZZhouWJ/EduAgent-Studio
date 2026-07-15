@@ -40,3 +40,6 @@ passlib[bcrypt]>=1.7.4
 # AES-GCM Encryption (for API Key encryption)
 cryptography>=42.0.0
 websocket-client>=1.8.0
+
+# Learning artifact export
+python-pptx>=1.0.2
