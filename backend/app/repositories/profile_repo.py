@@ -368,6 +368,26 @@ class ProfileRepository:
             return None
         return self.get_profile(row["profile_id"])
 
+    def get_profile_by_student_and_course(
+        self, student_id: int, course_id: int
+    ) -> Optional[Dict[str, Any]]:
+        with get_db_cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT profile_id
+                FROM student_profiles
+                WHERE student_id = %s
+                  AND course_id = %s
+                  AND is_deleted = 0
+                LIMIT 1
+                """,
+                (student_id, course_id),
+            )
+            row = cursor.fetchone()
+        if not row:
+            return None
+        return self.get_profile(row["profile_id"])
+
     def get_profile_owner_id(self, profile_id: int) -> Optional[int]:
         """返回画像所属学生 ID，不加载画像聚合详情。"""
         with get_db_cursor() as cursor:

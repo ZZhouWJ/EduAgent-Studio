@@ -8,7 +8,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import AliasChoices, BaseModel, Field, StringConstraints
 from typing import List
 
-from app.services.agent_service import AgentService
+from app.services.agent_service import AgentService, extract_resource_references
+from app.services.course_access_service import CourseAccessService
 from app.utils.dependencies import get_current_user_dep, require_role
 
 router = APIRouter(prefix="/agents", tags=["智能体工作台"])
@@ -16,9 +17,11 @@ logger = logging.getLogger(__name__)
 
 
 class GenerateRequest(BaseModel):
-    student_id: int
-    course_id: int
-    knowledge_point_ids: List[int]
+    student_id: int = Field(..., gt=0)
+    course_id: int = Field(..., gt=0)
+    knowledge_point_ids: List[Annotated[int, Field(gt=0)]] = Field(
+        ..., min_length=1, max_length=50
+    )
     resource_type: str
     difficulty: str
     generation_goal: Optional[str] = None
@@ -69,6 +72,9 @@ async def generate_learning_resource(
     diagnosis → planning → generation → assessment → teacher_review
     → (若质量 < 7.0 → revision → teacher_review) 最多循环 3 次
     """
+    CourseAccessService().require_generation_context(
+        req.course_id, req.student_id, req.knowledge_point_ids, user
+    )
     service = AgentService()
     result = service.generate(req)
     if result.get("code") != 0:
@@ -87,6 +93,9 @@ async def generate_stream(
     使用 Server-Sent Events（SSE）逐节点推送中间结果。
     前端可实时渲染每个 Agent 的执行状态和产出。
     """
+    CourseAccessService().require_generation_context(
+        req.course_id, req.student_id, req.knowledge_point_ids, user
+    )
     service = AgentService()
 
     async def event_stream():
@@ -122,6 +131,14 @@ async def get_workflow_status(
     result = service.get_workflow_status(run_id)
     if result.get("code") == 404:
         raise HTTPException(status_code=404, detail=result.get("message"))
+    raw = ((result.get("data") or {}).get("_raw") or {})
+    course_id = raw.get("course_id")
+    student_id = raw.get("student_id")
+    if course_id is None or student_id is None:
+        raise HTTPException(status_code=404, detail="工作流上下文不完整")
+    CourseAccessService().require_workflow_access(
+        int(course_id), int(student_id), user
+    )
     return result
 
 
@@ -131,6 +148,11 @@ async def save_resource(
     user: dict = Depends(require_role("teacher", "admin")),
 ):
     """保存生成的学习资源"""
+    access = CourseAccessService()
+    access.require_course_access(req.course_id, user)
+    references = extract_resource_references(req.result)
+    access.require_knowledge_points_course(req.course_id, references["kp_ids"])
+    access.require_material_chunks_course(req.course_id, references["chunk_ids"])
     service = AgentService()
     return service.save_resource(req, user_id=user.get("user_id"))
 

@@ -14,6 +14,7 @@ from app.services.storage_service import (
     save_resource_content,
     list_storage_files,
 )
+from app.utils.exceptions import NotFoundException, ValidationException
 
 settings = get_settings()
 
@@ -101,6 +102,35 @@ def _extract_save_payload(result: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def extract_resource_references(result: Dict[str, Any]) -> Dict[str, List[int]]:
+    payload = _extract_save_payload(result)
+    resource = payload["resource"]
+    raw_kp_ids = resource.get("target_kp_ids") or resource.get("knowledge_points") or []
+    if isinstance(raw_kp_ids, str):
+        raw_kp_ids = [value.strip() for value in raw_kp_ids.split(",") if value.strip()]
+    if not isinstance(raw_kp_ids, list):
+        raise ValidationException("资源知识点引用格式错误")
+
+    evidence_links = payload["evidence_links"]
+    if not isinstance(evidence_links, list) or any(
+        not isinstance(link, dict) or link.get("chunk_id") is None
+        for link in evidence_links
+    ):
+        raise ValidationException("资源证据引用格式错误")
+
+    try:
+        kp_ids = [int(value) for value in raw_kp_ids]
+        chunk_ids = [int(link["chunk_id"]) for link in evidence_links]
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValidationException("资源引用包含无效 ID") from exc
+    if any(value <= 0 for value in [*kp_ids, *chunk_ids]):
+        raise ValidationException("资源引用包含无效 ID")
+    return {
+        "kp_ids": list(dict.fromkeys(kp_ids)),
+        "chunk_ids": list(dict.fromkeys(chunk_ids)),
+    }
+
+
 class AgentService:
     """智能体工作台 Service — LangGraph 驱动"""
 
@@ -121,11 +151,18 @@ class AgentService:
             logger.warning(f"加载知识点失败，使用空列表: {e}")
             return []
 
-    def _load_learning_history(self, student_id: int) -> List[Dict[str, Any]]:
+    def _load_learning_history(
+        self, student_id: int, course_id: int
+    ) -> List[Dict[str, Any]]:
         try:
             from app.repositories.learning_feedback_repo import LearningFeedbackRepository
             repo = LearningFeedbackRepository()
-            result = repo.list_feedbacks(page=1, page_size=10)
+            result = repo.list_feedbacks(
+                page=1,
+                page_size=10,
+                course_id=course_id,
+                student_id=student_id,
+            )
             items = result.get("items") or []
             history = []
             for item in items:
@@ -143,22 +180,22 @@ class AgentService:
             logger.warning(f"加载学习历史失败，使用空列表: {e}")
             return []
 
-    def _resolve_profile(self, student_id: int):
-        try:
-            from app.repositories.profile_repo import ProfileRepository
-            repo = ProfileRepository()
-            profile = repo.get_profile_by_student_id(student_id)
-            if profile:
-                return profile.get("profile_id"), profile
-            return student_id, None
-        except Exception as e:
-            logger.warning(f"解析 profile 失败: {e}")
-            return student_id, None
+    def _resolve_profile(self, student_id: int, course_id: int):
+        from app.repositories.profile_repo import ProfileRepository
+
+        profile = ProfileRepository().get_profile_by_student_and_course(
+            student_id, course_id
+        )
+        if not profile:
+            raise NotFoundException("该课程中不存在此学生画像")
+        return profile.get("profile_id"), profile
 
     def generate(self, req: Any, checkpoint_id: str = None) -> Dict[str, Any]:
-        profile_id, student_profile = self._resolve_profile(req.student_id)
+        profile_id, student_profile = self._resolve_profile(
+            req.student_id, req.course_id
+        )
         selected_kps = self._load_knowledge_points(req.course_id, req.knowledge_point_ids, profile_id)
-        learning_history = self._load_learning_history(req.student_id)
+        learning_history = self._load_learning_history(req.student_id, req.course_id)
 
         raw = run_workflow(
             student_id=req.student_id,
@@ -176,9 +213,11 @@ class AgentService:
         return {"code": 0, "message": "success", "data": _map_workflow_result(raw)}
 
     def generate_stream(self, req: Any):
-        profile_id, student_profile = self._resolve_profile(req.student_id)
+        profile_id, student_profile = self._resolve_profile(
+            req.student_id, req.course_id
+        )
         selected_kps = self._load_knowledge_points(req.course_id, req.knowledge_point_ids, profile_id)
-        learning_history = self._load_learning_history(req.student_id)
+        learning_history = self._load_learning_history(req.student_id, req.course_id)
 
         return stream_workflow(
             student_id=req.student_id,
@@ -201,6 +240,7 @@ class AgentService:
 
     def save_resource(self, req: Any, user_id: int = 0) -> Dict[str, Any]:
         payload = _extract_save_payload(req.result)
+        references = extract_resource_references(req.result)
         resource = payload["resource"]
         evidence_links = payload["evidence_links"]
         trustworthiness = payload["trustworthiness"]
@@ -219,7 +259,7 @@ class AgentService:
                     "resource_type": resource.get("type", "lecture"),
                     "difficulty": resource.get("difficulty", "intermediate"),
                     "content": content,
-                    "target_kp_ids": resource.get("knowledge_points", []),
+                    "target_kp_ids": references["kp_ids"],
                     "generation_model": resource.get("generation_metadata", {}).get("model"),
                     "generation_agent": resource.get("generation_metadata", {}).get("agent"),
                     "status": "pending_review",

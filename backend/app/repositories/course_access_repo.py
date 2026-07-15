@@ -60,6 +60,60 @@ class CourseAccessRepository:
             )
             return cursor.fetchone() is not None
 
+    def get_student_profile_id(
+        self, course_id: int, student_id: int
+    ) -> Optional[int]:
+        with get_db_cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT profile_id
+                FROM student_profiles
+                WHERE course_id = %s
+                  AND student_id = %s
+                  AND is_deleted = 0
+                LIMIT 1
+                """,
+                (course_id, student_id),
+            )
+            row = cursor.fetchone()
+        return int(row["profile_id"]) if row else None
+
+    def list_knowledge_point_courses(
+        self, kp_ids: List[int]
+    ) -> Dict[int, int]:
+        if not kp_ids:
+            return {}
+        placeholders = ", ".join(["%s"] * len(kp_ids))
+        with get_db_cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT kp_id, course_id
+                FROM knowledge_points
+                WHERE kp_id IN ({placeholders}) AND is_deleted = 0
+                """,
+                tuple(kp_ids),
+            )
+            rows = cursor.fetchall()
+        return {int(row["kp_id"]): int(row["course_id"]) for row in rows}
+
+    def list_material_chunk_courses(
+        self, chunk_ids: List[int]
+    ) -> Dict[int, int]:
+        if not chunk_ids:
+            return {}
+        placeholders = ", ".join(["%s"] * len(chunk_ids))
+        with get_db_cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT chunk_id, course_id
+                FROM course_material_chunks
+                WHERE chunk_id IN ({placeholders}) AND is_deleted = 0
+                """,
+                tuple(chunk_ids),
+            )
+            rows = cursor.fetchall()
+        return {int(row["chunk_id"]): int(row["course_id"]) for row in rows}
+
     def get_material_course_id(self, material_id: int) -> Optional[int]:
         return self._single_course_id(
             "SELECT course_id FROM course_materials WHERE material_id = %s AND is_deleted = 0",

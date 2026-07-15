@@ -136,6 +136,38 @@ class CourseAccessTests(unittest.TestCase):
                 5, {"user_id": 12, "roles": ["student_member"]}
             )
 
+    def test_generation_context_validates_student_and_knowledge_points(self):
+        self.service._repo.get_student_profile_id.return_value = 22
+        self.service._repo.list_knowledge_point_courses.return_value = {4: 3, 5: 3}
+
+        profile_id = self.service.require_generation_context(
+            3, 12, [4, 5], {"user_id": 7, "roles": ["teacher"]}
+        )
+
+        self.assertEqual(profile_id, 22)
+
+    def test_generation_context_rejects_cross_course_knowledge_point(self):
+        self.service._repo.get_student_profile_id.return_value = 22
+        self.service._repo.list_knowledge_point_courses.return_value = {4: 3, 5: 9}
+
+        with self.assertRaises(ForbiddenException):
+            self.service.require_generation_context(
+                3, 12, [4, 5], {"user_id": 7, "roles": ["teacher"]}
+            )
+
+    def test_material_chunks_must_match_resource_course(self):
+        self.service._repo.list_material_chunk_courses.return_value = {8: 3, 9: 4}
+
+        with self.assertRaises(ForbiddenException):
+            self.service.require_material_chunks_course(3, [8, 9])
+
+    def test_student_can_only_read_own_workflow(self):
+        self.service._repo.is_student_enrolled.return_value = True
+        with self.assertRaises(ForbiddenException):
+            self.service.require_workflow_access(
+                3, 99, {"user_id": 12, "roles": ["student_member"]}
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

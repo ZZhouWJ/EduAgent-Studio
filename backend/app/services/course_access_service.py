@@ -86,6 +86,52 @@ class CourseAccessService:
         self.require_profile_access(context["profile_id"], user)
         return context["course_id"]
 
+    def require_generation_context(
+        self,
+        course_id: int,
+        student_id: int,
+        kp_ids: List[int],
+        user: Dict[str, Any],
+    ) -> int:
+        self.require_course_access(course_id, user)
+        profile_id = self._repo.get_student_profile_id(course_id, student_id)
+        if profile_id is None:
+            raise NotFoundException("该课程中不存在此学生画像")
+        self.require_knowledge_points_course(course_id, kp_ids)
+        return profile_id
+
+    def require_knowledge_points_course(
+        self, course_id: int, kp_ids: List[int]
+    ) -> None:
+        self._require_references_course(
+            course_id,
+            kp_ids,
+            self._repo.list_knowledge_point_courses,
+            "知识点不存在或不属于该课程",
+        )
+
+    def require_material_chunks_course(
+        self, course_id: int, chunk_ids: List[int]
+    ) -> None:
+        self._require_references_course(
+            course_id,
+            chunk_ids,
+            self._repo.list_material_chunk_courses,
+            "教材片段不存在或不属于该课程",
+        )
+
+    def require_workflow_access(
+        self,
+        course_id: int,
+        student_id: int,
+        user: Dict[str, Any],
+    ) -> None:
+        self.require_course_access(course_id, user)
+        roles = set(user.get("roles", []))
+        if "student_member" in roles and not roles.intersection({"teacher", "admin"}):
+            if int(user["user_id"]) != student_id:
+                raise ForbiddenException("无权访问其他学生的工作流")
+
     def require_profile_course(
         self,
         profile_id: int,
@@ -109,3 +155,18 @@ class CourseAccessService:
             raise NotFoundException(missing_message)
         self.require_course_access(course_id, user)
         return course_id
+
+    @staticmethod
+    def _require_references_course(
+        course_id: int,
+        entity_ids: List[int],
+        course_loader: Any,
+        error_message: str,
+    ) -> None:
+        unique_ids = list(dict.fromkeys(entity_ids))
+        owning_courses = course_loader(unique_ids)
+        if len(owning_courses) != len(unique_ids) or any(
+            owning_course_id != course_id
+            for owning_course_id in owning_courses.values()
+        ):
+            raise ForbiddenException(error_message)
