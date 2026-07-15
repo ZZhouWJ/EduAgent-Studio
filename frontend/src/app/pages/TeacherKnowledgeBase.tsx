@@ -1,9 +1,9 @@
 import React from "react";
-import { Database, FileUp, GitBranch, Layers3, SearchCheck, AlertCircle, Upload, FileText, Loader2, RefreshCw, Search, CheckCircle2, XCircle, Link2, BookOpen } from "lucide-react";
+import { Database, FileUp, GitBranch, Layers3, AlertCircle, Upload, Loader2, RefreshCw, Search, CheckCircle2, XCircle, Link2, BookOpen } from "lucide-react";
 import { useApi } from "@/lib/useApi";
-import { knowledgeApi, type Material, type SearchResult, type MaterialChunk, type KpChunkLink } from "@/lib/api/knowledge";
+import { knowledgeApi, type Material, type SearchResult, type MaterialChunk } from "@/lib/api/knowledge";
 import { learningApi } from "@/lib/api";
-import { DetailDrawer, PageHeader, PageShell, ProgressBar, SearchInput, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast, EmptyState } from "../components/common/ProductUI";
+import { PageHeader, PageShell, ProgressBar, SearchInput, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast, EmptyState } from "../components/common/ProductUI";
 
 export function TeacherKnowledgeBase() {
   const [query, setQuery] = React.useState("");
@@ -14,7 +14,6 @@ export function TeacherKnowledgeBase() {
   const [uploading, setUploading] = React.useState(false);
   const [parsing, setParsing] = React.useState<number | null>(null);
   const [searching, setSearching] = React.useState(false);
-  const [pendingLinks, setPendingLinks] = React.useState<KpChunkLink[]>([]);
   const [verifying, setVerifying] = React.useState<number | null>(null);
   const { toast, showToast } = useInlineToast();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -23,16 +22,16 @@ export function TeacherKnowledgeBase() {
   const { data: courseList } = useApi(() => learningApi.listCourses(), []);
 
   // 待审核的知识点-Chunk匹配（依赖 courseList）
-  const { data: pendingKpLinks, loading: linksLoading, refresh: refreshLinks } = useApi(
+  const { data: pendingKpLinks, loading: linksLoading, refetch: refreshLinks } = useApi(
     () => knowledgeApi.getPendingKpChunkLinks(courseList?.[0]?.id),
     [courseList]
   );
 
   // 资料列表（有课程 ID 时才请求，返回 data 字段）
-  const { data: materialsData, loading: materialsLoading, refresh: refreshMaterials } = useApi(
+  const { data: materialsData, loading: materialsLoading, refetch: refreshMaterials } = useApi(
     () => courseList?.[0]?.id
-      ? knowledgeApi.listMaterials(courseList[0].id).then(r => r.data ?? [])
-      : Promise.resolve([]),
+      ? knowledgeApi.listMaterials(courseList[0].id)
+      : Promise.resolve([] as Material[]),
     [courseList]
   );
 
@@ -56,15 +55,6 @@ export function TeacherKnowledgeBase() {
     parsing: '解析中',
     parsed: '已解析',
     failed: '解析失败',
-  };
-
-  const statusBadgeClass = (status: Material['status']) => {
-    switch (status) {
-      case 'pending': return 'bg-orange-50 text-orange-700 ring-orange-100';
-      case 'parsing': return 'bg-blue-50 text-blue-700 ring-blue-100';
-      case 'parsed': return 'bg-emerald-50 text-emerald-700 ring-emerald-100';
-      case 'failed': return 'bg-red-50 text-red-700 ring-red-100';
-    }
   };
 
   // 处理文件上传
