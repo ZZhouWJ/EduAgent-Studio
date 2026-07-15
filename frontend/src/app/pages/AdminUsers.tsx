@@ -32,7 +32,6 @@ function RoleEditModal({ user, onClose, onSuccess }: {
 }) {
   const rolesState = useApi(() => usersApi.listRoles(), []);
   const roles = rolesState.data ?? [];
-  const roleMap: Record<string, string> = { admin: "管理员", teacher: "教师", student_member: "学生" };
   const [selectedRole, setSelectedRole] = React.useState(user.raw.roles?.[0] ?? "student_member");
   const [saving, setSaving] = React.useState(false);
 

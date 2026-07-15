@@ -1,5 +1,5 @@
 import React from "react";
-import { Copy, FileText, History, Play, Plus, Save, ScrollText } from "lucide-react";
+import { Copy, FileText, History, Play, Plus, ScrollText } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { promptsApi, PromptTaskType, PromptTemplate, PromptVersion } from "@/lib/api";
 import { DetailDrawer, ModalShell, PageHeader, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, notify } from "../components/common/ProductUI";
@@ -65,10 +65,7 @@ export function AdminPrompts() {
   });
 
   const selectedTemplate = selected ?? filtered[0] ?? null;
-  const versions = (Array.isArray(versionsState.data)
-    ? versionsState.data
-    : (versionsState.data as { items?: PromptVersion[] })?.items ?? []
-  ).map(mapVersion);
+  const versions = (versionsState.data ?? []).map(mapVersion);
   const activeVersion = versions.find((v) => v.active) ?? versions[0];
 
   const stats = [

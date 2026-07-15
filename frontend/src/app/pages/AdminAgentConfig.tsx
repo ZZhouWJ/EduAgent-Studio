@@ -1,5 +1,5 @@
 import React from "react";
-import { ActivitySquare, Bot, CheckCircle2, Clock3, GitBranch, Play, Save, Settings2, ShieldCheck } from "lucide-react";
+import { ActivitySquare, Bot, CheckCircle2, Clock3, GitBranch, Play, Save, ShieldCheck } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { agentsApi } from "@/lib/api";
 import { ModalShell, PageHeader, ProgressBar, SearchInput, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast } from "../components/common/ProductUI";
@@ -40,7 +40,7 @@ export function AdminAgentConfig() {
   ];
 
   const toggle = (id: string) => {
-    showToast("状态切换：TODO - 后端无 toggle 接口");
+    showToast(`智能体 ${id} 暂不支持状态切换`);
   };
 
   return (

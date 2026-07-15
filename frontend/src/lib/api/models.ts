@@ -36,12 +36,16 @@ export interface TaskType {
 }
 
 export interface ApiConfig {
-  config_id: number
+  api_config_id: number
   provider_id: number
   config_name: string
+  key_mask: string
+  key_version?: number
+  status: string
   quota_limit: number
   used_quota: number
   created_at: string
+  provider_name?: string
 }
 
 export const modelsApi = {

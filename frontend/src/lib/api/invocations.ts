@@ -2,14 +2,17 @@ import client from '../api'
 
 export interface Invocation {
   invocation_id: number
-  model_id: number
-  model_name: string
-  display_name: string
-  provider_name: string
-  project_id: number
-  project_name: string
-  task_id: number
-  task_title: string
+  model_id?: number
+  model_name?: string
+  model_display_name?: string
+  provider_name?: string
+  project_id?: number
+  task_id?: number
+  task_title?: string
+  branch_id?: number
+  branch_name?: string
+  created_by?: number
+  creator_username?: string
   input_tokens: number
   output_tokens: number
   total_tokens: number
@@ -21,7 +24,7 @@ export interface Invocation {
 }
 
 export interface InvocationDetail extends Invocation {
-  invoker_real_name?: string
+  creator_real_name?: string
   input_text?: string
   output_text?: string
   cost?: number

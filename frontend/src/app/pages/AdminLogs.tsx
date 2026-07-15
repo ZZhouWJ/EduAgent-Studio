@@ -15,7 +15,6 @@ function mapOpLog(l: OperationLog) {
     ip: l.ip_address ?? "—",
     result: "成功",
     risk: "低",
-    raw: l,
   };
 }
 
@@ -30,7 +29,6 @@ function mapLoginLog(l: LoginLog) {
     ip: l.ip_address ?? "—",
     result: l.login_status === "success" ? "成功" : "失败",
     risk: l.login_status === "failed" ? "高" : "低",
-    raw: l,
   };
 }
 

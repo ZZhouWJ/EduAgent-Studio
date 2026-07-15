@@ -18,9 +18,6 @@ function mapModel(m: AIModel) {
     latency: m.max_context ? `${m.max_context}K ctx` : "—",
     calls: "-",
     cost: m.price_unit ? `¥${m.input_price}/${m.price_unit}` : "—",
-    key: "-",
-    apiKey: m.api_key ?? "—",
-    baseUrl: m.base_url ?? "—",
     raw: m,
   };
 }
@@ -32,10 +29,10 @@ export function AdminModelConfig() {
   const [editing, setEditing] = React.useState<ReturnType<typeof mapModel> | null>(null);
   const [open, setOpen] = React.useState(false);
   const [localEnabled, setLocalEnabled] = React.useState<Record<string, boolean>>({});
-  const [testingModel, setTestingModel] = React.useState<string | null>(null);
 
   const modelsState = useApi(() => modelsApi.getModels({ page: 1, page_size: 100 }), []);
   const costsState = useApi(() => statisticsApi.costs(), []);
+  const modelCallsState = useApi(() => statisticsApi.modelCalls(), []);
 
   const models = (modelsState.data?.items ?? []).map((m) => {
     const mapped = mapModel(m);
@@ -56,10 +53,10 @@ export function AdminModelConfig() {
   const stats = [
     { label: "已配置模型", value: `${modelsState.data?.total ?? "-"}`, hint: "含供应商", icon: Bot, tone: "blue" as const },
     { label: "可用模型", value: `${models.filter((p) => p.status === "启用").length}`, hint: "可被智能体调用", icon: PlugZap, tone: "emerald" as const },
-    { label: "今日调用次数", value: `${costsState.data?.total_invocations ?? "-"}`, hint: "全平台", icon: ActivitySquare, tone: "purple" as const },
-    { label: "平均响应时间", value: costsState.data?.avg_latency_ms ? `${Math.round(costsState.data.avg_latency_ms)}ms` : "—", hint: "全平台", icon: Gauge, tone: "cyan" as const },
+    { label: "调用次数", value: `${modelCallsState.data?.reduce((sum, item) => sum + item.call_count, 0) ?? "-"}`, hint: "全平台累计", icon: ActivitySquare, tone: "purple" as const },
+    { label: "平均响应时间", value: modelCallsState.data?.length ? `${Math.round(modelCallsState.data.reduce((sum, item) => sum + item.avg_latency_ms, 0) / modelCallsState.data.length)}ms` : "—", hint: "按模型平均", icon: Gauge, tone: "cyan" as const },
     { label: "今日成本", value: costsState.data?.total_cost ? `¥${costsState.data.total_cost.toFixed(2)}` : "—", hint: "全平台", icon: Coins, tone: "orange" as const },
-    { label: "异常次数", value: `${costsState.data?.failed_count ?? "-"}`, hint: "全平台", icon: ToggleLeft, tone: "red" as const },
+    { label: "异常次数", value: `${modelCallsState.data?.reduce((sum, item) => sum + item.failed_count, 0) ?? "-"}`, hint: "全平台", icon: ToggleLeft, tone: "red" as const },
   ];
 
   const setEnabled = (id: string, currentStatus: string) => {
@@ -69,24 +66,7 @@ export function AdminModelConfig() {
   };
 
   const handleTestConnection = async (model: ReturnType<typeof mapModel>) => {
-    setTestingModel(model.id);
-    notify.info(`正在测试 ${model.name}...`);
-    try {
-      const response = await fetch(model.baseUrl || "https://api.openai.com/v1/models", {
-        method: "GET",
-        headers: { "Authorization": `Bearer ${model.apiKey !== "—" ? "***" : ""}` },
-        signal: AbortSignal.timeout(8000),
-      });
-      if (response.ok) {
-        notify.success(`${model.name} 连接成功`);
-      } else {
-        notify.warning(`${model.name} 连接失败（HTTP ${response.status}）`);
-      }
-    } catch (e) {
-      notify.error(`${model.name} 连接失败：${e instanceof Error ? e.message : "超时或网络错误"}`);
-    } finally {
-      setTestingModel(null);
-    }
+    notify.info(`${model.name} 的凭证由服务端安全管理，请通过系统巡检验证连接`);
   };
 
   const handleHealthCheck = () => {
@@ -136,10 +116,9 @@ export function AdminModelConfig() {
               <div className="mt-5 grid grid-cols-2 gap-2">
                 <button
                   onClick={() => handleTestConnection(model)}
-                  disabled={testingModel === model.id}
-                  className={`${primaryButton} cursor-pointer disabled:opacity-60`}
+                  className={`${primaryButton} cursor-pointer`}
                 >
-                  {testingModel === model.id ? "测试中..." : "测试连接"}
+                  检查连接
                 </button>
                 <button onClick={() => { setEditing(model); setOpen(true); }} className={`${secondaryButton} cursor-pointer`}>编辑配置</button>
                 <button onClick={() => navigate(`/admin/audit?model=${model.id}`)} className={`${secondaryButton} cursor-pointer`}>查看调用</button>
@@ -161,7 +140,7 @@ export function AdminModelConfig() {
           </label>
           <label className="block text-sm font-bold text-slate-700">
             API Key
-            <input className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-mono" defaultValue={editing?.apiKey ?? ""} type="password" placeholder="sk-..." />
+            <input className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-mono" type="password" placeholder="凭证通过 API 配置管理" disabled />
           </label>
         </div>
         <div className="mt-5 flex justify-end gap-3">
