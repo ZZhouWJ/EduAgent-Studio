@@ -5,14 +5,60 @@
 """
 
 import hashlib
+import logging
 import os
+import zipfile
 from typing import Any, Dict, List, Optional
+from uuid import uuid4
 
 from app.config import get_settings
 from app.database import get_db_cursor
 from app.repositories.knowledge_repo import KnowledgeRepository
 from app.repositories.evidence_repo import EvidenceRepository
 from app.rag.parser import parse_document, extract_bm25_terms
+
+logger = logging.getLogger(__name__)
+MAX_MATERIAL_SIZE = 20 * 1024 * 1024
+
+
+def validate_material_upload(
+    file_content: bytes,
+    filename: str,
+    file_type: str,
+) -> str:
+    """校验上传边界、真实文件格式并返回安全文件名。"""
+    if not file_content:
+        raise ValueError("文件不能为空")
+    if len(file_content) > MAX_MATERIAL_SIZE:
+        raise ValueError("文件不能超过 20MB")
+
+    safe_name = os.path.basename(filename.replace("\\", "/")).strip()
+    if not safe_name or safe_name in {".", ".."}:
+        raise ValueError("文件名无效")
+
+    normalized_type = file_type.lower()
+    if normalized_type == "pdf" and not file_content.startswith(b"%PDF-"):
+        raise ValueError("PDF 文件内容与扩展名不一致")
+    if normalized_type in {"word", "ppt"}:
+        try:
+            from io import BytesIO
+
+            with zipfile.ZipFile(BytesIO(file_content)) as archive:
+                names = set(archive.namelist())
+        except zipfile.BadZipFile as exc:
+            raise ValueError("Office 文件已损坏或格式不正确") from exc
+        expected_entry = "word/document.xml" if normalized_type == "word" else "ppt/presentation.xml"
+        if expected_entry not in names:
+            raise ValueError("Office 文件内容与扩展名不一致")
+    if normalized_type in {"markdown", "text"}:
+        if b"\x00" in file_content:
+            raise ValueError("文本文件包含无效二进制内容")
+        try:
+            file_content.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError("文本文件必须使用 UTF-8 编码") from exc
+
+    return safe_name
 
 
 class KnowledgeService:
@@ -50,12 +96,17 @@ class KnowledgeService:
         Returns:
             统一响应格式
         """
+        storage_path: Optional[str] = None
         try:
+            safe_name = validate_material_upload(
+                file_content=file_content,
+                filename=filename,
+                file_type=file_type,
+            )
             # 确定存储路径
             upload_dir = self._get_upload_dir()
-            import time
-            safe_filename = f"{int(time.time() * 1000)}_{filename}"
-            storage_path = os.path.join(upload_dir, safe_filename)
+            extension = os.path.splitext(safe_name)[1].lower()
+            storage_path = os.path.join(upload_dir, f"{uuid4().hex}{extension}")
 
             # 写入文件
             with open(storage_path, "wb") as f:
@@ -64,7 +115,7 @@ class KnowledgeService:
             # 创建数据库记录
             material_id = self._repo.upload_material(
                 course_id=course_id,
-                filename=filename,
+                filename=safe_name,
                 file_type=file_type,
                 storage_path=storage_path,
                 created_by=created_by,
@@ -75,16 +126,24 @@ class KnowledgeService:
                 "message": "文件上传成功",
                 "data": {
                     "material_id": material_id,
-                    "filename": filename,
+                    "filename": safe_name,
                     "file_type": file_type,
                     "status": "pending",
                 },
             }
 
-        except Exception as e:
+        except ValueError as exc:
+            return {"code": 400, "message": str(exc), "data": None}
+        except Exception:
+            if storage_path and os.path.exists(storage_path):
+                try:
+                    os.remove(storage_path)
+                except OSError:
+                    logger.warning("无法清理上传失败的临时文件: %s", storage_path)
+            logger.exception("课程资料上传失败")
             return {
                 "code": 500,
-                "message": f"上传失败: {str(e)}",
+                "message": "上传失败，请稍后重试",
                 "data": None,
             }
 
