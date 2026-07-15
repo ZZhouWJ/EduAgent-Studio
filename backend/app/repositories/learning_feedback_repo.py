@@ -27,6 +27,7 @@ class LearningFeedbackRepository:
         course_id: Optional[int] = None,
         feedback_type: Optional[str] = None,
         student_id: Optional[int] = None,
+        course_ids: Optional[List[int]] = None,
     ) -> Dict[str, Any]:
         """
         分页查询学习反馈列表。
@@ -34,6 +35,9 @@ class LearningFeedbackRepository:
         Returns:
             {"items": [...], "total": int, "page": int, "page_size": int}
         """
+        if course_ids is not None and not course_ids:
+            return {"items": [], "total": 0, "page": page, "page_size": page_size}
+
         offset = (page - 1) * page_size
 
         filters = ["lf.is_deleted = 0"]
@@ -42,6 +46,10 @@ class LearningFeedbackRepository:
         if course_id is not None:
             filters.append("lf.course_id = %s")
             params.append(course_id)
+        elif course_ids is not None:
+            placeholders = ", ".join(["%s"] * len(course_ids))
+            filters.append(f"lf.course_id IN ({placeholders})")
+            params.extend(course_ids)
         if feedback_type:
             filters.append("lf.feedback_type = %s")
             params.append(feedback_type)
@@ -181,19 +189,12 @@ class LearningFeedbackRepository:
         self,
         data: Dict[str, Any],
         profile_id: int,
+        course_id: int,
         user_id: int,
     ) -> Dict[str, Any]:
         """创建新学习反馈。"""
         now = datetime.now()
         with get_db_cursor() as cursor:
-            # 获取该 profile 对应的 course_id
-            cursor.execute(
-                "SELECT course_id FROM student_profiles WHERE profile_id = %s AND is_deleted = 0",
-                (profile_id,),
-            )
-            profile_row = cursor.fetchone()
-            course_id = profile_row["course_id"] if profile_row else (data.get("course_id") or 1)
-
             cursor.execute("""
                 INSERT INTO learning_feedbacks
                     (profile_id, resource_id, course_id, feedback_type, content,

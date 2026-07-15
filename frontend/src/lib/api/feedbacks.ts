@@ -34,6 +34,7 @@ export const feedbackApi = {
   },
 
   submit(data: {
+    course_id?: number
     resource_id?: number
     feedback_type?: string
     content?: string
