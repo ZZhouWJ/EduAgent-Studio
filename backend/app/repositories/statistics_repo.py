@@ -860,7 +860,6 @@ def get_cost_by_model() -> List[Dict[str, Any]]:
                 SUM(cr.total_cost) as total_cost
             FROM cost_records cr
             INNER JOIN ai_models am ON cr.model_id = am.model_id AND am.is_deleted = 0
-            WHERE cr.is_deleted = 0
             GROUP BY am.model_id, am.display_name, am.model_name
             ORDER BY total_cost DESC
         """)

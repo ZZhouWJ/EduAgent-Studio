@@ -16,6 +16,9 @@ class FakeCursor:
     def fetchone(self):
         return next(self._responses)
 
+    def fetchall(self):
+        return next(self._responses)
+
 
 class PlatformStatisticsTests(unittest.TestCase):
     def test_platform_statistics_use_audit_table_schema(self):
@@ -48,6 +51,26 @@ class PlatformStatisticsTests(unittest.TestCase):
         self.assertNotIn("cost_records WHERE is_deleted", combined_queries)
         self.assertNotIn("FROM ai_invocations WHERE is_deleted", combined_queries)
         self.assertIn("SUM(status = 'success')", combined_queries)
+
+    def test_cost_by_model_does_not_soft_delete_audit_rows(self):
+        cursor = FakeCursor([[
+            {
+                "model": "Mock Writer",
+                "call_count": 2,
+                "total_tokens": 1200,
+                "total_cost": 0.02,
+            },
+        ]])
+
+        @contextmanager
+        def fake_cursor():
+            yield cursor
+
+        with patch.object(statistics_repo, "get_db_cursor", fake_cursor):
+            result = statistics_repo.get_cost_by_model()
+
+        self.assertEqual(result[0]["model"], "Mock Writer")
+        self.assertNotIn("cr.is_deleted", cursor.queries[0][0])
 
 
 if __name__ == "__main__":
