@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import client, { ApiError } from './api/client'
 
 export interface UseApiState<T> {
@@ -16,22 +16,41 @@ export function useApi<T, P extends unknown[] = []>(
   deps: ReadonlyArray<unknown> = [],
 ): UseApiResult<T, P> {
   const [state, setState] = useState<UseApiState<T>>({ data: null, loading: true, error: null })
+  const requestIdRef = useRef(0)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      requestIdRef.current += 1
+    }
+  }, [])
 
   const run = useCallback(async (...args: P) => {
-    setState((s) => ({ ...s, loading: true, error: null }))
+    const requestId = ++requestIdRef.current
+    if (mountedRef.current) {
+      setState((s) => ({ ...s, loading: true, error: null }))
+    }
     try {
       const data = await fetcher(...args)
-      setState({ data, loading: false, error: null })
+      if (mountedRef.current && requestId === requestIdRef.current) {
+        setState({ data, loading: false, error: null })
+      }
     } catch (e) {
-      setState({ data: null, loading: false, error: e instanceof ApiError ? e : new ApiError(String(e), -1) })
+      if (mountedRef.current && requestId === requestIdRef.current) {
+        setState({ data: null, loading: false, error: e instanceof ApiError ? e : new ApiError(String(e), -1) })
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps)
 
   useEffect(() => {
     run(...([] as unknown as P))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps)
+    return () => {
+      requestIdRef.current += 1
+    }
+  }, [run])
 
   return { ...state, refetch: run }
 }
