@@ -74,6 +74,33 @@ def _map_workflow_result(raw: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _extract_save_payload(result: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize synchronous and streamed workflow results before persistence."""
+    raw = result.get("_raw") or {}
+    if not isinstance(raw, dict):
+        raw = {}
+
+    resource = raw.get("generated_resource") or result.get("resource") or {}
+    metadata = result.get("metadata") or {}
+    evidence_links = raw.get("evidence_links")
+    if evidence_links is None:
+        evidence_links = result.get("evidence_links") or []
+
+    return {
+        "resource": resource,
+        "evidence_links": evidence_links,
+        "trustworthiness": raw.get(
+            "trustworthiness", result.get("trustworthiness", "draft")
+        ),
+        "quality_score": raw.get(
+            "quality_score", metadata.get("quality_score")
+        ),
+        "step_history": raw.get(
+            "step_history", metadata.get("step_history", [])
+        ),
+    }
+
+
 class AgentService:
     """智能体工作台 Service — LangGraph 驱动"""
 
@@ -173,10 +200,10 @@ class AgentService:
         return {"code": 404, "message": "未找到运行记录", "data": None}
 
     def save_resource(self, req: Any, user_id: int = 0) -> Dict[str, Any]:
-        raw = req.result.get("_raw", {})
-        resource = raw.get("generated_resource") or {}
-        evidence_links = raw.get("evidence_links", [])
-        trustworthiness = raw.get("trustworthiness", "draft")
+        payload = _extract_save_payload(req.result)
+        resource = payload["resource"]
+        evidence_links = payload["evidence_links"]
+        trustworthiness = payload["trustworthiness"]
 
         title = req.title or resource.get("title", "学习资源")
         content = resource.get("content", "")
@@ -189,7 +216,7 @@ class AgentService:
                 data={
                     "course_id": req.course_id,
                     "resource_title": title,
-                    "resource_type": req.result.get("resource", {}).get("type", "lecture"),
+                    "resource_type": resource.get("type", "lecture"),
                     "difficulty": resource.get("difficulty", "intermediate"),
                     "content": content,
                     "target_kp_ids": resource.get("knowledge_points", []),
@@ -209,15 +236,15 @@ class AgentService:
         saved = save_resource_content(
             title=title,
             content=content,
-            resource_type=req.result.get("resource", {}).get("type", "lecture"),
+            resource_type=resource.get("type", "lecture"),
             course_id=req.course_id,
             metadata={
                 "difficulty": resource.get("difficulty"),
                 "knowledge_points": resource.get("knowledge_points", []),
                 "target_kp_ids": resource.get("target_kp_ids", ""),
                 "generation_model": resource.get("generation_metadata", {}).get("model"),
-                "quality_score": raw.get("quality_score"),
-                "step_history": raw.get("step_history", []),
+                "quality_score": payload["quality_score"],
+                "step_history": payload["step_history"],
                 "trustworthiness": trustworthiness,
                 "db_resource_id": saved_resource_id,
             },
@@ -228,9 +255,11 @@ class AgentService:
             try:
                 from app.repositories.evidence_repo import EvidenceRepository
                 ev_repo = EvidenceRepository()
-                for link in evidence_links:
-                    link["resource_id"] = saved_resource_id
-                ev_repo.insert_resource_evidence_links(evidence_links)
+                links_to_save = [
+                    {**link, "resource_id": saved_resource_id}
+                    for link in evidence_links
+                ]
+                ev_repo.insert_resource_evidence_links(links_to_save)
                 logger.info(f"[AgentService] 写入 {len(evidence_links)} 条 evidence_links，resource_id={saved_resource_id}")
             except Exception as e:
                 logger.warning(f"[AgentService] 写入 evidence_links 失败: {e}")
