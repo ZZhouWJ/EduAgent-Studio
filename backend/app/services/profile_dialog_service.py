@@ -30,12 +30,16 @@ EXTRACTION_PROMPT = """你是一个学生学习画像分析助手。请从学生
 {{
     "knowledge_base": "学生已有知识基础的描述（null表示未知）",
     "current_level": "当前学习水平：基础/一般/较好",
+    "cognitive_style": "偏好的理解方式，例如视觉型、例题驱动或结构化阅读",
     "learning_goal": "学生的学习目标（null表示未知）",
     "weak_points": ["薄弱知识点名称1", "薄弱知识点名称2"],
     "error_prone_points": ["易错点1", "易错点2"],
     "interests": ["兴趣方向1", "兴趣方向2"],
     "resource_preferences": ["资源偏好类型1", "资源偏好类型2"],
-    "weekly_hours": 每周可学习小时数（数字，null表示未知）
+    "weekly_hours": 每周可学习小时数（数字，null表示未知）,
+    "time_constraints": "可学习时段或其他时间限制",
+    "practice_level": "实践能力水平描述",
+    "motivation": "学习动机"
 }}
 
 注意：
@@ -416,29 +420,36 @@ class ProfileDialogService:
         if not extracted_data:
             return {}
 
-        patch = {}
+        patch: Dict[str, Any] = {}
 
-        # learning_goal -> learning_goal
-        if extracted_data.get("learning_goal"):
-            patch["learning_goal"] = str(extracted_data["learning_goal"])
+        for field in (
+            "learning_goal",
+            "knowledge_base",
+            "current_level",
+            "cognitive_style",
+            "time_constraints",
+            "practice_level",
+            "motivation",
+        ):
+            value = extracted_data.get(field)
+            if value:
+                patch[field] = str(value).strip()
 
-        # current_level -> current_level
-        if extracted_data.get("current_level"):
-            patch["current_level"] = str(extracted_data["current_level"])
+        for field in ("interests", "resource_preferences"):
+            values = extracted_data.get(field)
+            if isinstance(values, list) and any(values):
+                patch[field] = ",".join(str(value).strip() for value in values if value)
 
-        # resource_preferences -> resource_preferences (逗号分隔字符串)
-        resource_prefs = extracted_data.get("resource_preferences")
-        if resource_prefs and isinstance(resource_prefs, list):
-            patch["resource_preferences"] = ",".join(str(p) for p in resource_prefs if p)
+        weekly_hours = extracted_data.get("weekly_hours")
+        if isinstance(weekly_hours, (int, float)):
+            patch["weekly_hours"] = max(0, min(168, int(weekly_hours)))
 
-        # time_constraints -> weekly_hours (简化处理)
-        time_constraints = extracted_data.get("time_constraints")
-        if time_constraints:
-            # 尝试从文本中提取小时数
-            import re
-            hours_match = re.search(r'(\d+)\s*(?:小时|hour)', str(time_constraints))
-            if hours_match:
-                patch["weekly_hours"] = int(hours_match.group(1))
+        error_prone_points = extracted_data.get("error_prone_points")
+        if isinstance(error_prone_points, list) and any(error_prone_points):
+            patch["error_prone_points"] = json.dumps(
+                [str(point).strip() for point in error_prone_points if point],
+                ensure_ascii=False,
+            )
 
         return patch
 
@@ -453,7 +464,13 @@ class ProfileDialogService:
 
         return {
             "learning_goal": profile.get("learning_goal", ""),
+            "knowledge_base": profile.get("knowledge_base", ""),
             "current_level": profile.get("current_level", ""),
+            "cognitive_style": profile.get("cognitive_style", ""),
+            "time_constraints": profile.get("time_constraints", ""),
+            "practice_level": profile.get("practice_level", ""),
+            "motivation": profile.get("motivation", ""),
+            "error_prone_points": profile.get("error_prone_points", []),
             "resource_preferences": profile.get("resource_preferences", ""),
             "interests": profile.get("interests", ""),
             "weekly_hours": profile.get("weekly_hours", 0),
@@ -473,6 +490,12 @@ class ProfileDialogService:
 
         if extracted_data.get("current_level"):
             parts.append(f"更新当前水平: {extracted_data['current_level']}")
+
+        if extracted_data.get("cognitive_style"):
+            parts.append(f"更新认知风格: {extracted_data['cognitive_style']}")
+
+        if extracted_data.get("weekly_hours") is not None:
+            parts.append(f"更新每周学习时长: {extracted_data['weekly_hours']} 小时")
 
         if extracted_data.get("weak_points"):
             weak = extracted_data.get("weak_points", [])
@@ -495,7 +518,9 @@ class ProfileDialogService:
             "error_prone_points": [],
             "learning_goal": None,
             "cognitive_style": None,
+            "interests": [],
             "resource_preferences": [],
+            "weekly_hours": None,
             "time_constraints": None,
             "practice_level": None,
             "motivation": None,

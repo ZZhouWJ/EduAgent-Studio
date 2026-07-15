@@ -7,7 +7,13 @@ export interface ProfileDetail {
   course_id: number
   course_name: string
   learning_goal: string
+  knowledge_base: string
   current_level: string
+  cognitive_style: string
+  time_constraints: string
+  practice_level: string
+  motivation: string
+  error_prone_points: string[]
   weak_points: Array<{
     kp_id: number
     kp_name?: string
@@ -81,7 +87,9 @@ export interface ProfileDialogResponse {
   reply: string
   extracted: ProfileExtraction
   profile_patch: Partial<Pick<ProfileDetail,
-    'learning_goal' | 'current_level' | 'resource_preferences' | 'interests' | 'weekly_hours'>>
+    'learning_goal' | 'knowledge_base' | 'current_level' | 'cognitive_style' |
+    'time_constraints' | 'practice_level' | 'motivation' | 'error_prone_points' |
+    'resource_preferences' | 'interests' | 'weekly_hours'>>
   pending_changes: PendingProfileChange[]
   student_message_id: number
   assistant_message_id: number

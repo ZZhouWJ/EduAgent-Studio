@@ -16,6 +16,7 @@ def _serialize_profile(raw: Dict[str, Any]) -> Dict[str, Any]:
     strong_points = _parse_json_list(raw.get("strong_points"))
     recent_tasks = _parse_json_list(raw.get("recent_tasks"))
     recent_tests = _parse_json_list(raw.get("recent_tests"))
+    error_prone_points = _parse_json_list(raw.get("error_prone_points"))
 
     updated_at = raw.get("updated_at") or raw.get("created_at")
     if isinstance(updated_at, datetime):
@@ -32,7 +33,13 @@ def _serialize_profile(raw: Dict[str, Any]) -> Dict[str, Any]:
         "course_id": raw["course_id"],
         "course_name": raw.get("course_name", ""),
         "learning_goal": raw.get("learning_goal") or "",
+        "knowledge_base": raw.get("knowledge_base") or "",
         "current_level": raw.get("current_level") or "",
+        "cognitive_style": raw.get("cognitive_style") or "",
+        "time_constraints": raw.get("time_constraints") or "",
+        "practice_level": raw.get("practice_level") or "",
+        "motivation": raw.get("motivation") or "",
+        "error_prone_points": error_prone_points,
         "weak_points": weak_points,
         "preferences": resource_prefs,
         "mastery_score": raw.get("mastery_score") or 0.0,
@@ -105,7 +112,13 @@ class ProfileRepository:
                 sp.course_id,
                 c.course_name,
                 sp.learning_goal,
+                sp.knowledge_base,
                 sp.current_level,
+                sp.cognitive_style,
+                sp.time_constraints,
+                sp.practice_level,
+                sp.motivation,
+                sp.error_prone_points,
                 sp.mastery_score,
                 sp.updated_at,
                 sp.created_at,
@@ -214,7 +227,13 @@ class ProfileRepository:
                 sp.course_id,
                 c.course_name,
                 sp.learning_goal,
+                sp.knowledge_base,
                 sp.current_level,
+                sp.cognitive_style,
+                sp.time_constraints,
+                sp.practice_level,
+                sp.motivation,
+                sp.error_prone_points,
                 sp.mastery_score,
                 sp.updated_at,
                 sp.created_at,
@@ -322,7 +341,13 @@ class ProfileRepository:
     def update_profile(self, profile_id: int, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         allowed_fields = {
             "learning_goal",
+            "knowledge_base",
             "current_level",
+            "cognitive_style",
+            "time_constraints",
+            "practice_level",
+            "motivation",
+            "error_prone_points",
             "interests",
             "resource_preferences",
             "weekly_hours",

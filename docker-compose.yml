@@ -52,6 +52,7 @@ services:
       - ./database/16_create_evidence_tables.sql:/docker-entrypoint-initdb.d/16_create_evidence_tables.sql:ro
       - ./database/17_alter_knowledge_tables.sql:/docker-entrypoint-initdb.d/17_alter_knowledge_tables.sql:ro
       - ./database/18_update_user_passwords.sql:/docker-entrypoint-initdb.d/18_update_user_passwords.sql:ro
+      - ./database/19_enhance_student_profiles.sql:/docker-entrypoint-initdb.d/19_enhance_student_profiles.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s
