@@ -237,6 +237,11 @@ KNOWLEDGE_POINTS: Dict[str, List[Tuple[str, str, str, float]]] = {
     ],
 }
 
+LEGACY_KP_CODES = (
+    "DB001", "DB002", "DB003", "DB005", "DB008", "DB012", "DB015", "DB020",
+    "PY001", "PY002", "PY003", "PY004", "SE001", "SE002",
+)
+
 
 def upsert_kp(cur, course_id: int, code: str, name: str, difficulty: str, hours: float) -> int:
     row = fetchone(
@@ -245,6 +250,14 @@ def upsert_kp(cur, course_id: int, code: str, name: str, difficulty: str, hours:
         course_id, code,
     )
     if row:
+        cur.execute(
+            """
+            UPDATE knowledge_points
+            SET kp_name=%s, difficulty_level=%s, estimated_hours=%s, is_deleted=0
+            WHERE kp_id=%s
+            """,
+            (name, difficulty, hours, row["kp_id"]),
+        )
         return row["kp_id"]
     cur.execute(
         """INSERT INTO knowledge_points
@@ -679,6 +692,13 @@ def main() -> int:
             # parent/child deletions across 30+ tables.
             cur.execute("SET FOREIGN_KEY_CHECKS = 0")
 
+            legacy_placeholders = ",".join(["%s"] * len(LEGACY_KP_CODES))
+            cur.execute(
+                f"UPDATE knowledge_points SET is_deleted=1 "
+                f"WHERE kp_code IN ({legacy_placeholders})",
+                LEGACY_KP_CODES,
+            )
+
             # Tables where the user is referenced via a direct FK column.
             USER_COL = [
                 ("adopted_outputs", "adopted_by"),
@@ -739,12 +759,6 @@ def main() -> int:
                 f"(SELECT user_id FROM users WHERE username IN ({placeholders}))",
                 demo_usernames,
             )
-            # Finally the users themselves.
-            cur.execute(
-                f"DELETE FROM users WHERE username IN ({placeholders})",
-                demo_usernames,
-            )
-
             # Re-enable FK checks now that demo rows are gone.
             cur.execute("SET FOREIGN_KEY_CHECKS = 1")
             log.info("  cleanup done")
