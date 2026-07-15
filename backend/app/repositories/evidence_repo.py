@@ -366,7 +366,6 @@ class EvidenceRepository:
                 kp.kp_name,
                 c.title AS chunk_title,
                 c.content AS chunk_content,
-                c.filename,
                 m.filename AS material_filename
             FROM resource_evidence_links rel
             JOIN knowledge_points kp ON rel.kp_id = kp.kp_id AND kp.is_deleted = 0
@@ -492,6 +491,7 @@ class EvidenceRepository:
                 JOIN learning_resources rr ON rel.resource_id = rr.resource_id AND rr.is_deleted = 0
                 JOIN knowledge_points kp ON rel.kp_id = kp.kp_id AND kp.is_deleted = 0
                 JOIN course_material_chunks cc ON rel.chunk_id = cc.chunk_id AND cc.is_deleted = 0
+                JOIN course_materials c ON cc.material_id = c.material_id AND c.is_deleted = 0
                 WHERE rel.verified_status = 'pending'
                   AND rr.course_id = %s
                 ORDER BY rel.relevance_score DESC
@@ -515,7 +515,8 @@ class EvidenceRepository:
                 FROM resource_evidence_links rel
                 JOIN learning_resources rr ON rel.resource_id = rr.resource_id AND rr.is_deleted = 0
                 JOIN knowledge_points kp ON rel.kp_id = kp.kp_id AND kp.is_deleted = 0
-                JOIN course_material_chunks c ON rel.chunk_id = c.chunk_id AND c.is_deleted = 0
+                JOIN course_material_chunks cc ON rel.chunk_id = cc.chunk_id AND cc.is_deleted = 0
+                JOIN course_materials c ON cc.material_id = c.material_id AND c.is_deleted = 0
                 WHERE rel.verified_status = 'pending'
                 ORDER BY rel.relevance_score DESC
                 LIMIT %s
