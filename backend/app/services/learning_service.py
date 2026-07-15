@@ -3,6 +3,7 @@
 from typing import Any, Dict, List, Optional
 
 from app.repositories import LearningRepository
+from app.services.course_access_service import CourseAccessService
 
 
 class LearningService:
@@ -11,8 +12,13 @@ class LearningService:
     def __init__(self) -> None:
         self._repo = LearningRepository()
 
-    def list_courses(self) -> Dict[str, Any]:
-        return {"code": 0, "message": "success", "data": self._repo.list_courses()}
+    def list_courses(self, user: Dict[str, Any]) -> Dict[str, Any]:
+        course_ids = CourseAccessService().list_accessible_course_ids(user)
+        return {
+            "code": 0,
+            "message": "success",
+            "data": self._repo.list_courses(course_ids=course_ids),
+        }
 
     def get_course(self, course_id: int) -> Dict[str, Any]:
         course = self._repo.get_course(course_id)

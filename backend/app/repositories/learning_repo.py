@@ -41,8 +41,18 @@ def _map_difficulty(level: Optional[str]) -> str:
 class LearningRepository:
     """学习模块数据访问层。"""
 
-    def list_courses(self) -> List[Dict[str, Any]]:
+    def list_courses(self, course_ids: Optional[List[int]] = None) -> List[Dict[str, Any]]:
         """Returns list of course dicts with knowledge_points embedded."""
+        if course_ids == []:
+            return []
+
+        course_filter = ""
+        params: List[Any] = []
+        if course_ids is not None:
+            placeholders = ",".join(["%s"] * len(course_ids))
+            course_filter = f" AND c.course_id IN ({placeholders})"
+            params.extend(course_ids)
+
         sql = """
             SELECT
                 c.course_id,
@@ -54,11 +64,12 @@ class LearningRepository:
             FROM courses c
             LEFT JOIN users u ON c.teacher_id = u.user_id AND u.is_deleted = 0
             WHERE c.is_deleted = 0
+        """ + course_filter + """
             ORDER BY c.course_id ASC
         """
 
         with get_db_cursor() as cursor:
-            cursor.execute(sql)
+            cursor.execute(sql, params)
             courses = cursor.fetchall()
 
             result = []

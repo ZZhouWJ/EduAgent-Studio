@@ -1,6 +1,6 @@
 """统一课程级访问控制，防止通过 ID 枚举读取跨课程数据。"""
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from app.repositories.course_access_repo import CourseAccessRepository
 from app.utils.exceptions import ForbiddenException, NotFoundException
@@ -25,6 +25,16 @@ class CourseAccessService:
             return
         raise ForbiddenException("无权访问该课程数据")
 
+    def list_accessible_course_ids(self, user: Dict[str, Any]) -> Optional[List[int]]:
+        roles = set(user.get("roles", []))
+        if "admin" in roles:
+            return None
+        return self._repo.list_accessible_course_ids(
+            user_id=int(user["user_id"]),
+            is_teacher="teacher" in roles,
+            is_student="student_member" in roles,
+        )
+
     def require_material_access(self, material_id: int, user: Dict[str, Any]) -> int:
         return self._require_entity_course(
             self._repo.get_material_course_id(material_id), user, "资料不存在"
@@ -44,6 +54,19 @@ class CourseAccessService:
         return self._require_entity_course(
             self._repo.get_evidence_link_course_id(link_id), user, "证据关联不存在"
         )
+
+    def require_profile_course(
+        self,
+        profile_id: int,
+        course_id: int,
+        user: Dict[str, Any],
+    ) -> None:
+        self.require_course_access(course_id, user)
+        profile_course_id = self._repo.get_profile_course_id(profile_id)
+        if profile_course_id is None:
+            raise NotFoundException("学生画像不存在")
+        if profile_course_id != course_id:
+            raise ForbiddenException("学生画像不属于该课程")
 
     def _require_entity_course(
         self,

@@ -40,6 +40,30 @@ class CourseAccessTests(unittest.TestCase):
         self.service.require_material_access(15, {"user_id": 7, "roles": ["teacher"]})
         self.service._repo.get_material_course_id.assert_called_once_with(15)
 
+    def test_admin_course_list_is_unrestricted(self):
+        self.assertIsNone(
+            self.service.list_accessible_course_ids({"user_id": 1, "roles": ["admin"]})
+        )
+
+    def test_member_course_list_uses_all_relevant_roles(self):
+        self.service._repo.list_accessible_course_ids.return_value = [2, 4]
+        result = self.service.list_accessible_course_ids(
+            {"user_id": 12, "roles": ["teacher", "student_member"]}
+        )
+        self.assertEqual(result, [2, 4])
+        self.service._repo.list_accessible_course_ids.assert_called_once_with(
+            user_id=12,
+            is_teacher=True,
+            is_student=True,
+        )
+
+    def test_profile_must_belong_to_requested_course(self):
+        self.service._repo.get_profile_course_id.return_value = 4
+        with self.assertRaises(ForbiddenException):
+            self.service.require_profile_course(
+                22, 3, {"user_id": 7, "roles": ["teacher"]}
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

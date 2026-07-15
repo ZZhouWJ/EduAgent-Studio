@@ -1,11 +1,43 @@
 """课程级数据访问上下文查询。"""
 
-from typing import Optional
+from typing import List, Optional
 
 from app.database import get_db_cursor
 
 
 class CourseAccessRepository:
+    def list_accessible_course_ids(
+        self,
+        user_id: int,
+        is_teacher: bool,
+        is_student: bool,
+    ) -> List[int]:
+        conditions = []
+        params = []
+        if is_teacher:
+            conditions.append("c.teacher_id = %s")
+            params.append(user_id)
+        if is_student:
+            conditions.append(
+                "EXISTS (SELECT 1 FROM student_profiles sp "
+                "WHERE sp.course_id = c.course_id AND sp.student_id = %s "
+                "AND sp.is_deleted = 0)"
+            )
+            params.append(user_id)
+        if not conditions:
+            return []
+
+        sql = f"""
+            SELECT c.course_id
+            FROM courses c
+            WHERE c.is_deleted = 0 AND ({' OR '.join(conditions)})
+            ORDER BY c.course_id
+        """
+        with get_db_cursor() as cursor:
+            cursor.execute(sql, tuple(params))
+            rows = cursor.fetchall()
+        return [int(row["course_id"]) for row in rows]
+
     def get_course_teacher_id(self, course_id: int) -> Optional[int]:
         with get_db_cursor() as cursor:
             cursor.execute(
@@ -38,6 +70,12 @@ class CourseAccessRepository:
         return self._single_course_id(
             "SELECT course_id FROM learning_resources WHERE resource_id = %s AND is_deleted = 0",
             resource_id,
+        )
+
+    def get_profile_course_id(self, profile_id: int) -> Optional[int]:
+        return self._single_course_id(
+            "SELECT course_id FROM student_profiles WHERE profile_id = %s AND is_deleted = 0",
+            profile_id,
         )
 
     def get_kp_link_course_id(self, link_id: int) -> Optional[int]:

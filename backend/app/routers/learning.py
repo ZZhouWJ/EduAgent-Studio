@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Path, Query
 from pydantic import BaseModel, Field
 
 from app.services import learning_service
+from app.services.course_access_service import CourseAccessService
 from app.services.profile_service import ProfileService
 from app.utils.dependencies import get_current_user_dep, require_role
 
@@ -27,7 +28,7 @@ class UpdateCourseStatusRequest(BaseModel):
 @router.get("/courses")
 async def list_courses(user: dict = Depends(get_current_user_dep)):
     """获取课程列表（包含知识点摘要）"""
-    return learning_service.LearningService().list_courses()
+    return learning_service.LearningService().list_courses(user)
 
 
 @router.get("/courses/{course_id}")
@@ -36,6 +37,7 @@ async def get_course(
     user: dict = Depends(get_current_user_dep),
 ):
     """获取课程详情（含知识点列表）"""
+    CourseAccessService().require_course_access(course_id, user)
     return learning_service.LearningService().get_course(course_id)
 
 
@@ -46,6 +48,7 @@ async def update_course(
     user: dict = Depends(require_role("teacher", "admin")),
 ):
     """更新课程状态"""
+    CourseAccessService().require_course_access(course_id, user)
     return learning_service.LearningService().update_course_status(course_id, body.status)
 
 
@@ -109,8 +112,12 @@ async def get_learning_path(
     Returns:
         { nodes: [...], edges: [...], summary: {...} }
     """
+    access_service = CourseAccessService()
     if profile_id is not None:
         ProfileService().require_profile_access(profile_id, user)
+        access_service.require_profile_course(profile_id, course_id, user)
+    else:
+        access_service.require_course_access(course_id, user)
     return learning_service.LearningService().get_learning_path(course_id, profile_id)
 
 
@@ -129,6 +136,7 @@ async def get_recommended_resources(
     - 教师审核通过资源
     """
     ProfileService().require_profile_access(profile_id, user)
+    CourseAccessService().require_profile_course(profile_id, course_id, user)
     service = learning_service.LearningService()
     resources = service.recommend_resources(profile_id, course_id)
     return {"code": 0, "message": "success", "data": resources}
