@@ -1,7 +1,7 @@
 import React from "react";
 import { CalendarClock, CheckSquare, ClipboardList, Plus, RefreshCw, Save, Users } from "lucide-react";
 import { useApi } from "@/lib/useApi";
-import { learningApi, statisticsApi, profilesApi } from "@/lib/api";
+import { learningApi, statisticsApi } from "@/lib/api";
 import { EmptyState, ModalShell, PageHeader, ProgressBar, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, notify } from "../components/common/ProductUI";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -32,25 +32,8 @@ export function TeacherTasks() {
   );
   const { data: statsData } = useApi(() => statisticsApi.overview(), []);
   const { data: courseData } = useApi(() => learningApi.listCourses(), []);
-  const { data: profileData } = useApi(() => profilesApi.list({ page_size: 100 }), []);
 
   const courses = courseData ?? [];
-  const profiles = profileData?.items ?? [];
-
-  // 选中课程的学生列表
-  const courseStudents = React.useMemo(() => {
-    if (!form.course_id) return [];
-    return profiles.filter((p: any) => p.course_id === form.course_id);
-  }, [form.course_id, profiles]);
-
-  // 选中课程关联的知识点
-  const [courseKps, setCourseKps] = React.useState<any[]>([]);
-  React.useEffect(() => {
-    if (!form.course_id) { setCourseKps([]); return; }
-    learningApi.getLearningPath(form.course_id)
-      .then(p => setCourseKps(p.nodes ?? []))
-      .catch(() => setCourseKps([]));
-  }, [form.course_id]);
 
   const items = (taskData?.items ?? []).map((t) => ({
     id: t.id,
