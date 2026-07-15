@@ -75,11 +75,23 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(AppException)
     async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
-        return error_response(message=exc.message, code=exc.code)
+        status_code = {
+            4000: 400,
+            4001: 403,
+            4002: 401,
+            4003: 404,
+            4004: 409,
+            5002: 503,
+        }.get(exc.code, 400)
+        return error_response(
+            message=exc.message,
+            code=exc.code,
+            status_code=status_code,
+        )
 
     @app.exception_handler(DatabaseException)
     async def database_exception_handler(request: Request, exc: DatabaseException) -> JSONResponse:
-        return error_response(message=exc.message, code=exc.code)
+        return error_response(message=exc.message, code=exc.code, status_code=503)
 
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
@@ -87,4 +99,5 @@ def register_exception_handlers(app: FastAPI) -> None:
         return error_response(
             message="系统内部错误，请稍后重试",
             code=5000,
+            status_code=500,
         )
