@@ -1,80 +1,141 @@
-# EduAgent Studio Docker Compose
-# 包含 PostgreSQL + pgvector + Redis + MinIO
+name: eduagent-studio
 
-version: "3.8"
+x-backend-environment: &backend-environment
+  APP_ENV: production
+  APP_DATA_DIR: /app/data
+  DB_HOST: mysql
+  DB_PORT: 3306
+  DB_USER: root
+  DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+  DB_NAME: ${DB_NAME:-ai_collab_audit_system}
+  REDIS_URL: redis://redis:6379/0
+  JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
+  JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+  JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-1440}
+  API_KEY_SECRET: ${API_KEY_SECRET:?Set API_KEY_SECRET in .env}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+  LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+  LLM_API_KEY: ${LLM_API_KEY:-}
+  LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com/v1}
+  LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
+  IFLYTEK_APP_ID: ${IFLYTEK_APP_ID:-}
+  IFLYTEK_API_KEY: ${IFLYTEK_API_KEY:-}
+  IFLYTEK_API_SECRET: ${IFLYTEK_API_SECRET:-}
+  IFLYTEK_DOC_ID: ${IFLYTEK_DOC_ID:-}
 
 services:
-  postgres:
-    image: pgvector/pgvector:pg16
-    container_name: eduagent-postgres
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: EduAgent2026
-      POSTGRES_DB: eduagent_studio
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      MYSQL_DATABASE: ${DB_NAME:-ai_collab_audit_system}
+      TZ: Asia/Shanghai
     ports:
-      - "5432:5432"
+      - "${BIND_ADDRESS:-127.0.0.1}:${MYSQL_PORT:-3306}:3306"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./database/pgvector:/docker-entrypoint-initdb.d
+      - mysql_data:/var/lib/mysql
+      - ./database/01_create_database.sql:/docker-entrypoint-initdb.d/01_create_database.sql:ro
+      - ./database/02_create_tables.sql:/docker-entrypoint-initdb.d/02_create_tables.sql:ro
+      - ./database/03_create_indexes.sql:/docker-entrypoint-initdb.d/03_create_indexes.sql:ro
+      - ./database/04_insert_initial_data.sql:/docker-entrypoint-initdb.d/04_insert_initial_data.sql:ro
+      - ./database/05_create_views.sql:/docker-entrypoint-initdb.d/05_create_views.sql:ro
+      - ./database/06_create_stored_procedures.sql:/docker-entrypoint-initdb.d/06_create_stored_procedures.sql:ro
+      - ./database/09_create_a3_tables.sql:/docker-entrypoint-initdb.d/09_create_a3_tables.sql:ro
+      - ./database/10_insert_a3_initial_data.sql:/docker-entrypoint-initdb.d/10_insert_a3_initial_data.sql:ro
+      - ./database/13_create_knowledge_base.sql:/docker-entrypoint-initdb.d/13_create_knowledge_base.sql:ro
+      - ./database/14_create_profile_dialog.sql:/docker-entrypoint-initdb.d/14_create_profile_dialog.sql:ro
+      - ./database/15_create_tutor_sessions.sql:/docker-entrypoint-initdb.d/15_create_tutor_sessions.sql:ro
+      - ./database/16_create_evidence_tables.sql:/docker-entrypoint-initdb.d/16_create_evidence_tables.sql:ro
+      - ./database/17_alter_knowledge_tables.sql:/docker-entrypoint-initdb.d/17_alter_knowledge_tables.sql:ro
+      - ./database/18_update_user_passwords.sql:/docker-entrypoint-initdb.d/18_update_user_passwords.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
   redis:
-    image: redis:7-alpine
-    container_name: eduagent-redis
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
     ports:
-      - "6379:6379"
+      - "${BIND_ADDRESS:-127.0.0.1}:${REDIS_PORT:-6379}:6379"
     volumes:
-      - redisdata:/data
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
 
-  minio:
-    image: minio/minio:latest
-    container_name: eduagent-minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: eduagent
-      MINIO_ROOT_PASSWORD: EduAgent2026MinIO
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment: *backend-environment
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${BIND_ADDRESS:-127.0.0.1}:${BACKEND_PORT:-8000}:8000"
     volumes:
-      - miniodata:/data
+      - backend_data:/app/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   celery_worker:
     build:
       context: ./backend
-      dockerfile: Dockerfile.celery
-    container_name: eduagent-celery
-    command: celery -A app.celery_app worker --loglevel=info -P solo
+    restart: unless-stopped
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    environment: *backend-environment
     volumes:
-      - ./backend:/app
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - DB_TYPE=mysql
-      - DB_HOST=mysql
-      - DB_PORT=3306
-      - DB_USER=root
-      - DB_PASSWORD=your_mysql_password
-      - DB_NAME=ai_collab_audit_system
+      - backend_data:/app/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery_beat:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    command: celery -A app.celery_app beat --loglevel=info
+    environment: *backend-environment
+    volumes:
+      - backend_data:/app/data
     depends_on:
       redis:
         condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
     restart: unless-stopped
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
 volumes:
-  pgdata:
-  redisdata:
-  miniodata:
+  mysql_data:
+  redis_data:
+  backend_data:
