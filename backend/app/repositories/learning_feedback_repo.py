@@ -26,6 +26,7 @@ class LearningFeedbackRepository:
         page_size: int = 20,
         course_id: Optional[int] = None,
         feedback_type: Optional[str] = None,
+        student_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         分页查询学习反馈列表。
@@ -44,6 +45,13 @@ class LearningFeedbackRepository:
         if feedback_type:
             filters.append("lf.feedback_type = %s")
             params.append(feedback_type)
+        if student_id is not None:
+            filters.append(
+                "EXISTS (SELECT 1 FROM student_profiles owner_sp "
+                "WHERE owner_sp.profile_id = lf.profile_id "
+                "AND owner_sp.student_id = %s AND owner_sp.is_deleted = 0)"
+            )
+            params.append(student_id)
 
         where_clause = " AND ".join(filters)
 

@@ -6,8 +6,8 @@ from pydantic import BaseModel
 
 from app.repositories.learning_feedback_repo import LearningFeedbackRepository
 from app.repositories.profile_repo import ProfileRepository
-from app.services.auth_service import get_current_user_dependency as get_current_user
 from app.services.learning_service import LearningService
+from app.utils.dependencies import get_current_user_dep
 from app.utils.response import success_response
 
 router = APIRouter(prefix="/learning", tags=["学习反馈"])
@@ -31,14 +31,17 @@ async def list_feedbacks(
     page_size: int = Query(20, ge=1, le=100),
     course_id: Optional[int] = None,
     feedback_type: Optional[str] = None,
-    token: str = Depends(get_current_user),
+    user: dict = Depends(get_current_user_dep),
 ):
     """获取学习反馈列表"""
+    roles = set(user.get("roles") or [])
+    student_id = None if roles.intersection({"teacher", "admin"}) else int(user["user_id"])
     result = _repo.list_feedbacks(
         page=page,
         page_size=page_size,
         course_id=course_id,
         feedback_type=feedback_type,
+        student_id=student_id,
     )
     return success_response(data=result)
 
@@ -46,20 +49,14 @@ async def list_feedbacks(
 @router.post("/feedbacks")
 async def submit_feedback(
     data: SubmitFeedbackRequest,
-    token: str = Depends(get_current_user),
+    user: dict = Depends(get_current_user_dep),
 ):
     """
     提交学习反馈，并自动更新知识点掌握度和学生画像。
     """
-    from app.services.auth_service import get_current_user as get_user
     from app.database import get_db_cursor
 
-    user = get_user(token)
-    user_id = user.get("user_id", 0) if user else 0
-
-    if not user_id:
-        from app.utils.response import error_response
-        return error_response(message="用户未认证", code=401)
+    user_id = int(user["user_id"])
 
     profile_id = None
     try:

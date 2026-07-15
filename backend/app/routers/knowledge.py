@@ -8,8 +8,8 @@ from typing import Optional
 
 from fastapi import APIRouter, Body, Depends, File, Form, Path, Query, UploadFile
 
-from app.services.auth_service import get_current_user_dependency as get_current_user
 from app.services import knowledge_service
+from app.utils.dependencies import get_current_user_dep, require_role
 
 router = APIRouter(prefix="/knowledge", tags=["课程知识库"])
 
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/knowledge", tags=["课程知识库"])
 async def upload_material(
     course_id: int = Form(..., description="课程 ID"),
     file: UploadFile = File(..., description="上传的文件"),
-    token: str = Depends(get_current_user),
+    user: dict = Depends(require_role("teacher", "admin")),
 ):
     """
     上传课程资料文件。
@@ -40,23 +40,20 @@ async def upload_material(
             "data": None,
         }
 
-    # 获取当前用户 ID（从 token 解析，简化处理）
-    user_id = _get_user_id_from_token(token)
-
     service = knowledge_service.KnowledgeService()
     return service.upload_material(
         course_id=course_id,
         file_content=file_content,
         filename=filename,
         file_type=file_type,
-        created_by=user_id,
+        created_by=int(user["user_id"]),
     )
 
 
 @router.get("/materials")
 async def list_materials(
     course_id: int = Query(..., description="课程 ID"),
-    token: str = Depends(get_current_user),
+    user: dict = Depends(get_current_user_dep),
 ):
     """
     获取课程资料列表。
@@ -70,7 +67,7 @@ async def list_materials(
 @router.get("/materials/{material_id}")
 async def get_material_detail(
     material_id: int = Path(..., gt=0, description="资料 ID"),
-    token: str = Depends(get_current_user),
+    user: dict = Depends(get_current_user_dep),
 ):
     """
     获取资料详情。
@@ -84,7 +81,7 @@ async def get_material_detail(
 @router.post("/materials/{material_id}/parse")
 async def parse_material(
     material_id: int = Path(..., gt=0, description="资料 ID"),
-    token: str = Depends(get_current_user),
+    user: dict = Depends(require_role("teacher", "admin")),
 ):
     """
     解析课程资料。
@@ -102,7 +99,7 @@ async def search_knowledge(
     query: str = Query(..., min_length=1, description="查询文本"),
     kp_id: Optional[int] = Query(None, description="限定知识点 ID"),
     limit: int = Query(5, ge=1, le=20, description="返回数量"),
-    token: str = Depends(get_current_user),
+    user: dict = Depends(get_current_user_dep),
 ):
     """
     检索课程知识库。
@@ -122,7 +119,7 @@ async def search_knowledge(
 @router.delete("/materials/{material_id}")
 async def delete_material(
     material_id: int = Path(..., gt=0, description="资料 ID"),
-    token: str = Depends(get_current_user),
+    user: dict = Depends(require_role("teacher", "admin")),
 ):
     """
     删除课程资料（软删除）。
@@ -140,7 +137,7 @@ async def delete_material(
 @router.get("/kp-chunk-links/pending")
 async def get_pending_kp_chunk_links(
     course_id: Optional[int] = Query(None, description="课程 ID"),
-    token: str = Depends(get_current_user),
+    user: dict = Depends(require_role("teacher", "admin")),
 ):
     """
     获取待审核的知识点-Chunk 匹配列表。
@@ -160,7 +157,7 @@ async def get_pending_kp_chunk_links(
 async def verify_kp_chunk_link(
     link_id: int = Path(..., gt=0, description="关联记录 ID"),
     status: str = Body(..., description="confirmed 或 rejected"),
-    token: str = Depends(get_current_user),
+    user: dict = Depends(require_role("teacher", "admin")),
 ):
     """
     确认或拒绝一条知识点-Chunk 匹配。
@@ -172,9 +169,8 @@ async def verify_kp_chunk_link(
         return {"code": 400, "message": "status 必须是 confirmed 或 rejected", "data": None}
     try:
         from app.repositories.evidence_repo import EvidenceRepository
-        user_id = _get_user_id_from_token(token)
         repo = EvidenceRepository()
-        success = repo.verify_kp_chunk_link(link_id, status, user_id)
+        success = repo.verify_kp_chunk_link(link_id, status, int(user["user_id"]))
         if success:
             return {"code": 0, "message": f"已{'确认' if status == 'confirmed' else '拒绝'}", "data": {"link_id": link_id}}
         return {"code": 404, "message": "记录不存在", "data": None}
@@ -185,7 +181,7 @@ async def verify_kp_chunk_link(
 @router.get("/resource-evidence")
 async def get_resource_evidence(
     resource_id: int = Query(..., gt=0, description="资源 ID"),
-    token: str = Depends(get_current_user),
+    user: dict = Depends(get_current_user_dep),
 ):
     """
     获取某资源的所有证据关联。
@@ -205,7 +201,7 @@ async def get_resource_evidence(
 async def verify_resource_evidence(
     link_id: int = Path(..., gt=0, description="证据关联 ID"),
     status: str = Body(..., description="verified 或 rejected"),
-    token: str = Depends(get_current_user),
+    user: dict = Depends(require_role("teacher", "admin")),
 ):
     """
     确认或拒绝一条资源证据。
@@ -216,9 +212,8 @@ async def verify_resource_evidence(
         return {"code": 400, "message": "status 必须是 verified 或 rejected", "data": None}
     try:
         from app.repositories.evidence_repo import EvidenceRepository
-        user_id = _get_user_id_from_token(token)
         repo = EvidenceRepository()
-        success = repo.verify_resource_evidence_link(link_id, status, user_id)
+        success = repo.verify_resource_evidence_link(link_id, status, int(user["user_id"]))
         if success:
             return {"code": 0, "message": f"已{'确认' if status == 'verified' else '拒绝'}", "data": {"link_id": link_id}}
         return {"code": 404, "message": "记录不存在", "data": None}
@@ -242,14 +237,3 @@ def _get_file_type(filename: str) -> Optional[str]:
         return "txt"
     else:
         return None
-
-
-def _get_user_id_from_token(token: str) -> int:
-    """
-    从 token 中提取用户 ID。
-    """
-    from app.services.auth_service import get_current_user
-    user = get_current_user(token)
-    if user is None:
-        return 0
-    return user.get("user_id", 0)

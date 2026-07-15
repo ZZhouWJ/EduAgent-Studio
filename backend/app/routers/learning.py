@@ -4,8 +4,9 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, Path, Query
 from pydantic import BaseModel, Field
 
-from app.services.auth_service import get_current_user_dependency as get_current_user
 from app.services import learning_service
+from app.services.profile_service import ProfileService
+from app.utils.dependencies import get_current_user_dep, require_role
 
 router = APIRouter(prefix="/learning", tags=["学习任务"])
 
@@ -24,7 +25,7 @@ class UpdateCourseStatusRequest(BaseModel):
 
 
 @router.get("/courses")
-async def list_courses(token: str = Depends(get_current_user)):
+async def list_courses(user: dict = Depends(get_current_user_dep)):
     """获取课程列表（包含知识点摘要）"""
     return learning_service.LearningService().list_courses()
 
@@ -32,7 +33,7 @@ async def list_courses(token: str = Depends(get_current_user)):
 @router.get("/courses/{course_id}")
 async def get_course(
     course_id: int = Path(..., gt=0),
-    token: str = Depends(get_current_user),
+    user: dict = Depends(get_current_user_dep),
 ):
     """获取课程详情（含知识点列表）"""
     return learning_service.LearningService().get_course(course_id)
@@ -42,7 +43,7 @@ async def get_course(
 async def update_course(
     course_id: int = Path(..., gt=0),
     body: UpdateCourseStatusRequest = ...,
-    token: str = Depends(get_current_user),
+    user: dict = Depends(require_role("teacher", "admin")),
 ):
     """更新课程状态"""
     return learning_service.LearningService().update_course_status(course_id, body.status)
@@ -54,7 +55,7 @@ async def list_learning_tasks(
     page_size: int = Query(20, ge=1, le=100),
     course_id: Optional[int] = None,
     status: Optional[str] = None,
-    token: str = Depends(get_current_user),
+    user: dict = Depends(get_current_user_dep),
 ):
     """获取学习任务列表（分页、课程过滤、状态过滤）"""
     return learning_service.LearningService().list_tasks(
@@ -65,7 +66,7 @@ async def list_learning_tasks(
 @router.get("/tasks/{task_id}")
 async def get_learning_task(
     task_id: int = Path(..., gt=0),
-    token: str = Depends(get_current_user),
+    user: dict = Depends(get_current_user_dep),
 ):
     """获取学习任务详情"""
     return learning_service.LearningService().get_task(task_id)
@@ -74,12 +75,9 @@ async def get_learning_task(
 @router.post("/tasks")
 async def create_learning_task(
     body: CreateLearningTaskRequest,
-    token: str = Depends(get_current_user),
+    user: dict = Depends(require_role("teacher", "admin")),
 ):
     """创建学习任务"""
-    from app.services.auth_service import get_current_user as get_user
-    user = get_user(token)
-    creator_id = user.get("user_id", 0) if user else 0
     return learning_service.LearningService().create_task(
         course_id=body.course_id,
         title=body.title,
@@ -87,7 +85,7 @@ async def create_learning_task(
         target_kp_ids=body.target_kp_ids,
         assignee_id=body.assignee_id,
         due_date=body.due_date,
-        creator_id=creator_id,
+        creator_id=int(user["user_id"]),
     )
 
 
@@ -99,7 +97,7 @@ async def create_learning_task(
 async def get_learning_path(
     course_id: int = Path(..., gt=0),
     profile_id: Optional[int] = None,
-    token: str = Depends(get_current_user),
+    user: dict = Depends(get_current_user_dep),
 ):
     """
     获取课程知识点学习路径图谱。
@@ -111,6 +109,8 @@ async def get_learning_path(
     Returns:
         { nodes: [...], edges: [...], summary: {...} }
     """
+    if profile_id is not None:
+        ProfileService().require_profile_access(profile_id, user)
     return learning_service.LearningService().get_learning_path(course_id, profile_id)
 
 
@@ -118,7 +118,7 @@ async def get_learning_path(
 async def get_recommended_resources(
     profile_id: int = Query(..., gt=0),
     course_id: int = Query(..., gt=0),
-    token: str = Depends(get_current_user),
+    user: dict = Depends(get_current_user_dep),
 ):
     """
     根据学生画像推荐学习资源。
@@ -128,6 +128,7 @@ async def get_recommended_resources(
     - 未学习过的资源
     - 教师审核通过资源
     """
+    ProfileService().require_profile_access(profile_id, user)
     service = learning_service.LearningService()
     resources = service.recommend_resources(profile_id, course_id)
     return {"code": 0, "message": "success", "data": resources}
