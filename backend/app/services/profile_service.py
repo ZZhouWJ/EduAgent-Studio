@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from app.repositories.profile_repo import ProfileRepository
+from app.utils.exceptions import ForbiddenException, NotFoundException
 
 
 class ProfileService:
@@ -10,6 +11,18 @@ class ProfileService:
 
     def __init__(self):
         self._repo = ProfileRepository()
+
+    def require_profile_access(self, profile_id: int, user: Any) -> None:
+        """仅画像本人、教师或管理员可以访问画像私有数据。"""
+        owner_id = self._repo.get_profile_owner_id(profile_id)
+        if owner_id is None:
+            raise NotFoundException(message="画像不存在")
+
+        roles = set(user.get("roles") or [])
+        if roles.intersection({"teacher", "admin"}):
+            return
+        if int(user.get("user_id") or 0) != owner_id:
+            raise ForbiddenException(message="无权访问该学生画像")
 
     def list_profiles(
         self,
@@ -61,10 +74,13 @@ class ProfileService:
         获取单个学生画像详情。
         """
         try:
+            self.require_profile_access(profile_id, user)
             profile = self._repo.get_profile(profile_id)
             if profile is None:
                 return {"code": 404, "message": "画像不存在", "data": None}
             return {"code": 0, "message": "success", "data": profile}
+        except (ForbiddenException, NotFoundException):
+            raise
         except Exception as e:
             return {"code": 500, "message": f"查询失败: {e}", "data": None}
 

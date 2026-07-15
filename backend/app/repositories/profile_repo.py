@@ -305,6 +305,20 @@ class ProfileRepository:
             return None
         return self.get_profile(row["profile_id"])
 
+    def get_profile_owner_id(self, profile_id: int) -> Optional[int]:
+        """返回画像所属学生 ID，不加载画像聚合详情。"""
+        with get_db_cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT student_id
+                FROM student_profiles
+                WHERE profile_id = %s AND is_deleted = 0
+                """,
+                (profile_id,),
+            )
+            row = cursor.fetchone()
+        return int(row["student_id"]) if row else None
+
     def update_profile(self, profile_id: int, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         allowed_fields = {
             "learning_goal",

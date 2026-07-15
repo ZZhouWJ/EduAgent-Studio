@@ -21,7 +21,7 @@ async def list_profiles(
     page_size: int = Query(20, ge=1, le=100),
     course_id: Optional[int] = None,
     keyword: Optional[str] = None,
-    user: dict = Depends(get_current_user_dep),
+    user: dict = Depends(require_role("teacher", "admin")),
 ):
     """获取学生画像列表（教师/管理员可访问，学生应使用 /profiles/me）"""
     service = ProfileService()
@@ -42,6 +42,7 @@ async def get_profile_feedback_history(
     user: dict = Depends(get_current_user_dep),
 ):
     """获取画像更新记录（学习反馈历史）"""
+    ProfileService().require_profile_access(profile_id, user)
     from app.repositories.learning_feedback_repo import LearningFeedbackRepository
     repo = LearningFeedbackRepository()
     items = repo.get_feedback_history_by_profile(profile_id, limit)
@@ -77,6 +78,7 @@ async def get_dialog_history(
     user: dict = Depends(get_current_user_dep),
 ):
     """获取对话历史（登录用户均可访问）"""
+    ProfileService().require_profile_access(profile_id, user)
     service = ProfileDialogService()
     return service.get_dialog_history(profile_id, limit)
 
@@ -109,6 +111,7 @@ async def send_dialog_message(
     if not message or not message.strip():
         return {"code": 400, "message": "消息不能为空", "data": None}
 
+    ProfileService().require_profile_access(profile_id, user)
     service = ProfileDialogService()
     return service.chat(profile_id, message.strip(), user)
 
@@ -135,5 +138,6 @@ async def apply_extraction(
     if not message_id:
         return {"code": 400, "message": "message_id 不能为空", "data": None}
 
+    ProfileService().require_profile_access(profile_id, user)
     service = ProfileDialogService()
     return service.apply_extraction(profile_id, message_id)
