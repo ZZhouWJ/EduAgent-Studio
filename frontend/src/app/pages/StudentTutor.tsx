@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react"
 import { Link } from "react-router-dom"
 import ReactMarkdown from "react-markdown"
-import { BookOpenCheck, Bot, CheckCircle2, ChevronRight, Clock3, Image, Loader2, MessageSquare, RotateCcw, Send, ThumbsDown, ThumbsUp, X, XCircle } from "lucide-react"
+import { BookOpenCheck, BookOpenText, Bot, BrainCircuit, CheckCircle2, ChevronRight, CircleX, Clock3, Code2, FileQuestion, Image, ImageIcon, Loader2, MessageSquare, Presentation, RotateCcw, Route, Search, Send, Settings2, ThumbsDown, ThumbsUp, Volume2, X, XCircle } from "lucide-react"
 import { useApi } from "@/lib/useApi"
 import { tutorApi, profilesApi, learningApi, multimodalApi } from "@/lib/api"
 import type { LearningPathNode } from "@/lib/api/learning"
@@ -9,7 +9,7 @@ import { LearningPathGraph } from "../components/learning/LearningPathGraph"
 import type { Citation, PracticeQuestion, RecommendedResource, ContentBlock, IntentResult, SSEEvent } from "@/lib/api/tutor"
 import { PageShell, useInlineToast } from "../components/common/ProductUI"
 import { marked } from "marked"
-import { ContentBlockRenderer } from "../components/tutor/ContentBlockRenderer"
+import { ContentBlockRenderer, ContentBlockTypeLabel } from "../components/tutor/ContentBlockRenderer"
 
 // 消息类型
 type Message = {
@@ -37,18 +37,18 @@ type ExecutionEvent = {
 // 建议问题（动态加载）
 
 /* ─── 工具图标映射 ───────────────────────────────────── */
-const TOOL_ICONS: Record<string, string> = {
-  retrieve_knowledge: "🔍",
-  quiz_agent: "📝",
-  code_case_agent: "💻",
-  mindmap_agent: "🧠",
-  planning_agent: "🗺️",
-  ppt_agent: "📊",
-  tts_tool: "🔊",
-  image_agent: "🖼️",
-  error_analysis_agent: "❌",
-  explanation_skill: "📖",
-  default: "⚙️",
+const TOOL_ICONS: Record<string, React.ElementType> = {
+  retrieve_knowledge: Search,
+  quiz_agent: FileQuestion,
+  code_case_agent: Code2,
+  mindmap_agent: BrainCircuit,
+  planning_agent: Route,
+  ppt_agent: Presentation,
+  tts_tool: Volume2,
+  image_agent: ImageIcon,
+  error_analysis_agent: CircleX,
+  explanation_skill: BookOpenText,
+  default: Settings2,
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -105,19 +105,21 @@ function ThinkingBar({ events, isFirstThinking }: { events: ExecutionEvent[]; is
         {/* 工具步骤条 */}
         {events.length > 0 && (
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {events.map((evt) => (
-              <div
-                key={evt.id}
-                className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-300 ${
-                  evt.status === "completed"
-                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                    : evt.status === "error"
-                    ? "bg-red-50 text-red-600 border border-red-200"
-                    : evt.status === "started"
-                    ? "bg-blue-50 text-blue-700 border border-blue-200 shadow-sm"
-                    : "bg-slate-50 text-slate-400 border border-slate-200"
-                }`}
-              >
+            {events.map((evt) => {
+              const ToolIcon = TOOL_ICONS[evt.tool] || TOOL_ICONS.default
+              return (
+                <div
+                  key={evt.id}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-300 ${
+                    evt.status === "completed"
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : evt.status === "error"
+                      ? "bg-red-50 text-red-600 border border-red-200"
+                      : evt.status === "started"
+                      ? "bg-blue-50 text-blue-700 border border-blue-200 shadow-sm"
+                      : "bg-slate-50 text-slate-400 border border-slate-200"
+                  }`}
+                >
                 {/* 状态图标 */}
                 {evt.status === "completed" ? (
                   <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
@@ -126,9 +128,7 @@ function ThinkingBar({ events, isFirstThinking }: { events: ExecutionEvent[]; is
                 ) : evt.status === "started" ? (
                   <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-blue-600" />
                 ) : (
-                  <span className="h-3.5 w-3.5 shrink-0 flex items-center justify-center text-slate-300">
-                    {TOOL_ICONS[evt.tool] || TOOL_ICONS.default}
-                  </span>
+                  <ToolIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                 )}
 
                 <span className="whitespace-nowrap">{TOOL_LABELS[evt.tool] || evt.tool}</span>
@@ -137,8 +137,9 @@ function ThinkingBar({ events, isFirstThinking }: { events: ExecutionEvent[]; is
                 {evt.duration_ms && evt.status === "completed" && (
                   <span className="text-slate-400 font-mono ml-0.5">{evt.duration_ms}ms</span>
                 )}
-              </div>
-            ))}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
@@ -405,28 +406,7 @@ function MessageBubble({ message, onFeedback, executionEvents }: {
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className="text-xs text-slate-500">已生成：</span>
                 {message.content_blocks.map((block) => (
-                  <span
-                    key={block.block_id}
-                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                      block.block_type === "mindmap"
-                        ? "bg-purple-100 text-purple-700"
-                        : block.block_type === "quiz"
-                        ? "bg-emerald-100 text-emerald-700"
-                        : block.block_type === "code_case"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {block.block_type === "mindmap"
-                      ? "🗺 思维导图"
-                      : block.block_type === "quiz"
-                      ? "📝 练习题"
-                      : block.block_type === "code_case"
-                      ? "💻 代码案例"
-                      : block.block_type === "ppt"
-                      ? "📊 PPT"
-                      : block.title}
-                  </span>
+                  <ContentBlockTypeLabel key={block.block_id} type={block.block_type} title={block.title} />
                 ))}
               </div>
             )}

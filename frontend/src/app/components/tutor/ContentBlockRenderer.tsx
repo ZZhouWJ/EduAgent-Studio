@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown"
-import type { ContentBlock } from "@/lib/api/tutor"
+import { BadgeCheck, Clapperboard, Code2, FileQuestion, Map, Presentation, TriangleAlert } from "lucide-react"
+import type { ContentBlock, ResourceType } from "@/lib/api/tutor"
 import { MindmapRenderer } from "../resource/MindmapRenderer"
 import { CodeCaseRenderer } from "../resource/CodeCaseRenderer"
 import { QuizRenderer } from "../resource/QuizRenderer"
@@ -10,6 +11,28 @@ interface ContentBlockRendererProps {
   expanded?: boolean
   /** 嵌入模式：不显示 block 类型 badge，更融入正文 */
   embedded?: boolean
+}
+
+const BLOCK_PRESENTATION: Partial<Record<ResourceType, { label: string; icon: React.ElementType; className: string }>> = {
+  mindmap: { label: "思维导图", icon: Map, className: "bg-purple-100 text-purple-700" },
+  quiz: { label: "练习题", icon: FileQuestion, className: "bg-emerald-100 text-emerald-700" },
+  code_case: { label: "代码案例", icon: Code2, className: "bg-blue-100 text-blue-700" },
+  ppt: { label: "PPT 课件", icon: Presentation, className: "bg-orange-100 text-orange-700" },
+  video_script: { label: "视频脚本", icon: Clapperboard, className: "bg-cyan-100 text-cyan-700" },
+}
+
+export function ContentBlockTypeLabel({ type, title }: { type: ResourceType; title: string }) {
+  const presentation = BLOCK_PRESENTATION[type]
+  if (!presentation) {
+    return <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">{title}</span>
+  }
+  const Icon = presentation.icon
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-bold ${presentation.className}`}>
+      <Icon className="h-3.5 w-3.5" />
+      {presentation.label}
+    </span>
+  )
 }
 
 // 将 ContentBlock 适配为 ResourceRenderer 期望的格式
@@ -167,36 +190,12 @@ export function ContentBlockRenderer({ block, embedded = false }: ContentBlockRe
       {/* 区块标签 — 嵌入模式下隐藏 */}
       {!embedded && (
         <div className="mb-2 flex items-center gap-2">
-          <span
-            className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-bold ${
-              block.block_type === "mindmap"
-                ? "bg-purple-100 text-purple-700"
-                : block.block_type === "quiz"
-                ? "bg-emerald-100 text-emerald-700"
-                : block.block_type === "code_case"
-                ? "bg-blue-100 text-blue-700"
-                : block.block_type === "ppt"
-                ? "bg-orange-100 text-orange-700"
-                : "bg-slate-100 text-slate-600"
-            }`}
-          >
-            {block.block_type === "mindmap"
-              ? "🗺 思维导图"
-              : block.block_type === "quiz"
-              ? "📝 练习题"
-              : block.block_type === "code_case"
-              ? "💻 代码案例"
-              : block.block_type === "ppt"
-              ? "📊 PPT大纲"
-              : block.block_type === "video_script"
-              ? "🎬 视频脚本"
-              : block.title}
-          </span>
+          <ContentBlockTypeLabel type={block.block_type} title={block.title} />
           {block.trustworthiness === "high" && (
-            <span className="text-xs text-emerald-600">✓ 已验证</span>
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600"><BadgeCheck className="h-3.5 w-3.5" />已验证</span>
           )}
           {block.trustworthiness === "draft" && (
-            <span className="text-xs text-orange-600">⚠ 草稿</span>
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600"><TriangleAlert className="h-3.5 w-3.5" />草稿</span>
           )}
         </div>
       )}

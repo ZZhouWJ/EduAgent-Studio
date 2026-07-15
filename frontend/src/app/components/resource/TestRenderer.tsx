@@ -107,8 +107,8 @@ function TestQuestionCard({ q, index }: { q: TestQuestion; index: number }) {
                   >
                     <span className="text-xs font-bold text-slate-400">{String.fromCharCode(65 + i)}.</span>
                     <span className="flex-1">{opt}</span>
-                    {submitted && isCorrectOpt && <span className="text-emerald-600 text-xs font-bold">✓</span>}
-                    {submitted && isSelected && !isCorrectOpt && <span className="text-red-600 text-xs font-bold">✗</span>}
+                    {submitted && isCorrectOpt && <Check className="h-4 w-4 text-emerald-600" aria-label="正确答案" />}
+                    {submitted && isSelected && !isCorrectOpt && <X className="h-4 w-4 text-red-600" aria-label="错误选择" />}
                   </button>
                 )
               })}
@@ -134,8 +134,9 @@ function TestQuestionCard({ q, index }: { q: TestQuestion; index: number }) {
 
           {submitted && (
             <div className="mt-3 flex items-center gap-2">
-              <span className={`text-sm font-bold ${isCorrect ? "text-emerald-700" : "text-red-700"}`}>
-                {isCorrect ? "回答正确 ✓" : "回答错误 ✗"}
+              <span className={`inline-flex items-center gap-1.5 text-sm font-bold ${isCorrect ? "text-emerald-700" : "text-red-700"}`}>
+                {isCorrect ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+                {isCorrect ? "回答正确" : "回答错误"}
               </span>
             </div>
           )}
@@ -186,3 +187,4 @@ export function TestRenderer({ resource }: TestRendererProps) {
     </div>
   )
 }
+import { Check, X } from "lucide-react"
