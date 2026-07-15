@@ -75,6 +75,17 @@ class CourseAccessService:
             return course_id
         raise ForbiddenException("无权访问该学生画像")
 
+    def require_tutor_session_access(
+        self, session_id: int, user: Dict[str, Any]
+    ) -> int:
+        context = self._repo.get_tutor_session_context(session_id)
+        if context is None:
+            raise NotFoundException("答疑会话不存在")
+        if context["course_id"] != context["profile_course_id"]:
+            raise ForbiddenException("答疑会话与学生画像课程不一致")
+        self.require_profile_access(context["profile_id"], user)
+        return context["course_id"]
+
     def require_profile_course(
         self,
         profile_id: int,

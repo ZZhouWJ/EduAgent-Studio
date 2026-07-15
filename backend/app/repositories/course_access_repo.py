@@ -104,6 +104,31 @@ class CourseAccessRepository:
             task_id,
         )
 
+    def get_tutor_session_context(
+        self, session_id: int
+    ) -> Optional[Dict[str, Any]]:
+        with get_db_cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT ts.profile_id,
+                       ts.course_id,
+                       sp.course_id AS profile_course_id
+                FROM tutor_sessions ts
+                INNER JOIN student_profiles sp
+                    ON ts.profile_id = sp.profile_id AND sp.is_deleted = 0
+                WHERE ts.session_id = %s AND ts.is_deleted = 0
+                """,
+                (session_id,),
+            )
+            row = cursor.fetchone()
+        if not row:
+            return None
+        return {
+            "profile_id": int(row["profile_id"]),
+            "course_id": int(row["course_id"]),
+            "profile_course_id": int(row["profile_course_id"]),
+        }
+
     def get_kp_link_course_id(self, link_id: int) -> Optional[int]:
         return self._single_course_id(
             """

@@ -16,6 +16,7 @@ from app.config import get_settings
 from app.llm.gateway import LLMGateway, LLMConfig
 from app.repositories.knowledge_repo import KnowledgeRepository
 from app.repositories.profile_repo import ProfileRepository
+from app.services.course_access_service import CourseAccessService
 from app.database import get_db_cursor
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,7 @@ class TutorService:
     def __init__(self, llm_gateway: Optional[LLMGateway] = None):
         self._knowledge_repo = KnowledgeRepository()
         self._profile_repo = ProfileRepository()
+        self._access = CourseAccessService()
         self._llm_gateway = llm_gateway
 
     def chat(
@@ -92,7 +94,7 @@ class TutorService:
         profile_id: int,
         course_id: int,
         question: str,
-        user: Optional[Dict[str, Any]] = None,
+        user: Dict[str, Any],
         requested_content_types: Optional[list[str]] = None,
     ) -> Dict[str, Any]:
         """
@@ -102,12 +104,13 @@ class TutorService:
             profile_id: 学生画像 ID
             course_id: 课程 ID
             question: 学生问题
-            user: 当前用户信息（可选）
+            user: 当前用户信息
             requested_content_types: 指定的内容类型（可选）
 
         Returns:
             统一响应格式，包含 TutorAnswer + 多模态 content_blocks
         """
+        self._access.require_profile_course(profile_id, course_id, user)
         try:
             # 1. 读取学生画像
             profile = self._profile_repo.get_profile(profile_id)
@@ -178,6 +181,7 @@ class TutorService:
         self,
         session_id: int,
         helpful: bool,
+        user: Dict[str, Any],
         follow_up: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
@@ -191,6 +195,7 @@ class TutorService:
         Returns:
             统一响应格式
         """
+        self._access.require_tutor_session_access(session_id, user)
         try:
             with get_db_cursor() as cursor:
                 # 更新反馈
@@ -219,6 +224,7 @@ class TutorService:
     def get_sessions(
         self,
         profile_id: int,
+        user: Dict[str, Any],
         course_id: Optional[int] = None,
         limit: int = 20,
     ) -> Dict[str, Any]:
@@ -233,6 +239,10 @@ class TutorService:
         Returns:
             统一响应格式
         """
+        if course_id is None:
+            self._access.require_profile_access(profile_id, user)
+        else:
+            self._access.require_profile_course(profile_id, course_id, user)
         try:
             sql = """
                 SELECT
@@ -636,9 +646,13 @@ flowchart LR
     def get_suggestions(
         self,
         course_id: int,
+        user: Dict[str, Any],
         profile_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """根据学生画像和课程知识点，动态生成学习建议问题"""
+        self._access.require_course_access(course_id, user)
+        if profile_id is not None:
+            self._access.require_profile_course(profile_id, course_id, user)
         try:
             # 获取学生画像
             profile = None

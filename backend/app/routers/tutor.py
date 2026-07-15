@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from app.services.auth_service import get_current_user_dependency as get_current_user
 from app.services.tutor_service import TutorService
 from app.services.tutor_supervisor import TutorSupervisor
+from app.services.course_access_service import CourseAccessService
 from app.repositories.profile_repo import ProfileRepository
 from app.repositories.knowledge_repo import KnowledgeRepository
 from app.utils.response import success_response, error_response
@@ -47,7 +48,7 @@ def _get_tutor_service() -> TutorService:
 @router.post("/chat")
 async def tutor_chat(
     data: ChatRequest,
-    token: str = Depends(get_current_user),
+    user: dict = Depends(get_current_user),
 ):
     """
     学生答疑接口。
@@ -76,6 +77,7 @@ async def tutor_chat(
         profile_id=data.profile_id,
         course_id=data.course_id,
         question=data.question,
+        user=user,
         requested_content_types=data.requested_content_types,
     )
 
@@ -91,7 +93,7 @@ async def tutor_chat(
 @router.post("/chat/stream")
 async def tutor_chat_stream(
     data: ChatRequest,
-    token: str = Depends(get_current_user),
+    user: dict = Depends(get_current_user),
 ):
     """
     学生答疑接口（SSE 流式版本）。
@@ -107,6 +109,10 @@ async def tutor_chat_stream(
     - supervisor.final：最终回答
     - supervisor.max_steps：达到最大步数
     """
+    CourseAccessService().require_profile_course(
+        data.profile_id, data.course_id, user
+    )
+
     async def event_stream():
         try:
             profile_repo = ProfileRepository()
@@ -153,7 +159,7 @@ async def tutor_chat_stream(
 async def get_suggestions(
     course_id: int = Query(..., description="课程 ID"),
     profile_id: Optional[int] = Query(None, description="学生画像 ID（可选）"),
-    token: str = Depends(get_current_user),
+    user: dict = Depends(get_current_user),
 ):
     """
     根据学生画像和课程知识点，动态生成学习建议问题。
@@ -163,7 +169,9 @@ async def get_suggestions(
     from app.services.tutor_service import TutorService
 
     service = TutorService()
-    result = service.get_suggestions(course_id=course_id, profile_id=profile_id)
+    result = service.get_suggestions(
+        course_id=course_id, profile_id=profile_id, user=user
+    )
 
     if result.get("code") != 0:
         return error_response(message=result.get("message", "获取建议失败"), code=result.get("code", 500))
@@ -174,7 +182,7 @@ async def get_suggestions(
 @router.post("/feedback")
 async def tutor_feedback(
     data: FeedbackRequest,
-    token: str = Depends(get_current_user),
+    user: dict = Depends(get_current_user),
 ):
     """
     提交答疑反馈。
@@ -191,6 +199,7 @@ async def tutor_feedback(
         session_id=data.session_id,
         helpful=data.helpful,
         follow_up=data.follow_up,
+        user=user,
     )
 
     if result.get("code") != 0:
@@ -207,7 +216,7 @@ async def get_tutor_sessions(
     profile_id: int = Query(..., description="学生画像 ID"),
     course_id: Optional[int] = Query(None, description="课程 ID（可选）"),
     limit: int = Query(20, ge=1, le=100, description="返回数量"),
-    token: str = Depends(get_current_user),
+    user: dict = Depends(get_current_user),
 ):
     """
     获取答疑会话历史。
@@ -222,6 +231,7 @@ async def get_tutor_sessions(
         profile_id=profile_id,
         course_id=course_id,
         limit=limit,
+        user=user,
     )
 
     if result.get("code") != 0:

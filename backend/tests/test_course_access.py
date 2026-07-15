@@ -108,6 +108,34 @@ class CourseAccessTests(unittest.TestCase):
         self.assertEqual(course_id, 3)
         self.service._repo.get_task_course_id.assert_called_once_with(19)
 
+    def test_tutor_session_access_uses_owning_profile(self):
+        self.service._repo.get_tutor_session_context.return_value = {
+            "profile_id": 22,
+            "course_id": 3,
+            "profile_course_id": 3,
+        }
+        self.service._repo.get_profile_access_context.return_value = {
+            "student_id": 12,
+            "course_id": 3,
+        }
+
+        course_id = self.service.require_tutor_session_access(
+            5, {"user_id": 12, "roles": ["student_member"]}
+        )
+
+        self.assertEqual(course_id, 3)
+
+    def test_tutor_session_rejects_inconsistent_course(self):
+        self.service._repo.get_tutor_session_context.return_value = {
+            "profile_id": 22,
+            "course_id": 4,
+            "profile_course_id": 3,
+        }
+        with self.assertRaises(ForbiddenException):
+            self.service.require_tutor_session_access(
+                5, {"user_id": 12, "roles": ["student_member"]}
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
