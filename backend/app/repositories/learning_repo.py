@@ -348,7 +348,6 @@ class LearningRepository:
             "completion_rate": 0.0,
         }
 
-    @staticmethod
     def create_task(
         self,
         course_id: int,
