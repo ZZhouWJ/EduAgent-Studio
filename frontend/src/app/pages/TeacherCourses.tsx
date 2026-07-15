@@ -123,7 +123,19 @@ export function TeacherCourses() {
       {selected && <DetailDrawer title={selected.name} subtitle={`${selected.code} / ${selected.owner}`} open={!!selected} onClose={() => setSelected(null)}>
         <div className="space-y-5">
           <p className="text-sm leading-6 text-slate-600">{selected.summary}</p>
-          {/* TODO: 后端暂无章节(chapters)、薄弱点(weakPoints)字段，暂时留空 */}
+          <dl className="grid grid-cols-2 gap-3">
+            {[
+              ["学生人数", selected.students],
+              ["知识点", selected.knowledgePoints],
+              ["学习任务", selected.tasks],
+              ["平均掌握度", `${selected.mastery}%`],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-lg bg-slate-50 p-3">
+                <dt className="text-xs font-semibold text-slate-500">{label}</dt>
+                <dd className="mt-1 text-lg font-bold text-slate-900">{value}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </DetailDrawer>}
       {toast}
