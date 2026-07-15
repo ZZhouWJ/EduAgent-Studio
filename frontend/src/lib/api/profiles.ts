@@ -46,11 +46,13 @@ export interface ProfileDetail {
 
 // 对话消息结构
 export interface DialogMessage {
-  id: number
+  message_id: number
+  profile_id: number
   role: 'student' | 'assistant'
   content: string
   created_at: string
-  extraction?: ProfileExtraction
+  extracted_json: ProfileExtraction | null
+  is_applied: boolean
 }
 
 // 抽取结果结构
@@ -65,6 +67,31 @@ export interface ProfileExtraction {
   practice_level?: string
   motivation?: string
   error_prone_points?: string[]
+  interests?: string[]
+  weekly_hours?: number
+}
+
+export interface PendingProfileChange {
+  message_id: number
+  extracted: ProfileExtraction
+  created_at: string
+}
+
+export interface ProfileDialogResponse {
+  reply: string
+  extracted: ProfileExtraction
+  profile_patch: Partial<Pick<ProfileDetail,
+    'learning_goal' | 'current_level' | 'resource_preferences' | 'interests' | 'weekly_hours'>>
+  pending_changes: PendingProfileChange[]
+  student_message_id: number
+  assistant_message_id: number
+}
+
+export interface ApplyExtractionResponse {
+  profile_id: number
+  message_id: number
+  updated_profile: ProfileDetail
+  change_summary: string
 }
 
 export const profilesApi = {
@@ -105,19 +132,14 @@ export const profilesApi = {
 
   // 发送对话消息
   sendDialogMessage(profileId: number, message: string) {
-    return client.post<any>(`/profiles/${profileId}/dialog`, { message })
-      .then(res => ({
-        id: Date.now(),
-        role: 'assistant' as const,
-        content: res.reply || res.content || '',
-        created_at: new Date().toISOString(),
-        extraction: res.extracted,
-      }))
+    return client.post<ProfileDialogResponse>(`/profiles/${profileId}/dialog`, { message })
   },
 
   // 应用抽取结果
-  applyExtraction(profileId: number, extraction: ProfileExtraction) {
-    return client.post<ProfileDetail>(`/profiles/${profileId}/apply-extraction`, extraction)
+  applyExtraction(profileId: number, messageId: number) {
+    return client.post<ApplyExtractionResponse>(`/profiles/${profileId}/apply-extraction`, {
+      message_id: messageId,
+    })
   },
 
   // 获取画像更新记录（学习反馈历史）
