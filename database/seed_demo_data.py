@@ -359,6 +359,71 @@ def seed_mastery(cur, profile_id: int, kp_ids: List[int], base: float) -> None:
             )
 
 
+def upsert_learning_task(
+    cur,
+    course_id: int,
+    title: str,
+    description: str,
+    target_kp_ids: List[int],
+    assignee_id: Optional[int],
+    creator_id: int,
+    status: str,
+    due_days: Optional[int],
+) -> int:
+    row = fetchone(
+        cur,
+        "SELECT task_id FROM learning_tasks WHERE course_id=%s AND title=%s",
+        course_id,
+        title,
+    )
+    kp_value = ",".join(str(kp_id) for kp_id in target_kp_ids)
+    due_date = datetime.now() + timedelta(days=due_days) if due_days else None
+    if row:
+        cur.execute(
+            """
+            UPDATE learning_tasks
+            SET description=%s,
+                target_kp_ids=%s,
+                assignee_id=%s,
+                creator_id=%s,
+                status=%s,
+                due_date=%s,
+                is_deleted=0,
+                updated_at=NOW()
+            WHERE task_id=%s
+            """,
+            (
+                description,
+                kp_value,
+                assignee_id,
+                creator_id,
+                status,
+                due_date,
+                row["task_id"],
+            ),
+        )
+        return row["task_id"]
+    cur.execute(
+        """
+        INSERT INTO learning_tasks
+            (course_id, title, description, target_kp_ids, assignee_id,
+             due_date, creator_id, status, is_deleted, created_at, updated_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0, NOW(), NOW())
+        """,
+        (
+            course_id,
+            title,
+            description,
+            kp_value,
+            assignee_id,
+            due_date,
+            creator_id,
+            status,
+        ),
+    )
+    return cur.lastrowid
+
+
 # ---------------------------------------------------------------------------
 # Model providers, AI models, API configs
 # ---------------------------------------------------------------------------
@@ -634,6 +699,38 @@ def upsert_learning_resource(cur, course_id: int, title: str, rtype: str,
 def upsert_feedback(cur, profile_id: int, course_id: int, resource_id: Optional[int],
                      ftype: str, content: str, score: Optional[float],
                      self_mastery: Optional[float], difficulty: str) -> int:
+    row = fetchone(
+        cur,
+        """
+        SELECT feedback_id
+        FROM learning_feedbacks
+        WHERE profile_id=%s
+          AND course_id=%s
+          AND resource_id <=> %s
+          AND feedback_type=%s
+          AND content=%s
+        LIMIT 1
+        """,
+        profile_id,
+        course_id,
+        resource_id,
+        ftype,
+        content,
+    )
+    if row:
+        cur.execute(
+            """
+            UPDATE learning_feedbacks
+            SET quiz_score=%s,
+                self_mastery=%s,
+                difficulty_rating=%s,
+                is_deleted=0,
+                updated_at=NOW()
+            WHERE feedback_id=%s
+            """,
+            (score, self_mastery, difficulty, row["feedback_id"]),
+        )
+        return row["feedback_id"]
     cur.execute(
         """INSERT INTO learning_feedbacks
                (profile_id, resource_id, course_id, feedback_type, content,
@@ -679,9 +776,8 @@ def main() -> int:
     conn = connect()
     try:
         with conn.cursor() as cur:
-            # 0) Clean up any leftover rows from previous failed runs so that
-            #    "user_id" stays stable across re-runs. We only touch our own
-            #    demo usernames — never the original `admin`, `student1`, etc.
+            # 0) Rebuild project-workflow fixtures while preserving stable
+            #    users, profiles, course resources, feedbacks, and learning tasks.
             demo_usernames = [u[0] for u in DEMO_USERS]
             log.info("=== cleanup previous demo rows (idempotent) ===")
             placeholders = ",".join(["%s"] * len(demo_usernames))
@@ -709,7 +805,6 @@ def main() -> int:
                 ("task_outputs", "created_by"),
                 ("ai_invocations", "created_by"),
                 ("cost_records", "user_id"),
-                ("learning_resources", "created_by"),
                 ("project_tasks", "creator_id"),
                 ("project_members", "user_id"),
                 ("operation_logs", "user_id"),
@@ -723,23 +818,6 @@ def main() -> int:
                     demo_usernames,
                 )
 
-            # Tables linked through `student_profiles`. Deleting the profile
-            # also drops the dependent mastery/feedback rows.
-            cur.execute(
-                f"DELETE sp, skm, lf FROM student_profiles sp "
-                f"INNER JOIN users u ON sp.student_id = u.user_id "
-                f"LEFT JOIN student_knowledge_mastery skm ON skm.profile_id = sp.profile_id "
-                f"LEFT JOIN learning_feedbacks lf ON lf.profile_id = sp.profile_id "
-                f"WHERE u.username IN ({placeholders})",
-                demo_usernames,
-            )
-
-            # learning_tasks is assigned to students (assignee_id), not a teacher.
-            cur.execute(
-                f"DELETE FROM learning_tasks WHERE assignee_id IN "
-                f"(SELECT user_id FROM users WHERE username IN ({placeholders}))",
-                demo_usernames,
-            )
             # project_tasks.assignee_id can also be a student; we already
             # deleted by creator_id above, but the assignee may still hold FK.
             cur.execute(
@@ -758,6 +836,15 @@ def main() -> int:
                 f"DELETE FROM projects WHERE owner_id IN "
                 f"(SELECT user_id FROM users WHERE username IN ({placeholders}))",
                 demo_usernames,
+            )
+            cur.execute(
+                """
+                DELETE ts
+                FROM tutor_sessions ts
+                LEFT JOIN student_profiles sp
+                  ON ts.profile_id = sp.profile_id AND sp.is_deleted = 0
+                WHERE sp.profile_id IS NULL
+                """
             )
             # Re-enable FK checks now that demo rows are gone.
             cur.execute("SET FOREIGN_KEY_CHECKS = 1")
@@ -804,6 +891,60 @@ def main() -> int:
                 profile_ids[(username, code)] = pid
                 seed_mastery(cur, pid, kp_ids_by_course[cid], mastery)
                 log.info("  profile %s/%s (id=%s) mastery=%.2f", username, code, pid, mastery)
+
+            log.info("=== learning tasks ===")
+            learning_task_specs = [
+                (
+                    "CS301",
+                    "数据库事务与并发控制",
+                    "学习事务的 ACID 特性，掌握隔离级别及并发控制方法",
+                    [5, 6],
+                    "student_zhang",
+                    "in_progress",
+                    4,
+                ),
+                (
+                    "CS301",
+                    "SQL多表连接练习",
+                    "完成教务系统多表查询练习，包括 INNER JOIN 和 LEFT JOIN",
+                    [3],
+                    "student_liu",
+                    "assigned",
+                    11,
+                ),
+                (
+                    "CS201",
+                    "Python函数与模块练习",
+                    "编写包含多个函数的 Python 模块，实现基本文本处理功能",
+                    [1],
+                    "student_chen",
+                    "assigned",
+                    7,
+                ),
+                (
+                    "CS401",
+                    "UML建模实践",
+                    "为选定系统绘制完整的用例图和类图",
+                    [2],
+                    "student_sun",
+                    "draft",
+                    None,
+                ),
+            ]
+            for code, title, desc, kp_indexes, assignee_name, status, due_days in learning_task_specs:
+                cid = course_ids[code]
+                task_id = upsert_learning_task(
+                    cur,
+                    cid,
+                    title,
+                    desc,
+                    [kp_ids_by_course[cid][index] for index in kp_indexes],
+                    get_user_id(cur, assignee_name),
+                    get_user_id(cur, COURSES[[item[0] for item in COURSES].index(code)][3]),
+                    status,
+                    due_days,
+                )
+                log.info("  task %s (id=%s)", title, task_id)
 
             log.info("=== model providers & models ===")
             providers = [
