@@ -1,102 +1,80 @@
-import React, { useEffect, useState, useRef } from "react";
-import Lottie, { type LottieRefCurrentProps } from "lottie-react";
-import { INLINE_LOTTIES, type InlineLottieKey } from "./inlineLotties";
+import {
+  BarChart3,
+  BookOpen,
+  BrainCircuit,
+  CheckCircle2,
+  LoaderCircle,
+  Sparkles,
+} from "lucide-react";
 
-type Source = InlineLottieKey | { url: string };
+type VisualKey = "loading" | "empty" | "success" | "dashboard" | "teaching" | "studying";
 
 interface SafeLottieProps {
-  /** 内置主题：loading / empty / success / dashboard / teaching / studying */
-  source: Source;
-  /** 自定义容器 className */
+  source: VisualKey;
   className?: string;
-  /** 是否循环（默认 true） */
   loop?: boolean;
-  /** 是否自动播放（默认 true） */
   autoplay?: boolean;
-  /** 播放速度，0.5 ~ 1.5 比较克制 */
   speed?: number;
-  /** 加载失败/网络不可达时的占位元素（可选） */
-  fallback?: React.ReactNode;
 }
 
-function useRemoteLottie(url: string | null) {
-  const [data, setData] = useState<object | null>(null);
-  const [error, setError] = useState(false);
-  useEffect(() => {
-    if (!url) {
-      setData(null);
-      setError(false);
-      return;
-    }
-    let cancelled = false;
-    setData(null);
-    setError(false);
-    fetch(url)
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((j) => {
-        if (!cancelled) setData(j);
-      })
-      .catch(() => {
-        if (!cancelled) setError(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [url]);
-  return { data, error };
-}
+const VISUALS = {
+  loading: { icon: LoaderCircle, tone: "text-blue-600", surface: "bg-blue-50", spin: true },
+  empty: { icon: BookOpen, tone: "text-slate-500", surface: "bg-slate-100", spin: false },
+  success: { icon: CheckCircle2, tone: "text-emerald-600", surface: "bg-emerald-50", spin: false },
+  teaching: { icon: Sparkles, tone: "text-violet-600", surface: "bg-violet-50", spin: false },
+  studying: { icon: BrainCircuit, tone: "text-cyan-700", surface: "bg-cyan-50", spin: false },
+} as const;
 
-/**
- * 通用 Lottie 包装：
- * - 默认使用内联 JSON（0 网络依赖，最稳）
- * - 可选 { url } 从公开 CDN 拉取（Lottie Simple License，无需署名）
- * - 失败/加载中均有占位，不污染布局
- */
 export function SafeLottie({
   source,
   className = "h-32 w-32",
   loop = true,
   autoplay = true,
   speed = 1,
-  fallback,
 }: SafeLottieProps) {
-  const ref = useRef<LottieRefCurrentProps | null>(null);
-  const remoteUrl = typeof source === "string" ? null : source.url;
-  const { data: remoteData, error: remoteError } = useRemoteLottie(remoteUrl);
+  const duration = `${Math.max(1.4, 2.8 / Math.max(speed, 0.25))}s`;
+  const animationStyle = autoplay
+    ? { animationDuration: duration, animationIterationCount: loop ? "infinite" : "1" }
+    : { animation: "none" };
 
-  useEffect(() => {
-    ref.current?.setSpeed(speed);
-  }, [speed]);
-
-  // 内联模式
-  if (typeof source === "string") {
-    const data = INLINE_LOTTIES[source as InlineLottieKey];
+  if (source === "dashboard") {
     return (
-      <Lottie
-        lottieRef={ref}
-        animationData={data}
-        loop={loop}
-        autoplay={autoplay}
-        className={className}
-      />
+      <div className={`${className} flex items-center justify-center p-4`} aria-hidden="true">
+        <div
+          className="relative h-full w-full max-h-28 max-w-28 motion-safe:animate-pulse"
+          style={animationStyle}
+        >
+          <div className="absolute inset-0 rounded-lg border border-slate-200 bg-white shadow-sm" />
+          <div className="absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-md bg-slate-900 text-white">
+            <BarChart3 className="h-4 w-4" />
+          </div>
+          <div className="absolute bottom-4 left-4 right-4 flex h-12 items-end gap-2">
+            {[45, 75, 58, 92].map((height, index) => (
+              <span
+                key={height}
+                className={`flex-1 rounded-t-sm ${index === 3 ? "bg-emerald-500" : "bg-blue-500"}`}
+                style={{ height: `${height}%` }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
     );
   }
 
-  // 远端模式
-  if (remoteError) {
-    return <div className={`${className} flex items-center justify-center`}>{fallback}</div>;
-  }
-  if (!remoteData) {
-    return <div className={`${className} animate-pulse rounded-lg bg-slate-100`} />;
-  }
+  const visual = VISUALS[source];
+  const Icon = visual.icon;
   return (
-    <Lottie
-      lottieRef={ref}
-      animationData={remoteData}
-      loop={loop}
-      autoplay={autoplay}
-      className={className}
-    />
+    <div className={`${className} flex items-center justify-center`} aria-hidden="true">
+      <div
+        className={`flex h-16 w-16 items-center justify-center rounded-lg ${visual.surface} ${visual.tone} ${
+          visual.spin ? "motion-safe:animate-spin" : "motion-safe:animate-pulse"
+        }`}
+        style={animationStyle}
+      >
+        <Icon className="h-8 w-8" strokeWidth={1.7} />
+      </div>
+    </div>
   );
 }
 

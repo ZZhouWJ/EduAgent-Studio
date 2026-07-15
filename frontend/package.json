@@ -52,8 +52,6 @@
     "echarts": "^6.1.0",
     "embla-carousel-react": "8.6.0",
     "input-otp": "1.4.2",
-    "lottie-react": "^2.4.1",
-    "lottie-web": "^5.13.0",
     "lucide-react": "0.487.0",
     "marked": "^18.0.5",
     "motion": "12.23.24",
