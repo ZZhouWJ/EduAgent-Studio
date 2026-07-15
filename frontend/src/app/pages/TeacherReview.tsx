@@ -1,5 +1,5 @@
 import React from "react";
-import { CheckCircle2, AlertCircle, Eye, AlertTriangle, MessageSquare, ShieldCheck, XCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, AlertTriangle, MessageSquare, ShieldCheck, XCircle } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { reviewsApi, ReviewRequest, ReviewDetail } from "@/lib/api";
 import { notify } from "@/lib/toast";

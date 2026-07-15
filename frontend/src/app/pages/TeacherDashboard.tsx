@@ -1,4 +1,3 @@
-import React from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, ArrowRight, BookOpen, CheckSquare, Database, FileText, GraduationCap, Library, MessageSquare, ShieldAlert, Target, Users } from "lucide-react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -21,7 +20,7 @@ export function TeacherDashboard() {
   const { data: overview, loading: loadingOverview } = useApi(() => statisticsApi.overview(), []);
   const { data: learningData, loading: loadingLearning } = useApi(() => statisticsApi.learningOverview(), []);
   const { data: weakPoints, loading: loadingWeak } = useApi(() => statisticsApi.weakKnowledgePoints(5), []);
-  const { data: pendingReviews } = useApi(() => reviewsApi.list({ status: "pending", page_size: 5 }), []);
+  const { data: pendingReviews } = useApi(() => reviewsApi.getPending({ page_size: 5 }), []);
   const { data: lowMastery } = useApi(() => statisticsApi.masteryDistribution(), []);
   const { data: tasksData } = useApi(() => learningApi.listTasks({ page_size: 6 }), []);
 
@@ -71,7 +70,7 @@ export function TeacherDashboard() {
                 ? `当前管理 ${learningData.course_count} 门课程，${learningData.student_count ?? 0} 名学生。`
                 : "正在加载课程信息..."}
               {(weakPoints ?? []).length > 0
-                ? ` 系统检测到"${weakPoints[0]?.kp_name}"等知识点为班级主要薄弱点，建议生成针对性资源并安排阶段测评。`
+                ? ` 系统检测到"${weakPoints?.[0]?.kp_name}"等知识点为班级主要薄弱点，建议生成针对性资源并安排阶段测评。`
                 : ""}
             </p>
             <div className="mt-6 flex gap-3">
