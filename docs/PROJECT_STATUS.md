@@ -15,7 +15,7 @@
 | 产品定位 | **面向高校课程的 AI 学习智能体操作系统**（不是资源生成工具） |
 | 核心主线 | 课程知识空间 → 学习画像 → 智能体编排 → 资源工厂 → Copilot → 效果闭环 → 治理审计 |
 | 开发阶段 | 第一优先级：核心链路打通中 |
-| 最近更新 | 2026-07-07 |
+| 最近更新 | 2026-07-15 |
 
 ---
 
@@ -452,9 +452,9 @@
 
 | # | 文档要求 | 状态 | 文件 |
 |---|---------|------|------|
-| 19 | 系统开发说明书 | ✅ | `docs/系统总体设计.md` |
-| 20 | 测试说明书 | ✅ | `docs/测试说明书.md` |
-| 21 | AI Coding工具说明 | ✅ | `docs/AI_Coding工具使用说明.md` |
+| 19 | 系统开发说明书 | ✅ 已生成标准Word文档 | `submission/系统开发说明书.docx` |
+| 20 | 测试说明书 | ✅ 已生成标准Word文档 | `submission/测试说明书.docx` |
+| 21 | AI Coding工具说明 | ✅ 已生成标准Word文档 | `submission/AI_Coding工具使用说明.docx` |
 
 ---
 
@@ -535,7 +535,9 @@
 
 | 日期 | 更新内容 | 负责人 |
 |------|---------|--------|
-| 2026-07-08 | **证据优先生成链路（模块一收尾）**：新建 `kp_chunk_links`+`resource_evidence_links` 表 + 扩展 chunks/materials 字段；新建 `evidence_repo.py`（BM25匹配+CRUD）；改造 `knowledge_service.py` 解析后自动 BM25 匹配知识点写入 `kp_chunk_links`；改造 `resource_generation_agent.py` 新增 `_retrieve_evidence()`/`_verify_citations()`/`_format_evidence_context()`，prompt 注入教材原文，输出 trustworthiness + evidence_links；改造 `workflow.py` 串联 `course_id` 传递 + evidence_links 写入；改造 `agent_service.py` 保存资源时写入 `learning_resources` 表 + evidence_links；新增 `/knowledge/kp-chunk-links/pending` 等 4 个后端 API；TeacherKnowledgeBase.tsx 新增绑定管理面板；AgentWorkbench.tsx 展示可信度 + 引用来源 + 草稿警告 | Claude |
+| 2026-07-15 | 根据 submission/docs 中的完整版 Markdown 重建系统开发说明书、测试说明书和 AI Coding 工具使用说明 Word 文档，修复 Markdown 未解析、表格与代码块混排问题，并完成结构化校验 | Codex |
+| 2026-07-14 | 完成软件杯最终交付文档整理：整理赛题要求、更新提交材料清单文档、生成3个标准Word文档（系统开发说明书/测试说明书/AI_Coding工具使用说明）、修复Word表格列宽问题（computeWidths按内容自适应）、修复PPTX生成问题（图标异步+多pres问题）、预渲染图标320张解决空文件问题、整理submission文件夹结构、清理重复文件、重命名PPT为中文名 | Claude |
+| 2026-07-13 | 新增软件杯提交材料：提交材料总览、系统开发说明书初稿、测试说明书初稿、AI Coding工具说明初稿、PPT大纲（含截图安排）、7分钟演示视频详细分镜脚本 | Claude |
 | 2026-07-08 | 完成模块八：管理端指标真实化 - statistics_repo.py 新增 get_platform_stats/get_cost_by_model/get_rag_hit_rate/get_resource_stats 方法、statistics_service.py 新增对应 service 方法、statistics.py 新增 3 个 API 路由、前端 AdminDashboard/AdminCosts 使用真实 API | Claude |
 | 2026-07-08 | 完成模块七：反馈驱动推荐重排 - feedbacks.py 扩展返回值、LearningService.recommend_resources()、LearningRepository.get_recommended_resources()、学习路径调整逻辑 | Claude |
 | 2026-07-08 | 完成模块七前端：LearningFeedback.tsx 提交后展示"画像已更新"+推荐策略变化卡片、StudentDashboard.tsx 新增今日推荐资源区块、learning.ts 新增 getRecommendedResources 方法 | Claude |
