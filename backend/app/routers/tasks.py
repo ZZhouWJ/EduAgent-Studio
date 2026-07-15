@@ -146,7 +146,6 @@ async def list_project_tasks(
     )
     return success_response(data=result)
 
-
 # =============================================================================
 # 创建项目任务
 # =============================================================================
@@ -316,6 +315,32 @@ async def list_task_outputs(
     result = task_service.list_task_outputs(
         token=token,
         task_id=task_id,
+    )
+    return success_response(data=result)
+
+
+# =============================================================================
+# 版本对比（必须注册在 /outputs/{output_id} 之前）
+# =============================================================================
+
+@router.get("/outputs/compare")
+async def compare_outputs(
+    request: Request,
+    output1_id: int = Query(..., gt=0),
+    output2_id: int = Query(..., gt=0),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+) -> dict:
+    """
+    对比两个输出版本。
+
+    两个输出必须属于同一任务，仅项目成员可访问。
+    """
+    token = _extract_token(authorization)
+
+    result = task_service.compare_outputs(
+        token=token,
+        output1_id=output1_id,
+        output2_id=output2_id,
     )
     return success_response(data=result)
 
@@ -543,31 +568,5 @@ async def update_comment_status(
         status=body.status,
         ip_address=ip,
         user_agent=ua,
-    )
-    return success_response(data=result)
-
-
-# =============================================================================
-# 版本对比
-# =============================================================================
-
-@router.get("/outputs/compare")
-async def compare_outputs(
-    request: Request,
-    output1_id: int = Query(..., gt=0),
-    output2_id: int = Query(..., gt=0),
-    authorization: Optional[str] = Header(None, alias="Authorization"),
-) -> dict:
-    """
-    对比两个输出版本。
-
-    两个输出必须属于同一任务，仅项目成员可访问。
-    """
-    token = _extract_token(authorization)
-
-    result = task_service.compare_outputs(
-        token=token,
-        output1_id=output1_id,
-        output2_id=output2_id,
     )
     return success_response(data=result)
