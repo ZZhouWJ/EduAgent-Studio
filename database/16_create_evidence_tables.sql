@@ -60,7 +60,7 @@ SELECT
     rel.verified_status,
     rel.relevance_score,
     kp.kp_name,
-    cmc.filename,
+    cm.filename,
     rel.source_page,
     rel.source_paragraph,
     rel.created_at,
@@ -70,6 +70,7 @@ FROM `resource_evidence_links` rel
 JOIN `learning_resources` rr ON rel.resource_id = rr.resource_id
 JOIN `knowledge_points` kp ON rel.kp_id = kp.kp_id
 JOIN `course_material_chunks` cmc ON rel.chunk_id = cmc.chunk_id
+JOIN `course_materials` cm ON cmc.material_id = cm.material_id
 WHERE rr.is_deleted = 0 AND cmc.is_deleted = 0;
 
 -- ----------------------------------------------------------
