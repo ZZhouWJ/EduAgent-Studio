@@ -1,31 +1,5 @@
 import { createBrowserRouter, Navigate, useNavigate } from "react-router-dom";
 import { Layout } from "./components/Layout";
-import { Login } from "./pages/Login";
-import { AdminAgentConfig } from "./pages/AdminAgentConfig";
-import { AdminAudit } from "./pages/AdminAudit";
-import { AdminCosts } from "./pages/AdminCosts";
-import { AdminCourses } from "./pages/AdminCourses";
-import { AdminDashboard } from "./pages/AdminDashboard";
-import { AdminGovernance } from "./pages/AdminGovernance";
-import { AdminLogs } from "./pages/AdminLogs";
-import { AdminModelConfig } from "./pages/AdminModelConfig";
-import { AdminPrompts } from "./pages/AdminPrompts";
-import { AdminUsers } from "./pages/AdminUsers";
-import { LearningAnalytics } from "./pages/LearningAnalytics";
-import { LearningFeedback } from "./pages/LearningFeedback";
-import { NotFound } from "./pages/NotFound";
-import { ResourceLibrary } from "./pages/ResourceLibrary";
-import { StudentDashboard } from "./pages/StudentDashboard";
-import { StudentLearningPath } from "./pages/StudentLearningPath";
-import { TeacherStudents } from "./pages/TeacherStudents";
-import { StudentProfile } from "./pages/StudentProfile";
-import { StudentTasks } from "./pages/StudentTasks";
-import { StudentTutor } from "./pages/StudentTutor";
-import { TeacherCourses } from "./pages/TeacherCourses";
-import { TeacherDashboard } from "./pages/TeacherDashboard";
-import { TeacherKnowledgeBase } from "./pages/TeacherKnowledgeBase";
-import { TeacherReview } from "./pages/TeacherReview";
-import { TeacherTasks } from "./pages/TeacherTasks";
 import { useAuthStore } from "@/stores/auth";
 import { useEffect } from "react";
 
@@ -45,7 +19,7 @@ export const router = createBrowserRouter(
   [
     {
       path: "/login",
-      Component: Login,
+      lazy: async () => ({ Component: (await import("./pages/Login")).Login }),
     },
     {
       path: "/",
@@ -53,43 +27,43 @@ export const router = createBrowserRouter(
       children: [
         { index: true, element: <RootRedirect /> },
 
-        { path: "student", Component: StudentTutor },
-        { path: "student/home", Component: StudentDashboard },
-        { path: "student/profile", Component: StudentProfile },
-        { path: "student/learning-path", Component: StudentLearningPath },
-        { path: "student/tasks", Component: StudentTasks },
-        { path: "student/resources", Component: ResourceLibrary },
-        { path: "student/tutor", Component: StudentTutor },
-        { path: "student/feedback", Component: LearningFeedback },
-        { path: "student/report", Component: LearningAnalytics },
+        { path: "student", lazy: async () => ({ Component: (await import("./pages/StudentTutor")).StudentTutor }) },
+        { path: "student/home", lazy: async () => ({ Component: (await import("./pages/StudentDashboard")).StudentDashboard }) },
+        { path: "student/profile", lazy: async () => ({ Component: (await import("./pages/StudentProfile")).StudentProfile }) },
+        { path: "student/learning-path", lazy: async () => ({ Component: (await import("./pages/StudentLearningPath")).StudentLearningPath }) },
+        { path: "student/tasks", lazy: async () => ({ Component: (await import("./pages/StudentTasks")).StudentTasks }) },
+        { path: "student/resources", lazy: async () => ({ Component: (await import("./pages/ResourceLibrary")).ResourceLibrary }) },
+        { path: "student/tutor", lazy: async () => ({ Component: (await import("./pages/StudentTutor")).StudentTutor }) },
+        { path: "student/feedback", lazy: async () => ({ Component: (await import("./pages/LearningFeedback")).LearningFeedback }) },
+        { path: "student/report", lazy: async () => ({ Component: (await import("./pages/LearningAnalytics")).LearningAnalytics }) },
 
-        { path: "teacher", Component: TeacherDashboard },
-        { path: "teacher/courses", Component: TeacherCourses },
-        { path: "teacher/students", Component: TeacherStudents },
-        { path: "teacher/resources", Component: ResourceLibrary },
-        { path: "teacher/review", Component: TeacherReview },
-        { path: "teacher/tasks", Component: TeacherTasks },
-        { path: "teacher/knowledge-base", Component: TeacherKnowledgeBase },
-        { path: "teacher/analytics", Component: LearningAnalytics },
+        { path: "teacher", lazy: async () => ({ Component: (await import("./pages/TeacherDashboard")).TeacherDashboard }) },
+        { path: "teacher/courses", lazy: async () => ({ Component: (await import("./pages/TeacherCourses")).TeacherCourses }) },
+        { path: "teacher/students", lazy: async () => ({ Component: (await import("./pages/TeacherStudents")).TeacherStudents }) },
+        { path: "teacher/resources", lazy: async () => ({ Component: (await import("./pages/ResourceLibrary")).ResourceLibrary }) },
+        { path: "teacher/review", lazy: async () => ({ Component: (await import("./pages/TeacherReview")).TeacherReview }) },
+        { path: "teacher/tasks", lazy: async () => ({ Component: (await import("./pages/TeacherTasks")).TeacherTasks }) },
+        { path: "teacher/knowledge-base", lazy: async () => ({ Component: (await import("./pages/TeacherKnowledgeBase")).TeacherKnowledgeBase }) },
+        { path: "teacher/analytics", lazy: async () => ({ Component: (await import("./pages/LearningAnalytics")).LearningAnalytics }) },
 
-        { path: "admin", Component: AdminDashboard },
-        { path: "admin/users", Component: AdminUsers },
-        { path: "admin/courses", Component: AdminCourses },
-        { path: "admin/resources", Component: ResourceLibrary },
-        { path: "admin/model-config", Component: AdminModelConfig },
-        { path: "admin/agent-config", Component: AdminAgentConfig },
-        { path: "admin/prompts", Component: AdminPrompts },
-        { path: "admin/audit", Component: AdminAudit },
-        { path: "admin/costs", Component: AdminCosts },
-        { path: "admin/governance", Component: AdminGovernance },
-        { path: "admin/logs", Component: AdminLogs },
+        { path: "admin", lazy: async () => ({ Component: (await import("./pages/AdminDashboard")).AdminDashboard }) },
+        { path: "admin/users", lazy: async () => ({ Component: (await import("./pages/AdminUsers")).AdminUsers }) },
+        { path: "admin/courses", lazy: async () => ({ Component: (await import("./pages/AdminCourses")).AdminCourses }) },
+        { path: "admin/resources", lazy: async () => ({ Component: (await import("./pages/ResourceLibrary")).ResourceLibrary }) },
+        { path: "admin/model-config", lazy: async () => ({ Component: (await import("./pages/AdminModelConfig")).AdminModelConfig }) },
+        { path: "admin/agent-config", lazy: async () => ({ Component: (await import("./pages/AdminAgentConfig")).AdminAgentConfig }) },
+        { path: "admin/prompts", lazy: async () => ({ Component: (await import("./pages/AdminPrompts")).AdminPrompts }) },
+        { path: "admin/audit", lazy: async () => ({ Component: (await import("./pages/AdminAudit")).AdminAudit }) },
+        { path: "admin/costs", lazy: async () => ({ Component: (await import("./pages/AdminCosts")).AdminCosts }) },
+        { path: "admin/governance", lazy: async () => ({ Component: (await import("./pages/AdminGovernance")).AdminGovernance }) },
+        { path: "admin/logs", lazy: async () => ({ Component: (await import("./pages/AdminLogs")).AdminLogs }) },
 
         { path: "student-profile", element: <Navigate to="/student/profile" replace /> },
         { path: "resource-library", element: <Navigate to="/teacher/resources" replace /> },
         { path: "teacher-review", element: <Navigate to="/teacher/review" replace /> },
         { path: "learning-feedback", element: <Navigate to="/student/feedback" replace /> },
         { path: "learning-analytics", element: <Navigate to="/teacher/analytics" replace /> },
-        { path: "*", Component: NotFound },
+        { path: "*", lazy: async () => ({ Component: (await import("./pages/NotFound")).NotFound }) },
       ],
     },
   ],
