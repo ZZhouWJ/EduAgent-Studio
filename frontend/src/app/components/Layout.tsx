@@ -147,6 +147,7 @@ const ROLE_CONFIG: Record<RoleKey, RoleConfig> = {
           { path: "/admin/roles", label: "角色权限", icon: LockKeyhole },
           { path: "/admin/courses", label: "课程管理", icon: BookOpen },
           { path: "/admin/resources", label: "资源管理", icon: Library },
+          { path: "/admin/knowledge-base", label: "课程知识库", icon: Database },
         ],
       },
       {
