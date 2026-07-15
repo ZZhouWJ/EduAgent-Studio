@@ -41,3 +41,4 @@ passlib[bcrypt]>=1.7.4
 
 # AES-GCM Encryption (for API Key encryption)
 cryptography>=42.0.0
+websocket-client

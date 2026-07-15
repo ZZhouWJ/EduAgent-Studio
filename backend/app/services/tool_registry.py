@@ -258,6 +258,9 @@ def _build_registry() -> ToolRegistry:
         planning_agent,
         error_analysis_agent,
         explanation_skill,
+        image_agent,
+        tts_tool,
+        ppt_agent,
     )
 
     registry = ToolRegistry()
@@ -275,24 +278,24 @@ def _build_registry() -> ToolRegistry:
         id="tts_tool",
         name="语音合成",
         description="将文本转换为语音。适用于学生要求朗读、听音频讲解的场景。",
-        handler=lambda text, voice="xiaoyan": {"audio_url": "", "text_length": len(text)},
+        handler=tts_tool,
         tags=["tool", "multimodal"],
     )
 
     registry.register_tool(
         id="image_agent",
         name="图片生成",
-        description="根据文本描述生成示意图、流程图或知识配图。",
-        handler=lambda prompt, style="教学插画": {"image_url": "", "prompt": prompt},
+        description="根据文本描述生成示意图、流程图或知识配图。适用于学生要求看图、示意图、流程图等场景。",
+        handler=image_agent,
         tags=["tool", "multimodal"],
     )
 
     registry.register_tool(
         id="ppt_agent",
         name="PPT 生成",
-        description="根据课程内容和目标生成 PPT 大纲和课件（异步任务）。耗时较长，完成后推送通知。",
-        handler=lambda course_id, topic, audience="学生": {"task_id": "ppt_task_001", "status": "started"},
-        tags=["tool", "async"],
+        description="根据课程内容和目标生成 PPT 大纲和课件。返回结构化幻灯片 JSON，可直接渲染为 PPT 预览。",
+        handler=ppt_agent,
+        tags=["tool", "resource"],
         timeout=120,
     )
 

@@ -53,15 +53,15 @@ class IFlyTekProvider:
     # 讯飞 HMAC-SHA256 签名
     # -------------------------------------------------------------------------
 
-    def _generate_auth_header(self) -> str:
+    def _generate_auth_header(self) -> tuple[str, str]:
         """
-        生成讯飞 Spark Open API 的 Authorization 头。
+        生成讯飞 Spark Open API 的 Authorization 头和 Date 值。
 
         签名原文：host + date + request-line
         签名算法：HMAC-SHA256
 
         Returns:
-            str: Authorization header value
+            tuple: (Authorization header value, date string for Date header)
         """
         date_str = formatdate(time.time(), usegmt=True)
         request_line = f"POST {IFLYTEK_API_PATH} HTTP/1.1"
@@ -74,12 +74,13 @@ class IFlyTekProvider:
         ).digest()
         signature = base64.b64encode(signature_raw).decode("utf-8")
 
-        return (
+        auth = (
             f'api_key="{self.api_key}", '
             f'algorithm="hmac-sha256", '
             f'headers="host date request-line", '
             f'signature="{signature}"'
         )
+        return auth, date_str
 
     # -------------------------------------------------------------------------
     # LLM 调用
@@ -96,7 +97,7 @@ class IFlyTekProvider:
 
         请求体为标准 Chat Completions 格式，响应体同样是 OpenAI 兼容格式。
         """
-        auth_header = self._generate_auth_header()
+        auth_header, date_str = self._generate_auth_header()
 
         temperature = kwargs.get(
             "temperature",
@@ -114,9 +115,17 @@ class IFlyTekProvider:
             "max_tokens": max_tokens,
         }
 
+        # Tool Calling 支持
+        if config.tools:
+            payload["tools"] = config.tools
+            if config.tool_choice:
+                payload["tool_choice"] = config.tool_choice
+
         headers = {
             "Content-Type": "application/json",
             "Authorization": auth_header,
+            "Date": date_str,
+            "Host": IFLYTEK_API_HOST,
         }
 
         start_time = time.time()
@@ -127,7 +136,9 @@ class IFlyTekProvider:
 
             # OpenAI 兼容响应格式：choices[0].message.content
             choice = data.get("choices", [{}])[0]
-            content = choice.get("message", {}).get("content", "")
+            message = choice.get("message", {})
+            content = message.get("content") or ""
+            tool_calls = message.get("tool_calls") or []
 
             usage = data.get("usage", {})
             input_tokens = usage.get("prompt_tokens", 0)
@@ -137,6 +148,7 @@ class IFlyTekProvider:
 
             return {
                 "content": content,
+                "tool_calls": tool_calls,
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens,
                 "cost": cost,

@@ -12,10 +12,19 @@
 | 项目名称 | 智学工坊 EduAgent Studio |
 | 赛题编号 | A3 - 基于大模型的个性化资源生成与学习多智能体系统开发 |
 | 出题企业 | 科大讯飞股份有限公司 |
+<<<<<<< HEAD
 | 产品定位 | **面向高校课程的 AI 学习智能体操作系统**（不是资源生成工具） |
 | 核心主线 | 课程知识空间 → 学习画像 → 智能体编排 → 资源工厂 → Copilot → 效果闭环 → 治理审计 |
 | 开发阶段 | 第一优先级：核心链路打通中 |
 | 最近更新 | 2026-07-15 |
+=======
+| 产品定位 | **面向高校课程的 AI 学习智能体操作系统**（教师用多智能体编排生成资源，学生用 Tutor Copilot 答疑） |
+| 核心主线 | 课程知识空间 → 学习画像 → **（教师）多智能体编排生成资源** → 资源工厂 → **（学生）Tutor Copilot 答疑** → 效果闭环 → 治理审计 |
+
+> **注意**：多智能体编排（5 Agent + LangGraph workflow）是**教师端**功能，用于生成个性化资源；**学生端**使用 Tutor Supervisor（单 Supervisor + 工具注册表）进行实时答疑。
+| 开发阶段 | 核心链路打通中，补充关键缺口（P0优先） |
+| 最近更新 | 2026-07-14 |
+>>>>>>> 0f66c6f54e4d67826a29b4a91a7fde4b089dc2c8
 
 ---
 
@@ -29,26 +38,30 @@
 |------|------|------|
 | **课程知识空间** | 教师上传资料，系统自动解析、切分、标注知识点、建立可检索知识库 | ✅ 后端已完成 |
 | **学生学习画像** | 学生通过对话、测验、学习行为持续形成动态画像（6+维度） | ⚠️ 待升级 |
-| **智能体编排中心** | 多个智能体围绕真实任务协作：诊断、检索、规划、生成、审核、评估、推荐 | ⚠️ 待升级 |
-| **资源生成工厂** | 针对不同学生和知识点生成讲义、题库、案例、PPT、视频脚本、思维导图、复习计划 | ✅ 基础完成 |
-| **学习辅导 Copilot** | 学生持续提问，系统结合画像和课程知识库回答 | ❌ 待独立实现 |
+| **资源生成工厂** | 针对不同学生和知识点生成讲义、题库、案例、PPT、视频脚本、思维导图、复习计划 | ⚠️ 由 Tutor Supervisor 按需调用，非独立流水线 |
+| **学习辅导 Copilot** | **（学生端）** 学生持续提问，Tutor Supervisor 自动调用工具生成多模态答疑内容 | ⚠️ 框架完成，但knowledge_context未注入LLM，image/tts/ppt工具是Stub |
 | **学习效果闭环** | 学生学习、反馈、测验后，系统更新画像、调整路径、重排推荐资源 | ⚠️ 部分完成 |
 | **治理与审计** | 教师审核、引用溯源、防幻觉、成本统计、模型调用日志全部可见 | ✅ 基础完成 |
 
 ### 2.2 数据流主线（核心链路）
+
+> **架构说明**：多智能体协作是**学生端**答疑时的动态能力，不是教师端流水线。
+> 赛题要求："通过与学生的智能交互，大模型结合 AI 前沿技术和工具...须由不同角色的智能体协作完成"
 
 ```
 教师上传课程资料 → 知识库（解析/切分/索引）
         ↓
 学生通过对话构建画像 → Learner Memory（6+维度动态画像）
         ↓
-画像 + 知识库 → 智能体编排中心（诊断/检索/规划/生成/审核）
+画像 + 知识库 → 学生提问
         ↓
-生成资源（绑定证据来源）→ 教师审核 → 发布给学生
+Tutor Supervisor 协调多工具/多技能循环（动态选择，以需求满足为终止条件）
+  ↙ 工具：retrieve_knowledge / quiz_agent / mindmap_agent / code_case_agent / ...
+  ↘ 技能：explanation_skill / error_analysis_agent / planning_agent / ...
         ↓
-学生收到个性化路径和资源 → 学习与反馈
+学生收到多模态答疑（文字+卡片+图解+练习题+...）
         ↓
-画像更新 → 路径调整 → 推荐重排 → Tutor Copilot 持续辅导
+画像更新 → 路径调整 → Tutor Copilot 持续辅导
         ↓
 管理端：调用审计、成本统计、内容安全
 ```
@@ -157,67 +170,50 @@
 
 ---
 
-### 3.3 模块三：智能体编排中心 Agent Orchestration Console
+### 3.3 模块三：Tutor Supervisor 动态多智能体编排
 
-**目标**：智能体工作台从"流程动画"升级为真正的执行控制台
+**目标**：学生提问时，Tutor Supervisor 动态协调多工具/多技能循环，以用户需求满足为终止条件
 
-**现状**：`AgentWorkbench.tsx` 有流程展示，但存在重复生成问题
+**现状**：`tutor_supervisor.py` 已有框架，但以下缺口待修复：
+- `knowledge_context` 未注入 LLM（缺口A）
+- image_agent / tts_tool / ppt_agent 是 Stub（缺口B）
+- 嵌入语法无兜底（缺口C）
+- 最大步数 8 步限制应改为"需求满足即终止"
 
-**当前问题**：
-- SSE 完成后又调用 `agentsApi.generate()` 造成重复生成
-- 工具调用、证据绑定、任务状态不够产品化
-- 学生下拉框是输入框，不够友好
+**核心设计**：
+- **终止条件**：模型输出纯文本回答（无 tool_calls）即为需求满足，不再强制限制步数
+- **工具选择**：两级路由（规则预筛选 → 模型自主选择），模型按需调用工具
+- **进度展示**：GPT/Gemini 风格底部动画，显示当前调用的工具名称
 
-**新增数据表**：
-- `agent_runs` - 智能体运行记录
-- `agent_run_steps` - 步骤记录
-- `agent_tool_calls` - 工具调用记录
-- `agent_evidence_refs` - 证据引用记录
+**与赛题的对应关系**：
+> 赛题原文："通过**与学生的智能交互**，大模型结合 AI 前沿技术和工具，...**须由不同角色的智能体协作完成**"
+> → Tutor Supervisor 就是这个"不同角色的智能体协作"的具体实现
 
-**工作流状态标准化**：
-```ts
-{
-  run_id: string,
-  task_id: string,
-  current_node: string,
-  node_status: "waiting" | "running" | "done" | "error",
-  input_snapshot: object,
-  output_snapshot: object,
-  evidence_refs: string[],
-  token_usage: number,
-  cost: number,
-  latency: number,
-  quality_score: number,
-  revision_count: number
-}
-```
-
-**后端改造**：
-- 改 `workflow.py`：`done` 事件返回完整 `result`
-- 改 `agents.py`：接收 `generation_goal` 和 `enable_review` 参数
-
-**前端改造**：
-- 改 `AgentWorkbench.tsx`：收到 `done` 直接 `setResult`，删二次生成
-- 学生下拉框改为真实 `profilesApi.list()`
-- 知识点改为完整 checkbox 列表
-- 资源结果 Markdown 渲染 + 证据来源 + 质量分 + 耗时
+**已有文件**：
+- `tutor_supervisor.py` — Supervisor 主循环（Tool Calling）
+- `tool_registry.py` — 统一工具/技能注册表
+- `tutor_tool_handlers.py` — 各工具处理器
+- `StudentTutor.tsx` — 前端答疑页面
 
 **功能清单**：
-- [x] SSE `done` 事件直接设置结果，不二次生成
-- [x] 学生下拉框显示姓名、掌握度、薄弱点
-- [x] 知识点完整 checkbox 列表
-- [x] 生成结果 Markdown 渲染
-- [x] 展示证据来源、质量评分、返工次数、生成耗时
-- [ ] "保存资源"写入资源库
-- [ ] 保存后能在 `/teacher/resources` 查到
+- [x] Supervisor Tool Calling 循环
+- [x] 两级路由（规则预筛选 + 模型自主选择）
+- [x] SSE 事件流（supervisor.tool_choice / tool.started / tool.completed）
+- [x] 内容块嵌入语法（:::type:block_id:::）
+- [x] 执行轨迹展示（ExecutionTrace）
+- [ ] **knowledge_context 注入 LLM**（缺口A）
+- [ ] **image_agent 真实实现**（缺口B）
+- [ ] **tts_tool 真实实现**（缺口B）
+- [ ] **ppt_agent 真实实现**（缺口B）
+- [ ] **GPT/Gemini 风格底部思考动画**（前端）
 
 **验收标准**：
-- 启动生成后，执行链路逐步变绿
-- SSE 完成后不再二次生成
-- 生成结果可保存
-- 保存后资源库出现新资源
+- 学生问"用思维导图整理 SQL JOIN"，Tutor 自动调用 mindmap_agent，底部显示"正在生成思维导图..."
+- 学生问"出一道练习题"，Tutor 自动调用 quiz_agent
+- 学生问复杂问题，Tutor 链式调用 retrieve_knowledge → quiz_agent → explanation_skill
+- 过程中底部进度条类似 GPT/Gemini 对话框的转圈动画
 
-**优先级**：🔴 P0（核心链路第三步）
+**优先级**：🔴 P0（核心链路，竞赛演示核心）
 
 ---
 
@@ -225,7 +221,7 @@
 
 **目标**：资源生成不只是返回 Markdown，不同类型要有差异化展示
 
-**现状**：资源列表有类型区分，详情页无差异化渲染
+**现状**：✅ 差异化渲染组件已完整实现，`ResourceRenderer` 支持 8 类资源
 
 **新增组件**：
 - `frontend/src/app/components/resource/ResourceRenderer.tsx`
@@ -268,10 +264,10 @@
 
 **目标**：学习路径从静态路线升级为可视化图谱 + 动态调整
 
-**现状**：`planning_agent.py` 有路径规划逻辑，但无前端图谱展示
+**现状**：`LearningPathGraph.tsx` 存在于学习分析页面，但 Tutor 答疑页面无路径图谱集成
 
-**新增组件**：
-- `frontend/src/app/components/learning/LearningPathGraph.tsx`
+**已有组件**：
+- `frontend/src/app/components/learning/LearningPathGraph.tsx` — 用于学习分析页
 
 **图谱节点颜色规则**：
 - 🟢 绿色：`mastery >= 0.75`（已掌握）
@@ -288,13 +284,14 @@
 6. 排出学习顺序
 
 **前端**：
-- `/student/learning-path`：图谱 + 今日学习顺序 + 推荐资源
+- `/analytics`：图谱 + 今日学习顺序 + 推荐资源（已实现）
 
 **功能清单**：
-- [x] 知识图谱可视化
+- [x] 知识图谱可视化（学习分析页）
 - [x] 节点颜色反映掌握度
 - [x] 点击薄弱点能看到推荐资源
 - [x] 反馈后刷新，节点颜色能变化
+- [ ] **Tutor 答疑页面集成路径图谱**（待实现）
 
 **验收标准**：
 - 学生端能看到知识点依赖图
@@ -305,52 +302,86 @@
 
 ---
 
-### 3.6 模块六：学习辅导 Copilot Tutor Chat
+### 3.6 模块六：Tutor 前端体验（GPT/Gemini 风格进度展示）
 
-**目标**：Tutor 从借资源生成接口答疑，升级为独立学习辅导智能体
+**目标**：学生在提问时能看到类似 GPT/Gemini 对话框底部的动态进度动画
 
-**现状**：`StudentTutor.tsx` 调用 `agentsApi.generate()`，不是真正答疑
+**现状**：已有 ExecutionTrace 展示执行轨迹，但缺少 GPT/Gemini 风格的底部思考动画
 
-**新增后端模块**：
-- [x] `backend/app/services/tutor_service.py` - Tutor Service 实现 chat/feedback/sessions
-- [x] `backend/app/routers/tutor.py` - Tutor Router 实现 REST API
-- [x] `database/15_create_tutor_sessions.sql` - 答疑会话表
-
-**接口**：
-- `POST /api/tutor/chat` - 答疑
-- `POST /api/tutor/feedback` - 反馈
-- `GET /api/tutor/sessions` - 会话历史
-
-**回答结构**：
-```json
-{
-  "answer": "Markdown 正文",
-  "explanation_level": "basic",
-  "citations": [{"chunk_id": "", "content": "", "source": ""}],
-  "diagram": {},
-  "practice_questions": [],
-  "recommended_resources": [],
-  "profile_updates": []
-}
+**GPT/Gemini 风格动画设计**：
 ```
+┌─────────────────────────────────────────────┐
+│  正在思考...                                │
+│  ○ retrieve_knowledge                       │
+│  ◉ 正在生成思维导图...                      │
+│  ○ quiz_agent                              │
+└─────────────────────────────────────────────┘
+```
+- **动画**：底部固定区域，显示当前正在执行的工具名称 + 转圈动画
+- **工具图标**：每个工具显示小图标（🔍检索 🧠思维导图 📝练习题 💻代码）
+- **完成状态**：工具完成后打勾，切换到下一个
+- **流式文本**：模型输出的文字实时显示在气泡中
 
-**多模态卡片**（先不做真视频）：
-- 图解说明：返回结构化步骤图
-- 代码实操：返回代码块
-- 练习题：返回题目 JSON
+**已有基础**：
+- `StudentTutor.tsx` 中的 `ExecutionTrace` 组件（工具调用轨迹）
+- SSE `tool.started` / `tool.completed` 事件流
+- `activeEvents` 状态管理
 
-**功能清单**：
-- [x] 独立 Tutor Chat 接口 (`tutorApi.chat()`)
-- [x] 结合画像和课程知识库回答
-- [x] 回答带引用来源 (CitationsCard)
-- [x] "没理解"降低解释难度，推荐基础资源 (handleFeedback)
-- [x] 回答中出现图解/练习/代码之一 (PracticeCard, ResourcesCard)
+**待实现**：
+- [ ] 底部固定思考动画条（类似 GPT 的"正在思考..."）
+- [ ] 实时流式文字渲染（Markdown 逐字显示）
+- [ ] 工具图标 + 状态动画
+- [ ] "需求满足"时动画收起，显示最终回答
 
 **验收标准**：
-- 学生问"可重复读和串行化区别"，回答带课程知识库引用
-- 点"没理解"，系统降低解释难度，推荐基础资源
+- 学生提问后，底部立即显示"正在思考..."
+- 调用工具时，底部显示"正在检索知识库..." → "正在生成思维导图..." → ...
+- 工具完成后显示 ✓，切换下一个
+- 全部完成后，动画收起，回答以气泡形式显示
 
-**优先级**：🟡 P1（加分项）
+**优先级**：🔴 P0（核心演示体验）
+
+---
+
+### 3.7 模块七：（已废弃：教师端 LangGraph 流水线）
+
+> ⚠️ `workflow.py`（LangGraph 多智能体流水线）和 `AgentWorkbench.tsx`（教师端工作台）已从赛题实现中移除。
+> 赛题要求的多智能体协作是**学生端** Tutor Supervisor 的动态工具调用，不是教师端的固定流水线。
+
+**已有功能去向**：
+- `resource_generation_agent.py` → 由 Tutor Supervisor 在答疑时按需调用，非独立流水线
+- `AgentWorkbench.tsx` → 页面保留但非核心演示路径
+- `workflow.py` → 代码保留，不再被主动使用
+
+---
+
+### 3.8 模块八：反馈驱动推荐重排
+- 代码实操 → ContentBlockRenderer (CodeCaseBlock)
+- 练习题 → ContentBlockRenderer (QuizBlock)
+- 图片生成 → image_agent（**Stub**，待实现）
+- 语音合成 → tts_tool（**Stub**，待实现）
+- PPT大纲 → ppt_agent（**Stub**，待实现）
+
+**功能清单**：
+- [x] 独立 Tutor Chat SSE 流式接口 (`tutorApi.chat()`)
+- [x] Supervisor 多工具 Agent 编排 (`tutor_supervisor.py`)
+- [x] 执行轨迹展示（ExecutionTrace）
+- [x] 内容块卡片渲染（ContentBlockRenderer）
+- [x] 回答带引用来源 (CitationsCard)
+- [x] "没理解"降低解释难度，推荐基础资源 (handleFeedback)
+- [x] 学习路径图谱（LearningPathGraph，在学习分析页，Tutor页未集成）
+- [ ] **knowledge_context 注入 LLM**（缺口A）
+- [ ] **image_agent 真实实现**（缺口B）
+- [ ] **tts_tool 真实实现**（缺口B）
+- [ ] **ppt_agent 真实实现**（缺口B）
+- [ ] **嵌入语法兜底**（缺口C）
+
+**验收标准**：
+- 学生问"可重复读和串行化区别"，回答带课程知识库引用（**knowledge_context 注入后生效**）
+- 点"没理解"，系统降低解释难度，推荐基础资源
+- 能生成真实图片/音频/PPT（**Stub 替换后生效**）
+
+**优先级**：🔴 P0（核心链路，关乎竞赛演示质量）
 
 ---
 
@@ -358,7 +389,7 @@
 
 **目标**：评估反馈后动态调整学习资源推送策略和学习计划
 
-**现状**：✅ 后端已完成闭环
+**现状**：⚠️ 部分完成。后端反馈逻辑存在，但"评估→调整→学生感知→再次评估"完整闭环未实现
 
 **后端改造**：
 - ✅ 改 `feedbacks.py` 返回：`updated_profile` + `mastery_changes` + `next_resources` + `path_adjustment`
@@ -420,33 +451,35 @@
 
 ## 四、赛题要求覆盖状态
 
-### 4.1 必做要求完成度：16/16 (100%) ✅
+### 4.1 必做要求完成度：约 10/16 ⚠️
 
-| # | 赛题要求 | 状态 | 实现文件 | 备注 |
-|---|---------|------|---------|------|
+> 修订时间：2026-07-14。文档原声称 16/16 (100%) 与实际不符，以下为真实状态。
+
+| # | 赛题要求 | 状态 | 实现文件 | 缺口说明 |
+|---|---------|------|---------|---------|
 | 1 | 面向高等教育学习场景 | ✅ 已完成 | `database/` | 3门课程 |
-| 2 | 以具体高校课程为切入点 | ✅ 已完成 | `database/` | 数据库原理等 |
+| 2 | 以具体高校课程为切入点 | ✅ 已完成 | `database/` | 数据库系统原理为主场景 |
 | 3 | 学生画像不少于6个维度 | ✅ 已完成 | `student_profiles`表 | 10个维度 |
-| 4 | 对话式学习画像自主构建 | ✅ 已完成 | `StudentProfile.tsx` + `profiles.ts` | 模块二 |
-| 5 | 画像随学随新、动态更新 | ✅ 已完成 | `feedbacks.py` | UPSERT |
-| 6 | 开发智能学习多智能体系统 | ✅ 已完成 | `workflow.py` | 5智能体 |
-| 7 | 多智能体协同生成资源 | ✅ 已完成 | `workflow.py` | D→P→G→A→TR |
-| 8 | 至少生成5种类型资源 | ✅ 已完成 | `resource_generation_agent.py` | 6种 |
-| 9 | 个性化学习路径规划 | ⚠️ 部分 | `planning_agent.py` | 无图谱 |
-| 10 | 学习资源精准推送 | ⚠️ 部分 | `learning_service.py` | 未闭环 |
-| 11 | 流式输出或进度追踪 | ✅ 已完成 | `workflow.py` | SSE |
-| 12 | Markdown渲染 | ✅ 已完成 | `marked` | AgentWorkbench |
-| 13 | 多模态内容卡片化展示 | ⚠️ 部分 | `ResourceLibrary.tsx` | 无详情渲染 |
-| 14 | 防幻觉与内容安全过滤 | ✅ 已完成 | `rag/retriever.py` + `resource_generation_agent.py` | BM25+evidence校验 |
-| 15 | 生成资源时绑定知识库依据 | ✅ 已完成 | `evidence_repo.py` + `kp_chunk_links` 表 | 证据优先链路 |
-| 16 | 至少一门完整课程知识库 | ⚠️ 需实际上传验证 | `knowledge_service.py` | 需端到端测试 |
+| 4 | 对话式学习画像自主构建 | ✅ 已完成 | `StudentProfile.tsx` + `profiles.ts` | 对话流+确认卡 |
+| 5 | 画像随学随新、动态更新 | ✅ 已完成 | `feedbacks.py` | UPSERT 写入 |
+| 6 | 开发智能学习多智能体系统 | ✅ 已完成 | `tutor_supervisor.py` | Tool Calling 循环 + 工具注册表 |
+| 7 | 多智能体协同生成资源 | ✅ 已完成 | `tutor_supervisor.py` | 学生提问时动态协调多工具协作 |
+| 8 | 至少生成5种类型资源 | ✅ 已完成 | `resource_generation_agent.py` | 6种资源类型 |
+| 9 | 个性化学习路径规划 | ⚠️ 部分 | `planning_agent.py` | Agent存在，但Tutor页面无图谱可视化 |
+| 10 | 学习资源精准推送 | ⚠️ 部分 | `learning_service.py` | 推荐逻辑存在，闭环不完整 |
+| 11 | 流式输出或进度追踪 | ✅ 已完成 | `workflow.py` + `tutor_supervisor.py` | SSE 完整事件流 |
+| 12 | Markdown渲染 | ✅ 已完成 | `marked` + `ReactMarkdown` | AgentWorkbench + StudentTutor |
+| 13 | 多模态内容卡片化展示 | ⚠️ 部分 | `ContentBlockRenderer.tsx` | 渲染器已实现，但内嵌嵌入依赖LLM遵守指令，稳定性有限 |
+| 14 | 防幻觉与内容安全过滤 | ⚠️ 部分 | `rag/retriever.py` + `resource_generation_agent.py` | evidence链路代码存在，未端到端验证 |
+| 15 | 生成资源时绑定知识库依据 | ⚠️ 部分 | `evidence_repo.py` + `kp_chunk_links` 表 | **关键缺口**：`knowledge_context`从未注入LLM messages |
+| 16 | 至少一门完整课程知识库 | ⚠️ 部分 | `rag/document_loader.py` | 内置COURSE_MATERIALS（非用户上传），BM25可用 |
 
-### 4.2 加分要求完成度：2/2 (100%)
+### 4.2 加分要求完成度：0/2 🔴
 
-| # | 加分要求 | 状态 | 实现文件 | 备注 |
-|---|---------|------|---------|------|
-| 17 | 智能辅导（多模态答疑） | 🔴 **待完成** | — | 模块六 |
-| 18 | 学习效果评估→推送策略动态调整 | ✅ 已完成 | `assessment_agent.py` + `LearningFeedback.tsx` + `learning.ts` | 闭环完成 |
+| # | 加分要求 | 状态 | 实现文件 | 缺口说明 |
+|---|---------|------|---------|---------|
+| 17 | 智能辅导（多模态答疑） | ⚠️ 框架完成，质量不足 | `tutor_supervisor.py` + `ContentBlockRenderer.tsx` | 答疑框架已建立，但image_agent/tts_tool是Stub；`knowledge_context`未注入LLM；内嵌嵌入依赖LLM遵守指令 |
+| 18 | 学习效果评估→推送策略动态调整 | ⚠️ 部分完成 | `assessment_agent.py` + `LearningFeedback.tsx` | 评估逻辑存在，但"评估→调整→学生感知→再次评估"完整闭环未实现 |
 
 ### 4.3 文档要求完成度：3/3 (100%)
 
@@ -504,30 +537,32 @@
 
 ---
 
-## 七、推荐开发顺序
+## 七、推荐开发顺序（修订版 2026-07-14）
 
-### 第一优先级（核心链路，必须先跑通）
+> ⚠️ **重大变更**：删除了教师端 LangGraph 流水线（workflow.py），多智能体协作全部聚焦学生端 Tutor Supervisor。
 
-| 顺序 | 模块 | 理由 |
-|------|------|------|
-| 1 | 模块一：课程知识库 | 所有后续功能依赖此模块 |
-| 2 | 模块二：对话式画像构建 | 画像是智能体决策依据 |
-| 3 | 模块三：修AgentWorkbench | 让智能体真正协作 |
-
-### 第二优先级（链路跑通后加体验）
+### 第一优先级（核心链路 P0）
 
 | 顺序 | 模块 | 理由 |
 |------|------|------|
-| 4 | 模块四：资源类型渲染器 | 不同资源不同展示 |
-| 5 | 模块五：学习路径图谱 | 可视化路径调整 |
-| 6 | 模块六：Tutor Chat | 接通画像和知识库的Copilot |
+| 1 | 模块六：Tutor 前端进度动画 | **最高优先**。GPT/Gemini风格底部思考动画是核心演示亮点 |
+| 2 | 模块三：Tutor Supervisor 关键缺口修复 | knowledge_context注入LLM、Stub工具替换、嵌入语法兜底 |
+| 3 | 模块一：课程知识库端到端验证 | knowledge_context 注入LLM后，检索结果才能真正被模型用到 |
 
-### 第三优先级（最后完善）
+### 第二优先级（链路质量提升 P1）
 
 | 顺序 | 模块 | 理由 |
 |------|------|------|
-| 7 | 模块七：反馈驱动推荐重排 | 画像更新后的真实效果 |
-| 8 | 模块八：管理端指标真实化 | 平台运营能力 |
+| 4 | 模块四：资源类型渲染器 | 不同资源已有差异化渲染，完善细节 |
+| 5 | 模块五：学习路径图谱接入 Tutor | planning_agent 已有，Tutor页面集成图谱 |
+| 6 | 模块二：对话式画像构建 | 对话流已完成，完善细节 |
+
+### 第三优先级（加分项 P2）
+
+| 顺序 | 模块 | 理由 |
+|------|------|------|
+| 7 | 模块八：反馈驱动推荐重排完整闭环 | 评估→调整→学生感知链路 |
+| 8 | 管理端指标真实化 | 已有真实化实现 |
 
 ---
 
@@ -535,9 +570,14 @@
 
 | 日期 | 更新内容 | 负责人 |
 |------|---------|--------|
+<<<<<<< HEAD
 | 2026-07-15 | 根据 submission/docs 中的完整版 Markdown 重建系统开发说明书、测试说明书和 AI Coding 工具使用说明 Word 文档，修复 Markdown 未解析、表格与代码块混排问题，并完成结构化校验 | Codex |
 | 2026-07-14 | 完成软件杯最终交付文档整理：整理赛题要求、更新提交材料清单文档、生成3个标准Word文档（系统开发说明书/测试说明书/AI_Coding工具使用说明）、修复Word表格列宽问题（computeWidths按内容自适应）、修复PPTX生成问题（图标异步+多pres问题）、预渲染图标320张解决空文件问题、整理submission文件夹结构、清理重复文件、重命名PPT为中文名 | Claude |
 | 2026-07-13 | 新增软件杯提交材料：提交材料总览、系统开发说明书初稿、测试说明书初稿、AI Coding工具说明初稿、PPT大纲（含截图安排）、7分钟演示视频详细分镜脚本 | Claude |
+=======
+| 2026-07-14 | **架构重大修正 + 文档全面更新**：(1) 删除教师端 LangGraph 流水线（workflow.py）从赛题核心，多智能体协作是学生端 Tutor Supervisor 的动态能力；(2) 必做要求 #6/#7 重新归属到 tutor_supervisor.py；(3) 模块三改为 Tutor Supervisor 动态编排；(4) 新增模块六：Tutor 前端进度动画（GPT/Gemini风格）；(5) 模块七废弃教师端流水线；(5) 全面修正各项完成度状态；(6) 新增缺口清单及优先级；(7) 开发顺序调整为 P0=Tutor前端动画，P1=Supervisor缺口修复，P2=其他 | Claude |
+| 2026-07-08 | **证据优先生成链路（模块一收尾）**：新建 `kp_chunk_links`+`resource_evidence_links` 表 + 扩展 chunks/materials 字段；新建 `evidence_repo.py`（BM25匹配+CRUD）；改造 `knowledge_service.py` 解析后自动 BM25 匹配知识点写入 `kp_chunk_links`；改造 `resource_generation_agent.py` 新增 `_retrieve_evidence()`/`_verify_citations()`/`_format_evidence_context()`，prompt 注入教材原文，输出 trustworthiness + evidence_links；改造 `workflow.py` 串联 `course_id` 传递 + evidence_links 写入；改造 `agent_service.py` 保存资源时写入 `learning_resources` 表 + evidence_links；新增 `/knowledge/kp-chunk-links/pending` 等 4 个后端 API；TeacherKnowledgeBase.tsx 新增绑定管理面板；AgentWorkbench.tsx 展示可信度 + 引用来源 + 草稿警告 | Claude |
+>>>>>>> 0f66c6f54e4d67826a29b4a91a7fde4b089dc2c8
 | 2026-07-08 | 完成模块八：管理端指标真实化 - statistics_repo.py 新增 get_platform_stats/get_cost_by_model/get_rag_hit_rate/get_resource_stats 方法、statistics_service.py 新增对应 service 方法、statistics.py 新增 3 个 API 路由、前端 AdminDashboard/AdminCosts 使用真实 API | Claude |
 | 2026-07-08 | 完成模块七：反馈驱动推荐重排 - feedbacks.py 扩展返回值、LearningService.recommend_resources()、LearningRepository.get_recommended_resources()、学习路径调整逻辑 | Claude |
 | 2026-07-08 | 完成模块七前端：LearningFeedback.tsx 提交后展示"画像已更新"+推荐策略变化卡片、StudentDashboard.tsx 新增今日推荐资源区块、learning.ts 新增 getRecommendedResources 方法 | Claude |
@@ -571,40 +611,42 @@
 3. 在"版本历史"部分添加更新记录
 
 ### 开发原则
-1. **先跑通核心链路**：先做模块一+二+三，确保数据流打通
+1. **P0 优先修复缺口**：先修复 Tutor Chat 的 knowledge_context 注入和 Stub 工具问题，确保核心演示链路质量
 2. **复用现有代码**：优先在现有 Repository/Service 上扩展，不另起架构
 3. **不破坏现有功能**：修改前验证不影响现有流程
 4. **保持文档同步**：代码变更后同步更新本文档
 
 ### 赛题要求优先级
-1. **必做要求（16项）**：优先确保全部完成，尤其是模块一、二
-2. **加分要求（2项）**：在时间允许的情况下完善（模块六、七）
-3. **文档要求（3项）**：确保全部完成
+1. **P0（必做缺口修复）**：knowledge_context 注入LLM、image/tts/ppt Stub 替换
+2. **P1（必做要求完善）**：学习路径图谱接入Tutor、推送闭环
+3. **P2（加分项）**：完整多模态答疑、学习效果动态调整
 
 ### 演示主线建议
 成熟版演示应该讲一个完整故事：
 ```
 教师上传课程资料 → 知识库建立
-↓ 
-学生通过对话构建画像 
 ↓
-系统识别学生薄弱点 
+学生通过对话构建画像
 ↓
-教师在智能体工作台为该学生生成个性化资源 
+系统识别学生薄弱点
 ↓
-多智能体执行：诊断、检索、规划、生成、审核 
+教师在智能体工作台为该学生生成个性化资源
 ↓
-资源生成后绑定证据来源 
+多智能体执行：诊断、检索、规划、生成、审核
 ↓
-教师审核通过 
+资源生成后绑定证据来源
 ↓
-学生收到个性化路径和资源 
+教师审核通过
 ↓
-学生向Tutor提问 
+学生收到个性化路径和资源
 ↓
-学生做反馈或测验 
+学生向Tutor提问
+↓  ← 当前缺口：knowledge_context未注入LLM；图片/语音工具是Stub
+学生做反馈或测验
 ↓
-系统更新画像并调整学习路径 
+系统更新画像并调整学习路径
 ↓
 管理端看到调用审计、成本和质量数据
 ```
+
+> ⚠️ Tutor 答疑环节存在关键缺口，演示前需优先修复（详见 `docs/A3当前实现状态与缺口清单.md` 第七节）

@@ -18,6 +18,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 from app.llm.gateway import LLMGateway, LLMConfig, llm_gateway as _default_llm
 from app.config import get_settings
 
+settings = get_settings()
 logger = logging.getLogger(__name__)
 
 # =============================================================================
@@ -128,6 +129,8 @@ class TutorSupervisor:
         # 构建消息历史
         messages = [
             {"role": "system", "content": system_prompt},
+            # 知识库上下文作为独立 system 消息注入，确保不被截断
+            {"role": "system", "content": f"## 知识库上下文\n{knowledge_context}"},
             {"role": "user", "content": question},
         ]
 
@@ -150,6 +153,9 @@ class TutorSupervisor:
             if not tool_calls:
                 # 无工具调用，回答完毕
                 final_answer = assistant_message.get("content", "")
+                # 当有内容块时，确保嵌入语法出现在回答中
+                if content_blocks:
+                    final_answer = _inject_embed_syntax(final_answer, content_blocks)
                 logger.info(f"[Supervisor] step={step} final_answer length={len(final_answer)}")
                 break
 
@@ -214,13 +220,15 @@ class TutorSupervisor:
                     "role": "tool",
                     "tool_call_id": tc.get("id", ""),
                     "name": tool_id,
-                    "content": json.dumps(result, ensure_ascii=False),
+                    "content": _summarize_result(result),
                 })
 
                 logger.info(f"[Supervisor] step={step} tool={tool_id} duration={duration_ms}ms success={success}")
         else:
             # 达到最大步数
             final_answer = "（处理超时，已达到最大执行步骤）"
+            if content_blocks:
+                final_answer = _build_embed_answer(content_blocks)
             execution_trace.append({"event": "max_steps_reached"})
 
         return SupervisorResult(
@@ -255,6 +263,8 @@ class TutorSupervisor:
 
         messages = [
             {"role": "system", "content": system_prompt},
+            # 知识库上下文作为独立 system 消息注入，确保不被截断
+            {"role": "system", "content": f"## 知识库上下文\n{knowledge_context}"},
             {"role": "user", "content": question},
         ]
 
@@ -270,6 +280,9 @@ class TutorSupervisor:
 
             if not tool_calls:
                 final_answer = assistant_message.get("content", "")
+                # 当有内容块时，确保嵌入语法出现在回答中
+                if content_blocks:
+                    final_answer = _inject_embed_syntax(final_answer, content_blocks)
                 yield self._sse_event("supervisor.final", {
                     "content": final_answer,
                     "content_blocks": content_blocks,
@@ -338,15 +351,17 @@ class TutorSupervisor:
                     "role": "tool",
                     "tool_call_id": tc.get("id", ""),
                     "name": tool_id,
-                    "content": json.dumps(result, ensure_ascii=False),
+                    "content": _summarize_result(result),
                 })
         else:
             final_answer = "（处理超时，已达到最大执行步骤）"
-            yield self._sse_event("supervisor.max_steps", {"content": final_answer})
+            if content_blocks:
+                final_answer = _build_embed_answer(content_blocks)
+            yield self._sse_event("supervisor.max_steps", {"content": final_answer, "content_blocks": content_blocks})
             return
 
         yield self._sse_event("supervisor.final", {
-            "content": final_answer,
+            "content": final_answer or (content_blocks and _build_embed_answer(content_blocks)) or "",
             "content_blocks": content_blocks,
             "citations": citations,
         })
@@ -372,8 +387,6 @@ class TutorSupervisor:
             student_name = "同学"
             current_level = "未知"
 
-        ctx = knowledge_context or "（暂无相关知识库内容）"
-
         return f"""你是一个专业的 AI 学习辅导老师。你的职责是根据学生的问题，自主判断是否需要调用工具来生成更丰富的内容。
 
 ## 学生画像
@@ -381,9 +394,6 @@ class TutorSupervisor:
 - 当前水平：{current_level}
 - 薄弱知识点：{weak_str}
 - 资源偏好：{resource_prefs}
-
-## 知识库上下文
-{ctx}
 
 ## 可用工具（请根据问题选择合适的工具）
 - retrieve_knowledge：检索课程教材和讲义（几乎所有问题都需要先用这个）
@@ -400,10 +410,25 @@ class TutorSupervisor:
 3. 整合工具返回结果，给出完整回答
 4. 重要：引用教材原文时使用 [引用:chunk_id] 格式
 
-## 回答要求
-- 用 Markdown 格式，清晰有条理
-- 结合学生水平和薄弱点个性化回答
-- 包含适当的代码示例或图示
+## 内容块嵌入语法（重要）
+当需要展示以下类型内容时，必须在回复正文中用嵌入语法引用内容块，
+这样内容会以精美卡片形式内嵌在回答中，而不是单独堆叠在下方：
+
+| 类型 | 嵌入语法 | 说明 |
+|------|----------|------|
+| 练习题 | :::quiz:block_id::: | 自适应练习题 |
+| 代码案例 | :::code_case:block_id::: | 可运行代码示例 |
+| 思维导图 | :::mindmap:block_id::: | 知识结构图 |
+| 学习规划 | :::lecture:block_id::: | 学习路径 |
+| PPT大纲 | :::ppt:block_id::: | 课件大纲 |
+| 视频脚本 | :::video_script:block_id::: | 视频文案 |
+
+使用示例：
+- 「下面是一道练习题：:::quiz:block_abc123:::」
+- 「代码示例：:::code_case:block_def456:::」
+- 「用思维导图梳理：:::mindmap:block_ghi789:::」
+
+直接用 Markdown 格式组织回答，被引用内容块会自动以内嵌卡片渲染。
 """
 
     def _call_llm_with_tools(
@@ -416,6 +441,9 @@ class TutorSupervisor:
             result = self._llm.generate(
                 messages=messages,
                 config=LLMConfig(
+                    model_id=0,
+                    model_name=settings.llm_model,
+                    provider=settings.llm_provider,
                     temperature=0.7,
                     max_tokens=2000,
                     tools=tools if tools else None,
@@ -423,11 +451,14 @@ class TutorSupervisor:
                 ),
             )
 
+            if hasattr(result, "tool_calls") and result.tool_calls:
+                # Provider 返回了 tool_calls（来自 OpenAI/讯飞等支持 function calling 的模型）
+                return {"message": {"content": result.content or "", "tool_calls": result.tool_calls}}
+
             if hasattr(result, "content"):
-                # 尝试解析 tool_calls
+                # 兜底：尝试解析 content 中的 tool_calls（某些 provider 可能放这里）
                 content = result.content
                 try:
-                    # 如果 content 是 JSON，解析 tool_calls
                     parsed = json.loads(content)
                     if isinstance(parsed, dict):
                         return {"message": parsed}
@@ -482,6 +513,70 @@ def _result_to_content_block(tool_id: str, result: Dict[str, Any]) -> Optional[D
         "quality_score": result.get("quality_score"),
         "trustworthiness": result.get("trustworthiness"),
     }
+
+
+def _inject_embed_syntax(final_answer: str, content_blocks: List[Dict[str, Any]]) -> str:
+    """
+    当 LLM 回答文本中没有内嵌语法时，自动追加引用标记。
+    检查 final_answer 是否已包含每个 block 的 :::type:block_id::: 引用，
+    如有遗漏则追加。
+    """
+    if not content_blocks:
+        return final_answer
+
+    # 检查已有引用
+    referenced_ids = set()
+    import re
+    for m in re.finditer(r":::(?:\w+):([\w_-]+):::", final_answer):
+        referenced_ids.add(m.group(1))
+
+    label_map = {
+        "quiz": "练习题",
+        "code_case": "代码案例",
+        "mindmap": "思维导图",
+        "lecture": "学习规划",
+        "ppt": "PPT",
+        "video_script": "视频脚本",
+        "error_analysis": "错因分析",
+        "learning_card": "知识卡片",
+        "image": "图片",
+    }
+
+    missing = [
+        f"{label_map.get(b.get('block_type', ''), b.get('title', '内容'))}：:::{b.get('block_type', '')}:{b.get('block_id', '')}:::"
+        for b in content_blocks
+        if b.get("block_id", "") not in referenced_ids
+    ]
+
+    if missing:
+        return final_answer + "\n\n" + " ".join(missing)
+    return final_answer
+
+
+def _build_embed_answer(content_blocks: List[Dict[str, Any]]) -> str:
+    """根据内容块列表生成带有嵌入语法的回答文本"""
+    if not content_blocks:
+        return ""
+
+    label_map = {
+        "quiz": "练习题",
+        "code_case": "代码案例",
+        "mindmap": "思维导图",
+        "lecture": "学习规划",
+        "ppt": "PPT",
+        "video_script": "视频脚本",
+        "error_analysis": "错因分析",
+        "learning_card": "知识卡片",
+    }
+
+    parts = []
+    for block in content_blocks:
+        block_type = block.get("block_type", "")
+        block_id = block.get("block_id", "")
+        label = label_map.get(block_type, block.get("title", "内容"))
+        parts.append(f"{label}：:::{block_type}:{block_id}:::")
+
+    return " ".join(parts)
 
 
 def _summarize_result(result: Any) -> str:
