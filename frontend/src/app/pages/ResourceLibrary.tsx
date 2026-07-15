@@ -42,18 +42,15 @@ export function ResourceLibrary() {
   const [courseFilter, setCourseFilter] = React.useState("");
   const [keyword, setKeyword] = React.useState("");
   const [selectedResource, setSelectedResource] = React.useState<(typeof resources)[0] | null>(null);
-  const [drawerResource, setDrawerResource] = React.useState<any>(null);
 
-  const { data: detailData, loading: detailLoading, execute: fetchDetail } = useApi(
-    (id: number) => id ? resourcesApi.getById(id) : Promise.resolve(null),
-    []
+  const { data: drawerResource, loading: detailLoading } = useApi(
+    () => selectedResource ? resourcesApi.getById(selectedResource.id) : Promise.resolve(null),
+    [selectedResource?.id]
   );
 
-  const handleResourceClick = async (resource: typeof resources[0]) => {
+  const handleResourceClick = (resource: typeof resources[0]) => {
     if (!resource?.id) return
     setSelectedResource(resource)
-    const detail = await fetchDetail(resource.id)
-    setDrawerResource(detail)
   }
 
   const { data, loading } = useApi(
