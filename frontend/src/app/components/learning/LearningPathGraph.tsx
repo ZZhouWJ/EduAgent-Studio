@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import * as echarts from 'echarts'
 
 export interface KpNode {
@@ -43,6 +43,7 @@ export function LearningPathGraph({ nodes, currentKpId, onNodeClick }: LearningP
       difficulty: node.difficulty_level,
       description: node.description,
       isCurrent: node.kp_id === currentKpId,
+      symbolSize: node.kp_id === currentKpId ? 65 : 50,
       itemStyle: {
         color: node.kp_id === currentKpId ? '#3b82f6' : masteryColor(node.mastery),
         borderColor: node.kp_id === currentKpId ? '#1d4ed8' : undefined,
@@ -83,15 +84,15 @@ export function LearningPathGraph({ nodes, currentKpId, onNodeClick }: LearningP
         type: 'graph',
         layout: 'force',
         symbol: 'circle',
-        symbolSize: (val: number, params: { data: { isCurrent?: boolean } }) =>
-          params.data.isCurrent ? 65 : 50,
         roam: true,
         draggable: true,
         label: {
           show: true,
           position: 'inside',
-          formatter: (params: { name: string }) =>
-            params.name.length > 5 ? params.name.slice(0, 4) + '…' : params.name,
+          formatter: (params: unknown) => {
+            const name = (params as { name?: string }).name ?? ''
+            return name.length > 5 ? name.slice(0, 4) + '…' : name
+          },
           fontSize: 11,
           fontWeight: 'bold',
           color: '#fff',
@@ -102,8 +103,8 @@ export function LearningPathGraph({ nodes, currentKpId, onNodeClick }: LearningP
           lineStyle: { width: 4, color: '#3b82f6' },
           itemStyle: { shadowBlur: 12, shadowColor: 'rgba(59,130,246,0.4)' },
         },
-        data: graphNodes as unknown as echarts.GraphNode[],
-        links: graphLinks as unknown as echarts.GraphLink[],
+        data: graphNodes,
+        links: graphLinks,
         categories: [
           { name: '已掌握', itemStyle: { color: '#22c55e' } },
           { name: '待巩固', itemStyle: { color: '#f97316' } },

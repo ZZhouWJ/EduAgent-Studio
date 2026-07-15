@@ -19,10 +19,15 @@ interface SafeLottieProps {
   fallback?: React.ReactNode;
 }
 
-function useRemoteLottie(url: string) {
+function useRemoteLottie(url: string | null) {
   const [data, setData] = useState<object | null>(null);
   const [error, setError] = useState(false);
   useEffect(() => {
+    if (!url) {
+      setData(null);
+      setError(false);
+      return;
+    }
     let cancelled = false;
     setData(null);
     setError(false);
@@ -56,6 +61,12 @@ export function SafeLottie({
   fallback,
 }: SafeLottieProps) {
   const ref = useRef<LottieRefCurrentProps | null>(null);
+  const remoteUrl = typeof source === "string" ? null : source.url;
+  const { data: remoteData, error: remoteError } = useRemoteLottie(remoteUrl);
+
+  useEffect(() => {
+    ref.current?.setSpeed(speed);
+  }, [speed]);
 
   // 内联模式
   if (typeof source === "string") {
@@ -72,17 +83,16 @@ export function SafeLottie({
   }
 
   // 远端模式
-  const { data, error } = useRemoteLottie(source.url);
-  if (error) {
+  if (remoteError) {
     return <div className={`${className} flex items-center justify-center`}>{fallback}</div>;
   }
-  if (!data) {
+  if (!remoteData) {
     return <div className={`${className} animate-pulse rounded-lg bg-slate-100`} />;
   }
   return (
     <Lottie
       lottieRef={ref}
-      animationData={data}
+      animationData={remoteData}
       loop={loop}
       autoplay={autoplay}
       className={className}

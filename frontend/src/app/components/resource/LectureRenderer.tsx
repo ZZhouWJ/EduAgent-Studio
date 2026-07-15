@@ -2,17 +2,23 @@ import { marked } from "marked"
 import DOMPurify from "dompurify"
 import type { LearningResource } from "@/lib/api/resources"
 
+interface EvidenceReference {
+  source: string
+  page: number
+  content: string
+}
+
 interface LectureRendererProps {
   resource: LearningResource & {
     metadata?: {
       quality_score?: number
       revision_count?: number
-      evidence_refs?: Array<{ source: string; page: number; content: string }>
+      evidence_refs?: EvidenceReference[]
     }
   }
 }
 
-function EvidenceSources({ sources }: { sources: LectureRendererProps['resource']['metadata']['evidence_refs'] }) {
+function EvidenceSources({ sources }: { sources?: EvidenceReference[] }) {
   if (!sources?.length) return null
   return (
     <div className="mt-4 p-4 bg-slate-50 rounded-xl">
@@ -47,6 +53,8 @@ function DifficultyBadge({ difficulty }: { difficulty?: string }) {
 }
 
 export function LectureRenderer({ resource }: LectureRendererProps) {
+  const renderedContent = marked.parse(resource.content ?? "", { async: false }) as string
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -65,7 +73,7 @@ export function LectureRenderer({ resource }: LectureRendererProps) {
 
       <div
         className="prose prose-sm prose-slate max-w-none"
-        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked(resource.content ?? "")) }}
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderedContent) }}
       />
 
       <EvidenceSources sources={resource.metadata?.evidence_refs} />

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import type { AnimationItem } from "lottie-web";
 
 /**
  * useLottieAnimation —— 懒加载 lottie-web 的轻量版
@@ -12,12 +13,10 @@ import { useEffect, useRef, useState, useCallback, type CSSProperties } from "re
 export function useLottieAnimation(opts: {
   src: string;
   loop?: boolean;
-  className?: string;
-  style?: CSSProperties;
 }) {
-  const { src, loop = true, className, style } = opts;
+  const { src, loop = true } = opts;
   const containerRef = useRef<HTMLDivElement>(null);
-  const animRef = useRef<ReturnType<typeof import("lottie-web/build/player/lottie_light").default> | null>(null);
+  const animRef = useRef<AnimationItem | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);

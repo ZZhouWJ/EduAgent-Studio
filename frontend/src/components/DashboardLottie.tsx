@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import { useLottieAnimation } from "@/hooks/useLottieAnimation";
 
 const ANIMATIONS: Record<string, string> = {

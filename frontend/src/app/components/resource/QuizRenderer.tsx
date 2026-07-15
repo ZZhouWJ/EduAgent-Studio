@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import { useState } from "react"
 import type { LearningResource } from "@/lib/api/resources"
 
 interface QuizRendererProps {

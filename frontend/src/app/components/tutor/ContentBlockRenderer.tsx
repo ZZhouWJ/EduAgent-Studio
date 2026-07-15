@@ -1,4 +1,3 @@
-import React from "react"
 import ReactMarkdown from "react-markdown"
 import type { ContentBlock } from "@/lib/api/tutor"
 import { MindmapRenderer } from "../resource/MindmapRenderer"
@@ -56,22 +55,22 @@ function MindmapBlock({ block }: { block: ContentBlock }) {
 }
 
 // 简单解析 Markdown 树形结构为 JSON
-function parseMarkdownTree(markdown: string): any {
+interface MindmapNode {
+  label: string
+  children: MindmapNode[]
+}
+
+function parseMarkdownTree(markdown: string): MindmapNode | null {
   const lines = markdown.split("\n").filter((l) => l.trim())
   if (lines.length === 0) return null
 
-  function parseLine(line: string, indent: number): any {
-    const text = line.replace(/^[\s#*-]+/, "").trim()
-    return { label: text, children: [] }
-  }
-
-  const root = { label: "根节点", children: [] }
+  const root: MindmapNode = { label: "根节点", children: [] }
   const stack = [{ node: root, indent: -1 }]
 
   for (const line of lines) {
     const indent = line.search(/\S/)
     const text = line.trim().replace(/^#+\s*/, "").replace(/^[-*]\s*/, "")
-    const node = { label: text, children: [] }
+    const node: MindmapNode = { label: text, children: [] }
 
     while (stack.length > 1 && stack[stack.length - 1].indent >= indent) {
       stack.pop()
@@ -85,10 +84,8 @@ function parseMarkdownTree(markdown: string): any {
 
 // 练习题类型的内容块
 function QuizBlock({ block }: { block: ContentBlock }) {
-  let quizData: any = null
-
   try {
-    quizData = JSON.parse(block.content)
+    JSON.parse(block.content)
   } catch {
     // 降级渲染为 Markdown
     return (
@@ -145,7 +142,7 @@ function GenericBlock({ block }: { block: ContentBlock }) {
   )
 }
 
-export function ContentBlockRenderer({ block, expanded = true, embedded = false }: ContentBlockRendererProps) {
+export function ContentBlockRenderer({ block, embedded = false }: ContentBlockRendererProps) {
   const blockClass = `content-block content-block-${block.block_type} ${embedded ? "embedded" : ""}`
 
   const content = (() => {
