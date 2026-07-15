@@ -1,4 +1,5 @@
 import React from "react";
+import { useSearchParams } from "react-router-dom";
 import { Database, FileUp, GitBranch, Layers3, AlertCircle, Upload, Loader2, RefreshCw, Search, CheckCircle2, XCircle, Link2, BookOpen } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { knowledgeApi, type Material, type SearchResult, type MaterialChunk } from "@/lib/api/knowledge";
@@ -7,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { PageHeader, PageShell, ProgressBar, SearchInput, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast, EmptyState } from "../components/common/ProductUI";
 
 export function TeacherKnowledgeBase() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = React.useState("");
   const [selectedMaterial, setSelectedMaterial] = React.useState<Material | null>(null);
   const [selectedChunks, setSelectedChunks] = React.useState<MaterialChunk[]>([]);
@@ -30,10 +32,15 @@ export function TeacherKnowledgeBase() {
       setSelectedCourseId(null);
       return;
     }
+    const requestedCourseId = Number(searchParams.get("course"));
+    if (requestedCourseId && courseList.some((course) => course.id === requestedCourseId)) {
+      setSelectedCourseId(requestedCourseId);
+      return;
+    }
     if (!courseList.some((course) => course.id === selectedCourseId)) {
       setSelectedCourseId(courseList[0].id);
     }
-  }, [courseList, selectedCourseId]);
+  }, [courseList, searchParams, selectedCourseId]);
 
   React.useEffect(() => {
     mountedRef.current = true;
@@ -181,7 +188,11 @@ export function TeacherKnowledgeBase() {
     setSelectedMaterial(null);
     setSelectedChunks([]);
     setSearchResults([]);
-    setSelectedCourseId(Number(value));
+    const courseId = Number(value);
+    setSelectedCourseId(courseId);
+    const next = new URLSearchParams(searchParams);
+    next.set("course", String(courseId));
+    setSearchParams(next, { replace: true });
   };
 
   // 确认/拒绝知识点-Chunk绑定
