@@ -434,10 +434,8 @@ def get_output_parent_chain(output_id: int) -> List[Dict[str, Any]]:
     """
     查询指定 output_id 的父版本链（从最早父版本到当前版本）。
 
-    使用 WITH RECURSIVE，从目标 output_id 开始，递归向上找 parent_output_id。
-    结果按 depth 升序排列（0=当前版本，越大=越早的父版本）。
-
-    最终 service 层反转顺序返回：最早版本 -> ... -> 当前版本。
+    逐级查询 parent_output_id，兼容 MySQL 5.7 和 8.x。
+    返回顺序为：最早版本 -> ... -> 当前版本。
 
     Args:
         output_id: 目标输出 ID
@@ -446,56 +444,41 @@ def get_output_parent_chain(output_id: int) -> List[Dict[str, Any]]:
         父版本链列表（含 output_id, parent_output_id, version_no, ...）
     """
     timeline_sql = """
-        WITH RECURSIVE parent_chain AS (
-            -- 锚点：当前 output
-            SELECT
-                o.output_id,
-                o.parent_output_id,
-                o.task_id,
-                o.version_no,
-                o.output_title,
-                o.source_type,
-                o.created_by,
-                o.created_at,
-                0 AS depth
-            FROM task_outputs o
-            WHERE o.output_id = %s AND o.is_deleted = 0
-
-            UNION ALL
-
-            -- 递归：找父版本
-            SELECT
-                p.output_id,
-                p.parent_output_id,
-                p.task_id,
-                p.version_no,
-                p.output_title,
-                p.source_type,
-                p.created_by,
-                p.created_at,
-                pc.depth + 1 AS depth
-            FROM task_outputs p
-            INNER JOIN parent_chain pc ON p.output_id = pc.parent_output_id
-            WHERE p.is_deleted = 0
-        )
         SELECT
-            pc.output_id,
-            pc.parent_output_id,
-            pc.version_no,
-            pc.output_title,
-            pc.source_type,
-            pc.created_by,
-            pc.created_at,
-            pc.depth,
+            o.output_id,
+            o.parent_output_id,
+            o.version_no,
+            o.output_title,
+            o.source_type,
+            o.created_by,
+            o.created_at,
             u.username AS creator_username,
             u.real_name AS creator_real_name
-        FROM parent_chain pc
-        LEFT JOIN users u ON pc.created_by = u.user_id AND u.is_deleted = 0
-        ORDER BY pc.depth DESC
+        FROM task_outputs o
+        LEFT JOIN users u ON o.created_by = u.user_id AND u.is_deleted = 0
+        WHERE o.output_id = %s AND o.is_deleted = 0
     """
     with get_db_cursor() as cursor:
-        cursor.execute(timeline_sql, (output_id,))
-        return cursor.fetchall()
+        chain: List[Dict[str, Any]] = []
+        visited: set[int] = set()
+        current_id: Optional[int] = output_id
+
+        while current_id is not None and len(chain) < 100:
+            if current_id in visited:
+                break
+            visited.add(current_id)
+
+            cursor.execute(timeline_sql, (current_id,))
+            row = cursor.fetchone()
+            if row is None:
+                break
+
+            item = dict(row)
+            item["depth"] = len(chain)
+            chain.append(item)
+            current_id = item.get("parent_output_id")
+
+        return list(reversed(chain))
 
 
 # =============================================================================
