@@ -72,6 +72,21 @@ class PlatformStatisticsTests(unittest.TestCase):
         self.assertEqual(result[0]["model"], "Mock Writer")
         self.assertNotIn("cr.is_deleted", cursor.queries[0][0])
 
+    def test_rag_hit_rate_uses_resource_evidence_links(self):
+        cursor = FakeCursor([{"cnt": 20}, {"cnt": 5}])
+
+        @contextmanager
+        def fake_cursor():
+            yield cursor
+
+        with patch.object(statistics_repo, "get_db_cursor", fake_cursor):
+            result = statistics_repo.get_rag_hit_rate()
+
+        self.assertEqual(result["referenced_chunks"], 5)
+        self.assertEqual(result["hit_rate"], 0.25)
+        self.assertIn("resource_evidence_links", cursor.queries[1][0])
+        self.assertIn("DISTINCT chunk_id", cursor.queries[1][0])
+
 
 if __name__ == "__main__":
     unittest.main()

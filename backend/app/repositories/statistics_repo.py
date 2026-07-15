@@ -881,9 +881,14 @@ def get_rag_hit_rate() -> Dict[str, Any]:
         )
         total_chunks = cursor.fetchone()["cnt"]
 
-        # 有被引用的chunk数 - 需要 evidence_refs 表
-        # 简化处理：暂时返回 0
-        referenced_chunks = 0
+        cursor.execute(
+            """
+            SELECT COUNT(DISTINCT chunk_id) AS cnt
+            FROM resource_evidence_links
+            WHERE verified_status <> 'rejected'
+            """
+        )
+        referenced_chunks = cursor.fetchone()["cnt"] or 0
 
     total = total_chunks or 0
     return {
