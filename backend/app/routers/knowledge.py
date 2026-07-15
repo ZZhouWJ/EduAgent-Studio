@@ -4,9 +4,10 @@
 提供资料上传、解析、检索、列表、详情等接口。
 """
 
-from typing import Optional
+from typing import Literal, Optional
 
-from fastapi import APIRouter, Body, Depends, File, Form, Path, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Path, Query, UploadFile
+from pydantic import BaseModel
 
 from app.services import knowledge_service
 from app.services.course_access_service import CourseAccessService
@@ -14,6 +15,14 @@ from app.utils.dependencies import get_current_user_dep, require_role
 from app.utils.exceptions import ForbiddenException
 
 router = APIRouter(prefix="/knowledge", tags=["课程知识库"])
+
+
+class KpLinkVerifyRequest(BaseModel):
+    status: Literal["confirmed", "rejected"]
+
+
+class ResourceEvidenceVerifyRequest(BaseModel):
+    status: Literal["verified", "rejected"]
 
 
 @router.post("/materials")
@@ -169,7 +178,7 @@ async def get_pending_kp_chunk_links(
 @router.put("/kp-chunk-links/{link_id}/verify")
 async def verify_kp_chunk_link(
     link_id: int = Path(..., gt=0, description="关联记录 ID"),
-    status: str = Body(..., description="confirmed 或 rejected"),
+    payload: KpLinkVerifyRequest = ...,
     user: dict = Depends(require_role("teacher", "admin")),
 ):
     """
@@ -179,8 +188,7 @@ async def verify_kp_chunk_link(
     status = 'rejected'：该匹配不通过，忽略
     """
     CourseAccessService().require_kp_link_access(link_id, user)
-    if status not in ("confirmed", "rejected"):
-        return {"code": 400, "message": "status 必须是 confirmed 或 rejected", "data": None}
+    status = payload.status
     try:
         from app.repositories.evidence_repo import EvidenceRepository
         repo = EvidenceRepository()
@@ -215,7 +223,7 @@ async def get_resource_evidence(
 @router.put("/resource-evidence/{link_id}/verify")
 async def verify_resource_evidence(
     link_id: int = Path(..., gt=0, description="证据关联 ID"),
-    status: str = Body(..., description="verified 或 rejected"),
+    payload: ResourceEvidenceVerifyRequest = ...,
     user: dict = Depends(require_role("teacher", "admin")),
 ):
     """
@@ -224,8 +232,7 @@ async def verify_resource_evidence(
     教师审核时使用：确认后证据链完整，可发布给学生。
     """
     CourseAccessService().require_evidence_link_access(link_id, user)
-    if status not in ("verified", "rejected"):
-        return {"code": 400, "message": "status 必须是 verified 或 rejected", "data": None}
+    status = payload.status
     try:
         from app.repositories.evidence_repo import EvidenceRepository
         repo = EvidenceRepository()
