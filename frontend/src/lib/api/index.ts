@@ -1,4 +1,9 @@
-import axios, { type AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
+import axios, {
+  type AxiosError,
+  type AxiosInstance,
+  type AxiosRequestConfig,
+  type InternalAxiosRequestConfig,
+} from 'axios'
 
 const TOKEN_KEY = 'eduagent_token'
 
@@ -31,10 +36,25 @@ export class ApiError extends Error {
   }
 }
 
-export const client: AxiosInstance = axios.create({
+/**
+ * Axios is unwrapped by the response interceptor below, so callers receive
+ * the API payload directly instead of AxiosResponse<T>. Keep the transport
+ * methods typed to match that runtime contract.
+ */
+type UnwrappedAxiosInstance = Omit<AxiosInstance, 'get' | 'delete' | 'head' | 'options' | 'post' | 'put' | 'patch'> & {
+  get<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T>
+  delete<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T>
+  head<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T>
+  options<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T>
+  post<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>
+  put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>
+  patch<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>
+}
+
+export const client = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 30000,
-})
+}) as UnwrappedAxiosInstance
 
 client.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
