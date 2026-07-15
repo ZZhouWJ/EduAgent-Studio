@@ -27,14 +27,17 @@ import { TeacherKnowledgeBase } from "./pages/TeacherKnowledgeBase";
 import { TeacherReview } from "./pages/TeacherReview";
 import { TeacherTasks } from "./pages/TeacherTasks";
 import { useAuthStore } from "@/stores/auth";
+import { useEffect } from "react";
 
 function RootRedirect() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const roles = user?.roles ?? [];
-  if (roles.includes("admin")) { navigate("/admin", { replace: true }); }
-  else if (roles.includes("teacher")) { navigate("/teacher", { replace: true }); }
-  else { navigate("/student", { replace: true }); }
+  useEffect(() => {
+    if (roles.includes("admin")) { navigate("/admin", { replace: true }); }
+    else if (roles.includes("teacher")) { navigate("/teacher", { replace: true }); }
+    else { navigate("/student", { replace: true }); }
+  }, [roles, navigate]);
   return null;
 }
 
