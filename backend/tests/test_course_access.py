@@ -64,6 +64,14 @@ class CourseAccessTests(unittest.TestCase):
                 22, 3, {"user_id": 7, "roles": ["teacher"]}
             )
 
+    def test_task_access_delegates_to_owning_course(self):
+        self.service._repo.get_task_course_id.return_value = 3
+        course_id = self.service.require_task_access(
+            19, {"user_id": 7, "roles": ["teacher"]}
+        )
+        self.assertEqual(course_id, 3)
+        self.service._repo.get_task_course_id.assert_called_once_with(19)
+
 
 if __name__ == "__main__":
     unittest.main()

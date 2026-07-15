@@ -78,6 +78,12 @@ class CourseAccessRepository:
             profile_id,
         )
 
+    def get_task_course_id(self, task_id: int) -> Optional[int]:
+        return self._single_course_id(
+            "SELECT course_id FROM learning_tasks WHERE task_id = %s AND is_deleted = 0",
+            task_id,
+        )
+
     def get_kp_link_course_id(self, link_id: int) -> Optional[int]:
         return self._single_course_id(
             """

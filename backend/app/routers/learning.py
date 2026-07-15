@@ -62,7 +62,11 @@ async def list_learning_tasks(
 ):
     """获取学习任务列表（分页、课程过滤、状态过滤）"""
     return learning_service.LearningService().list_tasks(
-        page=page, page_size=page_size, course_id=course_id, status=status
+        user=user,
+        page=page,
+        page_size=page_size,
+        course_id=course_id,
+        status=status,
     )
 
 
@@ -72,6 +76,7 @@ async def get_learning_task(
     user: dict = Depends(get_current_user_dep),
 ):
     """获取学习任务详情"""
+    CourseAccessService().require_task_access(task_id, user)
     return learning_service.LearningService().get_task(task_id)
 
 
@@ -81,6 +86,7 @@ async def create_learning_task(
     user: dict = Depends(require_role("teacher", "admin")),
 ):
     """创建学习任务"""
+    CourseAccessService().require_course_access(body.course_id, user)
     return learning_service.LearningService().create_task(
         course_id=body.course_id,
         title=body.title,

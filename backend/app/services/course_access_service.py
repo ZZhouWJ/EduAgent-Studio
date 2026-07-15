@@ -55,6 +55,11 @@ class CourseAccessService:
             self._repo.get_evidence_link_course_id(link_id), user, "证据关联不存在"
         )
 
+    def require_task_access(self, task_id: int, user: Dict[str, Any]) -> int:
+        return self._require_entity_course(
+            self._repo.get_task_course_id(task_id), user, "任务不存在"
+        )
+
     def require_profile_course(
         self,
         profile_id: int,

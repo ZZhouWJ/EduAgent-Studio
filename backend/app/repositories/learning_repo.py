@@ -225,6 +225,7 @@ class LearningRepository:
         page: int = 1,
         page_size: int = 20,
         course_id: Optional[int] = None,
+        course_ids: Optional[List[int]] = None,
         status: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
@@ -246,6 +247,17 @@ class LearningRepository:
         if course_id is not None:
             filters.append("t.course_id = %s")
             params.append(course_id)
+        elif course_ids == []:
+            return {
+                "items": [],
+                "total": 0,
+                "page": page,
+                "page_size": page_size,
+            }
+        elif course_ids is not None:
+            placeholders = ",".join(["%s"] * len(course_ids))
+            filters.append(f"t.course_id IN ({placeholders})")
+            params.extend(course_ids)
         if status:
             filters.append("t.status = %s")
             params.append(status)

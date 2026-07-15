@@ -11,9 +11,10 @@ class LearningService:
 
     def __init__(self) -> None:
         self._repo = LearningRepository()
+        self._access = CourseAccessService()
 
     def list_courses(self, user: Dict[str, Any]) -> Dict[str, Any]:
-        course_ids = CourseAccessService().list_accessible_course_ids(user)
+        course_ids = self._access.list_accessible_course_ids(user)
         return {
             "code": 0,
             "message": "success",
@@ -28,15 +29,25 @@ class LearningService:
 
     def list_tasks(
         self,
+        user: Dict[str, Any],
         page: int = 1,
         page_size: int = 20,
         course_id: Optional[int] = None,
         status: Optional[str] = None,
     ) -> Dict[str, Any]:
+        course_ids = self._access.list_accessible_course_ids(user)
+        if course_id is not None:
+            self._access.require_course_access(course_id, user)
         return {
             "code": 0,
             "message": "success",
-            "data": self._repo.list_tasks(page=page, page_size=page_size, course_id=course_id, status=status),
+            "data": self._repo.list_tasks(
+                page=page,
+                page_size=page_size,
+                course_id=course_id,
+                course_ids=course_ids,
+                status=status,
+            ),
         }
 
     def get_task(self, task_id: int) -> Dict[str, Any]:
