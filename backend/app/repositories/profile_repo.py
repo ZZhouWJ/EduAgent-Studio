@@ -128,7 +128,15 @@ class ProfileRepository:
                 sp.weekly_hours,
 
                 (
-                    SELECT JSON_ARRAYAGG(kp.kp_name)
+                    SELECT JSON_ARRAYAGG(
+                        JSON_OBJECT(
+                            'kp_id', kp.kp_id,
+                            'kp_name', kp.kp_name,
+                            'mastery', skm.mastery_level,
+                            'mastery_level', skm.mastery_level,
+                            'reason', skm.update_reason
+                        )
+                    )
                     FROM student_knowledge_mastery skm
                     INNER JOIN knowledge_points kp
                         ON skm.kp_id = kp.kp_id AND kp.is_deleted = 0
@@ -243,7 +251,15 @@ class ProfileRepository:
                 sp.weekly_hours,
 
                 (
-                    SELECT JSON_ARRAYAGG(kp.kp_name)
+                    SELECT JSON_ARRAYAGG(
+                        JSON_OBJECT(
+                            'kp_id', kp.kp_id,
+                            'kp_name', kp.kp_name,
+                            'mastery', skm.mastery_level,
+                            'mastery_level', skm.mastery_level,
+                            'reason', skm.update_reason
+                        )
+                    )
                     FROM student_knowledge_mastery skm
                     INNER JOIN knowledge_points kp
                         ON skm.kp_id = kp.kp_id AND kp.is_deleted = 0
