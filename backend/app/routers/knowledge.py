@@ -9,7 +9,9 @@ from typing import Optional
 from fastapi import APIRouter, Body, Depends, File, Form, Path, Query, UploadFile
 
 from app.services import knowledge_service
+from app.services.course_access_service import CourseAccessService
 from app.utils.dependencies import get_current_user_dep, require_role
+from app.utils.exceptions import ForbiddenException
 
 router = APIRouter(prefix="/knowledge", tags=["课程知识库"])
 
@@ -26,6 +28,8 @@ async def upload_material(
     支持 PDF、Markdown、DOCX、PPTX、TXT 格式。
     上传后状态为 pending，需要调用 /parse 接口触发解析。
     """
+    CourseAccessService().require_course_access(course_id, user)
+
     # 读取文件内容
     file_content = await file.read()
 
@@ -60,6 +64,7 @@ async def list_materials(
 
     返回该课程下所有已上传的资料及其解析状态。
     """
+    CourseAccessService().require_course_access(course_id, user)
     service = knowledge_service.KnowledgeService()
     return service.get_materials(course_id)
 
@@ -74,6 +79,7 @@ async def get_material_detail(
 
     返回资料元数据及所有 chunks。
     """
+    CourseAccessService().require_material_access(material_id, user)
     service = knowledge_service.KnowledgeService()
     return service.get_material_detail(material_id)
 
@@ -89,6 +95,7 @@ async def parse_material(
     读取文件内容，切分 chunks，提取关键词，存入数据库。
     解析完成后状态变为 parsed。
     """
+    CourseAccessService().require_material_access(material_id, user)
     service = knowledge_service.KnowledgeService()
     return service.parse_material(material_id)
 
@@ -107,6 +114,7 @@ async def search_knowledge(
     使用 BM25 算法检索与查询文本最相关的 chunks。
     返回按相关度排序的文档片段。
     """
+    CourseAccessService().require_course_access(course_id, user)
     service = knowledge_service.KnowledgeService()
     return service.search(
         course_id=course_id,
@@ -126,6 +134,7 @@ async def delete_material(
 
     会同时删除关联的 chunks。
     """
+    CourseAccessService().require_material_access(material_id, user)
     service = knowledge_service.KnowledgeService()
     return service.delete_material(material_id)
 
@@ -144,6 +153,10 @@ async def get_pending_kp_chunk_links(
 
     返回所有 status=pending 的匹配记录，供教师确认或拒绝。
     """
+    if course_id is None and "admin" not in user.get("roles", []):
+        raise ForbiddenException("教师查询待审核关联时必须指定本人课程")
+    if course_id is not None:
+        CourseAccessService().require_course_access(course_id, user)
     try:
         from app.repositories.evidence_repo import EvidenceRepository
         repo = EvidenceRepository()
@@ -165,6 +178,7 @@ async def verify_kp_chunk_link(
     status = 'confirmed'：该匹配通过，可用于资源生成
     status = 'rejected'：该匹配不通过，忽略
     """
+    CourseAccessService().require_kp_link_access(link_id, user)
     if status not in ("confirmed", "rejected"):
         return {"code": 400, "message": "status 必须是 confirmed 或 rejected", "data": None}
     try:
@@ -188,6 +202,7 @@ async def get_resource_evidence(
 
     返回资源生成时引用的所有教材原文片段及其审核状态。
     """
+    CourseAccessService().require_resource_access(resource_id, user)
     try:
         from app.repositories.evidence_repo import EvidenceRepository
         repo = EvidenceRepository()
@@ -208,6 +223,7 @@ async def verify_resource_evidence(
 
     教师审核时使用：确认后证据链完整，可发布给学生。
     """
+    CourseAccessService().require_evidence_link_access(link_id, user)
     if status not in ("verified", "rejected"):
         return {"code": 400, "message": "status 必须是 verified 或 rejected", "data": None}
     try:

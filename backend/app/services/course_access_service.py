@@ -1,0 +1,57 @@
+"""统一课程级访问控制，防止通过 ID 枚举读取跨课程数据。"""
+
+from typing import Any, Dict, Optional
+
+from app.repositories.course_access_repo import CourseAccessRepository
+from app.utils.exceptions import ForbiddenException, NotFoundException
+
+
+class CourseAccessService:
+    def __init__(self) -> None:
+        self._repo = CourseAccessRepository()
+
+    def require_course_access(self, course_id: int, user: Dict[str, Any]) -> None:
+        teacher_id = self._repo.get_course_teacher_id(course_id)
+        if teacher_id is None:
+            raise NotFoundException("课程不存在")
+
+        user_id = int(user["user_id"])
+        roles = set(user.get("roles", []))
+        if "admin" in roles:
+            return
+        if "teacher" in roles and teacher_id == user_id:
+            return
+        if "student_member" in roles and self._repo.is_student_enrolled(course_id, user_id):
+            return
+        raise ForbiddenException("无权访问该课程数据")
+
+    def require_material_access(self, material_id: int, user: Dict[str, Any]) -> int:
+        return self._require_entity_course(
+            self._repo.get_material_course_id(material_id), user, "资料不存在"
+        )
+
+    def require_resource_access(self, resource_id: int, user: Dict[str, Any]) -> int:
+        return self._require_entity_course(
+            self._repo.get_resource_course_id(resource_id), user, "资源不存在"
+        )
+
+    def require_kp_link_access(self, link_id: int, user: Dict[str, Any]) -> int:
+        return self._require_entity_course(
+            self._repo.get_kp_link_course_id(link_id), user, "知识点关联不存在"
+        )
+
+    def require_evidence_link_access(self, link_id: int, user: Dict[str, Any]) -> int:
+        return self._require_entity_course(
+            self._repo.get_evidence_link_course_id(link_id), user, "证据关联不存在"
+        )
+
+    def _require_entity_course(
+        self,
+        course_id: Optional[int],
+        user: Dict[str, Any],
+        missing_message: str,
+    ) -> int:
+        if course_id is None:
+            raise NotFoundException(missing_message)
+        self.require_course_access(course_id, user)
+        return course_id
