@@ -1,25 +1,26 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { User, Target, Book, Brain, Library, AlertTriangle, XCircle, Clock, Wrench, RefreshCw, History } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { profilesApi } from "@/lib/api";
 
 export function StudentProfile() {
   // 学生端：直接获取当前登录用户的画像，不暴露选择器
-  const { data: profile, loading: profileLoading, refetch: reloadProfile } = useApi(
+  const { data: profile, loading: profileLoading, error: profileError, refetch: reloadProfile } = useApi(
     () => profilesApi.getMyProfile(),
     []
   );
 
   // 画像更新记录
-  const [updateRecords, setUpdateRecords] = useState<any[]>([]);
+  type FeedbackRecord = Awaited<ReturnType<typeof profilesApi.getFeedbackHistory>>[number];
+  const [updateRecords, setUpdateRecords] = useState<FeedbackRecord[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(false);
 
   // 加载画像更新记录
   useEffect(() => {
-    if (profile && typeof profile === 'object' && 'profile_id' in profile) {
+    if (profile?.profile_id) {
       setLoadingRecords(true);
-      profilesApi.getFeedbackHistory((profile as any).profile_id)
-        .then(res => setUpdateRecords(res.data || []))
+      profilesApi.getFeedbackHistory(profile.profile_id)
+        .then(setUpdateRecords)
         .catch(console.error)
         .finally(() => setLoadingRecords(false));
     } else {
@@ -31,6 +32,16 @@ export function StudentProfile() {
     return (
       <div className="flex flex-col gap-6 max-w-[1400px] mx-auto">
         <div className="text-slate-400 p-12 text-center">加载画像数据中...</div>
+      </div>
+    );
+  }
+
+  if (profileError || !profile) {
+    return (
+      <div className="mx-auto flex min-h-64 max-w-[1400px] flex-col items-center justify-center gap-3 text-center">
+        <div className="text-base font-bold text-slate-700">暂时无法加载学习画像</div>
+        <div className="text-sm text-slate-400">请确认账号已绑定课程后重试</div>
+        <button onClick={() => reloadProfile()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">重新加载</button>
       </div>
     );
   }
