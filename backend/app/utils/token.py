@@ -4,16 +4,13 @@ JWT Token 工具。
 提供 access_token 创建和解析，从环境变量读取密钥和过期时间。
 """
 
-import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 import jwt
 from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 
-JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
-JWT_ALGORITHM = "HS256"
-JWT_EXPIRE_MINUTES = int(os.environ.get("JWT_EXPIRE_MINUTES", "1440"))
+from app.config import get_settings
 
 
 def create_access_token(
@@ -31,14 +28,19 @@ def create_access_token(
         JWT 字符串
     """
     to_encode = data.copy()
+    settings = get_settings()
     expire = datetime.now(timezone.utc) + (
-        expires_delta or timedelta(minutes=JWT_EXPIRE_MINUTES)
+        expires_delta or timedelta(minutes=settings.jwt_expire_minutes)
     )
     to_encode.update({
         "exp": expire,
         "iat": datetime.now(timezone.utc),
     })
-    return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    return jwt.encode(
+        to_encode,
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
 
 
 def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
@@ -52,10 +54,11 @@ def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
         解析成功返回 payload dict；token 无效或过期返回 None
     """
     try:
+        settings = get_settings()
         payload = jwt.decode(
             token,
-            JWT_SECRET_KEY,
-            algorithms=[JWT_ALGORITHM],
+            settings.jwt_secret_key,
+            algorithms=[settings.jwt_algorithm],
         )
         return payload
     except (ExpiredSignatureError, InvalidTokenError):

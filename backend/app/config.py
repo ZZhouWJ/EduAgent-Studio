@@ -5,11 +5,10 @@
 使用 pydantic-settings 自动解析环境变量。
 """
 
-import os
 from functools import lru_cache
-from typing import Optional
+from typing import Literal, Optional
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -20,6 +19,26 @@ class Settings(BaseSettings):
     app_name: str = Field(default="EduAgent Studio", alias="APP_NAME")
     app_env: str = Field(default="development", alias="APP_ENV")
     api_prefix: str = Field(default="/api", alias="API_PREFIX")
+
+    # --- 安全配置 ---
+    jwt_secret_key: str = Field(
+        default="dev-secret-key-change-before-production",
+        alias="JWT_SECRET_KEY",
+    )
+    jwt_algorithm: Literal["HS256", "HS384", "HS512"] = Field(
+        default="HS256",
+        alias="JWT_ALGORITHM",
+    )
+    jwt_expire_minutes: int = Field(
+        default=1440,
+        gt=0,
+        le=10080,
+        alias="JWT_EXPIRE_MINUTES",
+    )
+    cors_origins: str = Field(
+        default="http://127.0.0.1:5173,http://localhost:5173",
+        alias="CORS_ORIGINS",
+    )
 
     # --- 数据库配置 ---
     db_host: str = Field(default="127.0.0.1", alias="DB_HOST")
@@ -47,9 +66,6 @@ class Settings(BaseSettings):
     iflytek_api_secret: str = Field(default="", alias="IFLYTEK_API_SECRET")
     iflytek_doc_id: str = Field(default="", alias="IFLYTEK_DOC_ID")
 
-    # --- PostgreSQL 配置（pgvector） ---
-    postgres_url: str = Field(default="", alias="POSTGRES_URL")
-
     # --- 应用数据目录 ---
     app_data_dir: str = Field(default="data", alias="APP_DATA_DIR")
 
@@ -74,6 +90,32 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() == "production"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        """返回去重后的跨域来源列表。"""
+        return list(
+            dict.fromkeys(
+                origin.strip().rstrip("/")
+                for origin in self.cors_origins.split(",")
+                if origin.strip()
+            )
+        )
+
+    @model_validator(mode="after")
+    def validate_production_security(self) -> "Settings":
+        """生产环境禁止弱 JWT 密钥和任意来源跨域。"""
+        if not self.is_production:
+            return self
+
+        weak_markers = ("change_me", "change-before-production", "dev-secret")
+        if len(self.jwt_secret_key) < 32 or any(
+            marker in self.jwt_secret_key.lower() for marker in weak_markers
+        ):
+            raise ValueError("生产环境 JWT_SECRET_KEY 必须是至少 32 字符的随机密钥")
+        if not self.cors_origin_list or "*" in self.cors_origin_list:
+            raise ValueError("生产环境 CORS_ORIGINS 必须配置明确的前端来源")
+        return self
 
     def llm_config(self, model_name: str = None) -> "LLMConfig":
         """返回当前 LLM 配置。"""
