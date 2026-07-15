@@ -211,25 +211,6 @@ class EvidenceRepository:
             cursor.execute(sql, (status, verified_by, link_id))
             return cursor.rowcount > 0
 
-    def delete_kp_chunk_links_by_material(self, material_id: int) -> int:
-        """
-        删除某资料的所有 kp_chunk_links 关联。
-
-        Args:
-            material_id: 资料 ID
-
-        Returns:
-            删除数量
-        """
-        sql = """
-            DELETE l FROM kp_chunk_links l
-            JOIN course_material_chunks c ON l.chunk_id = c.chunk_id
-            WHERE c.material_id = %s
-        """
-        with get_db_cursor() as cursor:
-            cursor.execute(sql, (material_id,))
-            return cursor.rowcount
-
     def get_kps_by_course(self, course_id: int) -> List[Dict[str, Any]]:
         """
         获取课程的所有知识点。

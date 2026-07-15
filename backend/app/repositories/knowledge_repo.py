@@ -204,48 +204,6 @@ class KnowledgeRepository:
             "updated_at": str(row["updated_at"]) if row["updated_at"] else None,
         }
 
-    def insert_chunks(
-        self,
-        material_id: int,
-        course_id: int,
-        chunks: List[Dict[str, Any]],
-    ) -> int:
-        """
-        批量插入文档 chunks。
-
-        Args:
-            material_id: 资料 ID
-            course_id: 课程 ID
-            chunks: chunks 列表，每项包含 title, content, source_page, source_paragraph, bm25_terms
-
-        Returns:
-            插入的 chunk 数量
-        """
-        if not chunks:
-            return 0
-
-        sql = """
-            INSERT INTO course_material_chunks
-                (material_id, course_id, title, content, source_page, source_paragraph, bm25_terms, chunk_index, chunk_hash, material_version)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """
-
-        with get_db_cursor() as cursor:
-            for idx, chunk in enumerate(chunks):
-                cursor.execute(sql, (
-                    material_id,
-                    course_id,
-                    chunk.get("title", ""),
-                    chunk.get("content", ""),
-                    chunk.get("source_page"),
-                    chunk.get("source_paragraph"),
-                    chunk.get("bm25_terms", ""),
-                    idx,
-                    chunk.get("chunk_hash"),
-                    chunk.get("material_version", 1),
-                ))
-            return len(chunks)
-
     def replace_material_chunks(
         self,
         material_id: int,
@@ -615,30 +573,6 @@ class KnowledgeRepository:
             }
             for row in rows
         ]
-
-    def delete_chunks_by_material_version(
-        self,
-        material_id: int,
-        material_version: int,
-    ) -> int:
-        """
-        软删除指定资料版本的 chunks。
-
-        Args:
-            material_id: 资料 ID
-            material_version: 资料版本号
-
-        Returns:
-            删除数量
-        """
-        sql = """
-            UPDATE course_material_chunks
-            SET is_deleted = 1
-            WHERE material_id = %s AND material_version = %s AND is_deleted = 0
-        """
-        with get_db_cursor() as cursor:
-            cursor.execute(sql, (material_id, material_version))
-            return cursor.rowcount
 
     def get_chunk_id_by_index(
         self,
