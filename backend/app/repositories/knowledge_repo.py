@@ -13,7 +13,7 @@ import math
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.database import get_db_cursor
+from app.database import get_db_cursor, get_db_transaction
 
 
 class KnowledgeRepository:
@@ -112,6 +112,9 @@ class KnowledgeRepository:
                 cm.status,
                 cm.error_message,
                 cm.total_chunks,
+                cm.material_version,
+                cm.total_chars,
+                cm.last_reparse_at,
                 cm.created_by,
                 cm.created_at,
                 cm.updated_at,
@@ -162,6 +165,9 @@ class KnowledgeRepository:
                 cm.status,
                 cm.error_message,
                 cm.total_chunks,
+                cm.material_version,
+                cm.total_chars,
+                cm.last_reparse_at,
                 cm.created_by,
                 cm.created_at,
                 cm.updated_at,
@@ -189,6 +195,9 @@ class KnowledgeRepository:
             "status": row["status"],
             "error_message": row["error_message"],
             "total_chunks": row["total_chunks"],
+            "material_version": row.get("material_version") or 1,
+            "total_chars": row.get("total_chars") or 0,
+            "last_reparse_at": str(row["last_reparse_at"]) if row.get("last_reparse_at") else None,
             "created_by": row["created_by"],
             "creator_name": row.get("creator_name") or "",
             "created_at": str(row["created_at"]) if row["created_at"] else None,
@@ -236,6 +245,90 @@ class KnowledgeRepository:
                     chunk.get("material_version", 1),
                 ))
             return len(chunks)
+
+    def replace_material_chunks(
+        self,
+        material_id: int,
+        course_id: int,
+        chunks: List[Dict[str, Any]],
+        material_version: int,
+        total_chars: int,
+    ) -> int:
+        """在单个事务中替换资料片段、旧关联和资料版本元数据。"""
+        if not chunks:
+            raise ValueError("资料片段不能为空")
+
+        insert_sql = """
+            INSERT INTO course_material_chunks
+                (material_id, course_id, title, content, source_page,
+                 source_paragraph, bm25_terms, chunk_index, chunk_hash,
+                 material_version)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        with get_db_transaction() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE resource_evidence_links rel
+                    JOIN course_material_chunks chunks ON rel.chunk_id = chunks.chunk_id
+                    SET rel.verified_status = 'replaced'
+                    WHERE chunks.material_id = %s
+                      AND chunks.is_deleted = 0
+                      AND rel.verified_status <> 'replaced'
+                    """,
+                    (material_id,),
+                )
+                cursor.execute(
+                    """
+                    DELETE links FROM kp_chunk_links links
+                    JOIN course_material_chunks chunks ON links.chunk_id = chunks.chunk_id
+                    WHERE chunks.material_id = %s AND chunks.is_deleted = 0
+                    """,
+                    (material_id,),
+                )
+                cursor.execute(
+                    """
+                    UPDATE course_material_chunks
+                    SET is_deleted = 1
+                    WHERE material_id = %s AND is_deleted = 0
+                    """,
+                    (material_id,),
+                )
+
+                for index, chunk in enumerate(chunks):
+                    cursor.execute(
+                        insert_sql,
+                        (
+                            material_id,
+                            course_id,
+                            chunk.get("title", ""),
+                            chunk["content"],
+                            chunk.get("source_page"),
+                            chunk.get("source_paragraph"),
+                            chunk.get("bm25_terms", ""),
+                            index,
+                            chunk.get("chunk_hash"),
+                            material_version,
+                        ),
+                    )
+
+                cursor.execute(
+                    """
+                    UPDATE course_materials
+                    SET status = 'parsed',
+                        error_message = NULL,
+                        total_chunks = %s,
+                        material_version = %s,
+                        total_chars = %s,
+                        last_reparse_at = NOW()
+                    WHERE material_id = %s AND is_deleted = 0
+                    """,
+                    (len(chunks), material_version, total_chars, material_id),
+                )
+                if cursor.rowcount != 1:
+                    raise ValueError("资料不存在或已删除")
+
+        return len(chunks)
 
     def search_chunks(
         self,

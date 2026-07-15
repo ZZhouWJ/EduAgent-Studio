@@ -12,7 +12,6 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from app.config import get_settings
-from app.database import get_db_cursor
 from app.repositories.knowledge_repo import KnowledgeRepository
 from app.repositories.evidence_repo import EvidenceRepository
 from app.rag.parser import extract_bm25_terms, parse_document_file
@@ -173,7 +172,7 @@ class KnowledgeService:
             # 更新状态为 parsing
             self._repo.update_material_status(material_id, "parsing")
 
-            # 读取文件内容
+            # 首次解析没有可回退版本。
             storage_path = material["storage_path"]
             if not os.path.exists(storage_path):
                 self._repo.update_material_status(
@@ -190,38 +189,15 @@ class KnowledgeService:
                 )
                 return {"code": 400, "message": "未能提取有效内容", "data": None}
 
-            # 首次解析，material_version = 1
-            material_version = 1
-
-            # 为每个 chunk 提取 BM25 关键词并整理
-            final_chunks = []
-            for chunk in chunks_data:
-                bm25_terms = extract_bm25_terms(chunk["content"])
-                chunk_hash = hashlib.sha256(chunk["content"].encode("utf-8")).hexdigest()
-                final_chunks.append({
-                    "title": chunk.get("title", ""),
-                    "content": chunk["content"],
-                    "source_page": chunk.get("source_page"),
-                    "source_paragraph": chunk.get("source_paragraph", 0),
-                    "bm25_terms": ",".join(bm25_terms),
-                    "chunk_hash": chunk_hash,
-                    "material_version": material_version,
-                })
-
-            total_chars = sum(len(chunk["content"]) for chunk in final_chunks)
-
-            # 批量插入 chunks
-            inserted = self._repo.insert_chunks(
+            material_version = int(material.get("material_version") or 1)
+            final_chunks, total_chars = self._prepare_chunks(chunks_data)
+            inserted = self._repo.replace_material_chunks(
                 material_id=material_id,
                 course_id=material["course_id"],
                 chunks=final_chunks,
+                material_version=material_version,
+                total_chars=total_chars,
             )
-
-            # 更新状态为 parsed，记录总字符数
-            self._repo.update_material_status(
-                material_id, "parsed", total_chunks=inserted
-            )
-            self._update_material_version(material_id, material_version, total_chars)
 
             # 知识点预匹配
             match_result = self._match_knowledge_points(material_id, material["course_id"], material_version)
@@ -246,11 +222,12 @@ class KnowledgeService:
                 },
             }
 
-        except Exception as e:
+        except Exception:
+            logger.exception("资料解析失败: material_id=%s", material_id)
             self._repo.update_material_status(
-                material_id, "failed", error_message=str(e)
+                material_id, "failed", error_message="解析失败，请检查文件内容"
             )
-            return {"code": 500, "message": f"解析失败: {str(e)}", "data": None}
+            return {"code": 500, "message": "解析失败，请检查文件内容", "data": None}
 
     def search(
         self,
@@ -295,28 +272,26 @@ class KnowledgeService:
         except Exception as e:
             return {"code": 500, "message": f"检索失败: {str(e)}", "data": None}
 
-    def _update_material_version(
-        self,
-        material_id: int,
-        version: int,
-        total_chars: int,
-    ) -> None:
-        """更新资料的版本号和字符数。"""
-        sql = """
-            UPDATE course_materials
-            SET material_version = %s,
-                total_chars = %s,
-                last_reparse_at = NOW()
-            WHERE material_id = %s
-        """
-        with get_db_cursor() as cursor:
-            cursor.execute(sql, (version, total_chars, material_id))
+    @staticmethod
+    def _prepare_chunks(chunks_data: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], int]:
+        final_chunks = []
+        for chunk in chunks_data:
+            content = chunk["content"]
+            final_chunks.append({
+                "title": chunk.get("title", ""),
+                "content": content,
+                "source_page": chunk.get("source_page"),
+                "source_paragraph": chunk.get("source_paragraph", 0),
+                "bm25_terms": ",".join(extract_bm25_terms(content)),
+                "chunk_hash": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            })
+        return final_chunks, sum(len(chunk["content"]) for chunk in final_chunks)
 
     def reparse_material(self, material_id: int) -> Dict[str, Any]:
         """
         重新解析已解析过的资料。
 
-        先软删除旧版本 chunks 和 kp_chunk_links，再重新解析。
+        新内容解析成功后，在单个事务内替换旧 chunks 和关联。
 
         Args:
             material_id: 资料 ID
@@ -329,61 +304,46 @@ class KnowledgeService:
             if not material:
                 return {"code": 404, "message": "资料不存在", "data": None}
 
-            # 软删除旧 chunks（按 material_version 区分）
-            old_version = material.get("material_version", 1)
-            self._repo.delete_chunks_by_material_version(material_id, old_version)
-
-            # 删除旧的 kp_chunk_links
-            self._evidence_repo.delete_kp_chunk_links_by_material(material_id)
+            old_version = int(material.get("material_version") or 1)
 
             # 更新状态为 parsing
             self._repo.update_material_status(material_id, "parsing")
 
-            # 读取文件内容
+            # 重新解析期间旧片段保持可检索，失败时恢复 parsed 状态。
             storage_path = material["storage_path"]
             if not os.path.exists(storage_path):
                 self._repo.update_material_status(
-                    material_id, "failed", error_message="文件不存在"
+                    material_id, "parsed", error_message="源文件不存在，已保留上一版本"
                 )
-                return {"code": 404, "message": "文件不存在", "data": None}
+                return {
+                    "code": 404,
+                    "message": "源文件不存在，已保留上一版本",
+                    "data": None,
+                }
 
             # 重新解析
             chunks_data = parse_document_file(storage_path, material["file_type"])
             if not chunks_data:
                 self._repo.update_material_status(
-                    material_id, "failed", error_message="未能提取有效内容"
+                    material_id, "parsed", error_message="未提取到新内容，已保留上一版本"
                 )
-                return {"code": 400, "message": "未能提取有效内容", "data": None}
+                return {
+                    "code": 400,
+                    "message": "未提取到新内容，已保留上一版本",
+                    "data": None,
+                }
 
             # 新版本号 = 旧版本 + 1
             new_version = old_version + 1
 
-            final_chunks = []
-            for chunk in chunks_data:
-                bm25_terms = extract_bm25_terms(chunk["content"])
-                chunk_hash = hashlib.sha256(chunk["content"].encode("utf-8")).hexdigest()
-                final_chunks.append({
-                    "title": chunk.get("title", ""),
-                    "content": chunk["content"],
-                    "source_page": chunk.get("source_page"),
-                    "source_paragraph": chunk.get("source_paragraph", 0),
-                    "bm25_terms": ",".join(bm25_terms),
-                    "chunk_hash": chunk_hash,
-                    "material_version": new_version,
-                })
-
-            total_chars = sum(len(chunk["content"]) for chunk in final_chunks)
-
-            inserted = self._repo.insert_chunks(
+            final_chunks, total_chars = self._prepare_chunks(chunks_data)
+            inserted = self._repo.replace_material_chunks(
                 material_id=material_id,
                 course_id=material["course_id"],
                 chunks=final_chunks,
+                material_version=new_version,
+                total_chars=total_chars,
             )
-
-            self._repo.update_material_status(
-                material_id, "parsed", total_chunks=inserted
-            )
-            self._update_material_version(material_id, new_version, total_chars)
 
             # 知识点预匹配（使用新版本号）
             match_result = self._match_knowledge_points(material_id, material["course_id"], new_version)
@@ -408,11 +368,16 @@ class KnowledgeService:
                 },
             }
 
-        except Exception as e:
+        except Exception:
+            logger.exception("资料重新解析失败: material_id=%s", material_id)
             self._repo.update_material_status(
-                material_id, "failed", error_message=str(e)
+                material_id, "parsed", error_message="重新解析失败，已保留上一版本"
             )
-            return {"code": 500, "message": f"重新解析失败: {str(e)}", "data": None}
+            return {
+                "code": 500,
+                "message": "重新解析失败，已保留上一版本",
+                "data": None,
+            }
 
     def _match_knowledge_points(
         self,
