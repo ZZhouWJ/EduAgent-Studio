@@ -3,6 +3,7 @@ import { Database, FileUp, GitBranch, Layers3, AlertCircle, Upload, Loader2, Ref
 import { useApi } from "@/lib/useApi";
 import { knowledgeApi, type Material, type SearchResult, type MaterialChunk } from "@/lib/api/knowledge";
 import { learningApi } from "@/lib/api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { PageHeader, PageShell, ProgressBar, SearchInput, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast, EmptyState } from "../components/common/ProductUI";
 
 export function TeacherKnowledgeBase() {
@@ -15,31 +16,54 @@ export function TeacherKnowledgeBase() {
   const [parsing, setParsing] = React.useState<number | null>(null);
   const [searching, setSearching] = React.useState(false);
   const [verifying, setVerifying] = React.useState<number | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = React.useState<number | null>(null);
   const { toast, showToast } = useInlineToast();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const pollTimeoutRef = React.useRef<number | null>(null);
+  const mountedRef = React.useRef(true);
 
   // 课程列表（用于关联）
   const { data: courseList } = useApi(() => learningApi.listCourses(), []);
 
-  // 待审核的知识点-Chunk匹配（依赖 courseList）
+  React.useEffect(() => {
+    if (!courseList?.length) {
+      setSelectedCourseId(null);
+      return;
+    }
+    if (!courseList.some((course) => course.id === selectedCourseId)) {
+      setSelectedCourseId(courseList[0].id);
+    }
+  }, [courseList, selectedCourseId]);
+
+  React.useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (pollTimeoutRef.current !== null) window.clearTimeout(pollTimeoutRef.current);
+    };
+  }, []);
+
+  // 待审核的知识点-Chunk匹配
   const { data: pendingKpLinks, loading: linksLoading, refetch: refreshLinks } = useApi(
-    () => knowledgeApi.getPendingKpChunkLinks(courseList?.[0]?.id),
-    [courseList]
+    () => selectedCourseId
+      ? knowledgeApi.getPendingKpChunkLinks(selectedCourseId)
+      : Promise.resolve([]),
+    [selectedCourseId]
   );
 
   // 资料列表（有课程 ID 时才请求，返回 data 字段）
   const { data: materialsData, loading: materialsLoading, refetch: refreshMaterials } = useApi(
-    () => courseList?.[0]?.id
-      ? knowledgeApi.listMaterials(courseList[0].id)
+    () => selectedCourseId
+      ? knowledgeApi.listMaterials(selectedCourseId)
       : Promise.resolve([] as Material[]),
-    [courseList]
+    [selectedCourseId]
   );
 
-  // 知识点列表（依赖 courseList）
+  // 知识点列表
   const { data: knowledgePoints } = useApi(() => {
-    if (!courseList?.length) return Promise.resolve([]);
-    return learningApi.getLearningPath(courseList[0].id).then(p => p.nodes);
-  }, [courseList]);
+    if (!selectedCourseId) return Promise.resolve([]);
+    return learningApi.getLearningPath(selectedCourseId).then(p => p.nodes);
+  }, [selectedCourseId]);
 
   // 统计
   const stats = [
@@ -65,10 +89,11 @@ export function TeacherKnowledgeBase() {
     const formData = new FormData();
     formData.append('file', file);
 
-    // 如果有选中课程，关联课程ID
-    if (courseList?.length) {
-      formData.append('course_id', String(courseList[0].id));
+    if (!selectedCourseId) {
+      showToast('请先选择课程');
+      return;
     }
+    formData.append('course_id', String(selectedCourseId));
 
     setUploading(true);
     try {
@@ -86,21 +111,35 @@ export function TeacherKnowledgeBase() {
 
   // 解析资料
   const handleParse = async (material: Material) => {
+    if (pollTimeoutRef.current !== null) window.clearTimeout(pollTimeoutRef.current);
     setParsing(material.id);
     try {
       await knowledgeApi.parseMaterial(material.id);
       showToast('解析任务已启动');
-      // 轮询状态
+      let attempts = 0;
       const poll = async () => {
-        const updated = await knowledgeApi.getMaterial(material.id);
-        if (updated.status === 'parsed' || updated.status === 'failed') {
-          refreshMaterials();
-          setParsing(null);
-        } else {
-          setTimeout(poll, 2000);
+        try {
+          const updated = await knowledgeApi.getMaterial(material.id);
+          if (!mountedRef.current) return;
+          if (updated.status === 'parsed' || updated.status === 'failed') {
+            await refreshMaterials();
+            setParsing(null);
+            if (updated.status === 'failed') showToast('资料解析失败，请检查文件内容');
+            return;
+          }
+        } catch (err) {
+          console.error(err);
         }
+
+        attempts += 1;
+        if (attempts >= 60) {
+          setParsing(null);
+          showToast('解析仍在后台进行，请稍后刷新查看');
+          return;
+        }
+        pollTimeoutRef.current = window.setTimeout(poll, 2000);
       };
-      setTimeout(poll, 2000);
+      pollTimeoutRef.current = window.setTimeout(poll, 2000);
     } catch (err) {
       showToast('解析失败，请重试');
       setParsing(null);
@@ -122,10 +161,10 @@ export function TeacherKnowledgeBase() {
 
   // 检索
   const handleSearch = async () => {
-    if (!query.trim()) return;
+    if (!query.trim() || !selectedCourseId) return;
     setSearching(true);
     try {
-      const results = await knowledgeApi.search(query, courseList?.[0]?.id);
+      const results = await knowledgeApi.search(query, selectedCourseId);
       setSearchResults(results);
     } catch (err) {
       showToast('检索失败，请重试');
@@ -133,6 +172,16 @@ export function TeacherKnowledgeBase() {
     } finally {
       setSearching(false);
     }
+  };
+
+  const handleCourseChange = (value: string) => {
+    if (pollTimeoutRef.current !== null) window.clearTimeout(pollTimeoutRef.current);
+    pollTimeoutRef.current = null;
+    setParsing(null);
+    setSelectedMaterial(null);
+    setSelectedChunks([]);
+    setSearchResults([]);
+    setSelectedCourseId(Number(value));
   };
 
   // 确认/拒绝知识点-Chunk绑定
@@ -157,18 +206,30 @@ export function TeacherKnowledgeBase() {
         description="管理课程文档、知识点、知识片段和检索证据，为智能体生成资源提供可信依据。"
         icon={Database}
         action={
-          <label className={`${primaryButton} cursor-pointer`}>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.md,.docx,.pptx"
-              className="hidden"
-              onChange={handleFileUpload}
-              disabled={uploading}
-            />
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            {uploading ? '上传中...' : '上传资料'}
-          </label>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <Select value={selectedCourseId ? String(selectedCourseId) : undefined} onValueChange={handleCourseChange}>
+              <SelectTrigger className="h-10 min-w-48 rounded-xl bg-white">
+                <SelectValue placeholder="选择课程" />
+              </SelectTrigger>
+              <SelectContent>
+                {courseList?.map((course) => (
+                  <SelectItem key={course.id} value={String(course.id)}>{course.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <label className={`${primaryButton} cursor-pointer ${!selectedCourseId ? 'pointer-events-none opacity-50' : ''}`}>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.md,.markdown,.docx,.pptx,.txt,.text"
+                className="hidden"
+                onChange={handleFileUpload}
+                disabled={uploading || !selectedCourseId}
+              />
+              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {uploading ? '上传中...' : '上传资料'}
+            </label>
+          </div>
         }
       />
 
@@ -212,7 +273,7 @@ export function TeacherKnowledgeBase() {
                   <label className={`${secondaryButton} cursor-pointer`}>
                     <input
                       type="file"
-                      accept=".pdf,.md,.docx,.pptx"
+                      accept=".pdf,.md,.markdown,.docx,.pptx,.txt,.text"
                       className="hidden"
                       onChange={handleFileUpload}
                       disabled={uploading}
@@ -224,7 +285,7 @@ export function TeacherKnowledgeBase() {
               />
             ) : (
               materialsData?.map((doc) => (
-                <div key={doc.id} className="w-full rounded-2xl border p-4 text-left transition">
+                <div key={doc.id} className="w-full space-y-2">
                   <button
                     onClick={() => handleViewMaterial(doc)}
                     className={`w-full rounded-2xl border p-4 text-left transition ${
@@ -266,7 +327,6 @@ export function TeacherKnowledgeBase() {
         <div className={`edu-card rounded-2xl p-5 sm:p-6 ${activePanel === "graph" ? "block" : "hidden lg:block"}`}>
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-base font-black text-slate-950">知识点结构</h2>
-            <button onClick={() => showToast("知识点编辑面板已打开")} className={secondaryButton}>编辑知识点</button>
           </div>
           <div className="relative rounded-[20px] border border-slate-100 bg-slate-50/70 p-4 sm:rounded-[24px] sm:p-6">
             <div className="absolute inset-0 edu-grid-bg opacity-50" />
@@ -336,7 +396,7 @@ export function TeacherKnowledgeBase() {
             <SearchInput label="测试问题" value={query} onChange={setQuery} />
             <button
               onClick={handleSearch}
-              disabled={searching || !query.trim()}
+              disabled={searching || !query.trim() || !selectedCourseId}
               className={`${primaryButton} mt-auto disabled:opacity-50`}
             >
               {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
