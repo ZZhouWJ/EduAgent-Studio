@@ -1,7 +1,7 @@
 name: eduagent-studio
 
 x-backend-environment: &backend-environment
-  APP_ENV: production
+  APP_ENV: ${APP_ENV:-development}
   APP_DATA_DIR: /app/data
   DB_HOST: mysql
   DB_PORT: 3306
