@@ -6,6 +6,7 @@
 # Web Framework
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
+python-multipart>=0.0.9
 
 # Database Driver
 pymysql>=1.1.0
@@ -41,4 +42,4 @@ passlib[bcrypt]>=1.7.4
 
 # AES-GCM Encryption (for API Key encryption)
 cryptography>=42.0.0
-websocket-client
+websocket-client>=1.8.0
