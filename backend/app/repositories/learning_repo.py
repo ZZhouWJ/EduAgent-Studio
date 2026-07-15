@@ -363,6 +363,7 @@ class LearningRepository:
             task_id = cursor.lastrowid
         return self.get_task(task_id) or {"id": task_id, "course_id": course_id, "title": title}
 
+    @staticmethod
     def _detect_task_type(title: str) -> str:
         """根据标题关键词检测任务类型。"""
         title_lower = title.lower()
@@ -686,4 +687,3 @@ class LearningRepository:
             })
 
         return results
-
