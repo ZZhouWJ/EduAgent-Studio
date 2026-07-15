@@ -1,5 +1,11 @@
 import { useEffect, useRef } from 'react'
-import * as echarts from 'echarts'
+import * as echarts from 'echarts/core'
+import { GraphChart } from 'echarts/charts'
+import { TooltipComponent } from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
+import type { ECharts, EChartsCoreOption } from 'echarts/core'
+
+echarts.use([GraphChart, TooltipComponent, CanvasRenderer])
 
 export interface KpNode {
   kp_id: number
@@ -19,7 +25,7 @@ interface LearningPathGraphProps {
 
 export function LearningPathGraph({ nodes, currentKpId, onNodeClick }: LearningPathGraphProps) {
   const chartRef = useRef<HTMLDivElement>(null)
-  const chartInstance = useRef<echarts.ECharts | null>(null)
+  const chartInstance = useRef<ECharts | null>(null)
 
   useEffect(() => {
     if (!chartRef.current) return
@@ -58,7 +64,7 @@ export function LearningPathGraph({ nodes, currentKpId, onNodeClick }: LearningP
       }))
     )
 
-    const option: echarts.EChartsOption = {
+    const option: EChartsCoreOption = {
       tooltip: {
         trigger: 'item',
         triggerOn: 'mousemove',
