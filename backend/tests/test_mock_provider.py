@@ -20,6 +20,7 @@ class MockProfileExtractionTests(unittest.TestCase):
         self.assertEqual(result["weekly_hours"], 6)
         self.assertEqual(result["cognitive_style"], "视觉化理解")
         self.assertEqual(result["resource_preferences"], ["视频", "案例"])
+        self.assertIn("SQL", result["knowledge_base"])
 
 
 if __name__ == "__main__":

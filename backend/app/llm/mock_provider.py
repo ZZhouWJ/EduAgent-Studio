@@ -35,10 +35,9 @@ class MockProvider:
                 user_input = msg.get("content", "")
                 break
 
-        input_text = user_input.lower()
         input_tokens = max(len(" ".join([m.get("content", "") for m in messages])) // 4, 10)
 
-        response_content = self._generate_response(input_text, config.model_name)
+        response_content = self._generate_response(user_input, config.model_name)
         output_tokens = max(len(response_content) // 4, 10)
         total_cost = (input_tokens + output_tokens) * 0.000001
 
@@ -53,16 +52,17 @@ class MockProvider:
     def _generate_response(self, input_text: str, model_name: str) -> str:
         """根据输入生成 Mock 响应"""
         time.sleep(random.uniform(0.5, 1.5))
+        normalized_input = input_text.lower()
 
         if "学生学习画像分析助手" in input_text:
             return self._mock_profile_extraction(input_text)
-        if "诊断" in input_text or "薄弱" in input_text:
+        if "诊断" in normalized_input or "薄弱" in normalized_input:
             return self._mock_diagnosis()
-        elif "规划" in input_text or "路径" in input_text:
+        elif "规划" in normalized_input or "路径" in normalized_input:
             return self._mock_planning()
-        elif "评测" in input_text or "反馈" in input_text:
+        elif "评测" in normalized_input or "反馈" in normalized_input:
             return self._mock_assessment()
-        elif "审核" in input_text or "质量" in input_text:
+        elif "审核" in normalized_input or "质量" in normalized_input:
             return self._mock_teacher_review()
         else:
             return f"""# 个性化学习资源
