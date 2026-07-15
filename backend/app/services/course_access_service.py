@@ -56,9 +56,23 @@ class CourseAccessService:
         )
 
     def require_task_access(self, task_id: int, user: Dict[str, Any]) -> int:
-        return self._require_entity_course(
-            self._repo.get_task_course_id(task_id), user, "任务不存在"
-        )
+        context = self._repo.get_task_access_context(task_id)
+        if context is None:
+            raise NotFoundException("任务不存在")
+        course_id = int(context["course_id"])
+        self.require_course_access(course_id, user)
+        roles = set(user.get("roles", []))
+        if "student_member" in roles and not roles.intersection({"teacher", "admin"}):
+            assignee_id = context["assignee_id"]
+            if assignee_id is not None and assignee_id != int(user["user_id"]):
+                raise ForbiddenException("无权访问其他学生的任务")
+        return course_id
+
+    def require_student_course(self, course_id: int, student_id: int) -> int:
+        profile_id = self._repo.get_student_profile_id(course_id, student_id)
+        if profile_id is None:
+            raise NotFoundException("该课程中不存在此学生画像")
+        return profile_id
 
     def require_profile_access(self, profile_id: int, user: Dict[str, Any]) -> int:
         context = self._repo.get_profile_access_context(profile_id)
@@ -94,9 +108,7 @@ class CourseAccessService:
         user: Dict[str, Any],
     ) -> int:
         self.require_course_access(course_id, user)
-        profile_id = self._repo.get_student_profile_id(course_id, student_id)
-        if profile_id is None:
-            raise NotFoundException("该课程中不存在此学生画像")
+        profile_id = self.require_student_course(course_id, student_id)
         self.require_knowledge_points_course(course_id, kp_ids)
         return profile_id
 

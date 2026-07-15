@@ -42,6 +42,13 @@ class LearningService:
         course_ids = self._access.list_accessible_course_ids(user)
         if course_id is not None:
             self._access.require_course_access(course_id, user)
+        roles = set(user.get("roles", []))
+        assignee_user_id = (
+            int(user["user_id"])
+            if "student_member" in roles
+            and not roles.intersection({"teacher", "admin"})
+            else None
+        )
         return {
             "code": 0,
             "message": "success",
@@ -51,6 +58,7 @@ class LearningService:
                 course_id=course_id,
                 course_ids=course_ids,
                 status=status,
+                assignee_user_id=assignee_user_id,
             ),
         }
 

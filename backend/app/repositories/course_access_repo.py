@@ -158,6 +158,28 @@ class CourseAccessRepository:
             task_id,
         )
 
+    def get_task_access_context(
+        self, task_id: int
+    ) -> Optional[Dict[str, Any]]:
+        with get_db_cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT course_id, assignee_id
+                FROM learning_tasks
+                WHERE task_id = %s AND is_deleted = 0
+                """,
+                (task_id,),
+            )
+            row = cursor.fetchone()
+        if not row:
+            return None
+        return {
+            "course_id": int(row["course_id"]),
+            "assignee_id": int(row["assignee_id"])
+            if row["assignee_id"] is not None
+            else None,
+        }
+
     def get_tutor_session_context(
         self, session_id: int
     ) -> Optional[Dict[str, Any]]:

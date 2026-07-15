@@ -1,5 +1,6 @@
 """学习任务 API — 课程、知识点、学习任务、学习路径"""
-from typing import Any, Optional
+from datetime import datetime
+from typing import Annotated, Any, Optional
 
 from fastapi import APIRouter, Depends, Path, Query
 from pydantic import BaseModel, Field
@@ -16,9 +17,11 @@ class CreateLearningTaskRequest(BaseModel):
     course_id: int = Field(..., gt=0)
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = Field(None, max_length=2000)
-    target_kp_ids: Optional[list[int]] = Field(None)
-    assignee_id: Optional[int] = Field(None)
-    due_date: Optional[str] = Field(None)  # "YYYY-MM-DD" 格式
+    target_kp_ids: Optional[list[Annotated[int, Field(gt=0)]]] = Field(
+        None, max_length=50
+    )
+    assignee_id: Optional[int] = Field(None, gt=0)
+    due_date: Optional[datetime] = None
 
 
 class UpdateCourseStatusRequest(BaseModel):
@@ -86,14 +89,19 @@ async def create_learning_task(
     user: dict = Depends(require_role("teacher", "admin")),
 ):
     """创建学习任务"""
-    CourseAccessService().require_course_access(body.course_id, user)
+    access = CourseAccessService()
+    access.require_course_access(body.course_id, user)
+    if body.target_kp_ids:
+        access.require_knowledge_points_course(body.course_id, body.target_kp_ids)
+    if body.assignee_id is not None:
+        access.require_student_course(body.course_id, body.assignee_id)
     return learning_service.LearningService().create_task(
         course_id=body.course_id,
         title=body.title,
         description=body.description,
         target_kp_ids=body.target_kp_ids,
         assignee_id=body.assignee_id,
-        due_date=body.due_date,
+        due_date=body.due_date.isoformat(sep=" ") if body.due_date else None,
         creator_id=int(user["user_id"]),
     )
 

@@ -249,6 +249,7 @@ class LearningRepository:
         course_id: Optional[int] = None,
         course_ids: Optional[List[int]] = None,
         status: Optional[str] = None,
+        assignee_user_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Returns paginated task list:
@@ -283,6 +284,9 @@ class LearningRepository:
         if status:
             filters.append("t.status = %s")
             params.append(status)
+        if assignee_user_id is not None:
+            filters.append("(t.assignee_id IS NULL OR t.assignee_id = %s)")
+            params.append(assignee_user_id)
 
         where_clause = " AND ".join(filters)
 

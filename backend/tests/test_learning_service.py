@@ -28,6 +28,7 @@ class LearningServiceTests(unittest.TestCase):
             course_id=None,
             course_ids=[1],
             status=None,
+            assignee_user_id=12,
         )
 
     def test_explicit_task_course_requires_access(self):
