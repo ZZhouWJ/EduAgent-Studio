@@ -24,6 +24,7 @@ class LearningResourceRepository:
         page_size: int = 20,
         course_id: Optional[int] = None,
         resource_type: Optional[str] = None,
+        course_ids: Optional[List[int]] = None,
     ) -> Dict[str, Any]:
         """
         分页查询学习资源列表。
@@ -31,6 +32,9 @@ class LearningResourceRepository:
         Returns:
             {"items": [...], "total": int, "page": int, "page_size": int}
         """
+        if course_ids is not None and not course_ids:
+            return {"items": [], "total": 0, "page": page, "page_size": page_size}
+
         offset = (page - 1) * page_size
 
         filters = ["lr.is_deleted = 0"]
@@ -39,6 +43,10 @@ class LearningResourceRepository:
         if course_id is not None:
             filters.append("lr.course_id = %s")
             params.append(course_id)
+        elif course_ids is not None:
+            placeholders = ", ".join(["%s"] * len(course_ids))
+            filters.append(f"lr.course_id IN ({placeholders})")
+            params.extend(course_ids)
         if resource_type:
             filters.append("lr.resource_type = %s")
             params.append(resource_type)
