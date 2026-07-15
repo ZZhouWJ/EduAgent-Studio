@@ -7,6 +7,8 @@ import uuid
 import time
 import random
 import logging
+import json
+import re
 from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
@@ -52,6 +54,8 @@ class MockProvider:
         """根据输入生成 Mock 响应"""
         time.sleep(random.uniform(0.5, 1.5))
 
+        if "学生学习画像分析助手" in input_text:
+            return self._mock_profile_extraction(input_text)
         if "诊断" in input_text or "薄弱" in input_text:
             return self._mock_diagnosis()
         elif "规划" in input_text or "路径" in input_text:
@@ -77,6 +81,66 @@ class MockProvider:
 ---
 *本资源由 {model_name} 生成 | EduAgent Studio*
 """
+
+    def _mock_profile_extraction(self, prompt: str) -> str:
+        """为本地开发提供可确认、可落库的画像抽取结果。"""
+        message_match = re.search(
+            r"学生描述：\s*(.*?)\s*请抽取以下字段",
+            prompt,
+            re.DOTALL,
+        )
+        message = message_match.group(1).strip() if message_match else prompt
+
+        goal_match = re.search(
+            r"(?:学习目标|目标|希望|想要|计划)(?:是|为)?[：:]?\s*([^，。；\n]+)",
+            message,
+        )
+        hours_match = re.search(r"每周[^\d]{0,8}(\d+(?:\.\d+)?)\s*(?:小时|h)", message)
+
+        current_level = None
+        if any(keyword in message for keyword in ("零基础", "没学过", "刚入门")):
+            current_level = "基础"
+        elif any(keyword in message for keyword in ("熟练", "掌握较好", "有项目经验")):
+            current_level = "较好"
+        elif any(keyword in message for keyword in ("学过", "了解", "一般")):
+            current_level = "一般"
+
+        resource_keywords = (
+            "视频", "动画", "图解", "讲义", "文档", "思维导图", "练习", "代码", "案例",
+        )
+        resource_preferences = [
+            keyword for keyword in resource_keywords if keyword in message
+        ]
+
+        cognitive_style = None
+        if any(keyword in message for keyword in ("图解", "动画", "视频", "可视化")):
+            cognitive_style = "视觉化理解"
+        elif any(keyword in message for keyword in ("案例", "例题", "代码")):
+            cognitive_style = "案例与实践驱动"
+        elif any(keyword in message for keyword in ("讲义", "文档", "阅读")):
+            cognitive_style = "结构化阅读"
+
+        time_markers = [
+            marker for marker in ("工作日晚间", "晚上", "周末", "碎片时间")
+            if marker in message
+        ]
+        extraction = {
+            "knowledge_base": message if any(
+                keyword in message for keyword in ("学过", "掌握", "了解", "零基础")
+            ) else None,
+            "current_level": current_level,
+            "learning_goal": goal_match.group(1).strip() if goal_match else None,
+            "weak_points": [],
+            "error_prone_points": [],
+            "interests": [],
+            "resource_preferences": resource_preferences,
+            "weekly_hours": float(hours_match.group(1)) if hours_match else None,
+            "time_constraints": "、".join(time_markers) or None,
+            "cognitive_style": cognitive_style,
+            "practice_level": None,
+            "motivation": goal_match.group(1).strip() if goal_match else None,
+        }
+        return json.dumps(extraction, ensure_ascii=False)
 
     def _mock_diagnosis(self) -> str:
         return f"""{{
