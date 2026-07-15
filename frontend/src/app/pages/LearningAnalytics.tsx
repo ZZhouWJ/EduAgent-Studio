@@ -1,6 +1,6 @@
 import React from "react";
 import { ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip, BarChart, Bar } from "recharts";
-import { TrendingUp, Users, Target, BookOpen, MessageSquare, CheckCircle, Zap } from "lucide-react";
+import { TrendingUp, Target, BookOpen, MessageSquare, CheckCircle, Zap } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { statisticsApi, learningApi } from "@/lib/api";
 
@@ -77,13 +77,11 @@ export function LearningAnalytics() {
     : null;
 
   const pathNodes = learningPath?.nodes ?? [];
-  const pathEdges = learningPath?.edges ?? [];
-
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto pb-6">
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-        {kpiCards.map((item, i) => {
+        {kpiCards.map((item) => {
           const Icon = item.icon;
           return (
             <div key={item.label} className="bg-white rounded-xl p-4 shadow-[0_4px_12px_rgba(15,23,42,0.03)] border border-slate-100 flex flex-col justify-center gap-3">

@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { BookOpen, Clock, Target, Star, ChevronRight, HelpCircle, FileText, CheckCircle2, PlayCircle, PlusCircle, MessageSquare, RefreshCw, BookOpenCheck, ListTree } from "lucide-react";
+import { BookOpen, Target, Star, ChevronRight, HelpCircle, FileText, CheckCircle2, PlayCircle, PlusCircle, MessageSquare, RefreshCw, BookOpenCheck, ListTree } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { feedbackApi, resourcesApi, statisticsApi } from "@/lib/api";
 import type { MasteryChange, RecommendedResource } from "@/lib/api/learning";
@@ -68,8 +68,6 @@ export function LearningFeedback() {
       setSubmitting(false);
     }
   };
-
-  const masteryValue = MASTERY_LABELS.indexOf(selfMastery);
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6 pb-6">

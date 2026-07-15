@@ -92,8 +92,6 @@ export function StudentLearningPath() {
     if (label === "薄弱") return "bg-red-100 text-red-600";
     return "bg-slate-100 text-slate-600";
   };
-  const difficultyLabel: Record<string, string> = { basic: "基础", intermediate: "进阶", advanced: "高级" };
-
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
       <div className="flex items-start justify-end gap-4">

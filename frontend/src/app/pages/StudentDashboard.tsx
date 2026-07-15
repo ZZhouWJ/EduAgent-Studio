@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleDashed,
-  Clock3,
   FileText,
   Library,
   PlayCircle,
@@ -15,8 +14,6 @@ import {
 } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { learningApi, resourcesApi, statisticsApi, profilesApi } from "@/lib/api";
-import type { RecommendedResource } from "@/lib/api/learning";
-import { useAuthStore } from "@/stores/auth";
 import { SafeLottie } from "../components/SafeLottie";
 
 function resourceIcon(type: string) {
@@ -68,9 +65,6 @@ function StatCard({
 }
 
 export function StudentDashboard() {
-  const user = useAuthStore((s) => s.user);
-  const greetingName = user?.real_name ?? "同学";
-
   const { data: learningData } = useApi(() => learningApi.listCourses(), []);
   const { data: tasksData } = useApi(() => learningApi.listTasks({ page_size: 100 }), []);
   const { data: statsData } = useApi(() => statisticsApi.learningOverview(), []);
@@ -85,7 +79,6 @@ export function StudentDashboard() {
     [profileId, courseId]
   );
 
-  const courseName = learningData?.[0]?.name ?? "（未选课）";
   const tasks = tasksData?.items ?? [];
   const inProgressTasks = tasks.filter((t) => t.status === "in_progress").slice(0, 5);
   const pendingCount = tasks.filter((t) => t.status !== "completed").length;
