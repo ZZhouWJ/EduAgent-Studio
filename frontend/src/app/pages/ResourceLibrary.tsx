@@ -1,5 +1,6 @@
 import React from "react";
-import { Search, Filter, FileText, CheckCircle2, AlertCircle, PlayCircle, Code, ListTree, MoreVertical, X, Calendar, BookOpen } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Search, FileText, CheckCircle2, AlertCircle, PlayCircle, Code, ListTree, MoreVertical, X, Calendar, BookOpen } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { learningApi, resourcesApi } from "@/lib/api";
 import { SafeLottie } from "../components/SafeLottie";
@@ -37,11 +38,25 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export function ResourceLibrary() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [typeFilter, setTypeFilter] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("");
-  const [courseFilter, setCourseFilter] = React.useState("");
+  const [courseFilter, setCourseFilter] = React.useState(() => searchParams.get("course") ?? "");
   const [keyword, setKeyword] = React.useState("");
   const [selectedResource, setSelectedResource] = React.useState<(typeof resources)[0] | null>(null);
+
+  React.useEffect(() => {
+    const course = searchParams.get("course") ?? "";
+    setCourseFilter((current) => current === course ? current : course);
+  }, [searchParams]);
+
+  const handleCourseFilterChange = (value: string) => {
+    setCourseFilter(value);
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set("course", value);
+    else next.delete("course");
+    setSearchParams(next, { replace: true });
+  };
 
   const { data: drawerResource, loading: detailLoading } = useApi(
     () => selectedResource ? resourcesApi.getById(selectedResource.id) : Promise.resolve(null),
@@ -106,7 +121,7 @@ export function ResourceLibrary() {
           <select
             className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm"
             value={courseFilter}
-            onChange={(e) => setCourseFilter(e.target.value)}
+            onChange={(e) => handleCourseFilterChange(e.target.value)}
           >
             <option value="">所有课程</option>
             {courses.map((c) => (
@@ -124,9 +139,6 @@ export function ResourceLibrary() {
             <option value="rejected">被退回</option>
           </select>
         </div>
-        <button className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600 transition hover:bg-slate-50">
-          <Filter className="h-4 w-4" /> 更多筛选
-        </button>
       </div>
 
       {/* Type Tabs */}
