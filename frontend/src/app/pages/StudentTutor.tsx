@@ -3,7 +3,7 @@ import { Link } from "react-router-dom"
 import ReactMarkdown from "react-markdown"
 import { BookOpenCheck, Bot, CheckCircle2, ChevronRight, Clock3, Image, Loader2, MessageSquare, RotateCcw, Send, ThumbsDown, ThumbsUp, X, XCircle } from "lucide-react"
 import { useApi } from "@/lib/useApi"
-import { tutorApi, profilesApi, learningApi } from "@/lib/api"
+import { tutorApi, profilesApi, learningApi, multimodalApi } from "@/lib/api"
 import type { LearningPathNode } from "@/lib/api/learning"
 import { LearningPathGraph } from "../components/learning/LearningPathGraph"
 import type { Citation, PracticeQuestion, RecommendedResource, ContentBlock, IntentResult, SSEEvent } from "@/lib/api/tutor"
@@ -612,12 +612,11 @@ export function StudentTutor() {
         const byteNums = new Array(byteChars.length)
         for (let i = 0; i < byteChars.length; i++) byteNums[i] = byteChars.charCodeAt(i)
         const byteArr = new Uint8Array(byteNums)
-        const formData = new FormData()
-        formData.append("file", new Blob([byteArr], { type: "image/png" }), imageInfo.filename)
-        formData.append("question", text)
-
-        const resp = await fetch("/api/multimodal/image/understand", { method: "POST", body: formData })
-        const data = await resp.json()
+        const data = await multimodalApi.understandImage(
+          new Blob([byteArr], { type: "image/jpeg" }),
+          imageInfo.filename,
+          text,
+        )
         if (data.success) imageResult = "[图片分析结果] " + data.content + "\n\n"
       } catch {
         imageResult = "[图片分析失败]\n\n"

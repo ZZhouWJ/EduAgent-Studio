@@ -1,7 +1,7 @@
 """
 讯飞多模态 API 封装（P1/P2）
 
-包含：STT / 图片理解 / 图片生成 / 文本改写 / OCR / TTS
+包含：图片理解 / 图片生成 / 文本改写 / OCR / TTS
 认证与大模型共用 HMAC-SHA256 签名。
 
 各 API 文档：https://www.xfyun.cn/doc/
@@ -12,10 +12,8 @@ import hashlib
 import hmac
 import json
 import logging
-import ssl
+import threading
 import time
-from datetime import datetime
-from time import mktime
 from typing import Optional
 from urllib.parse import urlencode, urlparse
 from wsgiref.handlers import format_date_time
@@ -26,20 +24,18 @@ import websocket
 logger = logging.getLogger(__name__)
 
 # 各 API 地址（讯飞控制台查看具体地址）
-STT_URL = "https://队伍建设-api.xf-yun.com/asr吐出"
 IMAGE_UNDERSTAND_URL = "wss://spark-api.cn-huabei-1.xf-yun.com/v2.1/image"
 IMAGE_GENERATE_URL = "https://oa.aiadv.xf-yun.com/v1/generate"
 TEXT_REWRITE_URL = "https://oa.aiadv.xf-yun.com/v1/analysis"
 OCR_URL = "https://oa.aiadv.xf-yun.com/v1/ocr"
-TTS_URL = "https://队伍建设-api.xf-yun.com/tts_post"
+TTS_URL = "wss://tts-api.xfyun.cn/v2/tts"
 
 
 def _build_ws_url(ws_url: str, api_key: str, api_secret: str) -> str:
     """构建讯飞 WebSocket 鉴权 URL（HMAC-SHA256）。"""
     host = urlparse(ws_url).netloc
     path = urlparse(ws_url).path
-    now = datetime.now()
-    date = format_date_time(mktime(now.timetuple()))
+    date = format_date_time(time.time())
 
     sign_origin = f"host: {host}\ndate: {date}\nGET {path} HTTP/1.1"
     sig_sha = hmac.new(
@@ -79,60 +75,6 @@ def _post(url: str, app_id: str, api_key: str, api_secret: str,
     resp = httpx.post(url, headers=headers, json=body, timeout=timeout)
     resp.raise_for_status()
     return resp.json()
-
-
-# ---------------------------------------------------------------------------
-# STT — 语音听写（Speech-to-Text）
-# ---------------------------------------------------------------------------
-
-def speech_to_text(
-    audio_data: bytes,
-    format: str = "wav",
-    app_id: str = "",
-    api_key: str = "",
-    api_secret: str = "",
-) -> str:
-    """
-    讯飞语音听写：音频 bytes → 中文文本。
-
-    Args:
-        audio_data: 音频文件二进制（建议 16kHz 16bit PCM/WAV）
-        format: 音频格式，"wav" / "pcm" / "opus" 等
-        app_id/api_key/api_secret: 讯飞凭证（同大模型）
-    Returns:
-        识别出的中文文本，失败返回空字符串
-    """
-    if not app_id or not api_key or not api_secret:
-        logger.warning("[IFlyTek STT] 凭证未配置")
-        return ""
-
-    try:
-        audio_b64 = base64.b64encode(audio_data).decode()
-        payload = {
-            "data": {
-                "status": 2,
-                "format": format,
-                "encoding": "raw",
-                "sample": 16000,
-                "bits": 16,
-                "channel": 1,
-                "token": api_key,
-                "content": audio_b64,
-            }
-        }
-        data = _post(STT_URL, app_id, api_key, api_secret, payload)
-
-        code = data.get("header", {}).get("code", 0)
-        if code != 0:
-            logger.warning(f"[IFlyTek STT] code={code}: {data.get('header', {}).get('message')}")
-            return ""
-
-        texts = data.get("payload", {}).get("result", {}).get("ws", [])
-        return "".join(w.get("cw", []).get("w", "") for w in texts if w.get("cw"))
-
-    except Exception as e:
-        logger.error(f"[IFlyTek STT] failed: {e}")
-        return ""
 
 
 # ---------------------------------------------------------------------------
@@ -212,7 +154,12 @@ def image_understand(
             on_message=on_message,
             on_error=on_error,
         )
-        ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
+        timeout_guard = threading.Timer(60, ws.close)
+        timeout_guard.start()
+        try:
+            ws.run_forever(ping_interval=20, ping_timeout=10)
+        finally:
+            timeout_guard.cancel()
 
         if error_msg:
             logger.error(f"[IFlyTek ImageUnderstand] error: {error_msg[0]}")
@@ -345,35 +292,66 @@ def text_to_speech(
         return b""
 
     try:
-        auth = _auth(app_id, api_secret)
+        if not text.strip() or len(text.encode("utf-8")) >= 8000:
+            logger.warning("[IFlyTek TTS] 文本为空或超过 8000 字节")
+            return b""
+
+        ws_url = _build_ws_url(TTS_URL, api_key, api_secret)
+        chunks: list[bytes] = []
+        errors: list[str] = []
         body = {
-            "common": {"app_id": auth["app_id"]},
+            "common": {"app_id": app_id},
             "business": {
                 "aue": "lame",
                 "auf": "audio/L16;rate=16000",
-                "voice_name": voice,
+                "vcn": voice,
                 "speed": speed,
                 "volume": volume,
                 "pitch": pitch,
-                "tts_audio_settings": {"aue": "lame"},
+                "tte": "UTF8",
             },
             "data": {
                 "status": 2,
                 "text": base64.b64encode(text.encode()).decode(),
             },
         }
-        headers = {"Content-Type": "application/json"}
-        resp = httpx.post(TTS_URL, headers=headers, json=body, timeout=30.0)
-        resp.raise_for_status()
-        result = resp.json()
+        def on_open(ws):
+            ws.send(json.dumps(body))
 
-        code = result.get("header", {}).get("code", 0)
-        if code != 0:
-            logger.warning(f"[IFlyTek TTS] code={code}")
+        def on_message(ws, message):
+            result = json.loads(message)
+            code = result.get("code", 0)
+            if code != 0:
+                errors.append(result.get("message", f"code={code}"))
+                ws.close()
+                return
+            data = result.get("data", {})
+            audio_b64 = data.get("audio", "")
+            if audio_b64:
+                chunks.append(base64.b64decode(audio_b64))
+            if data.get("status") == 2:
+                ws.close()
+
+        def on_error(ws, error):
+            errors.append(str(error))
+
+        ws = websocket.WebSocketApp(
+            ws_url,
+            on_open=on_open,
+            on_message=on_message,
+            on_error=on_error,
+        )
+        timeout_guard = threading.Timer(60, ws.close)
+        timeout_guard.start()
+        try:
+            ws.run_forever(ping_interval=20, ping_timeout=10)
+        finally:
+            timeout_guard.cancel()
+
+        if errors:
+            logger.error(f"[IFlyTek TTS] error: {errors[0]}")
             return b""
-
-        audio_b64 = result.get("payload", {}).get("audio", "")
-        return base64.b64decode(audio_b64) if audio_b64 else b""
+        return b"".join(chunks)
 
     except Exception as e:
         logger.error(f"[IFlyTek TTS failed: {e}")

@@ -108,6 +108,9 @@ export { knowledgeApi, type Material, type MaterialChunk, type SearchResult } fr
 // Tutor
 export { tutorApi, type TutorChatResponse, type Citation, type PracticeQuestion, type RecommendedResource, type ContentBlock, type IntentResult, type ResourceType } from './tutor'
 
+// Multimodal
+export { multimodalApi, type ImageUnderstandResult } from './multimodal'
+
 // Statistics
 export {
   statisticsApi,
