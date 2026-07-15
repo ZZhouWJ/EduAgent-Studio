@@ -1,8 +1,8 @@
 """学生画像 Service"""
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from app.repositories.profile_repo import ProfileRepository
+from app.services.course_access_service import CourseAccessService
 from app.utils.exceptions import ForbiddenException, NotFoundException
 
 
@@ -11,18 +11,11 @@ class ProfileService:
 
     def __init__(self):
         self._repo = ProfileRepository()
+        self._access = CourseAccessService()
 
     def require_profile_access(self, profile_id: int, user: Any) -> None:
-        """仅画像本人、教师或管理员可以访问画像私有数据。"""
-        owner_id = self._repo.get_profile_owner_id(profile_id)
-        if owner_id is None:
-            raise NotFoundException(message="画像不存在")
-
-        roles = set(user.get("roles") or [])
-        if roles.intersection({"teacher", "admin"}):
-            return
-        if int(user.get("user_id") or 0) != owner_id:
-            raise ForbiddenException(message="无权访问该学生画像")
+        """仅画像本人、所属课程教师或管理员可以访问画像私有数据。"""
+        self._access.require_profile_access(profile_id, user)
 
     def list_profiles(
         self,
@@ -46,11 +39,16 @@ class ProfileService:
             标准响应 dict：{code, message, data: {items, total, page, page_size}}
         """
         try:
+            accessible_course_ids = self._access.list_accessible_course_ids(user)
+            if course_id is not None:
+                self._access.require_course_access(course_id, user)
+
             items, total = self._repo.list_profiles(
                 page=page,
                 page_size=page_size,
                 course_id=course_id,
                 keyword=keyword,
+                course_ids=accessible_course_ids if course_id is None else None,
             )
             return {
                 "code": 0,
@@ -62,6 +60,8 @@ class ProfileService:
                     "page_size": page_size,
                 },
             }
+        except (ForbiddenException, NotFoundException):
+            raise
         except Exception as e:
             return {
                 "code": 500,
@@ -112,10 +112,13 @@ class ProfileService:
         更新学生画像字段。
         """
         try:
+            self.require_profile_access(profile_id, user)
             updated = self._repo.update_profile(profile_id, data)
             if updated is None:
                 return {"code": 404, "message": "画像不存在", "data": None}
             return {"code": 0, "message": "更新成功", "data": updated}
+        except (ForbiddenException, NotFoundException):
+            raise
         except Exception as e:
             return {"code": 500, "message": f"更新失败: {e}", "data": None}
 
@@ -126,6 +129,7 @@ class ProfileService:
         更新或插入知识点掌握度记录。
         """
         try:
+            self.require_profile_access(profile_id, user)
             kp_id = data.get("kp_id")
             mastery = data.get("mastery")
             update_reason = data.get("update_reason")
@@ -156,5 +160,7 @@ class ProfileService:
                     ),
                 },
             }
+        except (ForbiddenException, NotFoundException):
+            raise
         except Exception as e:
             return {"code": 500, "message": f"掌握度更新失败: {e}", "data": None}

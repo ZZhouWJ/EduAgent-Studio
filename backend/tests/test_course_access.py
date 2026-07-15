@@ -64,6 +64,42 @@ class CourseAccessTests(unittest.TestCase):
                 22, 3, {"user_id": 7, "roles": ["teacher"]}
             )
 
+    def test_profile_owner_and_admin_can_access(self):
+        self.service._repo.get_profile_access_context.return_value = {
+            "student_id": 12,
+            "course_id": 3,
+        }
+        self.assertEqual(
+            self.service.require_profile_access(
+                22, {"user_id": 12, "roles": ["student_member"]}
+            ),
+            3,
+        )
+        self.assertEqual(
+            self.service.require_profile_access(
+                22, {"user_id": 1, "roles": ["admin"]}
+            ),
+            3,
+        )
+
+    def test_teacher_profile_access_is_limited_to_owned_course(self):
+        self.service._repo.get_profile_access_context.return_value = {
+            "student_id": 12,
+            "course_id": 3,
+        }
+        self.service.require_profile_access(22, {"user_id": 7, "roles": ["teacher"]})
+        with self.assertRaises(ForbiddenException):
+            self.service.require_profile_access(
+                22, {"user_id": 8, "roles": ["teacher"]}
+            )
+
+    def test_missing_profile_access_context_returns_not_found(self):
+        self.service._repo.get_profile_access_context.return_value = None
+        with self.assertRaises(NotFoundException):
+            self.service.require_profile_access(
+                22, {"user_id": 12, "roles": ["student_member"]}
+            )
+
     def test_task_access_delegates_to_owning_course(self):
         self.service._repo.get_task_course_id.return_value = 3
         course_id = self.service.require_task_access(

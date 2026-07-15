@@ -60,6 +60,21 @@ class CourseAccessService:
             self._repo.get_task_course_id(task_id), user, "任务不存在"
         )
 
+    def require_profile_access(self, profile_id: int, user: Dict[str, Any]) -> int:
+        context = self._repo.get_profile_access_context(profile_id)
+        if context is None:
+            raise NotFoundException("学生画像不存在")
+
+        user_id = int(user["user_id"])
+        roles = set(user.get("roles", []))
+        course_id = int(context["course_id"])
+        if "admin" in roles or int(context["student_id"]) == user_id:
+            return course_id
+        if "teacher" in roles:
+            self.require_course_access(course_id, user)
+            return course_id
+        raise ForbiddenException("无权访问该学生画像")
+
     def require_profile_course(
         self,
         profile_id: int,

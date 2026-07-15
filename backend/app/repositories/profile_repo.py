@@ -99,7 +99,11 @@ class ProfileRepository:
         page_size: int = 20,
         course_id: Optional[int] = None,
         keyword: Optional[str] = None,
+        course_ids: Optional[List[int]] = None,
     ) -> Tuple[List[Dict[str, Any]], int]:
+        if course_ids is not None and not course_ids:
+            return [], 0
+
         offset = (page - 1) * page_size
 
         count_sql = """
@@ -114,6 +118,10 @@ class ProfileRepository:
         if course_id is not None:
             count_sql += " AND sp.course_id = %s"
             count_params.append(course_id)
+        elif course_ids is not None:
+            placeholders = ", ".join(["%s"] * len(course_ids))
+            count_sql += f" AND sp.course_id IN ({placeholders})"
+            count_params.extend(course_ids)
 
         if keyword:
             count_sql += " AND (u.real_name LIKE %s OR u.student_no LIKE %s)"
@@ -220,6 +228,10 @@ class ProfileRepository:
         if course_id is not None:
             data_sql += " AND sp.course_id = %s"
             data_params.append(course_id)
+        elif course_ids is not None:
+            placeholders = ", ".join(["%s"] * len(course_ids))
+            data_sql += f" AND sp.course_id IN ({placeholders})"
+            data_params.extend(course_ids)
 
         if keyword:
             data_sql += " AND (u.real_name LIKE %s OR u.student_no LIKE %s)"
@@ -404,6 +416,23 @@ class ProfileRepository:
         update_reason: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         now = datetime.now()
+
+        with get_db_cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT 1
+                FROM student_profiles sp
+                INNER JOIN knowledge_points kp
+                    ON kp.course_id = sp.course_id AND kp.is_deleted = 0
+                WHERE sp.profile_id = %s
+                  AND kp.kp_id = %s
+                  AND sp.is_deleted = 0
+                LIMIT 1
+                """,
+                (profile_id, kp_id),
+            )
+            if cursor.fetchone() is None:
+                return None
 
         update_sql = """
             UPDATE student_knowledge_mastery

@@ -1,6 +1,6 @@
 """课程级数据访问上下文查询。"""
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from app.database import get_db_cursor
 
@@ -77,6 +77,26 @@ class CourseAccessRepository:
             "SELECT course_id FROM student_profiles WHERE profile_id = %s AND is_deleted = 0",
             profile_id,
         )
+
+    def get_profile_access_context(
+        self, profile_id: int
+    ) -> Optional[Dict[str, Any]]:
+        with get_db_cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT student_id, course_id
+                FROM student_profiles
+                WHERE profile_id = %s AND is_deleted = 0
+                """,
+                (profile_id,),
+            )
+            row = cursor.fetchone()
+        if not row:
+            return None
+        return {
+            "student_id": int(row["student_id"]),
+            "course_id": int(row["course_id"]),
+        }
 
     def get_task_course_id(self, task_id: int) -> Optional[int]:
         return self._single_course_id(
