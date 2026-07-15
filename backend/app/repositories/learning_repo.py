@@ -38,6 +38,15 @@ def _map_difficulty(level: Optional[str]) -> str:
     return DIFFICULTY_MAP.get(level.lower(), "基础")
 
 
+def _current_semester(reference: Optional[datetime] = None) -> str:
+    current = reference or datetime.now()
+    if current.month >= 9:
+        return f"{current.year}-{current.year + 1}学年秋季学期"
+    academic_year = current.year - 1
+    term = "春季学期" if current.month >= 2 else "秋季学期"
+    return f"{academic_year}-{current.year}学年{term}"
+
+
 class LearningRepository:
     """学习模块数据访问层。"""
 
@@ -60,9 +69,31 @@ class LearningRepository:
                 c.course_code,
                 c.description,
                 c.status,
-                u.real_name AS teacher
+                u.real_name AS teacher,
+                COALESCE(kp_stats.kp_count, 0) AS kp_count,
+                COALESCE(profile_stats.student_count, 0) AS student_count,
+                COALESCE(profile_stats.mastery_avg, 0) AS mastery_avg,
+                COALESCE(task_stats.task_count, 0) AS task_count,
+                COALESCE(resource_stats.resource_count, 0) AS resource_count
             FROM courses c
             LEFT JOIN users u ON c.teacher_id = u.user_id AND u.is_deleted = 0
+            LEFT JOIN (
+                SELECT course_id, COUNT(*) AS kp_count
+                FROM knowledge_points WHERE is_deleted = 0 GROUP BY course_id
+            ) kp_stats ON kp_stats.course_id = c.course_id
+            LEFT JOIN (
+                SELECT course_id, COUNT(*) AS student_count,
+                       AVG(mastery_score) AS mastery_avg
+                FROM student_profiles WHERE is_deleted = 0 GROUP BY course_id
+            ) profile_stats ON profile_stats.course_id = c.course_id
+            LEFT JOIN (
+                SELECT course_id, COUNT(*) AS task_count
+                FROM learning_tasks WHERE is_deleted = 0 GROUP BY course_id
+            ) task_stats ON task_stats.course_id = c.course_id
+            LEFT JOIN (
+                SELECT course_id, COUNT(*) AS resource_count
+                FROM learning_resources WHERE is_deleted = 0 GROUP BY course_id
+            ) resource_stats ON resource_stats.course_id = c.course_id
             WHERE c.is_deleted = 0
         """ + course_filter + """
             ORDER BY c.course_id ASC
@@ -72,63 +103,54 @@ class LearningRepository:
             cursor.execute(sql, params)
             courses = cursor.fetchall()
 
-            result = []
-            for course in courses:
-                course_id = course["course_id"]
-
-                kp_sql = """
-                    SELECT kp_id, kp_name, difficulty_level
-                    FROM knowledge_points
-                    WHERE course_id = %s AND is_deleted = 0
-                    ORDER BY kp_id ASC
-                """
-                cursor.execute(kp_sql, (course_id,))
-                kp_rows = cursor.fetchall()
-                knowledge_points = [
-                    {
+            knowledge_points_by_course: Dict[int, List[Dict[str, Any]]] = {
+                int(course["course_id"]): [] for course in courses
+            }
+            if courses:
+                returned_ids = list(knowledge_points_by_course)
+                placeholders = ",".join(["%s"] * len(returned_ids))
+                cursor.execute(
+                    f"""
+                    SELECT kp.course_id, kp.kp_id, kp.kp_name, kp.difficulty_level,
+                           COALESCE(AVG(mastery.mastery_level), 0) AS mastery_avg
+                    FROM knowledge_points kp
+                    LEFT JOIN student_knowledge_mastery mastery
+                      ON mastery.kp_id = kp.kp_id AND mastery.is_deleted = 0
+                    WHERE kp.course_id IN ({placeholders}) AND kp.is_deleted = 0
+                    GROUP BY kp.course_id, kp.kp_id, kp.kp_name, kp.difficulty_level
+                    ORDER BY kp.course_id, kp.kp_id
+                    """,
+                    returned_ids,
+                )
+                for row in cursor.fetchall():
+                    knowledge_points_by_course[int(row["course_id"])].append({
                         "id": row["kp_id"],
                         "name": row["kp_name"],
-                        "mastery_avg": 0.5,
+                        "mastery_avg": float(row["mastery_avg"]),
                         "difficulty": _map_difficulty(row["difficulty_level"]),
-                    }
-                    for row in kp_rows
-                ]
+                    })
 
-                cursor.execute(
-                    "SELECT COUNT(*) AS cnt FROM knowledge_points WHERE course_id = %s AND is_deleted = 0",
-                    (course_id,),
-                )
-                kp_count = cursor.fetchone()["cnt"]
-
-                cursor.execute(
-                    "SELECT COUNT(*) AS cnt FROM student_profiles WHERE course_id = %s AND is_deleted = 0",
-                    (course_id,),
-                )
-                student_count = cursor.fetchone()["cnt"]
-
-                cursor.execute(
-                    "SELECT COUNT(*) AS cnt FROM learning_tasks WHERE course_id = %s AND is_deleted = 0",
-                    (course_id,),
-                )
-                task_count = cursor.fetchone()["cnt"]
-
-                result.append(
-                    {
-                        "id": course_id,
-                        "name": course["course_name"],
-                        "code": course["course_code"],
-                        "description": course["description"],
-                        "teacher": course["teacher"] or "",
-                        "semester": "2025-2026学年春季学期",
-                        "status": course["status"],
-                        "knowledge_point_count": kp_count,
-                        "student_count": student_count,
-                        "task_count": task_count,
-                        "cover_color": _compute_cover_color(course_id),
-                        "tags": [],
-                        "knowledge_points": knowledge_points,
-                    }
-                )
+        result = []
+        semester = _current_semester()
+        for course in courses:
+            course_id = int(course["course_id"])
+            result.append({
+                "id": course_id,
+                "name": course["course_name"],
+                "code": course["course_code"],
+                "description": course["description"],
+                "teacher": course["teacher"] or "",
+                "semester": semester,
+                "status": course["status"],
+                "knowledge_point_count": int(course["kp_count"]),
+                "student_count": int(course["student_count"]),
+                "task_count": int(course["task_count"]),
+                "resource_count": int(course["resource_count"]),
+                "mastery_avg": float(course["mastery_avg"]),
+                "cover_color": _compute_cover_color(course_id),
+                "tags": [],
+                "knowledge_points": knowledge_points_by_course[course_id],
+            })
 
         return result
 

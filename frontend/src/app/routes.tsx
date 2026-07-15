@@ -50,6 +50,7 @@ export const router = createBrowserRouter(
         { path: "admin/users", lazy: async () => ({ Component: (await import("./pages/AdminUsers")).AdminUsers }) },
         { path: "admin/courses", lazy: async () => ({ Component: (await import("./pages/AdminCourses")).AdminCourses }) },
         { path: "admin/resources", lazy: async () => ({ Component: (await import("./pages/ResourceLibrary")).ResourceLibrary }) },
+        { path: "admin/knowledge-base", lazy: async () => ({ Component: (await import("./pages/TeacherKnowledgeBase")).TeacherKnowledgeBase }) },
         { path: "admin/model-config", lazy: async () => ({ Component: (await import("./pages/AdminModelConfig")).AdminModelConfig }) },
         { path: "admin/agent-config", lazy: async () => ({ Component: (await import("./pages/AdminAgentConfig")).AdminAgentConfig }) },
         { path: "admin/prompts", lazy: async () => ({ Component: (await import("./pages/AdminPrompts")).AdminPrompts }) },

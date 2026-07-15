@@ -16,12 +16,12 @@ function mapCourse(c: Course) {
     department: c.semester || "-",
     students: c.student_count ?? 0,
     knowledgePoints: c.knowledge_point_count ?? 0,
-    resources: "-",
-    mastery: 0,
+    resources: c.resource_count ?? 0,
+    mastery: Math.round((c.mastery_avg ?? 0) * 100),
     status: statusMap[c.status] ?? c.status,
     rawStatus: c.status,
     summary: c.description || "暂无课程描述",
-    chapters: c.tags?.length ? c.tags : ["课程内容待完善"],
+    chapters: c.knowledge_points?.map((point) => point.name) ?? [],
     raw: c,
   };
 }
@@ -97,10 +97,10 @@ export function AdminCourses() {
 
   const stats = [
     { label: "课程总数", value: `${courses.length || "-"}`, hint: "平台课程", icon: BookOpen, tone: "blue" as const },
-    { label: "活跃课程", value: `${courses.filter((c) => c.status === "活跃").length || "-"}`, hint: "最近 7 日有学习行为", icon: GraduationCap, tone: "emerald" as const },
-    { label: "课程负责人", value: String(courses.filter((c) => c.owner && c.owner !== "-").length) || "-", hint: "已分配教师", icon: UserRound, tone: "purple" as const },
+    { label: "活跃课程", value: String(courses.filter((c) => c.status === "活跃").length), hint: "当前启用", icon: GraduationCap, tone: "emerald" as const },
+    { label: "课程负责人", value: String(new Set(courses.filter((c) => c.owner !== "-").map((c) => c.owner)).size), hint: "已分配教师", icon: UserRound, tone: "purple" as const },
     { label: "课程知识点", value: `${courses.reduce((sum, c) => sum + c.knowledgePoints, 0) || "-"}`, hint: "结构化节点", icon: Database, tone: "cyan" as const },
-    { label: "资源总量", value: "-", hint: "待接入资源", icon: Library, tone: "orange" as const },
+    { label: "资源总量", value: String(courses.reduce((sum, c) => sum + c.resources, 0)), hint: "课程资源", icon: Library, tone: "orange" as const },
     { label: "归档课程", value: `${courses.filter((c) => c.status === "归档").length || "-"}`, hint: "历史课程", icon: FileText, tone: "red" as const },
   ];
 
@@ -203,11 +203,11 @@ export function AdminCourses() {
         <DetailDrawer title={selected.name} subtitle={`${selected.owner} / ${selected.department}`} open={!!selected} onClose={() => setSelected(null)}>
           <div className="space-y-5">
             <p className="text-sm leading-6 text-slate-600">{selected.summary}</p>
-            <div className="grid grid-cols-2 gap-3">{selected.chapters.map((item) => <div key={item} className="rounded-xl bg-slate-50 p-3 text-sm font-bold text-slate-700">{item}</div>)}</div>
+            {selected.chapters.length > 0 && <div className="grid grid-cols-2 gap-3">{selected.chapters.map((item) => <div key={item} className="rounded-xl bg-slate-50 p-3 text-sm font-bold text-slate-700">{item}</div>)}</div>}
             <div className="grid grid-cols-2 gap-3">
               <button onClick={() => navigate("/admin/users")} className={`${primaryButton} cursor-pointer`}><Users className="h-4 w-4" />分配负责人</button>
-              <button onClick={() => navigate(`/student/resources?course=${selected.id}`)} className={`${secondaryButton} cursor-pointer`}>查看课程资源</button>
-              <button onClick={() => navigate(`/teacher/knowledge-base?course=${selected.id}`)} className={`${secondaryButton} cursor-pointer`}>查看课程知识库</button>
+              <button onClick={() => navigate(`/admin/resources?course=${selected.id}`)} className={`${secondaryButton} cursor-pointer`}>查看课程资源</button>
+              <button onClick={() => navigate(`/admin/knowledge-base?course=${selected.id}`)} className={`${secondaryButton} cursor-pointer`}>查看课程知识库</button>
               <button onClick={() => handleUpdateStatus(selected.id, selected.rawStatus)} className={`${secondaryButton} cursor-pointer`}>更新状态</button>
             </div>
           </div>

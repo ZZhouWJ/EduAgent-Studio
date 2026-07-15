@@ -18,6 +18,8 @@ export interface Course {
   knowledge_point_count: number
   student_count: number
   task_count: number
+  resource_count: number
+  mastery_avg: number
   cover_color: string
   tags: string[]
   knowledge_points?: KnowledgePoint[]
