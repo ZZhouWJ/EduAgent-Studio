@@ -790,65 +790,57 @@ def get_platform_stats() -> Dict[str, Any]:
         avg_latency_ms, success_rate
     """
     with get_db_cursor() as cursor:
-        # 总调用次数
         cursor.execute(
-            "SELECT COUNT(*) as cnt FROM ai_invocations WHERE is_deleted = 0"
+            """
+            SELECT
+                COUNT(*) AS invocation_count,
+                COALESCE(SUM(input_tokens + output_tokens), 0) AS total_tokens,
+                COALESCE(SUM(DATE(created_at) = CURDATE()), 0) AS today_invocations,
+                COALESCE(AVG(latency_ms), 0) AS avg_latency_ms,
+                COALESCE(
+                    SUM(status = 'success') / NULLIF(COUNT(*), 0),
+                    0
+                ) AS success_rate
+            FROM ai_invocations
+            """
         )
-        invocation_count = cursor.fetchone()["cnt"]
+        invocation_stats = cursor.fetchone()
 
-        # 总Token消耗
-        cursor.execute(
-            "SELECT SUM(input_tokens + output_tokens) as total FROM ai_invocations WHERE is_deleted = 0"
-        )
-        total_tokens = cursor.fetchone()["total"] or 0
-
-        # 总成本
-        cursor.execute(
-            "SELECT SUM(total_cost) as total FROM cost_records WHERE is_deleted = 0"
-        )
+        cursor.execute("SELECT COALESCE(SUM(total_cost), 0) AS total FROM cost_records")
         total_cost = cursor.fetchone()["total"] or 0.0
 
-        # 今日调用
         cursor.execute(
-            "SELECT COUNT(*) as cnt FROM ai_invocations WHERE DATE(created_at) = CURDATE() AND is_deleted = 0"
+            """
+            SELECT
+                COUNT(*) AS resource_count,
+                COALESCE(SUM(status = 'pending_review'), 0) AS pending_resources
+            FROM learning_resources
+            WHERE is_deleted = 0
+            """
         )
-        today_invocations = cursor.fetchone()["cnt"]
+        resource_stats = cursor.fetchone()
 
-        # 资源总数
         cursor.execute(
-            "SELECT COUNT(*) as cnt FROM learning_resources WHERE is_deleted = 0"
+            """
+            SELECT
+                (SELECT COUNT(DISTINCT student_id)
+                 FROM student_profiles WHERE is_deleted = 0) AS student_count,
+                (SELECT COUNT(*) FROM courses WHERE is_deleted = 0) AS course_count
+            """
         )
-        resource_count = cursor.fetchone()["cnt"]
-
-        # 待审核资源
-        cursor.execute(
-            "SELECT COUNT(*) as cnt FROM learning_resources WHERE status = 'pending_review' AND is_deleted = 0"
-        )
-        pending_resources = cursor.fetchone()["cnt"]
-
-        # 学生数
-        cursor.execute(
-            "SELECT COUNT(*) as cnt FROM student_profiles WHERE is_deleted = 0"
-        )
-        student_count = cursor.fetchone()["cnt"]
-
-        # 课程数
-        cursor.execute(
-            "SELECT COUNT(*) as cnt FROM courses WHERE is_deleted = 0"
-        )
-        course_count = cursor.fetchone()["cnt"]
+        learning_stats = cursor.fetchone()
 
     return {
-        "invocation_count": invocation_count or 0,
-        "total_tokens": int(total_tokens),
+        "invocation_count": invocation_stats["invocation_count"] or 0,
+        "total_tokens": int(invocation_stats["total_tokens"] or 0),
         "total_cost": round(float(total_cost), 6),
-        "today_invocations": today_invocations or 0,
-        "resource_count": resource_count or 0,
-        "pending_resources": pending_resources or 0,
-        "student_count": student_count or 0,
-        "course_count": course_count or 0,
-        "avg_latency_ms": 0,  # 可后续添加
-        "success_rate": 0.95,  # 可后续添加
+        "today_invocations": invocation_stats["today_invocations"] or 0,
+        "resource_count": resource_stats["resource_count"] or 0,
+        "pending_resources": resource_stats["pending_resources"] or 0,
+        "student_count": learning_stats["student_count"] or 0,
+        "course_count": learning_stats["course_count"] or 0,
+        "avg_latency_ms": round(float(invocation_stats["avg_latency_ms"] or 0), 2),
+        "success_rate": round(float(invocation_stats["success_rate"] or 0), 4),
     }
 
 
