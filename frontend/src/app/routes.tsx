@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate, useNavigate } from "react-router-dom";
 import { Layout } from "./components/Layout";
+import { RouteError } from "./components/RouteError";
 import { useAuthStore } from "@/stores/auth";
 import { useEffect } from "react";
 
@@ -19,11 +20,13 @@ export const router = createBrowserRouter(
   [
     {
       path: "/login",
+      errorElement: <RouteError />,
       lazy: async () => ({ Component: (await import("./pages/Login")).Login }),
     },
     {
       path: "/",
       Component: Layout,
+      errorElement: <RouteError />,
       children: [
         { index: true, element: <RootRedirect /> },
 
