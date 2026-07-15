@@ -10,6 +10,7 @@
 
 import json
 import logging
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from app.config import get_settings
@@ -18,6 +19,17 @@ from app.repositories.profile_dialog_repo import ProfileDialogRepository
 from app.repositories.profile_repo import ProfileRepository
 
 logger = logging.getLogger(__name__)
+
+
+def _json_safe(value: Any) -> Any:
+    """将数据库值转换为可稳定写入 JSON 历史的基础类型。"""
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    return value
 
 # 画像抽取 Prompt 模板
 EXTRACTION_PROMPT = """你是一个学生学习画像分析助手。请从学生的描述中抽取结构化的画像信息。
@@ -462,7 +474,7 @@ class ProfileDialogService:
         if not profile:
             return {}
 
-        return {
+        return _json_safe({
             "learning_goal": profile.get("learning_goal", ""),
             "knowledge_base": profile.get("knowledge_base", ""),
             "current_level": profile.get("current_level", ""),
@@ -475,7 +487,7 @@ class ProfileDialogService:
             "interests": profile.get("interests", ""),
             "weekly_hours": profile.get("weekly_hours", 0),
             "mastery_score": profile.get("mastery_score", 0.0),
-        }
+        })
 
     def _generate_change_summary(
         self, extracted_data: Dict[str, Any]

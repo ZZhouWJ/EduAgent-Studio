@@ -1,5 +1,6 @@
 import json
 import unittest
+from decimal import Decimal
 
 from app.services.profile_dialog_service import ProfileDialogService
 
@@ -39,6 +40,17 @@ class ProfileDialogPatchTests(unittest.TestCase):
             self.service._build_profile_patch({"weekly_hours": 200})["weekly_hours"],
             168,
         )
+
+    def test_history_snapshot_converts_decimal_values(self):
+        snapshot = self.service._profile_to_history_format(
+            {
+                "mastery_score": Decimal("0.350"),
+                "error_prone_points": ["边界条件"],
+            }
+        )
+
+        self.assertEqual(snapshot["mastery_score"], 0.35)
+        json.dumps(snapshot)
 
 
 if __name__ == "__main__":
