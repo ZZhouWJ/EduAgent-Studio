@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect, useCallback } from "react"
+import React, { useState, useRef, useEffect } from "react"
 import { Link } from "react-router-dom"
 import ReactMarkdown from "react-markdown"
-import { BookOpenCheck, Bot, CheckCircle2, ChevronRight, Clock3, Image, Loader2, MessageSquare, Send, ThumbsDown, ThumbsUp, X, XCircle } from "lucide-react"
+import { BookOpenCheck, Bot, CheckCircle2, ChevronRight, Clock3, Image, Loader2, MessageSquare, RotateCcw, Send, ThumbsDown, ThumbsUp, X, XCircle } from "lucide-react"
 import { useApi } from "@/lib/useApi"
 import { tutorApi, profilesApi, learningApi } from "@/lib/api"
 import type { LearningPathNode } from "@/lib/api/learning"
@@ -105,7 +105,7 @@ function ThinkingBar({ events, isFirstThinking }: { events: ExecutionEvent[]; is
         {/* 工具步骤条 */}
         {events.length > 0 && (
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {events.map((evt, i) => (
+            {events.map((evt) => (
               <div
                 key={evt.id}
                 className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-300 ${
@@ -169,7 +169,7 @@ function ExecutionTrace({ events }: { events: ExecutionEvent[] }) {
         AI 执行轨迹
       </div>
       <div className="space-y-2">
-        {events.map((evt, i) => (
+        {events.map((evt) => (
           <div key={evt.id} className="flex items-center gap-3 text-sm">
             {/* 状态图标 */}
             <div className={`shrink-0 rounded-full p-1 ${
@@ -228,7 +228,7 @@ function ExecutionTrace({ events }: { events: ExecutionEvent[] }) {
 }
 
 /* ─── 引用来源卡片 ─────────────────────────────────────── */
-function CitationsCard({ citations }: { citations: Citation[] }) {
+function CitationsCard({ citations }: { citations?: Citation[] }) {
   if (!citations?.length) return null
   return (
     <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 p-3">
@@ -246,7 +246,7 @@ function CitationsCard({ citations }: { citations: Citation[] }) {
 }
 
 /* ─── 练习题卡片 ─────────────────────────────────────── */
-function PracticeCard({ questions }: { questions: PracticeQuestion[] }) {
+function PracticeCard({ questions }: { questions?: PracticeQuestion[] }) {
   if (!questions?.length) return null
   return (
     <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3">
@@ -270,7 +270,7 @@ function PracticeCard({ questions }: { questions: PracticeQuestion[] }) {
 }
 
 /* ─── 推荐资源卡片 ─────────────────────────────────────── */
-function ResourcesCard({ resources }: { resources: RecommendedResource[] }) {
+function ResourcesCard({ resources }: { resources?: RecommendedResource[] }) {
   if (!resources?.length) return null
   return (
     <div className="mt-3 rounded-xl border border-purple-100 bg-purple-50 p-3">
@@ -855,14 +855,21 @@ export function StudentTutor() {
             activePanel === "chat" ? "flex" : "hidden lg:flex"
           }`}
         >
-          <div className="border-b border-slate-100 px-5 py-4">
-            <h2 className="flex items-center gap-2 text-base font-semibold text-slate-950">
-              <MessageSquare className="h-5 w-5 text-slate-500" />
-              对话
-            </h2>
-            <p className="mt-1 text-xs font-semibold text-slate-400">
-              {messages.length === 0 ? "输入问题开始答疑" : `${messages.length} 条消息`}
-            </p>
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+            <div>
+              <h2 className="flex items-center gap-2 text-base font-semibold text-slate-950">
+                <MessageSquare className="h-5 w-5 text-slate-500" />
+                对话
+              </h2>
+              <p className="mt-1 text-xs font-semibold text-slate-400">
+                {messages.length === 0 ? "输入问题开始答疑" : `${messages.length} 条消息`}
+              </p>
+            </div>
+            {messages.length > 0 && (
+              <button onClick={handleReset} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" title="重置对话" aria-label="重置对话">
+                <RotateCcw className="h-4 w-4" />
+              </button>
+            )}
           </div>
 
           {/* 消息列表 */}
