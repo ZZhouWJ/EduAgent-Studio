@@ -141,9 +141,9 @@ Docker Compose 会自动初始化。原生 MySQL 环境按以下顺序执行：
 
 | 角色 | 用户名 | 初始密码 |
 | --- | --- | --- |
-| 管理员 | `admin` | `admin123456` |
-| 教师 | `teacher01` | `teacher01123456` |
-| 学生 | `student01` | `student01123456` |
+| 管理员 | `admin` | `Pass@1234` |
+| 教师 | `teacher_li` | `Pass@1234` |
+| 学生 | `student_zhang` | `Pass@1234` |
 
 首次登录后应立即修改初始密码。生产部署不得使用演示账号与初始密码。
 

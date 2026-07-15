@@ -138,7 +138,7 @@ WHERE r.role_code = 'admin';
 
 -- ============================================================
 -- 4. 插入管理员用户
--- 密码: Admin@123
+-- 演示密码: Pass@1234
 -- ============================================================
 
 INSERT INTO `users` (
@@ -146,7 +146,7 @@ INSERT INTO `users` (
     `email`, `phone`, `status`, `last_login_at`, `created_by`
 ) VALUES (
     'admin',
-    '$2b$12$Xia.y8ZIpcBVXPqy3AsWbegsA/Z3NmKEwGtKNUCMr7BQJpNN3gcu2',
+    '$2b$12$Qcnez8qsfbryeJTPA/STAuHy64Rwz2IZOMXjYR4C5VgxkkvtBx4/y',
     '系统管理员',
     NULL,
     'admin@example.com',
@@ -157,18 +157,18 @@ INSERT INTO `users` (
 );
 
 -- ============================================================
--- 4b. 插入教师用户（张老师）
--- 密码: teacher01123456（用户名+123456）
+-- 4b. 插入教师用户
+-- 演示密码: Pass@1234
 -- ============================================================
 INSERT INTO `users` (
     `username`, `password_hash`, `real_name`, `student_no`,
     `email`, `phone`, `status`, `last_login_at`, `created_by`
 ) VALUES (
-    'teacher01',
-    '$2b$12$XT7MynMTbfbXlHHf6k85F.i.BKu5vqVXi90cdtfqBxnSb.mvvMBmG',
-    '张老师',
+    'teacher_li',
+    '$2b$12$Qcnez8qsfbryeJTPA/STAuHy64Rwz2IZOMXjYR4C5VgxkkvtBx4/y',
+    '李建国',
     NULL,
-    'teacher01@example.com',
+    'li.jianguo@eduagent.local',
     '13800000001',
     'active',
     NULL,
@@ -176,16 +176,16 @@ INSERT INTO `users` (
 );
 
 -- ============================================================
--- 4c. 插入学生用户（李明、王悦、陈思雨）
--- 密码: 用户名+123456
+-- 4c. 插入学生用户
+-- 演示密码: Pass@1234
 -- ============================================================
 INSERT INTO `users` (
     `username`, `password_hash`, `real_name`, `student_no`,
     `email`, `phone`, `status`, `last_login_at`, `created_by`
 ) VALUES
-    ('student01', '$2b$12$xc2pBOBuryb5Mt5cVt7WSejawfEef4yYWv8B0Zt8JEmHhdo8S6NVG', '李明', 'S2023001', 'liming@example.com', '13800000002', 'active', NULL, NULL),
-    ('student02', '$2b$12$0wln8CTLXjc26LZelKXcDOZQo/zqfngdAUjId.Q6T9SUU2lBZ1ota', '王悦', 'S2023002', 'wangyue@example.com', '13800000003', 'active', NULL, NULL),
-    ('student03', '$2b$12$VMQgsECcF0NBg1pooXHpNeXqW0RrWhH5rwl7WHPuTZZHEb2qBhM7G', '陈思雨', 'S2023003', 'chensiyu@example.com', '13800000004', 'active', NULL, NULL);
+    ('student_zhang', '$2b$12$Qcnez8qsfbryeJTPA/STAuHy64Rwz2IZOMXjYR4C5VgxkkvtBx4/y', '张小明', '2024001001', 'zhang.xm@eduagent.local', '13800000201', 'active', NULL, NULL),
+    ('student_liu', '$2b$12$Qcnez8qsfbryeJTPA/STAuHy64Rwz2IZOMXjYR4C5VgxkkvtBx4/y', '刘洋', '2024001002', 'liu.yang@eduagent.local', '13800000202', 'active', NULL, NULL),
+    ('student_chen', '$2b$12$Qcnez8qsfbryeJTPA/STAuHy64Rwz2IZOMXjYR4C5VgxkkvtBx4/y', '陈雨欣', '2024001003', 'chen.yx@eduagent.local', '13800000203', 'active', NULL, NULL);
 
 -- ============================================================
 -- 5. 为管理员分配 admin 角色
@@ -202,7 +202,7 @@ WHERE u.username = 'admin' AND r.role_code = 'admin';
 INSERT INTO `user_roles` (`user_id`, `role_id`, `assigned_by`)
 SELECT u.user_id, r.role_id, NULL
 FROM `users` u, `roles` r
-WHERE u.username = 'teacher01' AND r.role_code = 'teacher';
+WHERE u.username = 'teacher_li' AND r.role_code = 'teacher';
 
 -- ============================================================
 -- 5c. 为学生分配 student_member 角色
@@ -210,7 +210,7 @@ WHERE u.username = 'teacher01' AND r.role_code = 'teacher';
 INSERT INTO `user_roles` (`user_id`, `role_id`, `assigned_by`)
 SELECT u.user_id, r.role_id, NULL
 FROM `users` u, `roles` r
-WHERE u.username IN ('student01', 'student02', 'student03') AND r.role_code = 'student_member';
+WHERE u.username IN ('student_zhang', 'student_liu', 'student_chen') AND r.role_code = 'student_member';
 
 -- ============================================================
 -- 6. 插入任务类型数据（9个常用任务类型）

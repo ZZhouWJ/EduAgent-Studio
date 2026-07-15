@@ -45,20 +45,25 @@ from pymysql.cursors import DictCursor
 # ---------------------------------------------------------------------------
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-ENV_PATH = os.path.join(BASE_DIR, ".env")
+ENV_PATHS = (
+    os.path.join(BASE_DIR, ".env"),
+    os.path.join(BASE_DIR, "backend", ".env"),
+)
 
 
 def _load_env() -> Dict[str, str]:
     env: Dict[str, str] = {}
-    if not os.path.exists(ENV_PATH):
-        return env
-    with open(ENV_PATH, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            k, v = line.split("=", 1)
-            env[k.strip()] = v.strip()
+    for env_path in ENV_PATHS:
+        if not os.path.exists(env_path):
+            continue
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                env[k.strip()] = v.strip()
+    env.update({key: value for key, value in os.environ.items() if key.startswith("DB_")})
     return env
 
 
@@ -134,10 +139,10 @@ def upsert_user(cur, username: str, real_name: str, email: Optional[str],
     if row:
         uid = row["user_id"]
         cur.execute(
-            """UPDATE users SET real_name=%s, email=%s, student_no=%s, phone=%s,
+            """UPDATE users SET password_hash=%s, real_name=%s, email=%s, student_no=%s, phone=%s,
                                  status='active', is_deleted=0
                WHERE user_id=%s""",
-            (real_name, email, student_no, phone, uid),
+            (DEMO_PWHASH, real_name, email, student_no, phone, uid),
         )
         return uid
     cur.execute(
