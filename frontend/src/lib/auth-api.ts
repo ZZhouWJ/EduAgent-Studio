@@ -1,4 +1,4 @@
-import client from './api'
+import client from './api/client'
 
 export interface UserInfo {
   user_id: number

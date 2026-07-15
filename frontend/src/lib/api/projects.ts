@@ -1,4 +1,4 @@
-import client from '../api'
+import client from './client'
 
 export interface Project {
   project_id: number

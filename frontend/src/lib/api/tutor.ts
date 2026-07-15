@@ -1,4 +1,4 @@
-import client, { getToken } from '../api'
+import client, { getToken } from './client'
 
 // 引用来源
 export interface Citation {

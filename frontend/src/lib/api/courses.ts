@@ -1,4 +1,4 @@
-import client from '../api'
+import client from './client'
 import type { Course } from './learning'
 
 export interface CourseUpdateBody {
