@@ -1,8 +1,8 @@
 """
 讯飞多模态 API 封装（P1/P2）
 
-包含：图片理解 / 图片生成 / 文本改写 / OCR / TTS
-认证与大模型共用 HMAC-SHA256 签名。
+包含：图片理解 / 图片生成 / TTS。
+所有能力均按讯飞官方 HMAC-SHA256 协议签名。
 
 各 API 文档：https://www.xfyun.cn/doc/
 """
@@ -23,21 +23,24 @@ import websocket
 
 logger = logging.getLogger(__name__)
 
-# 各 API 地址（讯飞控制台查看具体地址）
+# 讯飞开放平台官方 API 地址
 IMAGE_UNDERSTAND_URL = "wss://spark-api.cn-huabei-1.xf-yun.com/v2.1/image"
-IMAGE_GENERATE_URL = "https://oa.aiadv.xf-yun.com/v1/generate"
-TEXT_REWRITE_URL = "https://oa.aiadv.xf-yun.com/v1/analysis"
-OCR_URL = "https://oa.aiadv.xf-yun.com/v1/ocr"
+IMAGE_GENERATE_URL = "https://spark-api.cn-huabei-1.xf-yun.com/v2.1/tti"
 TTS_URL = "wss://tts-api.xfyun.cn/v2/tts"
 
 
-def _build_ws_url(ws_url: str, api_key: str, api_secret: str) -> str:
-    """构建讯飞 WebSocket 鉴权 URL（HMAC-SHA256）。"""
-    host = urlparse(ws_url).netloc
-    path = urlparse(ws_url).path
+def _build_signed_url(
+    api_url: str,
+    api_key: str,
+    api_secret: str,
+    method: str,
+) -> str:
+    """构建讯飞 HTTP/WebSocket HMAC-SHA256 鉴权 URL。"""
+    host = urlparse(api_url).netloc
+    path = urlparse(api_url).path
     date = format_date_time(time.time())
 
-    sign_origin = f"host: {host}\ndate: {date}\nGET {path} HTTP/1.1"
+    sign_origin = f"host: {host}\ndate: {date}\n{method.upper()} {path} HTTP/1.1"
     sig_sha = hmac.new(
         api_secret.encode("utf-8"),
         sign_origin.encode("utf-8"),
@@ -53,28 +56,12 @@ def _build_ws_url(ws_url: str, api_key: str, api_secret: str) -> str:
     )
     auth = base64.b64encode(auth_origin.encode("utf-8")).decode("utf-8")
 
-    return f"{ws_url}?{urlencode({'authorization': auth, 'date': date, 'host': host})}"
+    return f"{api_url}?{urlencode({'authorization': auth, 'date': date, 'host': host})}"
 
 
-def _auth(app_id: str, api_secret: str) -> dict:
-    """生成讯飞 HMAC-SHA1 认证头（旧接口使用）。"""
-    ts = str(int(time.time()))
-    sign_str = f"{app_id}{ts}"
-    sign = base64.b64encode(
-        hmac.new(api_secret.encode(), sign_str.encode(), hashlib.sha1).digest()
-    ).decode()
-    return {"app_id": app_id, "timestamp": ts, "sign": sign}
-
-
-def _post(url: str, app_id: str, api_key: str, api_secret: str,
-          payload: dict, timeout: float = 30.0) -> dict:
-    """通用 POST 请求（含讯飞认证）。"""
-    auth = _auth(app_id, api_secret)
-    headers = {"Content-Type": "application/json"}
-    body = {"header": auth, "payload": payload}
-    resp = httpx.post(url, headers=headers, json=body, timeout=timeout)
-    resp.raise_for_status()
-    return resp.json()
+def _build_ws_url(ws_url: str, api_key: str, api_secret: str) -> str:
+    """构建讯飞 WebSocket 鉴权 URL。"""
+    return _build_signed_url(ws_url, api_key, api_secret, "GET")
 
 
 # ---------------------------------------------------------------------------
@@ -187,83 +174,67 @@ def generate_image(
     api_secret: str = "",
 ) -> str:
     """
-    讯飞图片生成：返回生成的图片 Base64。
+    讯飞图片生成：返回带合成内容隐式标识的原始图片 Base64。
     """
     if not app_id or not api_key or not api_secret:
         logger.warning("[IFlyTek ImageGenerate] 凭证未配置")
         return ""
 
+    allowed_resolutions = {
+        "512*512", "640*360", "640*480", "640*640", "680*512",
+        "512*680", "768*768", "720*1280", "1280*720", "1024*1024",
+    }
+    if resolution not in allowed_resolutions:
+        logger.warning("[IFlyTek ImageGenerate] 不支持的分辨率: %s", resolution)
+        return ""
+    styled_prompt = f"{style}：{prompt.strip()}" if style else prompt.strip()
+    if not styled_prompt or len(styled_prompt) > 1000:
+        logger.warning("[IFlyTek ImageGenerate] 提示词为空或超过 1000 字符")
+        return ""
+
     try:
-        payload = {
-            "prompt": prompt,
-            "style": style,
-            "resolution": resolution,
+        width, height = (int(value) for value in resolution.split("*"))
+        signed_url = _build_signed_url(
+            IMAGE_GENERATE_URL, api_key, api_secret, "POST"
+        )
+        body = {
+            "header": {"app_id": app_id},
+            "parameter": {
+                "chat": {
+                    "domain": "general",
+                    "width": width,
+                    "height": height,
+                }
+            },
+            "payload": {
+                "message": {
+                    "text": [{"role": "user", "content": styled_prompt}]
+                }
+            },
         }
-        data = _post(IMAGE_GENERATE_URL, app_id, api_key, api_secret, payload)
-        img = data.get("payload", {}).get("image", "")
+        response = httpx.post(
+            signed_url,
+            headers={"Content-Type": "application/json;charset=UTF-8"},
+            json=body,
+            timeout=60.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+        header = data.get("header", {})
+        if header.get("code", 0) != 0:
+            logger.error(
+                "[IFlyTek ImageGenerate] code=%s message=%s",
+                header.get("code"),
+                header.get("message", "unknown"),
+            )
+            return ""
+        choices = data.get("payload", {}).get("choices", {})
+        images = choices.get("text", [])
+        img = images[0].get("content", "") if images else ""
         logger.info(f"[IFlyTek ImageGenerate] OK, length={len(img)}")
         return img
     except Exception as e:
         logger.error(f"[IFlyTek ImageGenerate failed: {e}")
-        return ""
-
-
-# ---------------------------------------------------------------------------
-# 文本改写
-# ---------------------------------------------------------------------------
-
-def rewrite_text(
-    text: str,
-    style: str = "正式",
-    app_id: str = "",
-    api_key: str = "",
-    api_secret: str = "",
-) -> str:
-    """
-    讯飞文本改写/润色。
-    """
-    if not app_id or not api_key or not api_secret:
-        logger.warning("[IFlyTek TextRewrite] 凭证未配置")
-        return ""
-
-    try:
-        payload = {
-            "text": text,
-            "style": style,
-        }
-        data = _post(TEXT_REWRITE_URL, app_id, api_key, api_secret, payload)
-        return data.get("payload", {}).get("result", text)
-    except Exception as e:
-        logger.error(f"[IFlyTek TextRewrite failed: {e}")
-        return text  # 失败时原样返回
-
-
-# ---------------------------------------------------------------------------
-# OCR 文字识别
-# ---------------------------------------------------------------------------
-
-def recognize_text(
-    image_base64: str,
-    app_id: str = "",
-    api_key: str = "",
-    api_secret: str = "",
-) -> str:
-    """
-    讯飞通用文字识别 OCR：图片 Base64 → 图片中的文字。
-    """
-    if not app_id or not api_key or not api_secret:
-        logger.warning("[IFlyTek OCR] 凭证未配置")
-        return ""
-
-    try:
-        payload = {
-            "image": image_base64,
-        }
-        data = _post(OCR_URL, app_id, api_key, api_secret, payload)
-        texts = data.get("payload", {}).get("text", [])
-        return "\n".join(texts) if isinstance(texts, list) else str(texts)
-    except Exception as e:
-        logger.error(f"[IFlyTek OCR failed: {e}")
         return ""
 
 

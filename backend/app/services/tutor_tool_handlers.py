@@ -327,7 +327,7 @@ async def tts_tool(
         from app.config import get_settings
         settings = get_settings()
 
-        if not settings.iflytek_app_id or not settings.iflytek_api_key:
+        if not all((settings.iflytek_app_id, settings.iflytek_api_key, settings.iflytek_api_secret)):
             logger.warning("[tts_tool] 讯飞凭证未配置")
             return {"audio_url": "", "text_length": len(text), "error": "语音合成服务未配置"}
 
@@ -424,7 +424,7 @@ async def image_agent(
         from app.config import get_settings
         settings = get_settings()
 
-        if not settings.iflytek_app_id or not settings.iflytek_api_key:
+        if not all((settings.iflytek_app_id, settings.iflytek_api_key, settings.iflytek_api_secret)):
             logger.warning("[image_agent] 讯飞凭证未配置")
             return {
                 "image_url": "",
@@ -432,14 +432,16 @@ async def image_agent(
                 "error": "图片生成服务未配置（讯飞凭证缺失）",
             }
 
+        import asyncio
         from app.services.iflytek_multimodal import generate_image
-        img_base64 = generate_image(
-            prompt=prompt,
-            style=style,
-            resolution="1024*1024",
-            app_id=settings.iflytek_app_id,
-            api_key=settings.iflytek_api_key,
-            api_secret=settings.iflytek_api_secret,
+        img_base64 = await asyncio.to_thread(
+            generate_image,
+            prompt,
+            style,
+            "1024*1024",
+            settings.iflytek_app_id,
+            settings.iflytek_api_key,
+            settings.iflytek_api_secret,
         )
 
         if not img_base64:
