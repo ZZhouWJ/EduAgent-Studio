@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, type Variants } from "motion/react";
 import confetti from "canvas-confetti";
 import { notify } from "@/lib/toast";
 import { useAuthStore } from "@/stores/auth";
@@ -299,12 +299,12 @@ export function Login() {
     }
   };
 
-  const leftFade = {
+  const leftFade: Variants = {
     hidden: { opacity: 0, y: 20 },
     visible: (i: number) => ({
       opacity: 1,
       y: 0,
-      transition: { delay: 0.4 + i * 0.1, duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+      transition: { delay: 0.4 + i * 0.1, duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
     }),
   };
 
