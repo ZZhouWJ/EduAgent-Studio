@@ -15,23 +15,20 @@ import {
   Gauge,
   Layers3,
   Link2,
-  Network,
   Play,
   RefreshCcw,
   RotateCcw,
   Route,
   Save,
-  ScanSearch,
   Send,
   Settings2,
   ShieldCheck,
   Terminal,
-  Sparkles,
   StopCircle,
   XCircle,
 } from "lucide-react";
 import { useApi } from "@/lib/useApi";
-import { agentsApi, learningApi, modelsApi, profilesApi, client, getToken } from "@/lib/api";
+import { agentsApi, learningApi, modelsApi, profilesApi, getToken } from "@/lib/api";
 import { useInlineToast } from "../components/common/ProductUI";
 import type { AgentRequest, WorkflowResult } from "@/lib/api/agents";
 import type { Course, KnowledgePoint } from "@/lib/api/learning";
@@ -60,12 +57,6 @@ const DIFFICULTY_MAP: Record<string, string> = {
   "标准": "intermediate",
   "进阶": "advanced",
 };
-const DIFFICULTY_REVERSE: Record<string, string> = {
-  "basic": "基础",
-  "intermediate": "标准",
-  "advanced": "进阶",
-};
-
 // 后端 WorkflowStep 枚举映射
 const STEP_ORDER = ["diagnosis", "planning", "generation", "assessment", "teacher_review", "revision"] as const;
 const STEP_LABELS: Record<string, string> = {
@@ -134,12 +125,12 @@ function buildInitialSteps(): AgentStep[] {
 
 export function AgentWorkbench() {
   const { toast, showToast } = useInlineToast();
-  const { data: courseList, refetch: refetchCourses } = useApi(() => learningApi.listCourses(), []);
+  const { data: courseList } = useApi(() => learningApi.listCourses(), []);
   const { data: modelData } = useApi(() => modelsApi.getModels({ status: "active" }), []);
 
   // === 表单状态 ===
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
-  const [selectedStudentId, setSelectedStudentId] = useState<number>(1);
+  const [selectedStudentId, setSelectedStudentId] = useState<number>(0);
   const [selectedKps, setSelectedKps] = useState<KnowledgePoint[]>([]);
   const [allCourseKps, setAllCourseKps] = useState<KnowledgePoint[]>([]);
   const [resourceType, setResourceType] = useState(RESOURCE_TYPES[0]);
@@ -159,11 +150,21 @@ export function AgentWorkbench() {
   const [logs, setLogs] = useState<string[]>([]);
   const [completedCount, setCompletedCount] = useState(0);
   const [result, setResult] = useState<WorkflowResult | null>(null);
-  const [currentStep, setCurrentStep] = useState<string>("");
   const abortControllerRef = useRef<AbortController | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   const activeModel = modelData?.items?.[0]?.display_name ?? "讯飞星火";
+
+  useEffect(() => {
+    const profiles = profilesData?.items ?? [];
+    if (profiles.length === 0) {
+      setSelectedStudentId(0);
+      return;
+    }
+    if (!profiles.some((profile) => profile.student_id === selectedStudentId)) {
+      setSelectedStudentId(profiles[0].student_id);
+    }
+  }, [profilesData, selectedStudentId]);
 
   // 自动选中第一个课程
   useEffect(() => {
@@ -175,6 +176,8 @@ export function AgentWorkbench() {
   // 课程变更时加载所有知识点
   useEffect(() => {
     if (selectedCourse) {
+      setAllCourseKps([]);
+      setSelectedKps([]);
       learningApi.getCourse(selectedCourse.id).then((course) => {
         if (course.knowledge_points && course.knowledge_points.length > 0) {
           setAllCourseKps(course.knowledge_points);
@@ -213,14 +216,13 @@ export function AgentWorkbench() {
     setLogs([]);
     setCompletedCount(0);
     setResult(null);
-    setCurrentStep("");
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
   }, []);
 
   const handleStartGeneration = useCallback(async () => {
-    if (!selectedCourse || selectedKps.length === 0) {
-      showToast("请选择课程和至少一个知识点", "error");
+    if (!selectedCourse || !selectedStudentId || selectedKps.length === 0) {
+      showToast("请选择课程、学生和至少一个知识点");
       return;
     }
 
@@ -300,8 +302,6 @@ export function AgentWorkbench() {
             // 解析工作流步骤事件
             const step = event.step || event.node;
             if (step && STEP_LABELS[step]) {
-              setCurrentStep(step);
-
               // 更新当前步骤为 running
               updateStepState(step, "running", `${STEP_LABELS[step]} 执行中...`, "生成中");
               addLog(`开始执行: ${STEP_LABELS[step]}`);
@@ -309,8 +309,8 @@ export function AgentWorkbench() {
               // 根据 step_history 判断完成的步骤
               const history = event.step_history || [];
               for (const record of history) {
+                const recordStep = record.step;
                 if (record.status === "success") {
-                  const recordStep = record.step;
                   updateStepState(
                     recordStep,
                     "done",
@@ -385,7 +385,7 @@ export function AgentWorkbench() {
 
   const handleSaveResource = useCallback(async () => {
     if (!result || !selectedCourse) {
-      showToast("无可保存的资源", "error");
+      showToast("无可保存的资源");
       return;
     }
     try {
@@ -394,9 +394,9 @@ export function AgentWorkbench() {
         title: result.resource?.title || "学习资源",
         course_id: selectedCourse.id,
       });
-      showToast("资源已保存到资源库", "success");
+      showToast("资源已保存到资源库");
     } catch (e: any) {
-      showToast(`保存失败: ${e.message}`, "error");
+      showToast(`保存失败: ${e.message}`);
     }
   }, [result, selectedCourse, showToast]);
 
@@ -530,7 +530,7 @@ export function AgentWorkbench() {
               <div>
                 <label className="mb-2 block text-sm font-bold text-slate-700">难度</label>
                 <div className="grid grid-cols-3 gap-2 rounded-2xl bg-slate-100 p-1">
-                  {["基础", "标准", "进阶"].map((item, index) => (
+                  {["基础", "标准", "进阶"].map((item) => (
                     <button
                       key={item}
                       onClick={() => setDifficulty(item)}
@@ -577,7 +577,7 @@ export function AgentWorkbench() {
               ) : (
                 <button
                   onClick={handleStartGeneration}
-                  disabled={workflowState === "running" || !selectedCourse || selectedKps.length === 0}
+                  disabled={!selectedCourse || selectedKps.length === 0}
                   className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[linear-gradient(110deg,#2563EB,#7C3AED)] text-sm font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.24)] transition hover:shadow-[0_18px_36px_rgba(37,99,235,0.32)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Play className="h-4 w-4" />
@@ -704,7 +704,7 @@ export function AgentWorkbench() {
                     )}
                     <div
                       className="prose prose-sm prose-slate"
-                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked(result.resource.content.replace(/\[引用:(\d+)\]/g, '<mark class="bg-blue-100 text-blue-800 px-0.5 rounded">[引用:$1]</mark>'))) }}
+                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(result.resource.content.replace(/\[引用:(\d+)\]/g, '<mark class="bg-blue-100 text-blue-800 px-0.5 rounded">[引用:$1]</mark>'), { async: false }) as string) }}
                     />
                   </div>
                 )}

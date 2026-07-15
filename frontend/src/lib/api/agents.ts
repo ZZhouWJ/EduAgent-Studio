@@ -11,6 +11,15 @@ export interface AgentRequest {
 }
 
 export interface WorkflowResult {
+  trustworthiness?: 'high' | 'medium' | 'low' | 'draft'
+  evidence_links?: Array<{
+    chunk_id?: number
+    quote_text?: string
+    content?: string
+    kp_id?: number
+    relevance_score?: number
+    usage_type?: string
+  }>
   diagnosis: {
     diagnosis_id: string
     weak_points: Array<{
@@ -90,6 +99,7 @@ export interface WorkflowResult {
     quality_score: number
     revision_count: number
   }
+  _raw?: Record<string, unknown>
 }
 
 export interface SaveResourceResponse {
