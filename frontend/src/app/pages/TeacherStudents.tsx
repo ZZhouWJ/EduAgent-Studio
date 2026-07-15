@@ -1,5 +1,5 @@
-import React, { useState } from "react"
-import { User, Target, Book, Brain, Library, AlertTriangle, XCircle, Clock, Wrench, ChevronLeft, GraduationCap } from "lucide-react"
+import { useState } from "react"
+import { User, Target, Brain, AlertTriangle, ChevronLeft, GraduationCap } from "lucide-react"
 import { useApi } from "@/lib/useApi"
 import { profilesApi, type ProfileDetail } from "@/lib/api"
 
@@ -265,7 +265,7 @@ function ProfileDetailPanel({ profile, onBack }: { profile: ProfileDetail; onBac
 export function TeacherStudents() {
   const [selectedProfileId, setSelectedProfileId] = useState<number | null>(null)
 
-  const { data: profilesData, loading, reload } = useApi(
+  const { data: profilesData, loading } = useApi(
     () => profilesApi.list({ page_size: 100 }),
     []
   )
