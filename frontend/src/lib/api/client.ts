@@ -19,6 +19,14 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY)
 }
 
+function getRequestToken(error: AxiosError): string | null {
+  const authorization = error.config?.headers?.Authorization
+  if (typeof authorization !== 'string' || !authorization.startsWith('Bearer ')) {
+    return null
+  }
+  return authorization.slice(7)
+}
+
 export interface ApiEnvelope<T = unknown> {
   code: number
   message: string
@@ -75,6 +83,11 @@ client.interceptors.response.use(
       const { status, data } = error.response
       const message = data?.message || error.message || '请求失败'
       if (status === 401) {
+        const currentToken = getToken()
+        const requestToken = getRequestToken(error)
+        if (currentToken && requestToken !== currentToken) {
+          return Promise.reject(new ApiError('请求使用的会话已失效', 401, 401))
+        }
         clearToken()
         if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
           window.location.href = '/login'
