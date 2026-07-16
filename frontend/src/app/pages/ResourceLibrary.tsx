@@ -79,7 +79,24 @@ export function ResourceLibrary() {
   const requestedKpId = Number(searchParams.get("kp_id")) || 0;
   const requestedKpName = searchParams.get("kp_name") ?? "";
   const user = useAuthStore((state) => state.user);
-  const canManageReviews = user?.roles?.some((role) => role === "teacher" || role === "admin") ?? false;
+  const isAdmin = user?.roles?.includes("admin") ?? false;
+  const isTeacher = user?.roles?.includes("teacher") ?? false;
+  const canManageReviews = isTeacher || isAdmin;
+  const pageRole = isAdmin ? "admin" : isTeacher ? "teacher" : "student";
+  const pageCopy = isAdmin
+    ? {
+        eyebrow: "资源管理",
+        description: "查看全平台课程资源，按课程、类型与审核状态定位内容并跟踪审核记录。",
+      }
+    : isTeacher
+      ? {
+          eyebrow: "教学资源",
+          description: "管理本人课程资源，查看生成内容、审核状态与历史记录，并将草稿提交审核。",
+        }
+      : {
+          eyebrow: "推荐资源",
+          description: "浏览与你当前课程和学习进度匹配的已审核资源，并按类型或课程快速筛选。",
+        };
 
   React.useEffect(() => {
     const course = searchParams.get("course") ?? "";
@@ -178,11 +195,11 @@ export function ResourceLibrary() {
   return (
     <div className="mx-auto flex h-full max-w-[1400px] flex-col space-y-6 pb-6">
       <PageHero
-        eyebrow="推荐资源"
+        eyebrow={pageCopy.eyebrow}
         title="学习资源库"
-        description="浏览、搜索和收藏与你当前学习进度匹配的学习资源，支持按类型、课程和审核状态筛选。"
+        description={pageCopy.description}
         icon={BookOpen}
-        role="student"
+        role={pageRole}
       />
       {/* Filters */}
       <div className="flex shrink-0 flex-col items-stretch justify-between gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:flex-row sm:items-center">
