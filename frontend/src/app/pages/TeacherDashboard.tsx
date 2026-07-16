@@ -84,12 +84,12 @@ export function TeacherDashboard() {
                 ? ` 系统检测到"${weakPoints?.[0]?.kp_name}"等知识点为班级主要薄弱点，建议生成针对性资源并安排阶段测评。`
                 : ""}
             </p>
-            <div className="mt-6 flex gap-3">
-              <Link to="/teacher/agent-workbench" className="inline-flex h-10 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800">
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <Link to="/teacher/agent-workbench" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800">
                 生成个性化资源
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link to="/teacher/review" className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50">
+              <Link to="/teacher/review" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50">
                 处理待审核资源
               </Link>
             </div>
