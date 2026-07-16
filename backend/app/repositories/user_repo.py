@@ -179,17 +179,39 @@ def insert_login_log(
         ))
 
 
-def count_recent_failed_login_attempts(username: str, since: datetime) -> int:
-    """统计指定用户名在时间窗口内的失败登录次数。"""
+def count_recent_failed_login_attempts(
+    username: str,
+    ip_address: str,
+    since: datetime,
+) -> int:
+    """Count credential failures for one username from one client address."""
     sql = """
         SELECT COUNT(*) AS total
         FROM login_logs
         WHERE username = %s
+          AND ip_address = %s
           AND login_status = 'failed'
+          AND COALESCE(failure_reason, '') <> '登录尝试过于频繁'
           AND login_time >= %s
     """
     with get_db_cursor() as cursor:
-        cursor.execute(sql, (username, since))
+        cursor.execute(sql, (username, ip_address, since))
+        row = cursor.fetchone()
+        return int((row or {}).get("total") or 0)
+
+
+def count_recent_failed_login_attempts_by_ip(ip_address: str, since: datetime) -> int:
+    """Count all credential failures from one client address."""
+    sql = """
+        SELECT COUNT(*) AS total
+        FROM login_logs
+        WHERE ip_address = %s
+          AND login_status = 'failed'
+          AND COALESCE(failure_reason, '') <> '登录尝试过于频繁'
+          AND login_time >= %s
+    """
+    with get_db_cursor() as cursor:
+        cursor.execute(sql, (ip_address, since))
         row = cursor.fetchone()
         return int((row or {}).get("total") or 0)
 

@@ -26,6 +26,10 @@ class LoginRateLimitTests(unittest.TestCase):
             return_value=0,
         ), patch.object(
             auth_service.user_repo,
+            "count_recent_failed_login_attempts_by_ip",
+            return_value=0,
+        ), patch.object(
+            auth_service.user_repo,
             "get_user_by_username",
             return_value=user,
         ), patch.object(
@@ -70,22 +74,54 @@ class LoginRateLimitTests(unittest.TestCase):
 
     @patch.object(auth_service.user_repo, "insert_login_log")
     @patch.object(auth_service.user_repo, "get_user_by_username")
+    @patch.object(auth_service.user_repo, "count_recent_failed_login_attempts_by_ip", return_value=0)
     @patch.object(auth_service.user_repo, "count_recent_failed_login_attempts")
     def test_service_blocks_repeated_failures_before_password_lookup(
         self,
         count_failures,
+        _count_ip_failures,
         get_user,
         insert_log,
     ):
         count_failures.return_value = auth_service.MAX_FAILED_LOGIN_ATTEMPTS
 
-        result = auth_service.login("  student_zhang  ", "wrong-password")
+        result = auth_service.login(
+            "  student_zhang  ",
+            "wrong-password",
+            ip_address="198.51.100.7",
+        )
 
         self.assertFalse(result["success"])
         self.assertTrue(result["rate_limited"])
         self.assertEqual(result["retry_after_seconds"], 15 * 60)
         count_failures.assert_called_once()
         self.assertEqual(count_failures.call_args.kwargs["username"], "student_zhang")
+        self.assertEqual(count_failures.call_args.kwargs["ip_address"], "198.51.100.7")
+        get_user.assert_not_called()
+        insert_log.assert_called_once()
+
+    @patch.object(auth_service.user_repo, "insert_login_log")
+    @patch.object(auth_service.user_repo, "get_user_by_username")
+    @patch.object(
+        auth_service.user_repo,
+        "count_recent_failed_login_attempts_by_ip",
+        return_value=auth_service.MAX_FAILED_LOGIN_ATTEMPTS_PER_IP,
+    )
+    @patch.object(auth_service.user_repo, "count_recent_failed_login_attempts", return_value=0)
+    def test_service_blocks_password_spraying_from_one_ip(
+        self,
+        _count_credential_failures,
+        _count_ip_failures,
+        get_user,
+        insert_log,
+    ):
+        result = auth_service.login(
+            "another_student",
+            "wrong-password",
+            ip_address="198.51.100.9",
+        )
+
+        self.assertTrue(result["rate_limited"])
         get_user.assert_not_called()
         insert_log.assert_called_once()
 
@@ -140,10 +176,12 @@ class PasswordBoundaryTests(unittest.TestCase):
 
     @patch.object(auth_service.user_repo, "insert_login_log")
     @patch.object(auth_service.user_repo, "get_user_by_username")
+    @patch.object(auth_service.user_repo, "count_recent_failed_login_attempts_by_ip", return_value=0)
     @patch.object(auth_service.user_repo, "count_recent_failed_login_attempts", return_value=0)
     def test_login_treats_overlong_utf8_password_as_invalid(
         self,
         _count_failures,
+        _count_ip_failures,
         get_user,
         insert_log,
     ):

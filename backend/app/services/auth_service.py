@@ -24,6 +24,7 @@ from app.utils.token import create_access_token, decode_access_token
 
 
 MAX_FAILED_LOGIN_ATTEMPTS = 5
+MAX_FAILED_LOGIN_ATTEMPTS_PER_IP = 30
 LOGIN_ATTEMPT_WINDOW_MINUTES = 15
 
 
@@ -55,12 +56,21 @@ def login(
         失败：{"success": False, "reason": "..."}
     """
     username = username.strip()
+    client_ip = ip_address or "unknown"
     failed_since = datetime.now() - timedelta(minutes=LOGIN_ATTEMPT_WINDOW_MINUTES)
-    failed_attempts = user_repo.count_recent_failed_login_attempts(
+    credential_failures = user_repo.count_recent_failed_login_attempts(
         username=username,
+        ip_address=client_ip,
         since=failed_since,
     )
-    if failed_attempts >= MAX_FAILED_LOGIN_ATTEMPTS:
+    ip_failures = user_repo.count_recent_failed_login_attempts_by_ip(
+        ip_address=client_ip,
+        since=failed_since,
+    )
+    if (
+        credential_failures >= MAX_FAILED_LOGIN_ATTEMPTS
+        or ip_failures >= MAX_FAILED_LOGIN_ATTEMPTS_PER_IP
+    ):
         user_repo.insert_login_log(
             user_id=None,
             username=username,
