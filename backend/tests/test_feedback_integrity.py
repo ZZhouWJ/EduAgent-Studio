@@ -125,12 +125,57 @@ class FeedbackIntegrityTests(unittest.IsolatedAsyncioTestCase):
             )
 
         profile.update_mastery.assert_called_once_with(
-            22, 4, 0.67, "自评掌握度 67%"
+            22, 4, 0.67, "自评掌握度 67%", assessment_score=None
         )
         payload = __import__("json").loads(response.body)
         change = payload["data"]["mastery_changes"][0]
         self.assertEqual(change["before"], 0.4)
         self.assertEqual(change["after"], 0.67)
+
+    async def test_quiz_score_is_forwarded_as_assessment_score(self):
+        access = Mock()
+        access.require_resource_access.return_value = 1
+        profile = Mock()
+        profile.get_profile_id_by_student_and_course.return_value = 22
+        profile.get_mastery_level.return_value = 0.4
+        profile.update_mastery.return_value = {
+            "kp_id": 4,
+            "kp_name": "事务",
+            "mastery_level": 0.82,
+        }
+        profile.get_profile.return_value = {"profile_id": 22}
+        resource = Mock()
+        resource.get_resource.return_value = {
+            "target_kp_ids": [4],
+            "status": "approved",
+        }
+        repo = Mock()
+        repo.create_feedback.return_value = {"feedback_id": 6, "course_id": 1}
+        learning = Mock()
+        learning.recommend_resources.return_value = []
+        user = {"user_id": 12, "roles": ["student_member"]}
+
+        with patch("app.routers.feedbacks.CourseAccessService", return_value=access), patch.object(
+            feedbacks, "_profile_repo", profile
+        ), patch.object(feedbacks, "_resource_repo", resource), patch.object(
+            feedbacks, "_repo", repo
+        ), patch.object(feedbacks, "_learning_service", learning):
+            await feedbacks.submit_feedback(
+                SubmitFeedbackRequest(
+                    resource_id=9,
+                    feedback_type="quiz_result",
+                    quiz_score=0.82,
+                ),
+                user,
+            )
+
+        profile.update_mastery.assert_called_once_with(
+            22,
+            4,
+            0.82,
+            "测验得分 82%",
+            assessment_score=0.82,
+        )
 
 
 if __name__ == "__main__":

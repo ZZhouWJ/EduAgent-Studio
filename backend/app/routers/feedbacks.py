@@ -142,6 +142,7 @@ async def submit_feedback(
             primary_kp_id,
             float(new_mastery),
             update_reason,
+            assessment_score=data.quiz_score,
         )
         if mastery is not None:
             after_mastery = float(mastery["mastery_level"])
