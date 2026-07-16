@@ -21,25 +21,27 @@ settings = get_settings()
 _llm_registered = False
 if not _llm_registered:
     llm_gateway.register_provider("mock", MockProvider())
-    llm_gateway.register_provider("openai_compatible", OpenAICompatibleProvider(
+    openai_compatible_provider = OpenAICompatibleProvider(
         model_name=settings.llm_model,
         base_url=settings.llm_base_url,
         api_key=settings.llm_api_key,
-    ))
+    )
+    for provider_code in ("openai_compatible", "openai", "deepseek", "qwen"):
+        llm_gateway.register_provider(provider_code, openai_compatible_provider)
     llm_gateway.register_provider("minimax", MiniMaxProvider(
         model_name=settings.llm_model,
         base_url=settings.llm_base_url,
         api_key=settings.llm_api_key,
     ))
     # 讯飞星火（当 LLM_PROVIDER=iflytek 时由 gateway 路由至此）
-    if settings.iflytek_app_id and settings.iflytek_api_key:
+    if all((settings.iflytek_app_id, settings.iflytek_api_key, settings.iflytek_api_secret)):
         llm_gateway.register_provider("iflytek", IFlyTekProvider(
             model_name=settings.llm_model,        # 星火 domain，如 "general"
             api_key=settings.iflytek_api_key,
             api_secret=settings.iflytek_api_secret,
             app_id=settings.iflytek_app_id,
         ))
-        logger.info(f"[IFlyTek] Registered: app_id={settings.iflytek_app_id}, model={settings.llm_model}")
+        logger.info("[IFlyTek] Provider registered for model=%s", settings.llm_model)
     _llm_registered = True
 
 from app.agents.workflow import run_workflow, stream_workflow, get_compiled_graph

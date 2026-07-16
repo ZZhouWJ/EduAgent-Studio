@@ -55,7 +55,15 @@ class Settings(BaseSettings):
     server_port: int = Field(default=8000, alias="SERVER_PORT")
 
     # --- LLM 配置 ---
-    llm_provider: str = Field(default="openai_compatible", alias="LLM_PROVIDER")
+    llm_provider: Literal[
+        "mock",
+        "openai_compatible",
+        "openai",
+        "deepseek",
+        "qwen",
+        "minimax",
+        "iflytek",
+    ] = Field(default="openai_compatible", alias="LLM_PROVIDER")
     llm_api_key: str = Field(default="", alias="LLM_API_KEY")
     llm_base_url: str = Field(default="https://api.deepseek.com/v1", alias="LLM_BASE_URL")
     llm_model: str = Field(default="deepseek-chat", alias="LLM_MODEL")
@@ -115,6 +123,13 @@ class Settings(BaseSettings):
             raise ValueError("生产环境 JWT_SECRET_KEY 必须是至少 32 字符的随机密钥")
         if not self.cors_origin_list or "*" in self.cors_origin_list:
             raise ValueError("生产环境 CORS_ORIGINS 必须配置明确的前端来源")
+        if self.llm_provider == "mock":
+            raise ValueError("生产环境禁止使用 Mock 模型")
+        if self.llm_provider == "iflytek":
+            if not all((self.iflytek_app_id, self.iflytek_api_key, self.iflytek_api_secret)):
+                raise ValueError("生产环境使用讯飞时必须配置 APP_ID、API_KEY 和 API_SECRET")
+        elif not self.llm_api_key:
+            raise ValueError("生产环境必须配置 LLM_API_KEY")
         return self
 
     def llm_config(self, model_name: str = None) -> "LLMConfig":
