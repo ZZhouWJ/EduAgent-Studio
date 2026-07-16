@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import AliasChoices, BaseModel, Field, StringConstraints
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, StringConstraints
 
 from app.services.agent_service import AgentService, extract_resource_references
 from app.services.course_access_service import CourseAccessService
@@ -32,6 +32,8 @@ ResourceType = Literal[
 
 
 class GenerateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     student_id: int = Field(..., gt=0)
     course_id: int = Field(..., gt=0)
     knowledge_point_ids: List[Annotated[int, Field(gt=0)]] = Field(
@@ -39,8 +41,9 @@ class GenerateRequest(BaseModel):
     )
     resource_type: ResourceType
     difficulty: Literal["basic", "intermediate", "advanced"]
-    generation_goal: Optional[str] = None
-    enable_review: bool = True
+    generation_goal: Optional[
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+    ] = None
 
 
 class SaveResourceRequest(BaseModel):

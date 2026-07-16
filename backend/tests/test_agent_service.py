@@ -77,6 +77,40 @@ class AgentContextTests(unittest.TestCase):
                 difficulty="intermediate",
             )
 
+    def test_generation_request_rejects_ignored_fields(self):
+        with self.assertRaises(ValidationError):
+            GenerateRequest(
+                student_id=12,
+                course_id=3,
+                knowledge_point_ids=[4],
+                resource_type="lecture",
+                difficulty="intermediate",
+                enable_review=False,
+            )
+
+    @patch("app.services.agent_service.run_workflow")
+    def test_generation_goal_reaches_workflow(self, run_workflow):
+        run_workflow.return_value = {"generated_resource": {}, "metadata": {}}
+        service = AgentService()
+        service._resolve_profile = Mock(return_value=(22, {"profile_id": 22}))
+        service._load_knowledge_points = Mock(return_value=[])
+        service._load_learning_history = Mock(return_value=[])
+        request = GenerateRequest(
+            student_id=12,
+            course_id=3,
+            knowledge_point_ids=[4],
+            resource_type="lecture",
+            difficulty="intermediate",
+            generation_goal="聚焦可重复读与幻读的差异",
+        )
+
+        service.generate(request)
+
+        self.assertEqual(
+            run_workflow.call_args.kwargs["generation_goal"],
+            "聚焦可重复读与幻读的差异",
+        )
+
     @patch("app.repositories.profile_repo.ProfileRepository")
     def test_profile_resolution_uses_student_and_course(self, repo_type):
         repo = Mock()
