@@ -4,6 +4,7 @@
 处理登录、登出、Token 生成与解析、用户注册。
 """
 
+from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 from fastapi import Header
@@ -18,6 +19,10 @@ from app.utils.roles import (
     permissions_for_roles,
 )
 from app.utils.token import create_access_token, decode_access_token
+
+
+MAX_FAILED_LOGIN_ATTEMPTS = 5
+LOGIN_ATTEMPT_WINDOW_MINUTES = 15
 
 
 def login(
@@ -47,6 +52,28 @@ def login(
         成功：{"success": True, "token": "...", "user": {...}}
         失败：{"success": False, "reason": "..."}
     """
+    username = username.strip()
+    failed_since = datetime.now() - timedelta(minutes=LOGIN_ATTEMPT_WINDOW_MINUTES)
+    failed_attempts = user_repo.count_recent_failed_login_attempts(
+        username=username,
+        since=failed_since,
+    )
+    if failed_attempts >= MAX_FAILED_LOGIN_ATTEMPTS:
+        user_repo.insert_login_log(
+            user_id=None,
+            username=username,
+            login_status="failed",
+            failure_reason="登录尝试过于频繁",
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        return {
+            "success": False,
+            "reason": "登录尝试过多，请 15 分钟后重试",
+            "rate_limited": True,
+            "retry_after_seconds": LOGIN_ATTEMPT_WINDOW_MINUTES * 60,
+        }
+
     user = user_repo.get_user_by_username(username)
 
     if user is None:

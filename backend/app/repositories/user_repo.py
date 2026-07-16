@@ -179,6 +179,21 @@ def insert_login_log(
         ))
 
 
+def count_recent_failed_login_attempts(username: str, since: datetime) -> int:
+    """统计指定用户名在时间窗口内的失败登录次数。"""
+    sql = """
+        SELECT COUNT(*) AS total
+        FROM login_logs
+        WHERE username = %s
+          AND login_status = 'failed'
+          AND login_time >= %s
+    """
+    with get_db_cursor() as cursor:
+        cursor.execute(sql, (username, since))
+        row = cursor.fetchone()
+        return int((row or {}).get("total") or 0)
+
+
 def insert_operation_log(
     user_id: int,
     action_type: str,

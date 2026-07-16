@@ -33,7 +33,7 @@ def _unexpected_auth_error(action: str, exc: Exception):
 
 class LoginRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=50)
-    password: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1, max_length=100)
 
 
 class RegisterRequest(BaseModel):
@@ -103,10 +103,14 @@ async def login(request: Request, body: LoginRequest) -> dict:
     )
 
     if not result["success"]:
-        return error_response(
+        response = error_response(
             message=result["reason"],
-            code=4002,
+            code=4290 if result.get("rate_limited") else 4002,
+            status_code=429 if result.get("rate_limited") else 200,
         )
+        if result.get("rate_limited"):
+            response.headers["Retry-After"] = str(result["retry_after_seconds"])
+        return response
 
     return success_response(
         data={
