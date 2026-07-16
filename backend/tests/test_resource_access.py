@@ -34,12 +34,16 @@ class ResourceAccessTests(unittest.TestCase):
         access = Mock()
         access.list_accessible_course_ids.return_value = [1]
         access_type.return_value = access
-        repo.list_resources.return_value = {"items": [], "total": 0}
+        repo.list_resources.return_value = {
+            "items": [{"resource_id": 9, "review_submitted_at": "2026-07-16T10:00:00"}],
+            "total": 1,
+        }
         user = {"user_id": 8, "roles": ["student_member"]}
 
-        asyncio.run(list_resources(page=1, page_size=20, user=user))
+        response = asyncio.run(list_resources(page=1, page_size=20, user=user))
 
         self.assertEqual(repo.list_resources.call_args.kwargs["status"], "approved")
+        self.assertNotIn("review_submitted_at", response.body.decode())
 
     @patch("app.routers.resources._repo")
     @patch("app.routers.resources.CourseAccessService")
@@ -51,6 +55,27 @@ class ResourceAccessTests(unittest.TestCase):
             asyncio.run(
                 get_resource(9, user={"user_id": 8, "roles": ["student_member"]})
             )
+
+    @patch("app.routers.resources._repo")
+    @patch("app.routers.resources.CourseAccessService")
+    def test_student_detail_hides_internal_review_history(self, access_type, repo):
+        access_type.return_value = Mock()
+        repo.get_resource.return_value = {
+            "resource_id": 9,
+            "status": "approved",
+            "content": "学生可见正文",
+            "reviewer_comment": "内部审核意见",
+            "review_history": [{"review_id": 31}],
+        }
+
+        response = asyncio.run(
+            get_resource(9, user={"user_id": 8, "roles": ["student_member"]})
+        )
+
+        body = response.body.decode()
+        self.assertIn("学生可见正文", body)
+        self.assertNotIn("内部审核意见", body)
+        self.assertNotIn("review_history", body)
 
     @patch("app.routers.resources._repo")
     @patch("app.routers.resources.CourseAccessService")

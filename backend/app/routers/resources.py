@@ -66,6 +66,14 @@ async def list_resources(
         status="approved" if _is_student_only(user) else status,
         course_ids=course_ids if course_id is None else None,
     )
+    if _is_student_only(user):
+        result = {
+            **result,
+            "items": [
+                {key: value for key, value in item.items() if key != "review_submitted_at"}
+                for item in result["items"]
+            ],
+        }
     return success_response(data=result)
 
 
@@ -78,6 +86,12 @@ async def get_resource(
     detail = _repo.get_resource(resource_id)
     if detail is None or (_is_student_only(user) and detail.get("status") != "approved"):
         raise NotFoundException("资源不存在")
+    if _is_student_only(user):
+        detail = {
+            key: value
+            for key, value in detail.items()
+            if key not in {"review_history", "reviewer_comment"}
+        }
     return success_response(data=detail)
 
 
