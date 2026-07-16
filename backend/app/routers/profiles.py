@@ -1,11 +1,18 @@
 """学生画像 API"""
 from fastapi import APIRouter, Depends, Path, Query
 from typing import Optional
+from pydantic import BaseModel, Field
 from app.utils.dependencies import get_current_user_dep, require_role
 from app.services.profile_service import ProfileService
 from app.services.profile_dialog_service import ProfileDialogService
 
 router = APIRouter(prefix="/profiles", tags=["学生画像"])
+
+
+class UpdateMasteryRequest(BaseModel):
+    kp_id: int = Field(..., gt=0)
+    mastery: float = Field(..., ge=0, le=1)
+    update_reason: Optional[str] = Field(None, max_length=500)
 
 
 @router.get("/me")
@@ -63,12 +70,12 @@ async def update_profile(
 @router.post("/{profile_id}/mastery")
 async def update_mastery(
     profile_id: int,
-    data: dict,
+    data: UpdateMasteryRequest,
     user: dict = Depends(require_role("teacher", "admin")),
 ):
     """更新知识点掌握度（仅教师/管理员可操作）"""
     service = ProfileService()
-    return service.update_mastery(profile_id, data, user)
+    return service.update_mastery(profile_id, data.model_dump(), user)
 
 
 @router.get("/{profile_id}/dialog")
