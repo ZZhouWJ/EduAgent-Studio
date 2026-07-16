@@ -46,18 +46,36 @@ export function AdminModelConfig() {
   const costsState = useApi(() => statisticsApi.costs(), []);
   const modelCallsState = useApi(() => statisticsApi.modelCalls(), []);
 
-  const models = (modelsState.data?.items ?? []).map(mapModel);
+  const activeProviderIds = new Set(
+    (providersState.data ?? [])
+      .filter((provider) => provider.status === "active")
+      .map((provider) => provider.provider_id),
+  );
+  const configuredProviderIds = new Set(
+    (configsState.data?.items ?? [])
+      .filter((config) => config.status === "active")
+      .map((config) => config.provider_id),
+  );
+  const models = (modelsState.data?.items ?? []).map((rawModel) => {
+    const model = mapModel(rawModel);
+    const isReady = rawModel.status === "active"
+      && activeProviderIds.has(rawModel.provider_id)
+      && configuredProviderIds.has(rawModel.provider_id);
+    return {
+      ...model,
+      status: rawModel.status !== "active" ? "停用" : isReady ? "可用" : "待配置",
+    };
+  });
 
   const filtered = models.filter((item) => {
-    const statusMap2: Record<string, string> = { "启用": "active", "停用": "disabled" };
-    const statusMatch = statusFilter === "全部" || item.rawStatus === statusMap2[statusFilter];
+    const statusMatch = statusFilter === "全部" || item.status === statusFilter;
     const keywordMatch = `${item.name}${item.provider}${item.abilities.join("")}`.toLowerCase().includes(query.toLowerCase());
     return statusMatch && keywordMatch;
   });
 
   const stats = [
     { label: "已配置模型", value: `${modelsState.data?.total ?? "-"}`, hint: "含供应商", icon: Bot, tone: "blue" as const },
-    { label: "可用模型", value: `${models.filter((p) => p.status === "启用").length}`, hint: "可被智能体调用", icon: PlugZap, tone: "emerald" as const },
+    { label: "可用模型", value: `${models.filter((model) => model.status === "可用").length}`, hint: "凭证与供应商均正常", icon: PlugZap, tone: "emerald" as const },
     { label: "调用次数", value: `${modelCallsState.data?.reduce((sum, item) => sum + item.call_count, 0) ?? "-"}`, hint: "全平台累计", icon: ActivitySquare, tone: "purple" as const },
     { label: "平均响应时间", value: modelCallsState.data?.length ? `${Math.round(modelCallsState.data.reduce((sum, item) => sum + item.avg_latency_ms, 0) / modelCallsState.data.length)}ms` : "—", hint: "按模型平均", icon: Gauge, tone: "cyan" as const },
     { label: "累计成本", value: costsState.loading ? "—" : `¥${(costsState.data?.total_cost ?? 0).toFixed(2)}`, hint: "全平台累计", icon: Coins, tone: "orange" as const },
@@ -99,7 +117,7 @@ export function AdminModelConfig() {
       notify.warning(`${model.name} 当前已停用`);
     } else if (provider?.status !== "active") {
       notify.warning(`${model.name} 的供应商当前不可用`);
-    } else if (provider.provider_code === "mock" || hasCredential) {
+    } else if (hasCredential) {
       notify.success(`${model.name} 配置完整，可供智能体调用`);
     } else {
       notify.warning(`${model.name} 尚未配置启用的服务端凭证`);
@@ -107,17 +125,8 @@ export function AdminModelConfig() {
   };
 
   const handleHealthCheck = () => {
-    const activeConfigs = new Set(
-      (configsState.data?.items ?? []).filter((item) => item.status === "active").map((item) => item.provider_id),
-    );
-    const activeProviders = new Set(
-      (providersState.data ?? []).filter((item) => item.status === "active").map((item) => item.provider_id),
-    );
     const enabled = models.filter((model) => model.rawStatus === "active");
-    const ready = enabled.filter((model) => {
-      const provider = providersState.data?.find((item) => item.provider_id === model.raw.provider_id);
-      return activeProviders.has(model.raw.provider_id) && (provider?.provider_code === "mock" || activeConfigs.has(model.raw.provider_id));
-    });
+    const ready = enabled.filter((model) => model.status === "可用");
     if (ready.length === enabled.length) {
       notify.success(`配置巡检完成：${ready.length} 个启用模型配置完整`);
     } else {
@@ -184,7 +193,7 @@ export function AdminModelConfig() {
       <section className="edu-card rounded-2xl p-4">
         <div className="flex flex-wrap items-end gap-4">
           <SearchInput label="搜索模型、供应商或能力" value={query} onChange={setQuery} />
-          <SegmentedControl value={statusFilter} options={["全部", "启用", "停用"]} onChange={setStatusFilter} />
+          <SegmentedControl value={statusFilter} options={["全部", "可用", "待配置", "停用"]} onChange={setStatusFilter} />
         </div>
       </section>
       {modelsState.loading ? (
@@ -217,7 +226,7 @@ export function AdminModelConfig() {
                 </button>
                 <button onClick={() => openEditor(model)} className={`${secondaryButton} cursor-pointer`}>编辑配置</button>
                 <button onClick={() => navigate(`/admin/audit?model=${model.id}`)} className={`${secondaryButton} cursor-pointer`}>查看调用</button>
-                <button disabled={updatingId === model.id} onClick={() => setEnabled(model)} className={`${secondaryButton} cursor-pointer disabled:cursor-not-allowed disabled:opacity-50`}>{updatingId === model.id ? "更新中..." : model.status === "启用" ? "停用" : "启用"}</button>
+                <button disabled={updatingId === model.id} onClick={() => setEnabled(model)} className={`${secondaryButton} cursor-pointer disabled:cursor-not-allowed disabled:opacity-50`}>{updatingId === model.id ? "更新中..." : model.rawStatus === "active" ? "停用" : "启用"}</button>
               </div>
             </article>
           ))}
