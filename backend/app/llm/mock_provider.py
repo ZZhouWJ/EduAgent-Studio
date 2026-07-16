@@ -57,21 +57,21 @@ class MockProvider:
         if "学生学习画像分析助手" in input_text:
             return self._mock_profile_extraction(input_text)
         if "专业的学习诊断智能体" in input_text:
-            return self._mock_diagnosis()
+            return self._mock_diagnosis(input_text)
         if "专业的教育资源生成智能体" in input_text or (
             "教材原文依据" in input_text and "直接输出 Markdown" in input_text
         ):
             return self._mock_resource(input_text, model_name)
         if "专业的学习规划智能体" in input_text:
-            return self._mock_planning()
+            return self._mock_planning(input_text)
         if "专业的学习评测反馈智能体" in input_text:
             return self._mock_assessment()
         if "专业的教学审核辅助智能体" in input_text:
             return self._mock_teacher_review()
         if "诊断" in normalized_input or "薄弱" in normalized_input:
-            return self._mock_diagnosis()
+            return self._mock_diagnosis(input_text)
         if "规划" in normalized_input or "路径" in normalized_input:
-            return self._mock_planning()
+            return self._mock_planning(input_text)
         if "评测" in normalized_input or "反馈" in normalized_input:
             return self._mock_assessment()
         if "审核" in normalized_input or "质量" in normalized_input:
@@ -204,33 +204,107 @@ class MockProvider:
         }
         return json.dumps(extraction, ensure_ascii=False)
 
-    def _mock_diagnosis(self) -> str:
-        return f"""{{
-  "diagnosis_id": "mock-{uuid.uuid4().hex[:8]}",
-  "weak_points": [
-    {{"kp_id": 5, "name": "SQL多表连接", "mastery_level": 0.3, "reason": "近3次测验中正确率仅30%"}},
-    {{"kp_id": 8, "name": "事务隔离级别", "mastery_level": 0.2, "reason": "从未正确解答相关题目"}}
-  ],
-  "strength_points": [
-    {{"kp_id": 2, "name": "SQL基本查询", "mastery_level": 0.85}}
-  ],
-  "learning_difficulties": ["多表连接时条件判断容易混淆", "子查询嵌套层次过深难以理解"],
-  "resource_needs": ["图文并茂的讲义", "具体案例演示", "补充练习题"],
-  "suggested_difficulty": "intermediate"
-}}"""
+    def _mock_diagnosis(self, prompt: str = "") -> str:
+        knowledge_points = self._extract_prompt_knowledge_points(
+            prompt, "课程知识点掌握情况", "最近学习任务", include_mastery=True
+        )
+        if not knowledge_points:
+            knowledge_points = [
+                {"kp_id": 5, "name": "SQL多表连接", "mastery_level": 0.3},
+                {"kp_id": 8, "name": "事务隔离级别", "mastery_level": 0.2},
+                {"kp_id": 2, "name": "SQL基本查询", "mastery_level": 0.85},
+            ]
 
-    def _mock_planning(self) -> str:
-        return f"""{{
-  "plan_id": "mock-{uuid.uuid4().hex[:8]}",
-  "learning_path": [
-    {{"order": 1, "kp_id": 3, "kp_name": "理解INNER JOIN", "estimated_time": "30分钟", "resource_type": "讲义", "priority": "high"}},
-    {{"order": 2, "kp_id": 5, "kp_name": "掌握OUTER JOIN", "estimated_time": "30分钟", "resource_type": "案例", "priority": "high"}},
-    {{"order": 3, "kp_id": 5, "kp_name": "多表连接综合练习", "estimated_time": "45分钟", "resource_type": "习题", "priority": "high"}}
-  ],
-  "resource_combination": ["讲义×3", "案例×2", "习题×5"],
-  "learning_sequence": "由浅入深，先掌握单表查询再扩展到多表连接",
-  "estimated_total_time": "约3小时"
-}}"""
+        weak_points = [
+            {
+                **kp,
+                "reason": f"当前掌握度仅{kp['mastery_level']:.0%}，需要优先补强",
+            }
+            for kp in knowledge_points if kp["mastery_level"] < 0.5
+        ]
+        strength_points = [
+            kp for kp in knowledge_points if kp["mastery_level"] >= 0.5
+        ]
+        focus_names = "、".join(kp["name"] for kp in weak_points[:3]) or "当前知识点"
+        result = {
+            "diagnosis_id": f"mock-{uuid.uuid4().hex[:8]}",
+            "weak_points": weak_points,
+            "strength_points": strength_points,
+            "learning_difficulties": [
+                f"{focus_names}的概念边界需要进一步澄清",
+                f"需要通过案例巩固{focus_names}的应用条件",
+            ],
+            "resource_needs": ["图文并茂的讲义", "具体案例演示", "补充练习题"],
+            "suggested_difficulty": "intermediate",
+        }
+        return json.dumps(result, ensure_ascii=False)
+
+    def _mock_planning(self, prompt: str = "") -> str:
+        knowledge_points = self._extract_prompt_knowledge_points(
+            prompt, "薄弱知识点（优先攻克）", "资源类型说明", include_mastery=True
+        )
+        if not knowledge_points:
+            knowledge_points = self._extract_prompt_knowledge_points(
+                prompt, "课程知识点", "薄弱知识点（优先攻克）", include_mastery=False
+            )
+        if not knowledge_points:
+            knowledge_points = [
+                {"kp_id": 5, "name": "SQL多表连接", "mastery_level": 0.3}
+            ]
+
+        learning_path = []
+        for index, kp in enumerate(knowledge_points, start=1):
+            resource_type = "讲义+案例+习题" if any(
+                marker in kp["name"] for marker in ("事务", "锁", "查询", "连接", "代码")
+            ) else "讲义+习题"
+            learning_path.append({
+                "order": index,
+                "kp_id": kp["kp_id"],
+                "kp_name": kp["name"],
+                "estimated_time": "40分钟",
+                "resource_type": resource_type,
+                "priority": "high" if index <= 2 else "medium",
+                "learning_objective": f"理解{kp['name']}并能够完成基础应用",
+            })
+
+        result = {
+            "plan_id": f"mock-{uuid.uuid4().hex[:8]}",
+            "learning_path": learning_path,
+            "resource_combination": ["讲义×1", "案例×1", "习题×3"],
+            "learning_sequence": "先澄清核心概念，再通过案例和练习完成迁移应用",
+            "estimated_total_time": f"约{len(learning_path) * 40}分钟",
+        }
+        return json.dumps(result, ensure_ascii=False)
+
+    def _extract_prompt_knowledge_points(
+        self,
+        prompt: str,
+        start_heading: str,
+        end_heading: str,
+        include_mastery: bool,
+    ) -> List[Dict[str, Any]]:
+        section_match = re.search(
+            rf"##\s*{re.escape(start_heading)}\s*(.*?)\s*##\s*{re.escape(end_heading)}",
+            prompt,
+            re.DOTALL,
+        )
+        if not section_match:
+            return []
+
+        section = section_match.group(1)
+        pattern = r"-\s*\[kp_id:(\d+)\]\s*([^|\n]+)"
+        if include_mastery:
+            pattern += r"\s*\|\s*掌握度\s*(\d+(?:\.\d+)?)%"
+
+        points = []
+        for match in re.finditer(pattern, section):
+            mastery = float(match.group(3)) / 100 if include_mastery else 0.5
+            points.append({
+                "kp_id": int(match.group(1)),
+                "name": match.group(2).strip(),
+                "mastery_level": mastery,
+            })
+        return points
 
     def _mock_assessment(self) -> str:
         return f"""{{

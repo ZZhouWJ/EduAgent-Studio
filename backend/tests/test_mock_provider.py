@@ -57,6 +57,41 @@ class MockProfileExtractionTests(unittest.TestCase):
         self.assertIn("quality_checks", result)
         self.assertNotIn("learning_path", result)
 
+    def test_diagnosis_and_plan_follow_selected_knowledge_points(self):
+        diagnosis_prompt = """你是一个专业的学习诊断智能体。
+## 课程知识点掌握情况
+- [kp_id:6] 事务与 ACID | 掌握度 35%
+- [kp_id:7] 并发控制与锁 | 掌握度 42%
+## 最近学习任务
+（暂无）
+"""
+        provider = MockProvider()
+        diagnosis = json.loads(provider._generate_response(diagnosis_prompt, "mock-model"))
+
+        self.assertEqual(
+            [point["name"] for point in diagnosis["weak_points"]],
+            ["事务与 ACID", "并发控制与锁"],
+        )
+        self.assertEqual([point["kp_id"] for point in diagnosis["weak_points"]], [6, 7])
+
+        planning_prompt = """你是一个专业的学习规划智能体。
+## 课程知识点
+- [kp_id:6] 事务与 ACID
+- [kp_id:7] 并发控制与锁
+## 薄弱知识点（优先攻克）
+- [kp_id:6] 事务与 ACID | 掌握度 35%
+- [kp_id:7] 并发控制与锁 | 掌握度 42%
+## 资源类型说明
+- 讲义
+"""
+        planning = json.loads(provider._generate_response(planning_prompt, "mock-model"))
+
+        self.assertEqual(
+            [step["kp_name"] for step in planning["learning_path"]],
+            ["事务与 ACID", "并发控制与锁"],
+        )
+        self.assertEqual([step["kp_id"] for step in planning["learning_path"]], [6, 7])
+
 
 if __name__ == "__main__":
     unittest.main()
