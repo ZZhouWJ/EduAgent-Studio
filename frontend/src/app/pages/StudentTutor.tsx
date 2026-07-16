@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown"
 import { BookOpenCheck, BookOpenText, Bot, BrainCircuit, CheckCircle2, ChevronRight, CircleX, Clock3, Code2, FileQuestion, Image, ImageIcon, Loader2, MessageSquare, Presentation, RotateCcw, Route, Search, Send, Settings2, ThumbsDown, ThumbsUp, Volume2, X, XCircle } from "lucide-react"
 import { useApi } from "@/lib/useApi"
 import { tutorApi, profilesApi, learningApi, multimodalApi } from "@/lib/api"
+import { resourceTypeLabel } from "@/lib/educationLabels"
 import type { LearningPathNode } from "@/lib/api/learning"
 import { LearningPathGraph } from "../components/learning/LearningPathGraph"
 import type { Citation, PracticeQuestion, RecommendedResource, ContentBlock, IntentResult, SSEEvent } from "@/lib/api/tutor"
@@ -285,7 +286,7 @@ function ResourcesCard({ resources }: { resources?: RecommendedResource[] }) {
             className="flex items-center justify-between rounded-lg bg-white p-2 text-xs transition hover:bg-purple-50"
           >
             <span className="font-medium text-slate-700">{res.title}</span>
-            <span className="rounded bg-purple-100 px-2 py-0.5 text-purple-700">{res.type}</span>
+            <span className="rounded bg-purple-100 px-2 py-0.5 text-purple-700">{resourceTypeLabel(res.type)}</span>
           </Link>
         ))}
       </div>
@@ -968,7 +969,7 @@ export function StudentTutor() {
                     </div>
                     <div className="mt-2 flex items-center justify-between text-xs">
                       <span className="rounded bg-purple-100 px-2 py-0.5 font-semibold text-purple-700">
-                        {res.type}
+                        {resourceTypeLabel(res.type)}
                       </span>
                     </div>
                   </Link>

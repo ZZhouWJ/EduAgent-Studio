@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { feedbackApi, profilesApi, resourcesApi } from "@/lib/api";
 import type { MasteryChange, RecommendedResource } from "@/lib/api/learning";
+import { resourceTypeLabel } from "@/lib/educationLabels";
 import { useApi } from "@/lib/useApi";
 import { notify } from "@/lib/toast";
 import { PageHero } from "../components/common/PageHero";
@@ -31,22 +32,6 @@ const FEEDBACK_TYPE_LABELS: Record<string, string> = {
   self_report: "学习自评",
   study_note: "学习笔记",
   question: "问题提问",
-};
-
-const RESOURCE_TYPE_LABELS: Record<string, string> = {
-  lecture: "课程讲义",
-  mindmap: "思维导图",
-  quiz: "练习题",
-  case: "案例材料",
-  code_case: "代码实操",
-  ppt: "PPT 大纲",
-  video_script: "视频脚本",
-  experiment_report: "实验报告",
-  error_analysis: "错题解析",
-  learning_card: "学习卡片",
-  review: "复习计划",
-  test: "阶段测验",
-  other: "其他",
 };
 
 const DIFFICULTY_OPTIONS: Array<{ value: DifficultyRating; label: string }> = [
@@ -259,7 +244,7 @@ export function LearningFeedback() {
                   <option value="">未关联具体资源</option>
                   {approvedResources.map((resource) => (
                     <option key={resource.resource_id} value={resource.resource_id}>
-                      {resource.resource_title} · {RESOURCE_TYPE_LABELS[resource.resource_type] ?? resource.resource_type}
+                      {resource.resource_title} · {resourceTypeLabel(resource.resource_type)}
                     </option>
                   ))}
                 </select>
@@ -428,7 +413,7 @@ export function LearningFeedback() {
                     <span className="rounded bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700">{resource.reason}</span>
                   </div>
                   <h4 className="mt-4 line-clamp-2 min-h-10 text-sm font-black leading-5 text-slate-800 group-hover:text-emerald-700">{resource.title}</h4>
-                  <p className="mt-3 text-xs font-medium text-slate-500">{RESOURCE_TYPE_LABELS[resource.type] ?? resource.type}</p>
+                  <p className="mt-3 text-xs font-medium text-slate-500">{resourceTypeLabel(resource.type)}</p>
                 </Link>
               );
             })}

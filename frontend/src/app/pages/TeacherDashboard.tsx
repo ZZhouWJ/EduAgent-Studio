@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowRight, BookOpen, CheckSquare, Database, FileText, G
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useApi } from "@/lib/useApi";
 import { reviewsApi, statisticsApi, learningApi } from "@/lib/api";
+import { taskTypeLabel } from "@/lib/educationLabels";
 import { useAuthStore } from "@/stores/auth";
 
 const toneClass: Record<string, string> = {
@@ -50,7 +51,7 @@ export function TeacherDashboard() {
 
   const taskSuggestions = (tasksData?.items ?? []).slice(0, 4).map((t) => ({
     title: t.title,
-    type: t.type ?? "任务",
+    type: taskTypeLabel(t.type),
     target: t.course_name,
     status: t.status,
   }));

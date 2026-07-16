@@ -14,15 +14,16 @@ import {
 } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { learningApi, resourcesApi, statisticsApi, profilesApi } from "@/lib/api";
+import { resourceTypeLabel, taskTypeLabel } from "@/lib/educationLabels";
 import { SafeLottie } from "../components/SafeLottie";
 import { MetricTile } from "../components/common/MetricTile";
 
 function resourceIcon(type: string) {
   const t = type?.toLowerCase() ?? "";
-  if (t.includes("讲义") || t.includes("文档")) return FileText;
-  if (t.includes("练习") || t.includes("题目")) return CheckCircle2;
-  if (t.includes("代码") || t.includes("案例")) return BookOpenCheck;
-  if (t.includes("视频") || t.includes("动画")) return PlayCircle;
+  if (["lecture", "mindmap", "ppt", "review"].includes(t) || t.includes("讲义") || t.includes("文档")) return FileText;
+  if (["quiz", "test", "error_analysis", "learning_card"].includes(t) || t.includes("练习") || t.includes("题目")) return CheckCircle2;
+  if (["code_case", "case", "experiment_report"].includes(t) || t.includes("代码") || t.includes("案例")) return BookOpenCheck;
+  if (t === "video_script" || t.includes("视频") || t.includes("动画")) return PlayCircle;
   return Library;
 }
 
@@ -49,7 +50,7 @@ export function StudentDashboard() {
   const resourceCards = (resourcesData?.items ?? []).map((r) => ({
     id: r.resource_id,
     title: r.resource_title,
-    type: r.resource_type || "资源",
+    type: resourceTypeLabel(r.resource_type),
     minutes: String(r.difficulty ?? "—"),
     status: r.status === "approved" ? "已认证" : r.status,
     icon: resourceIcon(r.resource_type ?? ""),
@@ -155,7 +156,7 @@ export function StudentDashboard() {
                             {step.title}
                           </h3>
                           <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
-                            {step.type}
+                            {taskTypeLabel(step.type)}
                           </span>
                         </div>
                         <p className="mt-1 line-clamp-2 text-xs leading-snug text-slate-500">
@@ -320,7 +321,7 @@ export function StudentDashboard() {
                       <Icon className="h-3.5 w-3.5" />
                     </span>
                     <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">
-                      {r.type}
+                      {resourceTypeLabel(r.type)}
                     </span>
                   </div>
                   <div className="mt-3 line-clamp-2 text-[13px] font-medium leading-snug text-slate-900">

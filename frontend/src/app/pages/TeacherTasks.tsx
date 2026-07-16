@@ -2,6 +2,7 @@ import React from "react";
 import { CalendarClock, CheckSquare, ClipboardList, Plus, RefreshCw, Save, Users } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { learningApi, statisticsApi } from "@/lib/api";
+import { taskTypeLabel } from "@/lib/educationLabels";
 import { EmptyState, ModalShell, PageHeader, ProgressBar, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, notify } from "../components/common/ProductUI";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -39,7 +40,7 @@ export function TeacherTasks() {
     id: t.id,
     title: t.title,
     course: t.course_name,
-    type: t.type,
+    type: taskTypeLabel(t.type),
     due: t.due_date ? t.due_date.replace("T", " ").slice(0, 16) : "—",
     completion: Math.round((t.completion_rate ?? 0) * 100),
     status: STATUS_LABELS[t.status] ?? t.status,

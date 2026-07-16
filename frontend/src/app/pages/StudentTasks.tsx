@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { BookOpenCheck, CheckCircle2, Clock3, FileText, MessageSquare, PlayCircle, Target } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { learningApi, resourcesApi } from "@/lib/api";
+import { resourceTypeLabel, taskTypeLabel } from "@/lib/educationLabels";
 import { DetailDrawer, EmptyState, ProgressBar, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, notify } from "../components/common/ProductUI";
 import { PageHero } from "../components/common/PageHero";
 
@@ -19,10 +20,10 @@ const STATUS_OPTIONS = ["全部", "进行中", "未开始", "已完成"];
 
 function resourceIcon(type: string) {
   const t = (type ?? "").toLowerCase();
-  if (t.includes("讲义") || t.includes("文档")) return FileText;
-  if (t.includes("练习") || t.includes("题")) return CheckCircle2;
-  if (t.includes("代码") || t.includes("案例")) return BookOpenCheck;
-  if (t.includes("视频") || t.includes("动画")) return PlayCircle;
+  if (["lecture", "mindmap", "ppt", "review"].includes(t) || t.includes("讲义") || t.includes("文档")) return FileText;
+  if (["quiz", "test", "error_analysis", "learning_card"].includes(t) || t.includes("练习") || t.includes("题")) return CheckCircle2;
+  if (["code_case", "case", "experiment_report"].includes(t) || t.includes("代码") || t.includes("案例")) return BookOpenCheck;
+  if (t === "video_script" || t.includes("视频") || t.includes("动画")) return PlayCircle;
   return FileText;
 }
 
@@ -53,7 +54,7 @@ export function StudentTasks() {
       ...task,
       id: task.id,
       course: task.course_name,
-      knowledge: task.type,
+      knowledge: taskTypeLabel(task.type),
       displayStatus: STATUS_LABELS[task.status] ?? task.status,
       progress: task.status === "completed" ? 100 : task.status === "in_progress" ? 50 : 0,
       section:
@@ -79,7 +80,7 @@ export function StudentTasks() {
 
   const recommendedResources = (resourcesData?.items ?? []).slice(0, 3).map((r) => ({
     title: r.resource_title,
-    type: r.resource_type || "资源",
+    type: resourceTypeLabel(r.resource_type),
     icon: resourceIcon(r.resource_type),
   }));
 
@@ -166,7 +167,7 @@ export function StudentTasks() {
                         id: task.id,
                         title: task.title,
                         course_name: task.course_name,
-                        type: task.type,
+                        type: taskTypeLabel(task.type),
                         status: task.displayStatus,
                         rawStatus: task.status,
                         priority: task.priority,
