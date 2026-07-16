@@ -458,8 +458,8 @@ export function StudentTutor() {
   const [selectedImage, setSelectedImage] = useState<{ base64: string; filename: string } | null>(null)
   const [pendingAi, setPendingAi] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [currentProfileId, setCurrentProfileId] = useState<number>(1)
-  const [currentCourseId, setCurrentCourseId] = useState<number>(1)
+  const [currentProfileId, setCurrentProfileId] = useState<number | null>(null)
+  const [currentCourseId, setCurrentCourseId] = useState<number | null>(null)
   const [lastSessionId, setLastSessionId] = useState<number | null>(null)
   const [activePanel, setActivePanel] = useState<"context" | "chat" | "resources">("chat")
   // 执行轨迹状态（当前活跃消息的轨迹）
@@ -473,8 +473,13 @@ export function StudentTutor() {
   const abortRef = useRef<(() => void) | null>(null)
 
   // 获取学生画像
-  const { data: profileData } = useApi(() => profilesApi.getMyProfile(), [])
+  const {
+    data: profileData,
+    error: profileError,
+    refetch: refetchProfile,
+  } = useApi(() => profilesApi.getMyProfile(), [])
   const currentProfile = profileData
+  const contextReady = currentProfileId !== null && currentCourseId !== null
 
   // 获取学习路径图谱数据
   const { data: pathData } = useApi(
@@ -507,8 +512,11 @@ export function StudentTutor() {
       tutorApi.getSuggestions(currentProfile.course_id, currentProfile.profile_id)
         .then((res: any) => setSuggestions(res.suggestions || []))
         .catch(() => setSuggestions([]))
+    } else if (profileError) {
+      setCurrentProfileId(null)
+      setCurrentCourseId(null)
     }
-  }, [currentProfile])
+  }, [currentProfile, profileError])
 
   // 配置 marked
   useEffect(() => {
@@ -556,6 +564,12 @@ export function StudentTutor() {
   async function handleSend(question: string) {
     let text = question.trim()
     if ((!text && !selectedImage) || pendingAi) return
+    const profileId = currentProfileId
+    const courseId = currentCourseId
+    if (profileId === null || courseId === null) {
+      showToast(profileError ? "学习画像加载失败，请重试" : "正在加载学习画像，请稍候")
+      return
+    }
     if (!text && selectedImage) text = "详细描述这张图片的内容"
 
     const imageInfo = selectedImage
@@ -609,8 +623,8 @@ export function StudentTutor() {
     // 3. SSE 流式调用（图片分析完成后才发，确保上下文完整）
     const cancel = tutorApi.chatStream(
       {
-        profile_id: currentProfileId,
-        course_id: currentCourseId,
+        profile_id: profileId,
+        course_id: courseId,
         question: fullQuestion,
       },
       {
@@ -772,17 +786,34 @@ export function StudentTutor() {
             <div className="rounded-2xl bg-slate-50 p-4">
               <div className="text-xs font-bold text-slate-400">当前课程</div>
               <div className="mt-1 font-black text-slate-900">
-                {currentProfile?.course_name ?? "数据库系统原理"}
+                {currentProfile?.course_name ?? (profileError ? "课程信息加载失败" : "正在加载...")}
               </div>
             </div>
 
             {/* 当前学生 */}
             <div className="rounded-2xl bg-slate-50 p-4">
               <div className="text-xs font-bold text-slate-400">当前学生</div>
-              <div className="mt-1 font-black text-slate-900">
-                {currentProfile?.student_name ?? "李明"} /{" "}
-                {currentProfile?.current_level ?? "大二"}
-              </div>
+              {currentProfile ? (
+                <div className="mt-1">
+                  <div className="font-black text-slate-900">{currentProfile.student_name || "当前学生"}</div>
+                  <p className="mt-1 line-clamp-3 text-xs leading-5 text-slate-500">
+                    {currentProfile.current_level || "学习阶段待补充"}
+                  </p>
+                </div>
+              ) : profileError ? (
+                <div className="mt-2 space-y-2">
+                  <p className="text-xs leading-5 text-red-600">暂时无法获取你的学习画像。</p>
+                  <button
+                    type="button"
+                    onClick={() => refetchProfile()}
+                    className="min-h-9 rounded-lg border border-red-200 bg-white px-3 text-xs font-bold text-red-700 transition hover:bg-red-50"
+                  >
+                    重试加载
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-1 text-sm font-bold text-slate-500">正在加载学习画像...</div>
+              )}
             </div>
 
             {/* 薄弱点 */}
@@ -920,26 +951,28 @@ export function StudentTutor() {
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
+                disabled={!contextReady}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault()
                     handleSend(input)
                   }
                 }}
-                placeholder={selectedImage ? "对图片的问题（可选）..." : "输入你的学习问题，按 Enter 发送..."}
-                className="edu-focus-ring h-20 flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700"
+                placeholder={!contextReady ? (profileError ? "学习画像加载失败，请在上下文面板重试" : "正在加载学习画像...") : selectedImage ? "对图片的问题（可选）..." : "输入你的学习问题，按 Enter 发送..."}
+                className="edu-focus-ring h-20 flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
               />
               <div className="flex flex-col gap-2">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 font-bold text-sm text-slate-600 transition hover:border-blue-200 hover:text-blue-700"
+                  disabled={!contextReady || pendingAi}
+                  className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 font-bold text-sm text-slate-600 transition hover:border-blue-200 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                   title="上传图片"
                 >
                   <Image className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => handleSend(input)}
-                  disabled={pendingAi || (!input.trim() && !selectedImage)}
+                  disabled={!contextReady || pendingAi || (!input.trim() && !selectedImage)}
                   className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Send className="h-4 w-4" />
