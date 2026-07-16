@@ -6,14 +6,17 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class DemoSeedContractTests(unittest.TestCase):
-    def test_demo_credentials_are_consistent(self):
+    def test_demo_credentials_stay_out_of_the_login_page(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         login = (ROOT / "frontend/src/app/pages/Login.tsx").read_text(encoding="utf-8")
         seed = (ROOT / "database/seed_demo_data.py").read_text(encoding="utf-8")
         for username in ("admin", "teacher_li", "student_zhang"):
             self.assertIn(username, readme)
-            self.assertIn(username, login)
             self.assertIn(username, seed)
+        for username in ("teacher_li", "student_zhang"):
+            self.assertNotIn(username, login)
+        self.assertNotIn('setUsername("admin")', login)
+        self.assertNotIn("Pass@1234", login)
         self.assertIn('DEMO_PASSWORD = "Pass@1234"', seed)
         self.assertIn('os.path.join(BASE_DIR, "backend", ".env")', seed)
         self.assertNotIn("DELETE FROM users WHERE username", seed)
