@@ -45,9 +45,8 @@ class GenerateRequest(BaseModel):
 
 class SaveResourceRequest(BaseModel):
     result: dict
-    title: str
-    course_id: int
-    user_id: int = 0
+    title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+    course_id: int = Field(..., gt=0)
 
 
 PptText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]

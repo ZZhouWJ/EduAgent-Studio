@@ -12,6 +12,8 @@ Tables:
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from pymysql.cursors import DictCursor
+
 from app.database import get_db_cursor
 
 
@@ -189,13 +191,13 @@ class LearningResourceRepository:
         self,
         data: Dict[str, Any],
         created_by: int,
+        conn: Any = None,
     ) -> Dict[str, Any]:
         """创建新学习资源。"""
         target_kp_ids = data.get("target_kp_ids") or []
         target_kp_ids_str = ",".join(str(x) for x in target_kp_ids) if isinstance(target_kp_ids, list) else str(target_kp_ids)
 
-        now = datetime.now()
-        with get_db_cursor() as cursor:
+        def insert(cursor: Any) -> int:
             cursor.execute("""
                 INSERT INTO learning_resources
                     (course_id, resource_title, resource_type, difficulty, content,
@@ -214,6 +216,14 @@ class LearningResourceRepository:
                 data.get("status", "draft"),
                 now, now, created_by,
             ))
-            resource_id = cursor.lastrowid
+            return int(cursor.lastrowid)
+
+        now = datetime.now()
+        if conn is not None:
+            with conn.cursor(DictCursor) as cursor:
+                return {"resource_id": insert(cursor)}
+
+        with get_db_cursor() as cursor:
+            resource_id = insert(cursor)
 
         return self.get_resource(resource_id) or {"resource_id": resource_id}

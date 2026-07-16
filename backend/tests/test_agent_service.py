@@ -9,7 +9,7 @@ from app.services.agent_service import (
     _extract_save_payload,
     extract_resource_references,
 )
-from app.routers.agents import GenerateRequest, generate_learning_resource
+from app.routers.agents import GenerateRequest, SaveResourceRequest, generate_learning_resource
 
 
 class ExtractSavePayloadTests(unittest.TestCase):
@@ -125,6 +125,81 @@ class AgentContextTests(unittest.TestCase):
 
         self.assertEqual(result["code"], 0)
         access.require_generation_context.assert_called_once_with(3, 12, [4], user)
+
+
+class AgentResourcePersistenceTests(unittest.TestCase):
+    @patch("app.repositories.user_repo.insert_operation_log_with_conn")
+    @patch("app.repositories.evidence_repo.EvidenceRepository")
+    @patch("app.repositories.learning_resource_repo.LearningResourceRepository")
+    @patch("app.services.agent_service.get_db_transaction")
+    def test_save_resource_commits_draft_and_audit_in_one_transaction(
+        self, transaction, resource_type, evidence_type, insert_log
+    ):
+        conn = Mock()
+        context = Mock()
+        context.__enter__ = Mock(return_value=conn)
+        context.__exit__ = Mock(return_value=False)
+        transaction.return_value = context
+        resource_repo = Mock()
+        resource_repo.create_resource.return_value = {"resource_id": 31}
+        resource_repo.get_resource.return_value = {
+            "resource_id": 31,
+            "resource_title": "事务隔离讲义",
+            "status": "draft",
+        }
+        resource_type.return_value = resource_repo
+        evidence_repo = Mock()
+        evidence_type.return_value = evidence_repo
+        request = SaveResourceRequest(
+            result={
+                "resource": {
+                    "title": "事务隔离讲义",
+                    "type": "lecture",
+                    "content": "正文",
+                    "difficulty": "intermediate",
+                    "target_kp_ids": [4],
+                },
+                "evidence_links": [],
+            },
+            title="事务隔离讲义",
+            course_id=3,
+        )
+
+        result = AgentService().save_resource(request, user_id=7)
+
+        create_call = resource_repo.create_resource.call_args
+        self.assertEqual(create_call.kwargs["data"]["status"], "draft")
+        self.assertIs(create_call.kwargs["conn"], conn)
+        insert_log.assert_called_once()
+        self.assertIs(insert_log.call_args.kwargs["conn"], conn)
+        evidence_repo.insert_resource_evidence_links.assert_not_called()
+        self.assertEqual(result["data"]["resource_id"], 31)
+
+    @patch("app.repositories.learning_resource_repo.LearningResourceRepository")
+    @patch("app.services.agent_service.get_db_transaction")
+    def test_save_resource_does_not_report_success_when_database_write_fails(
+        self, transaction, resource_type
+    ):
+        context = Mock()
+        context.__enter__ = Mock(return_value=Mock())
+        context.__exit__ = Mock(return_value=False)
+        transaction.return_value = context
+        resource_type.return_value.create_resource.side_effect = RuntimeError("db failed")
+        request = SaveResourceRequest(
+            result={
+                "resource": {
+                    "type": "lecture",
+                    "content": "正文",
+                    "target_kp_ids": [4],
+                },
+                "evidence_links": [],
+            },
+            title="事务隔离讲义",
+            course_id=3,
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "db failed"):
+            AgentService().save_resource(request, user_id=7)
 
 
 if __name__ == "__main__":
