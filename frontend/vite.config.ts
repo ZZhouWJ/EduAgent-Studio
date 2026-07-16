@@ -30,6 +30,25 @@ export default defineConfig(({ mode }) => {
       },
     },
     assetsInclude: ['**/*.svg', '**/*.csv'],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined
+            if (id.includes('/motion/') || id.includes('/framer-motion/')) return 'vendor-motion'
+            if (
+              id.includes('/react/') ||
+              id.includes('/react-dom/') ||
+              id.includes('/react-router') ||
+              id.includes('/scheduler/')
+            ) return 'vendor-react'
+            if (id.includes('/@radix-ui/') || id.includes('/cmdk/')) return 'vendor-ui'
+            if (id.includes('/axios/')) return 'vendor-http'
+            return undefined
+          },
+        },
+      },
+    },
     server: {
       port: 5173,
       proxy: {
