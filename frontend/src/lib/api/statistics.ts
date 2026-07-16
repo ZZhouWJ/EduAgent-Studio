@@ -52,6 +52,7 @@ export interface CostStats {
   cost_by_model: Array<{ model_id?: number; model_name: string; display_name?: string; provider_name?: string; total_cost: number; call_count?: number; input_cost?: number; output_cost?: number; total_tokens?: number; input_tokens?: number; output_tokens?: number }>
   cost_by_project: Array<{ project_id?: number; project_name: string; total_cost: number; task_count?: number }>
   cost_by_user: Array<{ user_id?: number; real_name: string; total_cost: number }>
+  cost_trend: Array<{ date: string; call_count: number; total_tokens: number; total_cost: number }>
 }
 
 export interface ReviewStats {
@@ -190,6 +191,7 @@ export const statisticsApi = {
 
   costs(params?: {
     project_id?: number
+    model_id?: number
     date_from?: string
     date_to?: string
   }) {

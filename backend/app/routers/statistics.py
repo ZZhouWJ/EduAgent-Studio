@@ -124,18 +124,20 @@ async def get_model_call_stats(
 async def get_cost_stats(
     authorization: Optional[str] = Header(None, alias="Authorization"),
     project_id: Optional[int] = Query(None, gt=0),
+    model_id: Optional[int] = Query(None, gt=0),
     date_from: Optional[str] = Query(None, max_length=10),
     date_to: Optional[str] = Query(None, max_length=10),
 ) -> dict:
     """
     成本统计。
 
-    支持 project_id 和日期范围过滤。
+    支持 project_id、model_id 和日期范围过滤。
     """
     token = _extract_token(authorization)
     result = statistics_service.get_cost_stats(
         token=token,
         project_id=project_id,
+        model_id=model_id,
         date_from=date_from,
         date_to=date_to,
     )

@@ -405,6 +405,7 @@ def get_cost_stats(
     is_admin: bool,
     user_id: int,
     project_id: Optional[int] = None,
+    model_id: Optional[int] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -414,6 +415,7 @@ def get_cost_stats(
     params: List = []
     project_filter = ""
     date_filter = ""
+    model_filter = ""
 
     if project_id is not None:
         project_filter = " AND cr.project_id = %s"
@@ -427,10 +429,16 @@ def get_cost_stats(
         date_filter += " AND cr.created_at <= %s"
         params.append(date_to + " 23:59:59")
 
+    if model_id is not None:
+        model_filter = " AND cr.model_id = %s"
+        params.append(model_id)
+
     member_filter = ""
     if not is_admin:
         member_filter = " AND cr.project_id IN (SELECT project_id FROM project_members WHERE user_id = %s AND is_deleted = 0)"
         params.append(user_id)
+
+    scope_filter = f"{project_filter}{date_filter}{model_filter}{member_filter}"
 
     # 总体成本
     total_sql = f"""
@@ -441,21 +449,13 @@ def get_cost_stats(
             COALESCE(SUM(cr.total_tokens), 0) AS total_tokens
         FROM cost_records cr
         WHERE 1=1
-        {project_filter}
-        {date_filter}
-        {member_filter}
+        {scope_filter}
     """
     with get_db_cursor() as cursor:
         cursor.execute(total_sql, params)
         total = cursor.fetchone()
 
     # 按模型分成本
-    by_model_params = params.copy()
-    by_model_filter = project_filter
-    by_model_date = date_filter
-    by_model_member = member_filter
-    if project_id is None:
-        by_model_filter = ""
     by_model_sql = f"""
         SELECT
             cr.model_id,
@@ -473,19 +473,15 @@ def get_cost_stats(
         INNER JOIN ai_models m ON cr.model_id = m.model_id AND m.is_deleted = 0
         LEFT JOIN model_providers mp ON m.provider_id = mp.provider_id AND mp.is_deleted = 0
         WHERE 1=1
-        {by_model_filter}
-        {by_model_date}
-        {by_model_member}
+        {scope_filter}
         GROUP BY cr.model_id, m.model_name, m.display_name, mp.provider_name
         ORDER BY total_cost DESC
     """
     with get_db_cursor() as cursor:
-        cursor.execute(by_model_sql, by_model_params)
+        cursor.execute(by_model_sql, params)
         cost_by_model = [_normalize_row(r) for r in cursor.fetchall()]
 
     # 按项目分成本
-    by_project_params = params.copy()
-    by_project_member = member_filter
     by_project_sql = f"""
         SELECT
             cr.project_id,
@@ -496,14 +492,12 @@ def get_cost_stats(
         FROM cost_records cr
         INNER JOIN projects p ON cr.project_id = p.project_id AND p.is_deleted = 0
         WHERE 1=1
-        {project_filter}
-        {date_filter}
-        {by_project_member}
+        {scope_filter}
         GROUP BY cr.project_id, p.project_name
         ORDER BY total_cost DESC
     """
     with get_db_cursor() as cursor:
-        cursor.execute(by_project_sql, by_project_params)
+        cursor.execute(by_project_sql, params)
         rows = cursor.fetchall()
         cost_by_project = [
             {**_normalize_row(r), "input_tokens": 0, "output_tokens": 0, "avg_cost_per_call": (r.get("total_cost") or 0) / (r.get("call_count") or 1)}
@@ -511,7 +505,6 @@ def get_cost_stats(
         ]
 
     # 按用户分成本
-    by_user_params = params.copy()
     by_user_sql = f"""
         SELECT
             cr.user_id,
@@ -521,15 +514,29 @@ def get_cost_stats(
         FROM cost_records cr
         INNER JOIN users u ON cr.user_id = u.user_id AND u.is_deleted = 0
         WHERE 1=1
-        {project_filter}
-        {date_filter}
-        {member_filter}
+        {scope_filter}
         GROUP BY cr.user_id, u.real_name
         ORDER BY total_cost DESC
     """
     with get_db_cursor() as cursor:
-        cursor.execute(by_user_sql, by_user_params)
+        cursor.execute(by_user_sql, params)
         cost_by_user = [_normalize_row(r) for r in cursor.fetchall()]
+
+    trend_sql = f"""
+        SELECT
+            DATE_FORMAT(cr.created_at, '%%Y-%%m-%%d') AS date,
+            COUNT(*) AS call_count,
+            COALESCE(SUM(cr.total_tokens), 0) AS total_tokens,
+            COALESCE(SUM(cr.total_cost), 0) AS total_cost
+        FROM cost_records cr
+        WHERE 1=1
+        {scope_filter}
+        GROUP BY DATE_FORMAT(cr.created_at, '%%Y-%%m-%%d')
+        ORDER BY date ASC
+    """
+    with get_db_cursor() as cursor:
+        cursor.execute(trend_sql, params)
+        cost_trend = [_normalize_row(r) for r in cursor.fetchall()]
 
     return {
         "total_cost": float(total["total_cost"] or 0),
@@ -540,6 +547,7 @@ def get_cost_stats(
         "cost_by_model": cost_by_model,
         "cost_by_project": cost_by_project,
         "cost_by_user": cost_by_user,
+        "cost_trend": cost_trend,
     }
 
 
