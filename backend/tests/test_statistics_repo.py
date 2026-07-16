@@ -210,6 +210,36 @@ class PlatformStatisticsTests(unittest.TestCase):
         profile_queries = [query for query, _ in cursor.queries if "student_profiles sp" in query]
         self.assertTrue(profile_queries)
         self.assertTrue(all("INNER JOIN users u" in query for query in profile_queries))
+        task_query = next(query for query, _ in cursor.queries if "learning_tasks lt" in query)
+        self.assertIn("learning_task_progress ltp", task_query)
+        self.assertIn("ltp.student_id = %s", task_query)
+        self.assertNotIn("lt.assignee_id", task_query)
+
+    def test_teacher_active_tasks_follow_student_progress(self):
+        cursor = FakeCursor([
+            {"cnt": 1},
+            {"cnt": 3},
+            {"cnt": 3},
+            {"cnt": 3},
+            {"avg_mastery": 0.52},
+            {"cnt": 8},
+            {"cnt": 2},
+            {"cnt": 4},
+        ])
+
+        @contextmanager
+        def fake_cursor():
+            yield cursor
+
+        repo = StatisticsLearningRepository()
+        with patch("app.repositories.statistics_learning_repo.get_db_cursor", fake_cursor):
+            result = repo.get_overview(scope="teacher", user_id=7)
+
+        self.assertEqual(result["active_tasks"], 2)
+        task_query = next(query for query, _ in cursor.queries if "learning_tasks lt" in query)
+        self.assertIn("EXISTS (", task_query)
+        self.assertIn("learning_task_progress active_progress", task_query)
+        self.assertIn("OR NOT EXISTS", task_query)
 
     def test_teacher_weak_points_are_scoped_to_owned_courses(self):
         cursor = FakeCursor([[]])

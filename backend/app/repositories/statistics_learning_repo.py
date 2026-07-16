@@ -123,18 +123,50 @@ class StatisticsLearningRepository:
             )
             feedback_count = cursor.fetchone()["cnt"]
 
-            task_filter = course_filter
-            task_params = course_params
             if scope == "student":
-                task_filter = "lt.assignee_id = %s"
-                task_params = (user_id,)
-            cursor.execute(
-                f"SELECT COUNT(*) AS cnt FROM learning_tasks lt "
-                f"INNER JOIN courses c ON c.course_id = lt.course_id AND c.is_deleted = 0 "
-                f"WHERE lt.is_deleted = 0 AND lt.status IN ('assigned', 'in_progress') "
-                f"AND {task_filter}",
-                task_params,
-            )
+                cursor.execute(
+                    """
+                    SELECT COUNT(*) AS cnt
+                    FROM learning_tasks lt
+                    INNER JOIN courses c
+                      ON c.course_id = lt.course_id AND c.is_deleted = 0
+                    INNER JOIN learning_task_progress ltp
+                      ON ltp.task_id = lt.task_id
+                     AND ltp.student_id = %s
+                     AND ltp.is_deleted = 0
+                    WHERE lt.is_deleted = 0
+                      AND ltp.status IN ('assigned', 'in_progress')
+                    """,
+                    (user_id,),
+                )
+            else:
+                cursor.execute(
+                    f"""
+                    SELECT COUNT(*) AS cnt
+                    FROM learning_tasks lt
+                    INNER JOIN courses c
+                      ON c.course_id = lt.course_id AND c.is_deleted = 0
+                    WHERE lt.is_deleted = 0
+                      AND lt.status IN ('assigned', 'in_progress')
+                      AND {course_filter}
+                      AND (
+                          EXISTS (
+                              SELECT 1
+                              FROM learning_task_progress active_progress
+                              WHERE active_progress.task_id = lt.task_id
+                                AND active_progress.status IN ('assigned', 'in_progress')
+                                AND active_progress.is_deleted = 0
+                          )
+                          OR NOT EXISTS (
+                              SELECT 1
+                              FROM learning_task_progress any_progress
+                              WHERE any_progress.task_id = lt.task_id
+                                AND any_progress.is_deleted = 0
+                          )
+                      )
+                    """,
+                    course_params,
+                )
             active_tasks = cursor.fetchone()["cnt"]
 
             review_pass_rate = (
