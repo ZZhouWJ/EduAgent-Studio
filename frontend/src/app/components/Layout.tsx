@@ -6,6 +6,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useRouterGuard } from "@/lib/router-guard";
 import { Toaster } from "sonner";
 import { FloatingHelper } from "./common/FloatingHelper";
+import { WaveFooter } from "./common/WaveFooter";
 import {
   ActivitySquare,
   BarChart3,
@@ -496,6 +497,7 @@ export function Layout() {
             </AnimatePresence>
           </div>
           <FloatingHelper role={role} />
+          <WaveFooter />
         </main>
       </div>
       <Toaster position="top-right" richColors />
