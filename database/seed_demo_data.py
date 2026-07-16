@@ -377,6 +377,27 @@ def seed_mastery(cur, profile_id: int, kp_ids: List[int], base: float) -> None:
             )
 
 
+def refresh_profile_mastery_score(cur, profile_id: int) -> float:
+    """Derive the profile summary from its persisted knowledge-point evidence."""
+    cur.execute(
+        """UPDATE student_profiles sp
+           SET sp.mastery_score = COALESCE(
+               (SELECT AVG(skm.mastery_level)
+                FROM student_knowledge_mastery skm
+                WHERE skm.profile_id = sp.profile_id AND skm.is_deleted = 0),
+               sp.mastery_score
+           )
+           WHERE sp.profile_id = %s AND sp.is_deleted = 0""",
+        (profile_id,),
+    )
+    row = fetchone(
+        cur,
+        "SELECT mastery_score FROM student_profiles WHERE profile_id=%s",
+        profile_id,
+    )
+    return float(row["mastery_score"]) if row else 0.0
+
+
 def upsert_learning_task(
     cur,
     course_id: int,
@@ -909,7 +930,14 @@ def main() -> int:
                                               interests, weekly, mastery)
                 profile_ids[(username, code)] = pid
                 seed_mastery(cur, pid, kp_ids_by_course[cid], mastery)
-                log.info("  profile %s/%s (id=%s) mastery=%.2f", username, code, pid, mastery)
+                actual_mastery = refresh_profile_mastery_score(cur, pid)
+                log.info(
+                    "  profile %s/%s (id=%s) mastery=%.3f",
+                    username,
+                    code,
+                    pid,
+                    actual_mastery,
+                )
 
             log.info("=== learning tasks ===")
             learning_task_specs = [
