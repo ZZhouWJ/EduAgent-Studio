@@ -1,6 +1,6 @@
 import React from "react";
 import { ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip, BarChart, Bar } from "recharts";
-import { TrendingUp, Target, BookOpen, MessageSquare, CheckCircle, Zap } from "lucide-react";
+import { TrendingUp, Target, BookOpen, MessageSquare, CheckCircle, Loader2, RotateCcw, Zap } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { statisticsApi, learningApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
@@ -41,10 +41,20 @@ export function LearningAnalytics() {
     () => isStudent ? Promise.resolve([]) : statisticsApi.reviewRateByCourse(),
     [isStudent],
   );
-  const { data: courses } = useApi(() => learningApi.listCourses(), []);
+  const {
+    data: courses,
+    loading: loadingCourses,
+    error: coursesError,
+    refetch: refetchCourses,
+  } = useApi(() => learningApi.listCourses(), []);
 
   const firstCourseId = courses?.[0]?.id;
-  const { data: learningPath } = useApi(
+  const {
+    data: learningPath,
+    loading: loadingPath,
+    error: pathError,
+    refetch: refetchPath,
+  } = useApi(
     () => firstCourseId ? learningApi.getLearningPath(firstCourseId) : Promise.resolve(null),
     [firstCourseId],
   );
@@ -93,6 +103,12 @@ export function LearningAnalytics() {
     : null;
 
   const pathNodes = learningPath?.nodes ?? [];
+  const pathIsLoading = loadingCourses || Boolean(firstCourseId && loadingPath);
+  const pathHasError = Boolean(coursesError || pathError);
+  const retryLearningPath = () => {
+    void refetchCourses();
+    if (firstCourseId) void refetchPath();
+  };
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto pb-6">
       {/* KPI Cards */}
@@ -122,7 +138,24 @@ export function LearningAnalytics() {
           <div className="flex-1 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center p-8 relative overflow-hidden">
             <div className="absolute inset-0 opacity-30 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:20px_20px]" />
 
-            {pathNodes.length > 0 ? (
+            {pathIsLoading ? (
+              <div className="relative z-10 flex items-center gap-2 text-sm font-medium text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                正在加载学习路径...
+              </div>
+            ) : pathHasError ? (
+              <div className="relative z-10 flex flex-col items-center gap-3 text-center">
+                <p className="text-sm text-red-600">学习路径加载失败，请检查网络后重试。</p>
+                <button
+                  type="button"
+                  onClick={retryLearningPath}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-red-200 bg-white px-3 text-sm font-bold text-red-700 transition hover:bg-red-50"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  重试
+                </button>
+              </div>
+            ) : pathNodes.length > 0 ? (
               <div className="relative z-10 w-full h-full flex flex-wrap items-center justify-center gap-6">
                 {pathNodes.map((node, i) => {
                   const status = node.mastery_level >= 0.7 ? "ok" : node.mastery_level >= 0.4 ? "warn" : "danger";
@@ -143,7 +176,11 @@ export function LearningAnalytics() {
               </div>
             ) : (
               <div className="relative z-10 text-sm text-slate-400">
-                {!firstCourseId ? "请先创建课程以查看学习路径" : "暂无学习路径数据"}
+                {!firstCourseId
+                  ? isStudent
+                    ? "尚未加入课程，暂无学习路径"
+                    : "请先创建课程以查看学习路径"
+                  : "暂无学习路径数据"}
               </div>
             )}
           </div>
