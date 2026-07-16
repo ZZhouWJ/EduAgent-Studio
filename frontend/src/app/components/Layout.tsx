@@ -10,15 +10,12 @@ import { WaveFooter } from "./common/WaveFooter";
 import {
   ActivitySquare,
   BarChart3,
-  Bell,
   BookOpen,
   Bot,
   CheckSquare,
   ChevronDown,
   CircleDot,
-  Command,
   Database,
-  GraduationCap,
   History,
   LayoutDashboard,
   Library,
@@ -29,17 +26,14 @@ import {
   Menu,
   LockKeyhole,
   MessageSquare,
-  PanelLeft,
   PieChart,
   Route,
-  Search,
   Settings2,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
   TerminalSquare,
   X,
-  UserCog,
   UserRound,
   UserSquare2,
   Users,
@@ -57,16 +51,8 @@ type RoleConfig = {
   brand: string;
   roleLabel: string;
   basePath: string;
-  user: string;
-  userMeta: string;
-  avatar: string;
-  accent: string;
   activeGradient: string;
-  courseLine: string;
-  searchHint: string;
   sections: Array<{ title: string; items: MenuItem[] }>;
-  statusTitle: string;
-  statusText: string;
 };
 
 const ROLE_CONFIG: Record<RoleKey, RoleConfig> = {
@@ -74,15 +60,7 @@ const ROLE_CONFIG: Record<RoleKey, RoleConfig> = {
     brand: "智学工坊",
     roleLabel: "学生端",
     basePath: "/student",
-    user: "李明",
-    userMeta: "学生 / 大二",
-    avatar: "李",
-    accent: "text-cyan-300",
     activeGradient: "bg-[linear-gradient(110deg,#2563EB,#06B6D4)]",
-    courseLine: "当前课程：数据库系统原理与 Web 项目实践",
-    searchHint: "搜索学习任务、资源或知识点",
-    statusTitle: "今日学习路径已更新",
-    statusText: "根据最近测评结果，建议先巩固事务隔离级别。",
     sections: [
       {
         title: "我的学习",
@@ -103,15 +81,7 @@ const ROLE_CONFIG: Record<RoleKey, RoleConfig> = {
     brand: "智学工坊",
     roleLabel: "教师端",
     basePath: "/teacher",
-    user: "张老师",
-    userMeta: "教师 / 课程负责人",
-    avatar: "张",
-    accent: "text-blue-300",
     activeGradient: "bg-[linear-gradient(110deg,#2563EB,#7C3AED)]",
-    courseLine: "当前课程：数据库系统原理与 Web 项目实践",
-    searchHint: "搜索学生、资源、审核任务",
-    statusTitle: "待处理事项 4 项",
-    statusText: "资源审核、薄弱点干预、反馈跟进等待处理。",
     sections: [
       {
         title: "教学工作流",
@@ -134,15 +104,7 @@ const ROLE_CONFIG: Record<RoleKey, RoleConfig> = {
     brand: "EduAgent Studio",
     roleLabel: "管理端",
     basePath: "/admin",
-    user: "王教授",
-    userMeta: "管理员 / 平台治理",
-    avatar: "王",
-    accent: "text-emerald-300",
     activeGradient: "bg-[linear-gradient(110deg,#0F172A,#2563EB)]",
-    courseLine: "平台范围：全部课程与系统服务",
-    searchHint: "搜索用户、课程、调用记录",
-    statusTitle: "平台治理正常",
-    statusText: "模型服务、内容安全、调用审计均处于可控状态。",
     sections: [
       {
         title: "系统治理",
@@ -329,10 +291,10 @@ export function Layout() {
 
         <div className="relative mx-3 mt-4 rounded-2xl border border-white/10 bg-white/[0.06] p-3">
           <div className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-blue-100">
-            {role === "student" ? <GraduationCap className="h-3.5 w-3.5 text-cyan-300" /> : role === "teacher" ? <Sparkles className="h-3.5 w-3.5 text-blue-300" /> : <UserCog className="h-3.5 w-3.5 text-emerald-300" />}
-            {config.statusTitle}
+            <UserRound className="h-3.5 w-3.5 shrink-0 text-blue-300" />
+            <span className="truncate">{realName}</span>
           </div>
-          <p className="text-[11px] leading-4 text-slate-300">{config.statusText}</p>
+          <p className="text-[11px] leading-4 text-slate-300">{userMeta}。已按{config.roleLabel}权限加载可访问数据。</p>
         </div>
 
         {renderNavigation()}
@@ -374,10 +336,10 @@ export function Layout() {
 
             <div className="relative mx-3 mt-4 rounded-2xl border border-white/10 bg-white/[0.06] p-3">
               <div className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-blue-100">
-                <UserRound className="h-3.5 w-3.5 text-blue-300" />
-                {config.user} · {userMeta}
+                <UserRound className="h-3.5 w-3.5 shrink-0 text-blue-300" />
+                <span className="truncate">{realName}</span>
               </div>
-              <p className="text-[11px] leading-4 text-slate-300">{config.courseLine}</p>
+              <p className="text-[11px] leading-4 text-slate-300">{userMeta}。已按{config.roleLabel}权限加载可访问数据。</p>
             </div>
 
             {renderNavigation(() => setIsMobileMenuOpen(false))}
@@ -420,12 +382,6 @@ export function Layout() {
 
         <header className="sticky top-0 z-10 hidden h-16 shrink-0 items-center justify-between border-b border-[#E2E8F0] bg-white/[0.92] px-6 backdrop-blur-xl lg:flex">
           <div className="flex min-w-0 items-center gap-4">
-            <button
-              className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-blue-200 hover:text-blue-700"
-              aria-label="切换侧边栏"
-            >
-              <PanelLeft className="h-[18px] w-[18px]" />
-            </button>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h1 className="truncate text-lg font-bold text-[#0F172A]">{pageTitle}</h1>
@@ -435,33 +391,12 @@ export function Layout() {
               </div>
               <div className="mt-0.5 hidden items-center gap-1.5 text-xs font-medium text-slate-500 md:flex">
                 <CircleDot className="h-3 w-3 text-blue-500" />
-                {config.courseLine}
+                {realName} · 当前仅展示{config.roleLabel}可访问内容
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="group relative hidden lg:block">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors" />
-              <input
-                type="search"
-                aria-label={config.searchHint}
-                placeholder={config.searchHint}
-                className="edu-focus-ring h-10 w-[300px] rounded-xl border border-slate-200 bg-white/80 pl-10 pr-10 text-sm text-slate-700 placeholder:text-slate-400 backdrop-blur transition-all duration-300 focus:w-[360px] focus:border-blue-400 focus:bg-white"
-              />
-              <Command className="pointer-events-none absolute right-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-300" />
-            </div>
-
-            <button
-              className="relative grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-200 hover:text-blue-700"
-              aria-label="查看通知"
-            >
-              <Bell className="h-[18px] w-[18px]" />
-              <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white edu-badge-pulse" />
-            </button>
-
-            <div className="hidden h-8 w-px bg-slate-200 sm:block" />
-
             <button onClick={handleLogout} className="flex h-11 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm transition hover:border-blue-200">
               <div className="hidden text-right sm:block">
                 <div className="text-sm font-bold leading-4 text-slate-800">{realName}</div>
