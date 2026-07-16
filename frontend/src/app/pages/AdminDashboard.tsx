@@ -106,14 +106,11 @@ export function AdminDashboard() {
     return () => clearInterval(h);
   }, []);
 
-  const overview = useApi(() => statisticsApi.overview(), []);
   const platformOverview = useApi(() => statisticsApi.getPlatformOverview(), []);
-  const recentActivities = useApi(() => statisticsApi.recentActivities({ limit: 10 }), []);
   const modelCalls = useApi(() => statisticsApi.modelCalls(), []);
-  const costs = useApi(() => statisticsApi.costs(), []);
   const reviewsStats = useApi(() => statisticsApi.reviews(), []);
 
-  const loading = overview.loading || platformOverview.loading || recentActivities.loading || modelCalls.loading || costs.loading;
+  const loading = platformOverview.loading || modelCalls.loading || reviewsStats.loading;
 
   // RISKS derived from reviews top_issue_tags
   const riskItems = (reviewsStats.data?.top_issue_tags ?? []).slice(0, 4).map((t): [string, string, string] => [
