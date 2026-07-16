@@ -138,6 +138,25 @@ class PromptContractTests(unittest.TestCase):
         self.assertEqual(insert_log.call_args.kwargs["conn"], transaction)
         transaction.commit.assert_called_once()
 
+    @patch("app.services.prompt_service.prompt_repo.get_template_created_by")
+    @patch("app.services.prompt_service.prompt_repo.get_template_by_id")
+    @patch("app.services.prompt_service._require_auth")
+    def test_update_template_cannot_enable_without_version(
+        self, require_auth, get_template, get_created_by
+    ):
+        require_auth.return_value = {"user_id": 1, "roles": ["admin"]}
+        get_template.return_value = {
+            "template_id": 7,
+            "current_version_id": None,
+        }
+
+        with self.assertRaises(ValidationException):
+            prompt_service.update_template(
+                token="token",
+                template_id=7,
+                is_active=True,
+            )
+
     def test_template_row_exposes_current_version_and_update_time(self):
         result = prompt_service._template_row_to_dict({
             "template_id": 7,

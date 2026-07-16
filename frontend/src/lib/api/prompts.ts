@@ -15,6 +15,7 @@ export interface PromptTemplate {
   task_type_id: number
   type_name: string
   type_code: string
+  description?: string
   current_version_id?: number
   current_version_no?: string
   is_active: boolean
@@ -46,6 +47,7 @@ export interface CreateTemplateBody {
 export interface UpdateTemplateBody {
   template_name?: string
   task_type_id?: number
+  description?: string
   is_active?: boolean
 }
 

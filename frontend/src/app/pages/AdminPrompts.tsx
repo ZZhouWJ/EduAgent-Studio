@@ -36,6 +36,10 @@ export function AdminPrompts() {
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const [promptContent, setPromptContent] = React.useState("");
   const [changeNote, setChangeNote] = React.useState("");
+  const [editTemplateName, setEditTemplateName] = React.useState("");
+  const [editTaskTypeId, setEditTaskTypeId] = React.useState<number | "">("");
+  const [editDescription, setEditDescription] = React.useState("");
+  const [editTemplateActive, setEditTemplateActive] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
 
   const [newTemplateName, setNewTemplateName] = React.useState("");
@@ -106,15 +110,44 @@ export function AdminPrompts() {
   };
 
   const handleSaveVersion = async () => {
-    if (!selected) return;
+    if (!selected || !editTemplateName.trim() || !editTaskTypeId) {
+      notify.warning("请填写模板名称并选择任务类型");
+      return;
+    }
+    const currentContent = activeVersion?.raw.prompt_content?.trim() ?? "";
+    const contentChanged = promptContent.trim() !== currentContent;
+    const metadataChanged =
+      editTemplateName.trim() !== selected.raw.template_name ||
+      editTaskTypeId !== selected.raw.task_type_id ||
+      editDescription.trim() !== (selected.raw.description ?? "") ||
+      editTemplateActive !== selected.raw.is_active;
+
+    if (!contentChanged && !metadataChanged) {
+      notify.info("模板内容未发生变化");
+      return;
+    }
+    if (editTemplateActive && !activeVersion && !promptContent.trim()) {
+      notify.warning("启用模板前必须填写 Prompt 内容");
+      return;
+    }
     setSaving(true);
     try {
-      await promptsApi.createVersion(Number(selected.id), {
-        prompt_content: promptContent,
-        change_note: changeNote || "更新 Prompt 内容",
-        activate: true,
-      });
-      notify.success("新版本已保存并激活");
+      if (contentChanged) {
+        await promptsApi.createVersion(Number(selected.id), {
+          prompt_content: promptContent,
+          change_note: changeNote || "更新 Prompt 内容",
+          activate: true,
+        });
+      }
+      if (metadataChanged) {
+        await promptsApi.updateTemplate(Number(selected.id), {
+          template_name: editTemplateName.trim(),
+          task_type_id: editTaskTypeId as number,
+          description: editDescription.trim(),
+          is_active: editTemplateActive,
+        });
+      }
+      notify.success(contentChanged ? "模板与新版本已保存" : "模板设置已保存");
       versionsState.refetch();
       templatesState.refetch();
       setModalMode(null);
@@ -177,6 +210,16 @@ export function AdminPrompts() {
     } finally {
       setCreatingTemplate(false);
     }
+  };
+
+  const handleOpenEdit = () => {
+    if (!selectedTemplate) return;
+    setEditTemplateName(selectedTemplate.raw.template_name);
+    setEditTaskTypeId(selectedTemplate.raw.task_type_id);
+    setEditDescription(selectedTemplate.raw.description ?? "");
+    setEditTemplateActive(selectedTemplate.raw.is_active);
+    setChangeNote("");
+    setModalMode("edit");
   };
 
   const renderPreview = async (versionId: number, variables: Record<string, string>) => {
@@ -274,7 +317,7 @@ export function AdminPrompts() {
                 {(promptContent || activeVersion?.raw?.prompt_content) ?? "通过版本历史选择加载内容"}
               </div>
               <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <button onClick={() => setModalMode("edit")} className={`${primaryButton} cursor-pointer`}>编辑模板</button>
+                <button onClick={handleOpenEdit} className={`${primaryButton} cursor-pointer`}>编辑模板</button>
                 <button onClick={handleCopyTemplate} className={`${secondaryButton} cursor-pointer`}><Copy className="h-4 w-4" />复制模板</button>
                 <button onClick={() => setHistoryOpen(true)} className={`${secondaryButton} cursor-pointer`}>版本历史</button>
                 <button onClick={handleOpenPreview} disabled={!activeVersion} className={`${secondaryButton} cursor-pointer disabled:cursor-not-allowed disabled:opacity-50`}><Play className="h-4 w-4" />渲染预览</button>
@@ -345,6 +388,36 @@ export function AdminPrompts() {
           ) : selectedTemplate ? (
             <>
               <label className="block text-sm font-bold text-slate-700">
+                模板名称
+                <input
+                  className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
+                  value={editTemplateName}
+                  onChange={(event) => setEditTemplateName(event.target.value)}
+                />
+              </label>
+              <label className="block text-sm font-bold text-slate-700">
+                任务类型
+                <select
+                  className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
+                  value={editTaskTypeId}
+                  onChange={(event) => setEditTaskTypeId(Number(event.target.value) || "")}
+                >
+                  <option value="">请选择任务类型</option>
+                  {taskTypes.map((taskType) => (
+                    <option key={taskType.task_type_id} value={taskType.task_type_id}>{taskType.type_name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm font-bold text-slate-700">
+                使用说明
+                <input
+                  className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
+                  value={editDescription}
+                  onChange={(event) => setEditDescription(event.target.value)}
+                  placeholder="说明模板适用场景（选填）"
+                />
+              </label>
+              <label className="block text-sm font-bold text-slate-700">
                 Prompt 内容
                 <textarea
                   className="edu-focus-ring mt-2 h-40 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-6"
@@ -362,13 +435,22 @@ export function AdminPrompts() {
                   placeholder="简要描述本次修改（选填）"
                 />
               </label>
+              <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <span className="text-sm font-bold text-slate-700">启用模板</span>
+                <input
+                  type="checkbox"
+                  checked={editTemplateActive}
+                  onChange={(event) => setEditTemplateActive(event.target.checked)}
+                  className="h-5 w-5 accent-blue-600"
+                />
+              </label>
             </>
           ) : null}
           <div className="flex justify-end gap-3">
             <button onClick={() => setModalMode(null)} className={`${secondaryButton} cursor-pointer`}>取消</button>
             {modalMode === "edit" ? (
               <button onClick={handleSaveVersion} disabled={saving} className={`${primaryButton} cursor-pointer disabled:opacity-60`}>
-                {saving ? "保存中..." : "保存新版本"}
+                {saving ? "保存中..." : "保存修改"}
               </button>
             ) : (
               <button onClick={handleCreateTemplate} disabled={creatingTemplate} className={`${primaryButton} cursor-pointer disabled:opacity-60`}>

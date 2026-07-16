@@ -253,6 +253,9 @@ def update_template(
         if task_type is None:
             raise NotFoundException(message="任务类型不存在")
 
+    if is_active is True and template.get("current_version_id") is None:
+        raise ValidationException(message="启用模板前必须先创建提示词版本")
+
     with get_db_transaction() as conn:
         affected = prompt_repo.update_template(
             template_id=template_id,
