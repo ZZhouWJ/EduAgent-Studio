@@ -59,7 +59,6 @@ function downloadCsv(rows: Record<string, string | number>[], filename: string) 
 
 export function AdminCosts() {
   const [range, setRange] = React.useState("近 7 日");
-  const [projectFilter, setProjectFilter] = React.useState("");
   const [modelFilter, setModelFilter] = React.useState("");
   const [open, setOpen] = React.useState(false);
   const [savingBudget, setSavingBudget] = React.useState(false);
@@ -67,23 +66,20 @@ export function AdminCosts() {
 
   const dateRange = React.useMemo(() => resolveDateRange(range), [range]);
   const costsState = useApi(() => statisticsApi.costs({
-    project_id: projectFilter ? Number(projectFilter) : undefined,
     model_id: modelFilter ? Number(modelFilter) : undefined,
     date_from: dateRange.dateFrom,
     date_to: dateRange.dateTo,
-  }), [dateRange.dateFrom, dateRange.dateTo, projectFilter, modelFilter]);
-  const projectsState = useApi(() => statisticsApi.projects(), []);
+  }), [dateRange.dateFrom, dateRange.dateTo, modelFilter]);
   const modelsState = useApi(() => modelsApi.getModels({ page_size: 50 }), []);
   const budgetState = useApi(() => platformSettingsApi.getBudgetAlert(), []);
 
   const costs = costsState.data;
-  const projects = projectsState.data ?? [];
   const models = modelsState.data?.items ?? [];
 
-  const selectedProject = projects.find((project) => String(project.project_id) === projectFilter);
   const selectedModel = models.find((model) => String(model.model_id) === modelFilter);
   const totalCost = costs?.total_cost ?? 0;
   const modelCostRows = costs?.cost_by_model ?? [];
+  const totalCalls = (costs?.cost_trend ?? []).reduce((sum, row) => sum + (row.call_count ?? 0), 0);
 
   const stats = [
     { label: `${range}成本`, value: costs ? formatCurrency(totalCost) : "—", hint: "预算可控", icon: Coins, tone: "blue" as const },
@@ -91,7 +87,7 @@ export function AdminCosts() {
     { label: "输入成本", value: costs ? formatCurrency(costs.input_cost ?? 0) : "—", hint: "模型输入", icon: PieChart, tone: "emerald" as const },
     { label: "输出成本", value: costs ? formatCurrency(costs.output_cost ?? 0) : "—", hint: "模型输出", icon: LineChartIcon, tone: "cyan" as const },
     { label: "成本最高模型", value: modelCostRows[0]?.display_name?.slice(0, 10) || modelCostRows[0]?.model_name?.slice(0, 10) || "—", hint: modelCostRows[0] && totalCost > 0 ? `${(((modelCostRows[0].total_cost ?? 0) / totalCost) * 100).toFixed(0)}%` : "", icon: Coins, tone: "orange" as const },
-    { label: "成本最高项目", value: costs?.cost_by_project?.[0]?.project_name?.slice(0, 10) ?? "—", hint: costs?.cost_by_project?.[0] && totalCost > 0 ? `${(((costs.cost_by_project[0].total_cost ?? 0) / totalCost) * 100).toFixed(0)}%` : "", icon: BellRing, tone: "red" as const },
+    { label: "调用总次数", value: costs ? String(totalCalls) : "—", hint: totalCalls > 0 ? `均次 ${formatCurrency(totalCost / totalCalls)}` : "暂无调用", icon: BellRing, tone: "red" as const },
   ];
 
   const barData = modelCostRows.map((row) => ({
@@ -112,8 +108,8 @@ export function AdminCosts() {
 
   const handleExport = () => {
     const rows = [
-      { 日期: `${dateRange.dateFrom} ~ ${dateRange.dateTo}`, 模型: selectedModel?.display_name || selectedModel?.model_name || "全部模型", 项目: selectedProject?.project_name || "全部项目",
-        总成本: costs?.total_cost ?? 0, Token消耗: costs?.total_tokens ?? 0 },
+      { 日期: `${dateRange.dateFrom} ~ ${dateRange.dateTo}`, 模型: selectedModel?.display_name || selectedModel?.model_name || "全部模型",
+        总成本: costs?.total_cost ?? 0, Token消耗: costs?.total_tokens ?? 0, 调用次数: totalCalls },
       ...(costs?.cost_by_model ?? []).map((r) => ({
         模型: r.display_name || r.model_name, 成本: r.total_cost ?? 0, 占比: `${(totalCost > 0 ? ((r.total_cost ?? 0) / totalCost) * 100 : 0).toFixed(1)}%`
       }))
@@ -155,7 +151,7 @@ export function AdminCosts() {
 
   return (
     <PageShell>
-      <PageHeader title="成本统计" description="按时间、项目和模型分析大模型调用成本。" icon={Coins}
+      <PageHeader title="成本统计" description="按时间和模型分析大模型调用、Token 消耗与成本。" icon={Coins}
         action={<div className="flex flex-col gap-3 sm:flex-row">
           <button
             onClick={openBudgetEditor}
@@ -179,10 +175,6 @@ export function AdminCosts() {
       <section className="edu-card rounded-2xl p-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
           <SegmentedControl value={range} options={["今日", "近 7 日", "本月"]} onChange={setRange} />
-          <select aria-label="按项目筛选" value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="edu-focus-ring min-h-11 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-700">
-            <option value="">全部项目</option>
-            {projects.map((project) => <option key={project.project_id} value={project.project_id}>{project.project_name}</option>)}
-          </select>
           <select aria-label="按模型筛选" value={modelFilter} onChange={(e) => setModelFilter(e.target.value)} className="edu-focus-ring min-h-11 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-700">
             <option value="">全部模型</option>
             {models.map((model) => (
