@@ -646,7 +646,7 @@ class LearningRepository:
 
             # 获取低 mastery 知识点（< 0.5）
             cursor.execute("""
-                SELECT kp.kp_id, kp.kp_name, skm.mastery_level
+                SELECT kp.kp_id, kp.kp_name, kp.estimated_hours, skm.mastery_level
                 FROM student_knowledge_mastery skm
                 INNER JOIN knowledge_points kp ON skm.kp_id = kp.kp_id AND kp.is_deleted = 0
                 WHERE skm.profile_id = %s
@@ -659,7 +659,8 @@ class LearningRepository:
             # 如果没有低 mastery 知识点，取所有知识点按 mastery 排序
             if not low_mastery_kps:
                 cursor.execute("""
-                    SELECT kp.kp_id, kp.kp_name, COALESCE(skm.mastery_level, 0.5) AS mastery_level
+                    SELECT kp.kp_id, kp.kp_name, kp.estimated_hours,
+                           COALESCE(skm.mastery_level, 0.5) AS mastery_level
                     FROM knowledge_points kp
                     LEFT JOIN student_knowledge_mastery skm
                         ON kp.kp_id = skm.kp_id AND skm.profile_id = %s AND skm.is_deleted = 0
@@ -669,8 +670,6 @@ class LearningRepository:
                 low_mastery_kps = cursor.fetchall()
 
             kp_ids = [row["kp_id"] for row in low_mastery_kps]
-            kp_names_map = {row["kp_id"]: row["kp_name"] for row in low_mastery_kps}
-
             # 已学过的资源 ID（通过 feedback）
             cursor.execute("""
                 SELECT DISTINCT resource_id
@@ -679,39 +678,52 @@ class LearningRepository:
             """, (profile_id,))
             learned_resource_ids = [row["resource_id"] for row in cursor.fetchall()]
 
+        kp_names_map = {row["kp_id"]: row["kp_name"] for row in low_mastery_kps}
+        kp_mastery_map = {
+            row["kp_id"]: float(row.get("mastery_level") or 0.5)
+            for row in low_mastery_kps
+        }
+        kp_hours_map = {
+            row["kp_id"]: float(row.get("estimated_hours") or 1)
+            for row in low_mastery_kps
+        }
+
         if not kp_ids:
             return []
 
-        # 构建推荐资源查询
-        # 资源关联的知识点包含低 mastery 知识点，且未学过，且审核通过
+        # 资源关联的知识点包含低 mastery 知识点，且未学过，且审核通过。
+        # FIND_IN_SET 避免知识点 1 误匹配 target_kp_ids 中的 10。
         placeholders_kp = ",".join(["%s"] * len(kp_ids))
         learned_ids_placeholder = ",".join(["%s"] * len(learned_resource_ids)) if learned_resource_ids else "'-1'"
 
         sql = f"""
-            SELECT DISTINCT
+            SELECT
                 lr.resource_id,
                 lr.resource_title,
                 lr.resource_type,
                 lr.difficulty,
                 lr.target_kp_ids,
-                lr.review_status,
-                kp.kp_name AS primary_kp_name,
-                kp.kp_id AS primary_kp_id,
-                kp.estimated_hours,
-                COALESCE(skm.mastery_level, 0.5) AS kp_mastery
+                lr.status,
+                lr.created_at
             FROM learning_resources lr
-            INNER JOIN knowledge_points kp ON lr.target_kp_ids LIKE CONCAT('%%', kp.kp_id, '%%')
-            LEFT JOIN student_knowledge_mastery skm
-                ON kp.kp_id = skm.kp_id AND skm.profile_id = %s AND skm.is_deleted = 0
-            WHERE kp.kp_id IN ({placeholders_kp})
-              AND lr.is_deleted = 0
-              AND lr.review_status = 'approved'
+            WHERE lr.is_deleted = 0
+              AND lr.status = 'approved'
+              AND EXISTS (
+                  SELECT 1
+                  FROM knowledge_points kp
+                  WHERE kp.kp_id IN ({placeholders_kp})
+                    AND kp.is_deleted = 0
+                    AND FIND_IN_SET(
+                        CAST(kp.kp_id AS CHAR),
+                        REPLACE(COALESCE(lr.target_kp_ids, ''), ' ', '')
+                    ) > 0
+              )
               {'AND lr.resource_id NOT IN (' + learned_ids_placeholder + ')' if learned_resource_ids else ''}
-            ORDER BY kp_mastery ASC, lr.created_at DESC
+            ORDER BY lr.created_at DESC
             LIMIT %s
         """
 
-        params = [profile_id] + kp_ids + (learned_resource_ids if learned_resource_ids else []) + [limit]
+        params = kp_ids + (learned_resource_ids if learned_resource_ids else []) + [limit]
 
         with get_db_cursor() as cursor:
             cursor.execute(sql, params)
@@ -729,18 +741,13 @@ class LearningRepository:
             min_mastery_kp_id = None
             min_mastery = 1.0
             for kp_id in target_kp_ids:
-                if kp_id in kp_names_map:
-                    cursor.execute("""
-                        SELECT mastery_level FROM student_knowledge_mastery
-                        WHERE profile_id = %s AND kp_id = %s AND is_deleted = 0
-                    """, (profile_id, kp_id))
-                    m_row = cursor.fetchone()
-                    mastery = m_row["mastery_level"] if m_row else 0.5
+                if kp_id in kp_mastery_map:
+                    mastery = kp_mastery_map[kp_id]
                     if mastery < min_mastery:
                         min_mastery = mastery
                         min_mastery_kp_id = kp_id
 
-            kp_name = kp_names_map.get(min_mastery_kp_id, row["primary_kp_name"]) if min_mastery_kp_id else row["primary_kp_name"]
+            kp_name = kp_names_map.get(min_mastery_kp_id, "相关知识点")
 
             # 生成推荐理由
             if min_mastery < 0.3:
@@ -755,7 +762,7 @@ class LearningRepository:
                 reason = f"推荐{row['resource_type']}类型资源，" + reason
 
             # estimated_minutes: 从知识点 estimated_hours 计算（小时 * 60）
-            estimated_hours = row.get("estimated_hours") or 1
+            estimated_hours = kp_hours_map.get(min_mastery_kp_id, 1)
             estimated_minutes = round(float(estimated_hours) * 60)
 
             results.append({
