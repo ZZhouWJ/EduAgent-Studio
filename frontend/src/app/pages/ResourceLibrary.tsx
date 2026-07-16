@@ -75,6 +75,8 @@ export function ResourceLibrary() {
   const [selectedResource, setSelectedResource] = React.useState<(typeof resources)[0] | null>(null);
   const [submitNote, setSubmitNote] = React.useState("");
   const [submittingReview, setSubmittingReview] = React.useState(false);
+  const requestedKpId = Number(searchParams.get("kp_id")) || 0;
+  const requestedKpName = searchParams.get("kp_name") ?? "";
   const user = useAuthStore((state) => state.user);
   const canManageReviews = user?.roles?.some((role) => role === "teacher" || role === "admin") ?? false;
 
@@ -109,9 +111,10 @@ export function ResourceLibrary() {
       type: typeFilter || undefined,
       status: statusFilter || undefined,
       course_id: Number(courseFilter) || undefined,
+      kp_id: requestedKpId || undefined,
       page_size: 100,
     }),
-    [typeFilter, statusFilter, courseFilter]
+    [typeFilter, statusFilter, courseFilter, requestedKpId]
   );
   const coursesState = useApi(() => learningApi.listCourses(), []);
 
@@ -130,6 +133,13 @@ export function ResourceLibrary() {
   })), [data?.items]);
 
   const requestedResourceId = Number(searchParams.get("resource")) || 0;
+
+  const clearKnowledgePointFilter = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("kp_id");
+    next.delete("kp_name");
+    setSearchParams(next, { replace: true });
+  };
 
   React.useEffect(() => {
     if (!requestedResourceId || loading) return;
@@ -205,6 +215,14 @@ export function ResourceLibrary() {
             <option value="archived">已归档</option>
           </select>
         </div>
+        {requestedKpId > 0 && (
+          <div className="flex min-h-9 items-center justify-between gap-2 rounded-lg bg-emerald-50 px-3 text-xs font-bold text-emerald-800 sm:justify-start">
+            <span className="truncate">知识点：{requestedKpName || `#${requestedKpId}`}</span>
+            <button type="button" onClick={clearKnowledgePointFilter} aria-label="清除知识点筛选" className="rounded p-1 hover:bg-emerald-100">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Type Tabs */}
@@ -230,7 +248,7 @@ export function ResourceLibrary() {
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-10 text-slate-400">
           <SafeLottie source="empty" className="h-24 w-32" speed={0.8} />
-          <span className="text-sm">暂无资源</span>
+          <span className="text-sm">{requestedKpId ? "当前知识点暂无已审核资源" : "暂无资源"}</span>
         </div>
       ) : (
         <div className="auto-rows-max grid grid-cols-1 gap-4 overflow-y-auto min-h-0 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

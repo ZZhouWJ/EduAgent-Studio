@@ -26,6 +26,7 @@ class LearningResourceRepository:
         page_size: int = 20,
         course_id: Optional[int] = None,
         resource_type: Optional[str] = None,
+        knowledge_point_id: Optional[int] = None,
         status: Optional[str] = None,
         course_ids: Optional[List[int]] = None,
     ) -> Dict[str, Any]:
@@ -53,6 +54,12 @@ class LearningResourceRepository:
         if resource_type:
             filters.append("lr.resource_type = %s")
             params.append(resource_type)
+        if knowledge_point_id is not None:
+            filters.append(
+                "FIND_IN_SET(CAST(%s AS CHAR), "
+                "REPLACE(COALESCE(lr.target_kp_ids, ''), ' ', '')) > 0"
+            )
+            params.append(knowledge_point_id)
         if status:
             filters.append("lr.status = %s")
             params.append(status)

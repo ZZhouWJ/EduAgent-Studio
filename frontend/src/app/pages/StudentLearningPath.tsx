@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { ArrowRight, Network, Target } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { learningApi } from "@/lib/api/learning";
@@ -55,9 +55,12 @@ export function StudentLearningPath() {
 
   const handleNodeClick = React.useCallback(
     (kpId: number) => {
-      navigate(`/student/resources?kp_id=${kpId}`);
+      const point = knowledgePoints.find((item) => item.kp_id === kpId);
+      const params = new URLSearchParams({ kp_id: String(kpId) });
+      if (point?.kp_name) params.set("kp_name", point.kp_name);
+      navigate(`/student/resources?${params.toString()}`);
     },
-    [navigate]
+    [knowledgePoints, navigate]
   );
 
   const displayNodes: KpNode[] = knowledgePoints.length > 0 ? knowledgePoints : [
@@ -95,10 +98,15 @@ export function StudentLearningPath() {
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
       <div className="flex items-start justify-end gap-4">
-        <Link to="/student/resources" className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.22)]">
+        <button
+          type="button"
+          onClick={() => displayCurrentKpId && handleNodeClick(displayCurrentKpId)}
+          disabled={!displayCurrentKpId}
+          className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.22)] disabled:cursor-not-allowed disabled:opacity-60"
+        >
           继续学习当前推荐资源
           <ArrowRight className="h-4 w-4" />
-        </Link>
+        </button>
       </div>
 
       {/* 知识图谱 */}

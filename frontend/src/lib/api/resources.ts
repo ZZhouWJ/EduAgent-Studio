@@ -59,6 +59,7 @@ export const resourcesApi = {
     page_size?: number
     course_id?: number
     type?: string
+    kp_id?: number
     status?: string
   }) {
     return client.get<{ items: LearningResource[]; total: number }>('/learning/resources', { params })

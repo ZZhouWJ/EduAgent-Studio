@@ -51,6 +51,7 @@ async def list_resources(
     page_size: int = Query(20, ge=1, le=100),
     course_id: Optional[int] = None,
     type: Optional[str] = None,
+    kp_id: Optional[int] = Query(None, gt=0),
     status: Optional[Literal["draft", "pending_review", "approved", "rejected", "archived"]] = None,
     user: dict = Depends(get_current_user),
 ):
@@ -58,11 +59,14 @@ async def list_resources(
     course_ids = access.list_accessible_course_ids(user)
     if course_id is not None:
         access.require_course_access(course_id, user)
+        if kp_id is not None:
+            access.require_knowledge_points_course(course_id, [kp_id])
     result = _repo.list_resources(
         page=page,
         page_size=page_size,
         course_id=course_id,
         resource_type=type,
+        knowledge_point_id=kp_id,
         status="approved" if _is_student_only(user) else status,
         course_ids=course_ids if course_id is None else None,
     )

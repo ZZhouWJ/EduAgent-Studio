@@ -16,7 +16,9 @@ class ResourceAccessTests(unittest.TestCase):
         repo.list_resources.return_value = {"items": [], "total": 0}
         user = {"user_id": 7, "roles": ["teacher"]}
 
-        response = asyncio.run(list_resources(page=1, page_size=20, user=user))
+        response = asyncio.run(
+            list_resources(page=1, page_size=20, kp_id=None, user=user)
+        )
 
         self.assertEqual(response.status_code, 200)
         repo.list_resources.assert_called_once_with(
@@ -24,6 +26,7 @@ class ResourceAccessTests(unittest.TestCase):
             page_size=20,
             course_id=None,
             resource_type=None,
+            knowledge_point_id=None,
             status=None,
             course_ids=[1, 3],
         )
@@ -40,10 +43,34 @@ class ResourceAccessTests(unittest.TestCase):
         }
         user = {"user_id": 8, "roles": ["student_member"]}
 
-        response = asyncio.run(list_resources(page=1, page_size=20, user=user))
+        response = asyncio.run(
+            list_resources(page=1, page_size=20, kp_id=None, user=user)
+        )
 
         self.assertEqual(repo.list_resources.call_args.kwargs["status"], "approved")
         self.assertNotIn("review_submitted_at", response.body.decode())
+
+    @patch("app.routers.resources._repo")
+    @patch("app.routers.resources.CourseAccessService")
+    def test_course_knowledge_point_filter_checks_ownership(self, access_type, repo):
+        access = Mock()
+        access.list_accessible_course_ids.return_value = [1]
+        access_type.return_value = access
+        repo.list_resources.return_value = {"items": [], "total": 0}
+        user = {"user_id": 7, "roles": ["teacher"]}
+
+        asyncio.run(
+            list_resources(
+                page=1,
+                page_size=20,
+                course_id=1,
+                kp_id=4,
+                user=user,
+            )
+        )
+
+        access.require_knowledge_points_course.assert_called_once_with(1, [4])
+        self.assertEqual(repo.list_resources.call_args.kwargs["knowledge_point_id"], 4)
 
     @patch("app.routers.resources._repo")
     @patch("app.routers.resources.CourseAccessService")
