@@ -88,19 +88,19 @@ class CreateManualOutputRequest(BaseModel):
     branch_id: Optional[int] = Field(None, gt=0)
     parent_output_id: Optional[int] = Field(None, gt=0)
     output_title: str = Field(..., min_length=1, max_length=200)
-    content: str = Field(...)
+    content: str = Field(..., min_length=1, max_length=2_000_000)
     edit_summary: Optional[str] = Field(None, max_length=500)
 
 
 class UpdateOutputRequest(BaseModel):
-    content: str = Field(..., min_length=1)
+    content: str = Field(..., min_length=1, max_length=2_000_000)
     lock_version: int = Field(..., ge=0)
     edit_summary: Optional[str] = Field(None, max_length=500)
 
 
 class SaveAsNewVersionRequest(BaseModel):
     output_title: str = Field(..., min_length=1, max_length=200)
-    content: str = Field(...)
+    content: str = Field(..., min_length=1, max_length=2_000_000)
     edit_summary: Optional[str] = Field(None, max_length=500)
     branch_id: Optional[int] = Field(None, gt=0)
 

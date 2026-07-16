@@ -1,7 +1,14 @@
 import unittest
 from unittest.mock import Mock, patch
 
+from pydantic import ValidationError
+
 from app.routers.learning import CreateLearningTaskRequest, create_learning_task
+from app.routers.tasks import (
+    CreateManualOutputRequest,
+    SaveAsNewVersionRequest,
+    UpdateOutputRequest,
+)
 from app.services.learning_service import LearningService
 
 
@@ -44,6 +51,28 @@ class TaskIntegrityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             service._repo.list_tasks.call_args.kwargs["assignee_user_id"], 12
         )
+
+
+class TaskPayloadBoundsTests(unittest.TestCase):
+    def test_output_content_must_be_non_empty_and_bounded(self):
+        factories = (
+            lambda content: CreateManualOutputRequest(
+                output_title="讲义",
+                content=content,
+            ),
+            lambda content: UpdateOutputRequest(content=content, lock_version=0),
+            lambda content: SaveAsNewVersionRequest(
+                output_title="讲义",
+                content=content,
+            ),
+        )
+
+        for factory in factories:
+            with self.subTest(factory=factory):
+                with self.assertRaises(ValidationError):
+                    factory("")
+                with self.assertRaises(ValidationError):
+                    factory("x" * 2_000_001)
 
 
 if __name__ == "__main__":
