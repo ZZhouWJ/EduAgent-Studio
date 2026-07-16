@@ -32,6 +32,7 @@ class AuthenticatedContextTests(unittest.IsolatedAsyncioTestCase):
                 page=1,
                 page_size=20,
                 course_id=None,
+                student_id=None,
                 feedback_type=None,
                 user={"user_id": 42, "roles": ["student_member"]},
             )
@@ -49,6 +50,7 @@ class AuthenticatedContextTests(unittest.IsolatedAsyncioTestCase):
                 page=1,
                 page_size=20,
                 course_id=1,
+                student_id=None,
                 feedback_type=None,
                 user={"user_id": 7, "roles": ["teacher"]},
             )
