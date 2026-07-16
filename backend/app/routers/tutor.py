@@ -11,11 +11,11 @@ Tutor API 路由
 import asyncio
 import json
 import logging
-from typing import Optional
+from typing import Annotated, Literal, Optional
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app.services.auth_service import get_current_user_dependency as get_current_user
 from app.services.tutor_service import TutorService
@@ -29,17 +29,43 @@ router = APIRouter(prefix="/tutor", tags=["学习辅导"])
 logger = logging.getLogger(__name__)
 
 
+TutorContentType = Literal[
+    "lecture",
+    "mindmap",
+    "quiz",
+    "code_case",
+    "ppt",
+    "video_script",
+    "experiment_report",
+    "error_analysis",
+    "learning_card",
+]
+
+
 class ChatRequest(BaseModel):
-    profile_id: int
-    course_id: int
-    question: str
-    requested_content_types: Optional[list[str]] = None  # 学生指定的内容类型
+    model_config = ConfigDict(extra="forbid")
+
+    profile_id: int = Field(..., gt=0)
+    course_id: int = Field(..., gt=0)
+    question: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)
+    ]
+    requested_content_types: Optional[list[TutorContentType]] = Field(
+        None, max_length=9
+    )
 
 
 class FeedbackRequest(BaseModel):
-    session_id: int
+    model_config = ConfigDict(extra="forbid")
+
+    session_id: int = Field(..., gt=0)
     helpful: bool
-    follow_up: Optional[str] = None
+    follow_up: Optional[
+        Annotated[
+            str,
+            StringConstraints(strip_whitespace=True, min_length=1, max_length=2000),
+        ]
+    ] = None
 
 
 def _get_tutor_service() -> TutorService:
@@ -160,8 +186,8 @@ async def tutor_chat_stream(
 
 @router.get("/suggestions")
 async def get_suggestions(
-    course_id: int = Query(..., description="课程 ID"),
-    profile_id: Optional[int] = Query(None, description="学生画像 ID（可选）"),
+    course_id: int = Query(..., gt=0, description="课程 ID"),
+    profile_id: Optional[int] = Query(None, gt=0, description="学生画像 ID（可选）"),
     user: dict = Depends(get_current_user),
 ):
     """
@@ -216,8 +242,8 @@ async def tutor_feedback(
 
 @router.get("/sessions")
 async def get_tutor_sessions(
-    profile_id: int = Query(..., description="学生画像 ID"),
-    course_id: Optional[int] = Query(None, description="课程 ID（可选）"),
+    profile_id: int = Query(..., gt=0, description="学生画像 ID"),
+    course_id: Optional[int] = Query(None, gt=0, description="课程 ID（可选）"),
     limit: int = Query(20, ge=1, le=100, description="返回数量"),
     user: dict = Depends(get_current_user),
 ):
