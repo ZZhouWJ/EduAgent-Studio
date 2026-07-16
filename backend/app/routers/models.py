@@ -59,9 +59,9 @@ class CreateModelRequest(BaseModel):
     model_name: str = Field(..., min_length=1, max_length=100)
     display_name: str = Field(..., min_length=1, max_length=100)
     capability_tags: Optional[str] = Field(None, max_length=200)
-    max_context: int = Field(4096, ge=1)
-    input_price: float = Field(0.0, ge=0)
-    output_price: float = Field(0.0, ge=0)
+    max_context: int = Field(4096, ge=1, le=10_000_000)
+    input_price: float = Field(0.0, ge=0, le=1_000_000)
+    output_price: float = Field(0.0, ge=0, le=1_000_000)
     price_unit: str = Field("1K_TOKENS", max_length=20)
     status: str = Field("active", max_length=20)
 
@@ -69,9 +69,9 @@ class CreateModelRequest(BaseModel):
 class UpdateModelRequest(BaseModel):
     display_name: str = Field(..., min_length=1, max_length=100)
     capability_tags: Optional[str] = Field(None, max_length=500)
-    max_context: int = Field(..., ge=1)
-    input_price: float = Field(..., ge=0)
-    output_price: float = Field(..., ge=0)
+    max_context: int = Field(..., ge=1, le=10_000_000)
+    input_price: float = Field(..., ge=0, le=1_000_000)
+    output_price: float = Field(..., ge=0, le=1_000_000)
     price_unit: str = Field(..., min_length=1, max_length=20)
     status: str = Field(..., pattern="^(active|disabled)$")
 
@@ -79,8 +79,8 @@ class UpdateModelRequest(BaseModel):
 class CreateApiConfigRequest(BaseModel):
     provider_id: int = Field(..., gt=0)
     config_name: str = Field(..., min_length=1, max_length=100)
-    api_key: str = Field(..., min_length=1)
-    quota_limit: int = Field(..., ge=0)
+    api_key: str = Field(..., min_length=1, max_length=4096)
+    quota_limit: int = Field(..., ge=0, le=1_000_000_000)
 
 
 # =============================================================================

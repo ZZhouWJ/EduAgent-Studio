@@ -5,6 +5,7 @@
 """
 
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlsplit, urlunsplit
 
 from app.database import get_db_transaction
 from app.repositories import model_repo, user_repo
@@ -39,6 +40,20 @@ def _require_admin(user: Dict[str, Any]) -> None:
         raise ForbiddenException(message="只有管理员可以执行此操作")
 
 
+def normalize_provider_url(base_url: str) -> str:
+    """Validate an HTTP model endpoint without blocking private local deployments."""
+    value = base_url.strip()
+    parsed = urlsplit(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValidationException(message="供应商地址必须是有效的 HTTP 或 HTTPS URL")
+    if parsed.username or parsed.password:
+        raise ValidationException(message="供应商地址不能包含用户名或密码")
+    if parsed.query or parsed.fragment:
+        raise ValidationException(message="供应商地址不能包含查询参数或片段")
+    normalized_path = parsed.path.rstrip("/")
+    return urlunsplit((parsed.scheme, parsed.netloc, normalized_path, "", ""))
+
+
 # =============================================================================
 # 模型供应商
 # =============================================================================
@@ -71,8 +86,7 @@ def create_provider(
         raise ValidationException(message="供应商名称不能为空")
     if not provider_code or not provider_code.strip():
         raise ValidationException(message="供应商代码不能为空")
-    if not base_url or not base_url.strip():
-        raise ValidationException(message="供应商地址不能为空")
+    normalized_base_url = normalize_provider_url(base_url)
 
     if model_repo.is_provider_code_exists(provider_code):
         raise ValidationException(message="供应商代码已存在")
@@ -83,7 +97,7 @@ def create_provider(
         provider_id = model_repo.create_provider(
             provider_name=provider_name.strip(),
             provider_code=provider_code.strip(),
-            base_url=base_url.strip(),
+            base_url=normalized_base_url,
             website=(website.strip() if website else None),
             description=(description.strip() if description else None),
             created_by=user["user_id"],
