@@ -1,8 +1,11 @@
+import asyncio
 import unittest
 from contextlib import contextmanager
 from unittest.mock import patch
 
 from app.repositories import statistics_repo
+from app.routers import statistics as statistics_router
+from app.services import statistics_service
 
 
 class FakeCursor:
@@ -21,6 +24,85 @@ class FakeCursor:
 
 
 class PlatformStatisticsTests(unittest.TestCase):
+    def test_cost_statistics_apply_every_filter_to_every_breakdown(self):
+        cursor = FakeCursor([
+            {
+                "total_cost": 0.25,
+                "input_cost": 0.1,
+                "output_cost": 0.15,
+                "total_tokens": 1200,
+            },
+            [{"model_id": 7, "model_name": "model", "total_cost": 0.25}],
+            [{"project_id": 36, "project_name": "project", "total_cost": 0.25, "call_count": 2}],
+            [{"user_id": 1, "real_name": "admin", "total_cost": 0.25}],
+            [{"date": "2026-07-16", "call_count": 2, "total_tokens": 1200, "total_cost": 0.25}],
+        ])
+
+        @contextmanager
+        def fake_cursor():
+            yield cursor
+
+        with patch.object(statistics_repo, "get_db_cursor", fake_cursor):
+            result = statistics_repo.get_cost_stats(
+                is_admin=True,
+                user_id=1,
+                project_id=36,
+                model_id=7,
+                date_from="2026-07-10",
+                date_to="2026-07-16",
+            )
+
+        self.assertEqual(result["cost_trend"][0]["date"], "2026-07-16")
+        expected_params = [36, "2026-07-10", "2026-07-16 23:59:59", 7]
+        self.assertEqual(len(cursor.queries), 5)
+        for query, params in cursor.queries:
+            self.assertIn("cr.project_id = %s", query)
+            self.assertIn("cr.model_id = %s", query)
+            self.assertIn("cr.created_at >= %s", query)
+            self.assertIn("cr.created_at <= %s", query)
+            self.assertEqual(params, expected_params)
+        trend_query = cursor.queries[-1][0]
+        self.assertIn("GROUP BY DATE_FORMAT(cr.created_at", trend_query)
+        self.assertIn("ORDER BY date ASC", trend_query)
+
+    @patch("app.services.statistics_service.statistics_repo.get_cost_stats", return_value={})
+    @patch("app.services.statistics_service._require_auth", return_value={"user_id": 1, "roles": ["admin"]})
+    def test_cost_service_forwards_model_filter(self, _require_auth, get_cost_stats):
+        statistics_service.get_cost_stats(
+            token="token",
+            project_id=36,
+            model_id=7,
+            date_from="2026-07-10",
+            date_to="2026-07-16",
+        )
+
+        get_cost_stats.assert_called_once_with(
+            is_admin=True,
+            user_id=1,
+            project_id=36,
+            model_id=7,
+            date_from="2026-07-10",
+            date_to="2026-07-16",
+        )
+
+    @patch("app.routers.statistics.statistics_service.get_cost_stats", return_value={})
+    def test_cost_route_forwards_model_filter(self, get_cost_stats):
+        asyncio.run(statistics_router.get_cost_stats(
+            authorization="Bearer token",
+            project_id=36,
+            model_id=7,
+            date_from="2026-07-10",
+            date_to="2026-07-16",
+        ))
+
+        get_cost_stats.assert_called_once_with(
+            token="token",
+            project_id=36,
+            model_id=7,
+            date_from="2026-07-10",
+            date_to="2026-07-16",
+        )
+
     def test_platform_statistics_use_audit_table_schema(self):
         cursor = FakeCursor([
             {

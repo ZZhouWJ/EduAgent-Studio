@@ -33,7 +33,13 @@ export {
 export { coursesApi, type CourseUpdateBody } from './courses'
 
 // Resources
-export { resourcesApi, type LearningResource } from './resources'
+export {
+  resourcesApi,
+  type LearningResource,
+  type LearningResourceReview,
+  type CompleteResourceReviewBody,
+  type ResourceReviewResult,
+} from './resources'
 
 // Feedbacks
 export { feedbackApi, type LearningFeedback } from './feedbacks'
@@ -52,7 +58,6 @@ export {
   type TaskOutput,
   type TaskBranch,
   type OutputComment,
-  type GenerationResult,
 } from './tasks'
 
 // Projects
@@ -76,6 +81,7 @@ export {
   type CreateTemplateBody,
   type UpdateTemplateBody,
   type CreateVersionBody,
+  type PromptRenderResult,
 } from './prompts'
 
 // Reviews
@@ -110,6 +116,15 @@ export { tutorApi, type TutorChatResponse, type Citation, type PracticeQuestion,
 
 // Multimodal
 export { multimodalApi, type ImageUnderstandResult } from './multimodal'
+
+// Platform settings
+export {
+  platformSettingsApi,
+  type GovernanceSettings,
+  type GovernanceSettingsUpdate,
+  type BudgetAlertSettings,
+  type BudgetAlertSettingsUpdate,
+} from './platform-settings'
 
 // Statistics
 export {

@@ -46,7 +46,7 @@ class RegisterRequest(BaseModel):
     phone: Optional[str] = Field(None, max_length=20)
     role_ids: Optional[list[int]] = Field(
         None,
-        description="注册时选择的角色 ID 列表（不含 admin）",
+        description="公开注册仅支持学生角色；不传时默认分配学生角色",
     )
 
 
@@ -58,7 +58,7 @@ class UpdateProfileRequest(BaseModel):
 
 
 class UpdateMyRolesRequest(BaseModel):
-    role_ids: list[int] = Field(..., description="新的角色 ID 列表（不含 admin）")
+    role_ids: list[int] = Field(..., description="角色 ID 列表（仅用于返回禁止自助修改提示）")
 
 
 class UpdatePasswordRequest(BaseModel):
@@ -236,7 +236,7 @@ async def update_my_roles(
     authorization: Optional[str] = Header(None, alias="Authorization"),
 ) -> dict:
     """
-    当前用户修改自己的角色（不可选择 admin）。
+    当前用户不能修改自己的角色；角色只能由管理员分配。
 
     需要提供有效的 token。
     """
@@ -289,7 +289,7 @@ async def update_my_password(
 @router.get("/roles")
 async def list_my_roles() -> dict:
     """
-    获取角色列表（不含 admin，用于个人中心等普通用户页面）。
+    获取公开注册可选角色（当前仅学生角色）。
     无需特殊权限。
     """
     roles = auth_service.list_roles_public()

@@ -17,7 +17,7 @@ POST   /api/prompt-templates/{template_id}/versions
 POST   /api/prompt-templates/{template_id}/versions/{version_id}/activate
 """
 
-from typing import Optional
+from typing import Dict, Optional
 
 from fastapi import APIRouter, Body, Header, Path, Query, Request
 from pydantic import BaseModel, Field
@@ -54,6 +54,9 @@ class CreateTemplateRequest(BaseModel):
     template_name: str = Field(..., min_length=1, max_length=200)
     task_type_id: int = Field(..., gt=0)
     description: Optional[str] = Field(None, max_length=500)
+    initial_prompt_content: Optional[str] = Field(None, max_length=200_000)
+    change_note: Optional[str] = Field(None, max_length=500)
+    activate: bool = Field(False)
 
 
 class UpdateTemplateRequest(BaseModel):
@@ -67,6 +70,12 @@ class CreateVersionRequest(BaseModel):
     version_no: Optional[str] = Field(None, max_length=20)
     prompt_content: str = Field(..., min_length=1)
     change_note: Optional[str] = Field(None, max_length=500)
+    activate: bool = Field(False)
+
+
+class RenderTemplateRequest(BaseModel):
+    version_id: Optional[int] = Field(None, gt=0)
+    variables: Dict[str, str] = Field(default_factory=dict)
 
 
 # =============================================================================
@@ -131,6 +140,9 @@ async def create_template(
         template_name=body.template_name,
         task_type_id=body.task_type_id,
         description=body.description,
+        initial_prompt_content=body.initial_prompt_content,
+        change_note=body.change_note,
+        activate=body.activate,
         ip_address=ip,
         user_agent=ua,
     )
@@ -231,6 +243,28 @@ async def list_template_versions(
 
 
 # =============================================================================
+# 渲染提示词预览
+# =============================================================================
+
+@router.post("/prompt-templates/{template_id}/render")
+async def render_template(
+    request: Request,
+    template_id: int = Path(..., gt=0),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    body: RenderTemplateRequest = Body(...),
+) -> dict:
+    """使用受控变量替换渲染提示词，不执行模型调用。"""
+    token = _extract_token(authorization)
+    result = prompt_service.render_template(
+        token=token,
+        template_id=template_id,
+        version_id=body.version_id,
+        variables=body.variables,
+    )
+    return success_response(data=result)
+
+
+# =============================================================================
 # 创建提示词版本
 # =============================================================================
 
@@ -252,6 +286,7 @@ async def create_version(
         version_no=body.version_no,
         prompt_content=body.prompt_content,
         change_note=body.change_note,
+        auto_activate=body.activate,
         ip_address=ip,
         user_agent=ua,
     )

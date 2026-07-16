@@ -9,8 +9,14 @@ from typing import Any, Dict, Optional
 from fastapi import Header
 
 from app.repositories import user_repo
-from app.utils.exceptions import ConflictException, UnauthorizedException, ValidationException
+from app.utils.exceptions import ConflictException, ForbiddenException, UnauthorizedException, ValidationException
 from app.utils.password import hash_password, verify_password
+from app.utils.roles import (
+    PLATFORM_ROLE_CODES,
+    PUBLIC_REGISTRATION_ROLE_CODES,
+    filter_platform_roles,
+    permissions_for_roles,
+)
 from app.utils.token import create_access_token, decode_access_token
 
 
@@ -129,7 +135,7 @@ def get_current_user(token: str) -> Optional[Dict[str, Any]]:
         return None
 
     roles = user_repo.get_user_roles(user_id)
-    permissions = user_repo.get_user_permissions(user_id)
+    permissions = permissions_for_roles(roles)
 
     return {
         "user_id": user["user_id"],
@@ -180,6 +186,8 @@ def register(
     role_ids: Optional[list[int]] = None,
     ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
+    created_by: Optional[int] = None,
+    allow_admin_role: bool = False,
 ) -> Dict[str, Any]:
     """
     用户注册（事务保证 users/user_roles/operation_logs 原子性）。
@@ -188,7 +196,7 @@ def register(
     1. 校验两次密码一致
     2. 校验参数（username 非空，password 至少 6 字符）
     3. 检查用户名是否已存在
-    4. 校验 role_ids 不含 admin
+    4. 校验角色是否符合注册来源的授权范围
     5. bcrypt 哈希密码
     6. 在同一事务内：创建用户 -> 分配角色 -> 写入操作日志
     7. 事务失败整体回滚
@@ -201,7 +209,7 @@ def register(
         student_no: 学号（可选）
         email: 邮箱（可选）
         phone: 手机号（可选）
-        role_ids: 注册时选择的角色 ID 列表（不含 admin，可选）
+        role_ids: 公开注册仅允许学生角色；管理员创建时可指定平台角色
         ip_address: 客户端 IP
         user_agent: 客户端 UA
 
@@ -227,7 +235,12 @@ def register(
         raise ConflictException(message="用户名已存在")
 
     if role_ids is not None:
-        _validate_role_ids_for_user(role_ids)
+        allowed_role_codes = (
+            PLATFORM_ROLE_CODES
+            if allow_admin_role
+            else PUBLIC_REGISTRATION_ROLE_CODES
+        )
+        _validate_role_ids_for_user(role_ids, allowed_role_codes)
 
     password_hash = hash_password(password)
 
@@ -241,7 +254,7 @@ def register(
             student_no=(student_no.strip() if student_no else None),
             email=(email.strip() if email else None),
             phone=(phone.strip() if phone else None),
-            created_by=None,
+            created_by=created_by,
         )
 
         user_repo.assign_roles_with_conn(
@@ -252,9 +265,9 @@ def register(
 
         user_repo.insert_operation_log_with_conn(
             conn=conn,
-            user_id=user_id,
-            action_type="register",
-            action_desc=f"用户注册: {username}",
+            user_id=created_by or user_id,
+            action_type="user:create" if created_by else "register",
+            action_desc=f"创建用户: {username}" if created_by else f"用户注册: {username}",
             target_type="user",
             target_id=user_id,
             ip_address=ip_address,
@@ -315,26 +328,37 @@ def update_password(
 
 
 def list_roles_public() -> list[dict]:
-    """获取角色列表（不含 admin），无需认证。"""
-    return user_repo.list_roles(include_admin=False)
+    """获取公开注册可选角色；当前仅允许学生。"""
+    return [
+        role
+        for role in filter_platform_roles(user_repo.list_roles(include_admin=False))
+        if role["role_code"] in PUBLIC_REGISTRATION_ROLE_CODES
+    ]
 
 
 # =============================================================================
 # 用户自主角色与资料管理
 # =============================================================================
 
-def _validate_role_ids_for_user(role_ids: list[int]) -> None:
+def _validate_role_ids_for_user(
+    role_ids: list[int], allowed_role_codes: frozenset[str]
+) -> None:
     """
-    校验 role_ids 不包含 admin。
+    校验角色存在且属于当前操作允许分配的角色集合。
 
     Raises:
-        ValidationException: 如果包含 admin 角色
+        ValidationException: 角色不存在或超出可分配范围
     """
     all_roles = user_repo.list_roles()
-    admin_role_ids = {r["role_id"] for r in all_roles if r["role_code"] == "admin"}
+    roles_by_id = {int(role["role_id"]): role for role in all_roles}
     for rid in role_ids:
-        if rid in admin_role_ids:
-            raise ValidationException(message="无法选择管理员角色")
+        role = roles_by_id.get(int(rid))
+        if role is None:
+            raise ValidationException(message="选择的角色不存在")
+        if role.get("status", "active") != "active":
+            raise ValidationException(message="选择的角色已停用")
+        if role["role_code"] not in allowed_role_codes:
+            raise ValidationException(message="无法分配该角色")
 
 
 def update_my_profile(
@@ -407,36 +431,21 @@ def update_my_roles(
     user_agent: Optional[str] = None,
 ) -> None:
     """
-    当前用户修改自己的角色（不可选择 admin）。
+    拒绝用户自行修改角色。
 
     Args:
         token: 当前用户的 JWT token
-        role_ids: 新的角色 ID 列表（不含 admin）
+        role_ids: 客户端请求的角色 ID 列表（不会执行修改）
         ip_address: 客户端 IP
         user_agent: 客户端 UA
 
     Raises:
         UnauthorizedException: 未登录或 token 无效
-        ValidationException: 包含 admin 角色
+        ForbiddenException: 当前用户无权修改自己的角色
     """
-    user = get_current_user(token)
-    if user is None:
+    if get_current_user(token) is None:
         raise UnauthorizedException(message="未登录或登录已过期，请重新登录")
-
-    _validate_role_ids_for_user(role_ids)
-
-    user_id = user["user_id"]
-    user_repo.update_user_roles(user_id, role_ids)
-
-    user_repo.insert_operation_log(
-        user_id=user_id,
-        action_type="role:update",
-        action_desc="更新个人角色",
-        target_type="user",
-        target_id=user_id,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
+    raise ForbiddenException(message="角色只能由系统管理员分配")
 
 
 def _extract_token_from_header(authorization: str) -> str:

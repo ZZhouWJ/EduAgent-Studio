@@ -68,6 +68,19 @@ class CourseAccessService:
                 raise ForbiddenException("无权访问其他学生的任务")
         return course_id
 
+    def require_task_update_access(self, task_id: int, user: Dict[str, Any]) -> int:
+        """校验任务状态写权限；学生只能更新明确指派给自己的任务。"""
+        context = self._repo.get_task_access_context(task_id)
+        if context is None:
+            raise NotFoundException("任务不存在")
+        course_id = int(context["course_id"])
+        self.require_course_access(course_id, user)
+        roles = set(user.get("roles", []))
+        if "student_member" in roles and not roles.intersection({"teacher", "admin"}):
+            if context["assignee_id"] != int(user["user_id"]):
+                raise ForbiddenException("只能更新明确指派给自己的任务")
+        return course_id
+
     def require_student_course(self, course_id: int, student_id: int) -> int:
         profile_id = self._repo.get_student_profile_id(course_id, student_id)
         if profile_id is None:

@@ -7,7 +7,6 @@ export interface AgentRequest {
   resource_type: string
   difficulty: string
   generation_goal?: string
-  enable_review?: boolean
 }
 
 export interface WorkflowResult {
@@ -55,8 +54,10 @@ export interface WorkflowResult {
     resource_id: string
     title: string
     type: string
+    type_label?: string
     content: string
     knowledge_points: number[]
+    target_kp_ids?: number[] | string
     difficulty: string
     target_audience: string
     estimated_learning_time: string
@@ -103,18 +104,21 @@ export interface WorkflowResult {
 }
 
 export interface SaveResourceResponse {
-  resource_id: string
-  title: string
+  resource_id: number
+  resource_title: string
   course_id: number
-  type: string
+  course_name: string
+  resource_type: string
   content: string
-  knowledge_points: number[]
+  target_kp_ids: number[]
+  target_kp_names: string[]
   difficulty: string
   status: string
   created_at: string
-  storage_path: string
-  storage_url: string
-  file_size: number
+  updated_at: string
+  evidence_count: number
+  trustworthiness: string
+  quality_score: number | null
 }
 
 export interface PptExportSlide {

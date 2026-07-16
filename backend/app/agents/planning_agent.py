@@ -81,13 +81,14 @@ class PlanningAgent:
             student_profile = {}
 
         outline_text = "\n".join(
-            f"- {kp.get('name', '')}"
+            f"- [kp_id:{kp.get('kp_id', kp.get('id', 0))}] {kp.get('name', '')}"
             for kp in course_outline
         ) or "（暂无课程大纲）"
 
         weak_points = diagnosis.get("weak_points", [])
         wp_text = "\n".join(
-            f"- {wp.get('name', '')}（掌握度 {wp.get('mastery_level', 0):.0%}）"
+            f"- [kp_id:{wp.get('kp_id', 0)}] {wp.get('name', '')} | "
+            f"掌握度 {wp.get('mastery_level', 0):.0%}"
             for wp in weak_points
         ) or "（无薄弱知识点）"
 

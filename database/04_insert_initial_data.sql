@@ -12,10 +12,10 @@ USE `ai_collab_audit_system`;
 
 INSERT INTO `roles` (`role_name`, `role_code`, `description`, `status`, `created_by`)
 VALUES
-    ('学生成员', 'student_member', '项目普通成员，可以创建任务、提交输出、查看本项目内容', 'active', NULL),
-    ('项目负责人', 'project_leader', '项目负责人，可以审核本项目输出、添加成员、采纳成果', 'active', NULL),
-    ('指导教师', 'teacher', '指导教师，可以查看指导项目并添加意见、审核输出、采纳成果', 'active', NULL),
-    ('系统管理员', 'admin', '系统管理员，拥有最高权限，可以管理所有用户、角色、模型和日志', 'active', NULL);
+    ('学生', 'student_member', '使用个性化辅导、学习路径、任务、资源与学习反馈', 'active', NULL),
+    ('历史项目负责人', 'project_leader', '旧协作模块兼容角色，当前教育平台不再分配', 'disabled', NULL),
+    ('教师', 'teacher', '管理本人课程、学生画像、学习任务、知识库与 AI 生成资源', 'active', NULL),
+    ('系统管理员', 'admin', '负责平台用户、课程、模型、智能体、审计、成本与内容安全治理', 'active', NULL);
 
 -- ============================================================
 -- 2. 插入权限数据

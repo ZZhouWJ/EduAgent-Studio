@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS `learning_resources` (
     `resource_id` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '资源ID',
     `course_id` INT UNSIGNED NOT NULL COMMENT '所属课程ID',
     `resource_title` VARCHAR(200) NOT NULL COMMENT '资源标题',
-    `resource_type` ENUM('lecture','ppt','quiz','case','review','test','other') NOT NULL COMMENT '资源类型',
+    `resource_type` ENUM('lecture','mindmap','quiz','case','code_case','ppt','video_script','experiment_report','error_analysis','learning_card','review','test','other') NOT NULL COMMENT '资源类型',
     `difficulty` ENUM('basic','intermediate','advanced') NOT NULL DEFAULT 'basic' COMMENT '难度等级',
     `content` LONGTEXT NULL COMMENT '资源正文内容',
     `target_kp_ids` VARCHAR(500) NULL COMMENT '关联知识点ID列表',

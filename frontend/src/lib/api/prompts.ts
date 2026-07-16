@@ -15,16 +15,18 @@ export interface PromptTemplate {
   task_type_id: number
   type_name: string
   type_code: string
-  current_version_no: number
+  description?: string
+  current_version_id?: number
+  current_version_no?: string
   is_active: boolean
   created_at: string
-  updated_at: string
+  updated_at?: string
 }
 
 export interface PromptVersion {
-  version_id: number
+  prompt_version_id: number
   template_id: number
-  version_no: number
+  version_no: string
   prompt_content: string
   change_note: string
   is_active: boolean
@@ -36,13 +38,16 @@ export interface PromptVersion {
 export interface CreateTemplateBody {
   template_name: string
   task_type_id: number
+  description?: string
   initial_prompt_content?: string
   change_note?: string
+  activate?: boolean
 }
 
 export interface UpdateTemplateBody {
   template_name?: string
   task_type_id?: number
+  description?: string
   is_active?: boolean
 }
 
@@ -50,6 +55,16 @@ export interface CreateVersionBody {
   version_no?: string
   prompt_content: string
   change_note?: string
+  activate?: boolean
+}
+
+export interface PromptRenderResult {
+  template_id: number
+  version_id: number
+  version_no: string
+  required_variables: string[]
+  missing_variables: string[]
+  rendered_content: string
 }
 
 export const promptsApi = {
@@ -92,5 +107,9 @@ export const promptsApi = {
 
   activateVersion(template_id: number, version_id: number) {
     return client.post(`/prompt-templates/${template_id}/versions/${version_id}/activate`)
+  },
+
+  renderTemplate(template_id: number, data: { version_id?: number; variables: Record<string, string> }) {
+    return client.post<PromptRenderResult>(`/prompt-templates/${template_id}/render`, data)
   },
 }

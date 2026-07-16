@@ -68,6 +68,7 @@ class WorkflowState(TypedDict, total=False):
     knowledge_point_ids: List[int]
     resource_type: str
     difficulty: str
+    generation_goal: Optional[str]
     student_profile: Optional[Dict[str, Any]]
     knowledge_points: Optional[List[Dict[str, Any]]]
     learning_history: Optional[List[Dict[str, Any]]]
@@ -159,7 +160,10 @@ def _planning_node(state: WorkflowState) -> Dict[str, Any]:
         agent = PlanningAgent(_get_llm_gateway())
         result = agent.run(
             diagnosis=state.get("diagnosis") or {},
-            learning_goal=state.get("student_profile", {}).get("learning_goal", ""),
+            learning_goal=(
+                state.get("generation_goal")
+                or state.get("student_profile", {}).get("learning_goal", "")
+            ),
             course_outline=state.get("knowledge_points") or [],
             student_profile=state.get("student_profile") or {},
         )
@@ -508,6 +512,7 @@ def run_workflow(
     knowledge_point_ids: List[int],
     resource_type: str,
     difficulty: str,
+    generation_goal: Optional[str] = None,
     student_profile: Optional[Dict[str, Any]] = None,
     knowledge_points: Optional[List[Dict[str, Any]]] = None,
     learning_history: Optional[List[Dict[str, Any]]] = None,
@@ -533,6 +538,7 @@ def run_workflow(
         "knowledge_point_ids": knowledge_point_ids,
         "resource_type": resource_type,
         "difficulty": difficulty,
+        "generation_goal": generation_goal,
         "student_profile": student_profile,
         "knowledge_points": knowledge_points,
         "learning_history": learning_history,
@@ -591,6 +597,7 @@ def stream_workflow(
     knowledge_point_ids: List[int],
     resource_type: str,
     difficulty: str,
+    generation_goal: Optional[str] = None,
     student_profile: Optional[Dict[str, Any]] = None,
     knowledge_points: Optional[List[Dict[str, Any]]] = None,
     learning_history: Optional[List[Dict[str, Any]]] = None,
@@ -611,6 +618,7 @@ def stream_workflow(
         "knowledge_point_ids": knowledge_point_ids,
         "resource_type": resource_type,
         "difficulty": difficulty,
+        "generation_goal": generation_goal,
         "student_profile": student_profile,
         "knowledge_points": knowledge_points,
         "learning_history": learning_history,
@@ -634,6 +642,7 @@ def stream_workflow(
             "thread_id": initial_state["run_id"],
         }
     }
+    total_start = time.time()
 
     for event in graph.stream(initial_state, config):
         node_name = next(iter(event.keys()))
@@ -661,8 +670,11 @@ def stream_workflow(
         result = final_state.values
         result["metadata"] = {
             **result.get("metadata", {}),
-            "total_duration_ms": result.get("metadata", {}).get("total_duration_ms", 0),
+            "total_duration_ms": int((time.time() - total_start) * 1000),
             "revision_count": result.get("revision_count", 0),
+            "quality_score": result.get("quality_score"),
+            "step_history": result.get("step_history", []),
+            "run_id": result.get("run_id"),
         }
         result["current_step"] = "completed"
         yield {

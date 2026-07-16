@@ -202,6 +202,69 @@ def create_model(
     return {"model_id": model_id}
 
 
+def update_model(
+    token: str,
+    model_id: int,
+    display_name: str,
+    capability_tags: Optional[str],
+    max_context: int,
+    input_price: float,
+    output_price: float,
+    price_unit: str,
+    status: str,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
+) -> Dict[str, Any]:
+    """更新 AI 模型配置（仅 admin 可操作）。"""
+    user = _require_auth(token)
+    _require_admin(user)
+
+    existing = model_repo.get_model_by_id(model_id)
+    if existing is None:
+        raise NotFoundException(message="AI 模型不存在")
+    if not display_name or not display_name.strip():
+        raise ValidationException(message="模型显示名称不能为空")
+    if status not in {"active", "disabled"}:
+        raise ValidationException(message="模型状态必须为 active 或 disabled")
+    if max_context < 1:
+        raise ValidationException(message="最大上下文必须大于 0")
+    if input_price < 0 or output_price < 0:
+        raise ValidationException(message="模型价格不能为负数")
+    if not price_unit or not price_unit.strip():
+        raise ValidationException(message="价格单位不能为空")
+
+    with get_db_transaction() as conn:
+        affected = model_repo.update_model(
+            model_id=model_id,
+            display_name=display_name.strip(),
+            capability_tags=(capability_tags.strip() if capability_tags else None),
+            max_context=max_context,
+            input_price=input_price,
+            output_price=output_price,
+            price_unit=price_unit.strip(),
+            status=status,
+            updated_by=user["user_id"],
+            conn=conn,
+        )
+        if affected == 0:
+            raise NotFoundException(message="AI 模型不存在")
+        user_repo.insert_operation_log_with_conn(
+            user_id=user["user_id"],
+            action_type="ai_model:update",
+            action_desc=f"更新 AI 模型: {display_name.strip()}",
+            target_type="ai_model",
+            target_id=model_id,
+            project_id=None,
+            task_id=None,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            conn=conn,
+        )
+        conn.commit()
+
+    return {"model_id": model_id}
+
+
 # =============================================================================
 # API 配置
 # =============================================================================

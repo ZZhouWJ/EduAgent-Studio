@@ -16,12 +16,18 @@ export interface Role {
   role_id: number
   role_name: string
   role_code: string
+  description?: string
+  status?: string
 }
 
 export interface Permission {
   permission_id: number
   permission_name: string
   permission_code: string
+  module_name: string
+  module_label: string
+  description?: string
+  role_codes: string[]
 }
 
 export const usersApi = {
@@ -32,6 +38,15 @@ export const usersApi = {
     status?: string
   }) {
     return client.get<{ items: User[]; total: number }>('/users', { params })
+  },
+
+  create(data: {
+    username: string
+    password: string
+    real_name: string
+    role_ids: number[]
+  }) {
+    return client.post<User>('/users', data)
   },
 
   updateStatus(user_id: number, status: string) {

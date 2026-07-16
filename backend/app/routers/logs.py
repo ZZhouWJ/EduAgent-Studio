@@ -11,7 +11,7 @@ from fastapi import APIRouter, Header, Query
 from pydantic import BaseModel
 
 from app.services import auth_service, user_service
-from app.utils.exceptions import UnauthorizedException
+from app.utils.exceptions import ForbiddenException, UnauthorizedException
 from app.utils.response import success_response
 
 router = APIRouter(prefix="", tags=["日志"])
@@ -30,6 +30,14 @@ def _resolve_current_user(authorization: Optional[str]) -> dict:
     return user
 
 
+def _resolve_admin_user(authorization: Optional[str]) -> dict:
+    """解析当前用户并限制审计日志仅供管理员访问。"""
+    user = _resolve_current_user(authorization)
+    if "admin" not in user.get("roles", []):
+        raise ForbiddenException(message="仅管理员可查看平台审计日志")
+    return user
+
+
 @router.get("/logs/operation")
 async def list_operation_logs(
     authorization: Optional[str] = Header(None, alias="Authorization"),
@@ -44,9 +52,9 @@ async def list_operation_logs(
     """
     获取操作日志列表（分页 + 多条件过滤）。
 
-    仅登录用户可访问。
+    仅管理员可访问。
     """
-    current_user = _resolve_current_user(authorization)
+    _resolve_admin_user(authorization)
 
     result = user_service.list_operation_logs_service(
         page=page,
@@ -73,9 +81,9 @@ async def list_login_logs(
     """
     获取登录日志列表（分页 + 多条件过滤）。
 
-    仅登录用户可访问。
+    仅管理员可访问。
     """
-    current_user = _resolve_current_user(authorization)
+    _resolve_admin_user(authorization)
 
     result = user_service.list_login_logs_service(
         page=page,

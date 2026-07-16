@@ -4,12 +4,30 @@ import { useApi } from "@/lib/useApi";
 import { logsApi, OperationLog, LoginLog } from "@/lib/api";
 import { DetailDrawer, PageHeader, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, notify } from "../components/common/ProductUI";
 
+const ROLE_LABELS: Record<string, string> = {
+  admin: "管理员",
+  teacher: "教师",
+  student_member: "学生",
+  project_leader: "项目负责人",
+  project_reviewer: "审核员",
+};
+
+function formatRoles(roleCodes?: string) {
+  if (!roleCodes) return "—";
+  return roleCodes
+    .split(",")
+    .filter(Boolean)
+    .map((role) => ROLE_LABELS[role] ?? role)
+    .join(" / ");
+}
+
 function mapOpLog(l: OperationLog) {
   return {
-    id: String(l.log_id),
+    id: `operation:${l.log_id}`,
+    sortTime: l.created_at ? Date.parse(l.created_at) : 0,
     time: l.created_at ? new Date(l.created_at).toLocaleString("zh-CN") : "—",
-    actor: l.real_name || l.username || "—",
-    role: "—",
+    actor: l.operator_real_name || l.operator_username || "—",
+    role: formatRoles(l.role_codes),
     type: l.action_type || "操作",
     object: l.action_desc || l.target_type || "—",
     ip: l.ip_address ?? "—",
@@ -20,10 +38,11 @@ function mapOpLog(l: OperationLog) {
 
 function mapLoginLog(l: LoginLog) {
   return {
-    id: String(l.log_id),
+    id: `login:${l.login_id}`,
+    sortTime: l.login_time ? Date.parse(l.login_time) : 0,
     time: l.login_time ? new Date(l.login_time).toLocaleString("zh-CN") : "—",
     actor: l.real_name || l.username || "—",
-    role: "—",
+    role: formatRoles(l.role_codes),
     type: "登录",
     object: l.login_status === "success" ? "登录成功" : `登录失败: ${l.failure_reason ?? "未知"}`,
     ip: l.ip_address ?? "—",
@@ -63,9 +82,10 @@ export function AdminLogs() {
   const opTypes = Array.from(new Set(opLogs.map((l) => l.type))).filter(Boolean);
   const logTabs = ["全部", "登录日志", ...opTypes];
 
-  const combinedLogs: LogEntry[] = type === "全部" || type === "登录日志"
+  const combinedLogs: LogEntry[] = (type === "全部" || type === "登录日志"
     ? type === "登录日志" ? loginLogs : [...loginLogs, ...opLogs]
-    : opLogs.filter((l) => l.type === type);
+    : opLogs.filter((l) => l.type === type)
+  ).sort((left, right) => right.sortTime - left.sortTime);
 
   const filtered = combinedLogs.filter((log) => {
     const typeMatch = type === "全部" || log.type === type ||

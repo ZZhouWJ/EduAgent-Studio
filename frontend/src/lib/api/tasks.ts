@@ -44,18 +44,6 @@ export interface OutputComment {
   updated_at: string
 }
 
-export interface GenerationResult {
-  model_id: number
-  invocation_id: number
-  output_id?: number
-  version_no?: number
-  status: string
-  input_tokens?: number
-  output_tokens?: number
-  latency_ms?: number
-  error_message?: string
-}
-
 export const tasksApi = {
   getById(task_id: number) {
     return client.get<unknown>(`/tasks/${task_id}`)
@@ -148,18 +136,6 @@ export const tasksApi = {
 
   updateCommentStatus(comment_id: number, status: 'open' | 'resolved' | 'closed') {
     return client.put<OutputComment>(`/comments/${comment_id}/status`, { status })
-  },
-
-  generate(
-    task_id: number,
-    data: {
-      branch_id?: number
-      model_ids: number[]
-      prompt_version_id?: number
-      input_text: string
-    }
-  ) {
-    return client.post<GenerationResult[]>(`/tasks/${task_id}/generate`, data)
   },
 
   submitReview(output_id: number, data?: { reviewer_id?: number; submit_note?: string }) {

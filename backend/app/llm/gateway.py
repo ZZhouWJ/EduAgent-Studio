@@ -71,14 +71,13 @@ class LLMGateway:
 
         provider = self._providers.get(config.provider)
         if provider is None:
-            provider = self._providers.get("mock")
-            if provider is None:
-                return LLMCallResult(
-                    content="", model=config.model_name, provider=config.provider,
-                    input_tokens=0, output_tokens=0, total_tokens=0,
-                    latency_ms=0, cost=0.0, status="failed",
-                    error="模型服务不可用"
-                )
+            logger.error("LLM provider is not registered: %s", config.provider)
+            return LLMCallResult(
+                content="", model=config.model_name, provider=config.provider,
+                input_tokens=0, output_tokens=0, total_tokens=0,
+                latency_ms=0, cost=0.0, status="failed",
+                error="模型服务不可用",
+            )
 
         try:
             result = provider.generate(messages, config, **kwargs)

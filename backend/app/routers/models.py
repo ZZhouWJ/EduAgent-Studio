@@ -66,6 +66,16 @@ class CreateModelRequest(BaseModel):
     status: str = Field("active", max_length=20)
 
 
+class UpdateModelRequest(BaseModel):
+    display_name: str = Field(..., min_length=1, max_length=100)
+    capability_tags: Optional[str] = Field(None, max_length=500)
+    max_context: int = Field(..., ge=1)
+    input_price: float = Field(..., ge=0)
+    output_price: float = Field(..., ge=0)
+    price_unit: str = Field(..., min_length=1, max_length=20)
+    status: str = Field(..., pattern="^(active|disabled)$")
+
+
 class CreateApiConfigRequest(BaseModel):
     provider_id: int = Field(..., gt=0)
     config_name: str = Field(..., min_length=1, max_length=100)
@@ -166,6 +176,31 @@ async def create_model(
         status=body.status,
         ip_address=ip,
         user_agent=ua,
+    )
+    return success_response(data=result)
+
+
+@router.patch("/ai-models/{model_id}")
+async def update_model(
+    request: Request,
+    model_id: int = Path(..., gt=0),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    body: UpdateModelRequest = Body(...),
+) -> dict:
+    """更新 AI 模型配置（仅 admin 可操作）。"""
+    token = _extract_token(authorization)
+    result = model_service.update_model(
+        token=token,
+        model_id=model_id,
+        display_name=body.display_name,
+        capability_tags=body.capability_tags,
+        max_context=body.max_context,
+        input_price=body.input_price,
+        output_price=body.output_price,
+        price_unit=body.price_unit,
+        status=body.status,
+        ip_address=_get_client_ip(request),
+        user_agent=request.headers.get("User-Agent", ""),
     )
     return success_response(data=result)
 

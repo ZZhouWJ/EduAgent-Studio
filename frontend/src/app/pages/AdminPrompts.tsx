@@ -1,7 +1,7 @@
 import React from "react";
 import { Copy, FileText, History, Play, Plus, ScrollText } from "lucide-react";
 import { useApi } from "@/lib/useApi";
-import { promptsApi, PromptTaskType, PromptTemplate, PromptVersion } from "@/lib/api";
+import { promptsApi, PromptRenderResult, PromptTaskType, PromptTemplate, PromptVersion } from "@/lib/api";
 import { DetailDrawer, ModalShell, PageHeader, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, notify } from "../components/common/ProductUI";
 
 function mapTemplate(t: PromptTemplate) {
@@ -9,7 +9,7 @@ function mapTemplate(t: PromptTemplate) {
     id: String(t.template_id),
     name: t.template_name,
     agent: t.type_name,
-    version: `v${t.current_version_no}`,
+    version: t.current_version_no ? `v${t.current_version_no}` : "未发布",
     enabled: t.is_active,
     updatedAt: t.updated_at ? new Date(t.updated_at).toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" }) : "-",
     raw: t,
@@ -18,7 +18,7 @@ function mapTemplate(t: PromptTemplate) {
 
 function mapVersion(v: PromptVersion) {
   return {
-    id: String(v.version_id),
+    id: String(v.prompt_version_id),
     no: `v${v.version_no}`,
     note: v.change_note ?? "-",
     active: v.is_active,
@@ -32,18 +32,42 @@ export function AdminPrompts() {
   const [query, setQuery] = React.useState("");
   const [taskTypeFilter, setTaskTypeFilter] = React.useState("全部");
   const [selected, setSelected] = React.useState<ReturnType<typeof mapTemplate> | null>(null);
-  const [open, setOpen] = React.useState(false);
+  const [modalMode, setModalMode] = React.useState<"create" | "edit" | null>(null);
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const [promptContent, setPromptContent] = React.useState("");
   const [changeNote, setChangeNote] = React.useState("");
+  const [editTemplateName, setEditTemplateName] = React.useState("");
+  const [editTaskTypeId, setEditTaskTypeId] = React.useState<number | "">("");
+  const [editDescription, setEditDescription] = React.useState("");
+  const [editTemplateActive, setEditTemplateActive] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
 
   const [newTemplateName, setNewTemplateName] = React.useState("");
   const [newTaskTypeId, setNewTaskTypeId] = React.useState<number | "">("");
+  const [newDescription, setNewDescription] = React.useState("");
+  const [newPromptContent, setNewPromptContent] = React.useState("");
+  const [newTemplateActive, setNewTemplateActive] = React.useState(true);
   const [creatingTemplate, setCreatingTemplate] = React.useState(false);
+  const [previewOpen, setPreviewOpen] = React.useState(false);
+  const [previewVersionId, setPreviewVersionId] = React.useState<number | null>(null);
+  const [previewValues, setPreviewValues] = React.useState<Record<string, string>>({});
+  const [previewResult, setPreviewResult] = React.useState<PromptRenderResult | null>(null);
+  const [previewLoading, setPreviewLoading] = React.useState(false);
+  const [previewError, setPreviewError] = React.useState("");
 
   const taskTypesState = useApi(() => promptsApi.getTaskTypes(), []);
   const templatesState = useApi(() => promptsApi.getTemplates({ page: 1, page_size: 100, keyword: query || undefined }), [query]);
+  const templates = React.useMemo(
+    () => (templatesState.data?.items ?? []).map(mapTemplate),
+    [templatesState.data]
+  );
+
+  React.useEffect(() => {
+    setSelected((current) => {
+      if (templates.length === 0) return null;
+      return templates.find((item) => item.id === current?.id) ?? templates[0];
+    });
+  }, [templates]);
 
   const versionsState = useApi(
     () => selected ? promptsApi.getVersions(Number(selected.id)) : Promise.resolve([] as PromptVersion[]),
@@ -51,12 +75,12 @@ export function AdminPrompts() {
   );
 
   React.useEffect(() => {
-    if (versionsState.data?.length && versionsState.data[0]?.prompt_content) {
-      setPromptContent(versionsState.data[0].prompt_content);
+    if (versionsState.data?.length) {
+      const currentVersion = versionsState.data.find((version) => version.is_active) ?? versionsState.data[0];
+      setPromptContent(currentVersion.prompt_content ?? "");
     }
   }, [versionsState.data]);
 
-  const templates = (templatesState.data?.items ?? []).map(mapTemplate);
   const taskTypeOptions = ["全部", ...Array.from(new Set(templates.map((t) => t.agent)))];
   const filtered = templates.filter((item) => {
     const typeMatch = taskTypeFilter === "全部" || item.agent === taskTypeFilter;
@@ -80,20 +104,53 @@ export function AdminPrompts() {
     setHistoryOpen(false);
     setPromptContent("");
     setChangeNote("");
+    setPreviewOpen(false);
+    setPreviewResult(null);
+    setPreviewValues({});
   };
 
   const handleSaveVersion = async () => {
-    if (!selected) return;
+    if (!selected || !editTemplateName.trim() || !editTaskTypeId) {
+      notify.warning("请填写模板名称并选择任务类型");
+      return;
+    }
+    const currentContent = activeVersion?.raw.prompt_content?.trim() ?? "";
+    const contentChanged = promptContent.trim() !== currentContent;
+    const metadataChanged =
+      editTemplateName.trim() !== selected.raw.template_name ||
+      editTaskTypeId !== selected.raw.task_type_id ||
+      editDescription.trim() !== (selected.raw.description ?? "") ||
+      editTemplateActive !== selected.raw.is_active;
+
+    if (!contentChanged && !metadataChanged) {
+      notify.info("模板内容未发生变化");
+      return;
+    }
+    if (editTemplateActive && !activeVersion && !promptContent.trim()) {
+      notify.warning("启用模板前必须填写 Prompt 内容");
+      return;
+    }
     setSaving(true);
     try {
-      await promptsApi.createVersion(Number(selected.id), {
-        prompt_content: promptContent,
-        change_note: changeNote || "更新 Prompt 内容",
-      });
-      notify.success("版本已保存");
+      if (contentChanged) {
+        await promptsApi.createVersion(Number(selected.id), {
+          prompt_content: promptContent,
+          change_note: changeNote || "更新 Prompt 内容",
+          activate: true,
+        });
+      }
+      if (metadataChanged) {
+        await promptsApi.updateTemplate(Number(selected.id), {
+          template_name: editTemplateName.trim(),
+          task_type_id: editTaskTypeId as number,
+          description: editDescription.trim(),
+          is_active: editTemplateActive,
+        });
+      }
+      notify.success(contentChanged ? "模板与新版本已保存" : "模板设置已保存");
       versionsState.refetch();
       templatesState.refetch();
-      setOpen(false);
+      setModalMode(null);
       setChangeNote("");
     } catch (e) {
       notify.error("保存失败：" + String(e));
@@ -124,8 +181,8 @@ export function AdminPrompts() {
   };
 
   const handleCreateTemplate = async () => {
-    if (!newTemplateName.trim() || !newTaskTypeId) {
-      notify.warning("请填写模板名称并选择任务类型");
+    if (!newTemplateName.trim() || !newTaskTypeId || !newPromptContent.trim()) {
+      notify.warning("请填写模板名称、任务类型和初始 Prompt");
       return;
     }
     setCreatingTemplate(true);
@@ -133,18 +190,82 @@ export function AdminPrompts() {
       const created = await promptsApi.createTemplate({
         template_name: newTemplateName.trim(),
         task_type_id: newTaskTypeId as number,
+        description: newDescription.trim() || undefined,
+        initial_prompt_content: newPromptContent.trim(),
+        change_note: "初始版本",
+        activate: newTemplateActive,
       });
       notify.success(`模板「${newTemplateName}」已创建`);
       templatesState.refetch();
       setNewTemplateName("");
       setNewTaskTypeId("");
-      setOpen(false);
+      setNewDescription("");
+      setNewPromptContent("");
+      setNewTemplateActive(true);
+      setModalMode(null);
       const mapped = mapTemplate(created);
       setSelected(mapped);
     } catch (e) {
       notify.error("创建失败：" + String(e));
     } finally {
       setCreatingTemplate(false);
+    }
+  };
+
+  const handleOpenEdit = () => {
+    if (!selectedTemplate) return;
+    setEditTemplateName(selectedTemplate.raw.template_name);
+    setEditTaskTypeId(selectedTemplate.raw.task_type_id);
+    setEditDescription(selectedTemplate.raw.description ?? "");
+    setEditTemplateActive(selectedTemplate.raw.is_active);
+    setChangeNote("");
+    setModalMode("edit");
+  };
+
+  const renderPreview = async (versionId: number, variables: Record<string, string>) => {
+    if (!selectedTemplate) return;
+    setPreviewLoading(true);
+    setPreviewError("");
+    try {
+      const result = await promptsApi.renderTemplate(Number(selectedTemplate.id), {
+        version_id: versionId,
+        variables,
+      });
+      setPreviewResult(result);
+    } catch (e) {
+      setPreviewError(String(e));
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleOpenPreview = () => {
+    const versionId = activeVersion?.raw.prompt_version_id;
+    if (!versionId) {
+      notify.warning("当前模板尚无可渲染版本");
+      return;
+    }
+    setPreviewVersionId(versionId);
+    setPreviewValues({});
+    setPreviewResult(null);
+    setPreviewOpen(true);
+    void renderPreview(versionId, {});
+  };
+
+  const handlePreviewVersionChange = (versionId: number) => {
+    setPreviewVersionId(versionId);
+    setPreviewValues({});
+    setPreviewResult(null);
+    void renderPreview(versionId, {});
+  };
+
+  const handleCopyPreview = async () => {
+    if (!previewResult) return;
+    try {
+      await navigator.clipboard.writeText(previewResult.rendered_content);
+      notify.success("渲染结果已复制到剪贴板");
+    } catch {
+      notify.error("复制失败，请手动复制");
     }
   };
 
@@ -156,7 +277,7 @@ export function AdminPrompts() {
         title="提示词模板"
         description="管理资源生成、画像诊断、教师审核和防幻觉检查等场景的提示词模板。"
         icon={FileText}
-        action={<button onClick={() => setOpen(true)} className={`${primaryButton} cursor-pointer`}><Plus className="h-4 w-4" />新建模板</button>}
+        action={<button onClick={() => setModalMode("create")} className={`${primaryButton} cursor-pointer`}><Plus className="h-4 w-4" />新建模板</button>}
       />
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">{stats.map((stat) => <StatCard key={stat.label} {...stat} />)}</section>
       <section className="grid grid-cols-[360px_1fr] gap-6">
@@ -196,10 +317,10 @@ export function AdminPrompts() {
                 {(promptContent || activeVersion?.raw?.prompt_content) ?? "通过版本历史选择加载内容"}
               </div>
               <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <button onClick={() => setOpen(true)} className={`${primaryButton} cursor-pointer`}>编辑模板</button>
+                <button onClick={handleOpenEdit} className={`${primaryButton} cursor-pointer`}>编辑模板</button>
                 <button onClick={handleCopyTemplate} className={`${secondaryButton} cursor-pointer`}><Copy className="h-4 w-4" />复制模板</button>
                 <button onClick={() => setHistoryOpen(true)} className={`${secondaryButton} cursor-pointer`}>版本历史</button>
-                <button onClick={() => notify.info("模拟渲染需要运行智能体工作流")} className={`${secondaryButton} cursor-pointer`}><Play className="h-4 w-4" />模拟渲染</button>
+                <button onClick={handleOpenPreview} disabled={!activeVersion} className={`${secondaryButton} cursor-pointer disabled:cursor-not-allowed disabled:opacity-50`}><Play className="h-4 w-4" />渲染预览</button>
               </div>
             </>
           )}
@@ -207,32 +328,95 @@ export function AdminPrompts() {
       </section>
 
       {/* Edit Modal */}
-      <ModalShell title="编辑提示词模板" open={open} onClose={() => setOpen(false)}>
+      <ModalShell title={modalMode === "create" ? "新建提示词模板" : "编辑提示词模板"} open={modalMode !== null} onClose={() => setModalMode(null)}>
         <div className="space-y-4">
-          <label className="block text-sm font-bold text-slate-700">
-            模板名称
-            <input
-              className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
-              value={newTemplateName}
-              onChange={(e) => setNewTemplateName(e.target.value)}
-              placeholder="输入模板名称"
-            />
-          </label>
-          <label className="block text-sm font-bold text-slate-700">
-            任务类型
-            <select
-              className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
-              value={newTaskTypeId}
-              onChange={(e) => setNewTaskTypeId(Number(e.target.value) || "")}
-            >
-              <option value="">请选择任务类型</option>
-              {taskTypes.map((tt) => (
-                <option key={tt.task_type_id} value={tt.task_type_id}>{tt.type_name}</option>
-              ))}
-            </select>
-          </label>
-          {selectedTemplate && (
+          {modalMode === "create" ? (
             <>
+              <label className="block text-sm font-bold text-slate-700">
+                模板名称
+                <input
+                  className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
+                  value={newTemplateName}
+                  onChange={(e) => setNewTemplateName(e.target.value)}
+                  placeholder="输入模板名称"
+                />
+              </label>
+              <label className="block text-sm font-bold text-slate-700">
+                任务类型
+                <select
+                  className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
+                  value={newTaskTypeId}
+                  onChange={(e) => setNewTaskTypeId(Number(e.target.value) || "")}
+                >
+                  <option value="">请选择任务类型</option>
+                  {taskTypes.map((tt) => (
+                    <option key={tt.task_type_id} value={tt.task_type_id}>{tt.type_name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm font-bold text-slate-700">
+                使用说明
+                <input
+                  className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
+                  value={newDescription}
+                  onChange={(event) => setNewDescription(event.target.value)}
+                  placeholder="说明模板适用场景（选填）"
+                />
+              </label>
+              <label className="block text-sm font-bold text-slate-700">
+                初始 Prompt
+                <textarea
+                  className="edu-focus-ring mt-2 h-48 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 p-3 font-mono text-sm leading-6"
+                  value={newPromptContent}
+                  onChange={(event) => setNewPromptContent(event.target.value)}
+                  placeholder="输入首个可用版本，变量使用 {{variable_name}}"
+                />
+              </label>
+              <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <span>
+                  <span className="block text-sm font-bold text-slate-700">创建后启用</span>
+                  <span className="mt-1 block text-xs text-slate-500">启用后可被对应任务流程调用</span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={newTemplateActive}
+                  onChange={(event) => setNewTemplateActive(event.target.checked)}
+                  className="h-5 w-5 accent-blue-600"
+                />
+              </label>
+            </>
+          ) : selectedTemplate ? (
+            <>
+              <label className="block text-sm font-bold text-slate-700">
+                模板名称
+                <input
+                  className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
+                  value={editTemplateName}
+                  onChange={(event) => setEditTemplateName(event.target.value)}
+                />
+              </label>
+              <label className="block text-sm font-bold text-slate-700">
+                任务类型
+                <select
+                  className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
+                  value={editTaskTypeId}
+                  onChange={(event) => setEditTaskTypeId(Number(event.target.value) || "")}
+                >
+                  <option value="">请选择任务类型</option>
+                  {taskTypes.map((taskType) => (
+                    <option key={taskType.task_type_id} value={taskType.task_type_id}>{taskType.type_name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm font-bold text-slate-700">
+                使用说明
+                <input
+                  className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
+                  value={editDescription}
+                  onChange={(event) => setEditDescription(event.target.value)}
+                  placeholder="说明模板适用场景（选填）"
+                />
+              </label>
               <label className="block text-sm font-bold text-slate-700">
                 Prompt 内容
                 <textarea
@@ -251,13 +435,22 @@ export function AdminPrompts() {
                   placeholder="简要描述本次修改（选填）"
                 />
               </label>
+              <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <span className="text-sm font-bold text-slate-700">启用模板</span>
+                <input
+                  type="checkbox"
+                  checked={editTemplateActive}
+                  onChange={(event) => setEditTemplateActive(event.target.checked)}
+                  className="h-5 w-5 accent-blue-600"
+                />
+              </label>
             </>
-          )}
+          ) : null}
           <div className="flex justify-end gap-3">
-            <button onClick={() => setOpen(false)} className={`${secondaryButton} cursor-pointer`}>取消</button>
-            {selectedTemplate ? (
+            <button onClick={() => setModalMode(null)} className={`${secondaryButton} cursor-pointer`}>取消</button>
+            {modalMode === "edit" ? (
               <button onClick={handleSaveVersion} disabled={saving} className={`${primaryButton} cursor-pointer disabled:opacity-60`}>
-                {saving ? "保存中..." : "保存新版本"}
+                {saving ? "保存中..." : "保存修改"}
               </button>
             ) : (
               <button onClick={handleCreateTemplate} disabled={creatingTemplate} className={`${primaryButton} cursor-pointer disabled:opacity-60`}>
@@ -265,6 +458,82 @@ export function AdminPrompts() {
               </button>
             )}
           </div>
+        </div>
+      </ModalShell>
+
+      <ModalShell title="Prompt 渲染预览" open={previewOpen} onClose={() => setPreviewOpen(false)}>
+        <div className="space-y-5">
+          <label className="block text-sm font-bold text-slate-700">
+            模板版本
+            <select
+              className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
+              value={previewVersionId ?? ""}
+              onChange={(event) => handlePreviewVersionChange(Number(event.target.value))}
+            >
+              {versions.map((version) => (
+                <option key={version.id} value={version.id}>{version.no}{version.active ? "（当前）" : ""}</option>
+              ))}
+            </select>
+          </label>
+
+          {previewLoading && !previewResult ? (
+            <div className="flex items-center justify-center py-10"><div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" /></div>
+          ) : previewError ? (
+            <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{previewError}</div>
+          ) : previewResult ? (
+            <>
+              <section>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-black text-slate-900">模板变量</h3>
+                  <span className="text-xs font-semibold text-slate-500">
+                    {Object.keys(previewValues).length}/{previewResult.required_variables.length} 已填写
+                  </span>
+                </div>
+                {previewResult.required_variables.length === 0 ? (
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-500">此版本不包含变量</div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {previewResult.required_variables.map((name: string) => (
+                      <label key={name} className="block text-xs font-bold text-slate-600">
+                        <code>{name}</code>
+                        <textarea
+                          className="edu-focus-ring mt-1.5 min-h-20 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-5 text-slate-800"
+                          value={previewValues[name] ?? ""}
+                          onChange={(event) => setPreviewValues((current) => ({ ...current, [name]: event.target.value }))}
+                          placeholder={`输入 ${name}`}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={() => previewVersionId && void renderPreview(previewVersionId, previewValues)}
+                  disabled={previewLoading}
+                  className={`${primaryButton} cursor-pointer disabled:cursor-not-allowed disabled:opacity-60`}
+                >
+                  <Play className="h-4 w-4" />{previewLoading ? "渲染中..." : "生成预览"}
+                </button>
+              </div>
+
+              <section>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-black text-slate-900">渲染结果</h3>
+                    {previewResult.missing_variables.length > 0 && (
+                      <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700">
+                        缺少 {previewResult.missing_variables.length} 项
+                      </span>
+                    )}
+                  </div>
+                  <button onClick={handleCopyPreview} className={`${secondaryButton} min-h-9 cursor-pointer px-3`}><Copy className="h-4 w-4" />复制</button>
+                </div>
+                <pre className="custom-scrollbar max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-slate-950 p-4 text-xs leading-6 text-slate-200">{previewResult.rendered_content}</pre>
+              </section>
+            </>
+          ) : null}
         </div>
       </ModalShell>
 

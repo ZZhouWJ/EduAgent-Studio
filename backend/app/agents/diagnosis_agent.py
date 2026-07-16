@@ -72,7 +72,8 @@ class DiagnosisAgent:
         logger.info(f"[{self.AGENT_NAME}] 诊断学生: {student_profile.get('student_name', 'Unknown')}")
 
         kp_text = "\n".join(
-            f"- {kp.get('name', '')}: 掌握度 {kp.get('mastery_level', kp.get('mastery', 0)):.0%}"
+            f"- [kp_id:{kp.get('kp_id', kp.get('id', 0))}] {kp.get('name', '')} | "
+            f"掌握度 {kp.get('mastery_level', kp.get('mastery', 0)):.0%}"
             for kp in knowledge_points
         ) or "（暂无知识点数据）"
 
@@ -171,14 +172,14 @@ class DiagnosisAgent:
             mastery = kp.get("mastery_level", kp.get("mastery", 0.5))
             if mastery < 0.5:
                 weak_points.append({
-                    "kp_id": kp.get("kp_id", 0),
+                    "kp_id": kp.get("kp_id", kp.get("id", 0)),
                     "name": kp.get("name", ""),
                     "mastery_level": mastery,
                     "reason": f"掌握度 {mastery:.0%}，低于阈值"
                 })
             else:
                 strong_points.append({
-                    "kp_id": kp.get("kp_id", 0),
+                    "kp_id": kp.get("kp_id", kp.get("id", 0)),
                     "name": kp.get("name", ""),
                     "mastery_level": mastery
                 })

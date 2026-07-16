@@ -1,313 +1,590 @@
 import React from "react";
-import { CheckCircle2, AlertCircle, AlertTriangle, MessageSquare, ShieldCheck, XCircle } from "lucide-react";
+import DOMPurify from "dompurify";
+import { marked } from "marked";
+import {
+  AlertTriangle,
+  BookOpenCheck,
+  CheckCircle2,
+  ClipboardCheck,
+  FileCheck2,
+  MessageSquare,
+  RotateCcw,
+  XCircle,
+} from "lucide-react";
 import { useApi } from "@/lib/useApi";
-import { reviewsApi, ReviewRequest, ReviewDetail } from "@/lib/api";
+import {
+  resourcesApi,
+  reviewsApi,
+  type LearningResource,
+  type ReviewDetail,
+  type ReviewRequest,
+} from "@/lib/api";
 import { notify } from "@/lib/toast";
 import { SafeLottie } from "../components/SafeLottie";
+import { ResourceRenderer } from "../components/resource/ResourceRenderer";
 
-function formatTimeAgo(dateStr: string): string {
-  try {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-    if (diff < 60) return `${diff}秒前`;
-    if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
-    return `${Math.floor(diff / 86400)}天前`;
-  } catch {
-    return dateStr;
-  }
+type ReviewMode = "resource" | "project";
+type ScoreKey = "accuracy" | "completeness" | "logic" | "format" | "usability";
+type Scores = Record<ScoreKey, number>;
+
+const DEFAULT_SCORES: Scores = {
+  accuracy: 8,
+  completeness: 8,
+  logic: 8,
+  format: 8,
+  usability: 8,
+};
+
+const SCORE_FIELDS: Array<{ key: ScoreKey; label: string }> = [
+  { key: "accuracy", label: "内容准确性" },
+  { key: "completeness", label: "内容完整性" },
+  { key: "logic", label: "逻辑严谨性" },
+  { key: "format", label: "格式规范性" },
+  { key: "usability", label: "教学可用性" },
+];
+
+const RESOURCE_TYPE_LABELS: Record<string, string> = {
+  lecture: "课程讲义",
+  mindmap: "思维导图",
+  quiz: "练习题",
+  case: "案例材料",
+  code_case: "代码实操",
+  ppt: "PPT 大纲",
+  video_script: "视频脚本",
+  experiment_report: "实验报告",
+  error_analysis: "错题解析",
+  learning_card: "学习卡片",
+  review: "复习计划",
+  test: "阶段测验",
+  other: "其他",
+};
+
+const DIFFICULTY_LABELS: Record<string, string> = {
+  basic: "基础",
+  intermediate: "标准",
+  advanced: "进阶",
+};
+
+function formatTimeAgo(dateStr?: string | null): string {
+  if (!dateStr) return "刚刚";
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return dateStr;
+  const diff = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (diff < 60) return `${diff}秒前`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
+  return `${Math.floor(diff / 86400)}天前`;
 }
 
-function ReviewCard({ item, selected, onClick }: {
+function ScoreFields({ scores, onChange }: { scores: Scores; onChange: (key: ScoreKey, value: number) => void }) {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {SCORE_FIELDS.map(({ key, label }) => (
+        <div key={key}>
+          <label className="mb-2 block text-sm font-medium text-slate-700">
+            {label}（{scores[key]} 分）
+          </label>
+          <input
+            type="range"
+            min="1"
+            max="10"
+            value={scores[key]}
+            onChange={(event) => onChange(key, Number(event.target.value))}
+            aria-label={label}
+            className="h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600"
+          />
+          <div className="mt-1 flex justify-between text-xs text-slate-400">
+            <span>1</span><span>5</span><span>10</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EmptyReview({ message }: { message: string }) {
+  return (
+    <div className="flex h-48 flex-col items-center justify-center gap-2 text-slate-400">
+      <SafeLottie source="empty" className="h-20 w-28" speed={0.8} />
+      <span className="text-sm">{message}</span>
+    </div>
+  );
+}
+
+function MarkdownOutput({ content }: { content: string }) {
+  const sanitizedHtml = React.useMemo(
+    () => DOMPurify.sanitize(marked.parse(content, { async: false }) as string),
+    [content],
+  );
+
+  return (
+    <div
+      className="prose prose-sm prose-slate max-w-none break-words prose-headings:scroll-mt-4 prose-pre:overflow-x-auto prose-table:block prose-table:max-w-full prose-table:overflow-x-auto"
+      dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+    />
+  );
+}
+
+function ReviewError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex h-48 flex-col items-center justify-center gap-3 px-6 text-center">
+      <AlertTriangle className="h-8 w-8 text-red-500" />
+      <p className="text-sm text-slate-600">{message}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
+      >
+        <RotateCcw className="h-4 w-4" /> 重试
+      </button>
+    </div>
+  );
+}
+
+function ResourceReviewCard({ item, selected, onClick }: {
+  item: LearningResource;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full rounded-lg border p-4 text-left transition ${
+        selected
+          ? "border-blue-200 bg-blue-50 shadow-sm"
+          : "border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <h3 className={`text-[15px] font-bold leading-5 ${selected ? "text-blue-900" : "text-slate-800"}`}>
+          {item.resource_title}
+        </h3>
+        <span className="shrink-0 rounded bg-orange-50 px-2 py-0.5 text-[11px] font-bold text-orange-700">待审核</span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+        <span className="rounded bg-slate-100 px-2 py-0.5 font-medium text-slate-600">{item.course_name}</span>
+        <span className="rounded bg-blue-50 px-2 py-0.5 font-medium text-blue-700">
+          {RESOURCE_TYPE_LABELS[item.resource_type] ?? item.resource_type}
+        </span>
+      </div>
+      <p className="mt-3 text-xs text-slate-400">{formatTimeAgo(item.review_submitted_at ?? item.created_at)}提交</p>
+    </button>
+  );
+}
+
+function LearningResourceReviewPanel() {
+  const [selectedId, setSelectedId] = React.useState<number | null>(null);
+  const [scores, setScores] = React.useState<Scores>(DEFAULT_SCORES);
+  const [reviewComment, setReviewComment] = React.useState("");
+  const [submitting, setSubmitting] = React.useState(false);
+
+  const pendingState = useApi(
+    () => resourcesApi.list({ status: "pending_review", page: 1, page_size: 100 }),
+    [],
+  );
+  const pendingList = pendingState.data?.items ?? [];
+
+  React.useEffect(() => {
+    if (pendingList.length === 0) {
+      setSelectedId(null);
+      return;
+    }
+    if (!selectedId || !pendingList.some((item) => item.resource_id === selectedId)) {
+      setSelectedId(pendingList[0].resource_id);
+    }
+  }, [pendingList, selectedId]);
+
+  const detailState = useApi(
+    () => selectedId ? resourcesApi.getById(selectedId) : Promise.resolve(null),
+    [selectedId],
+  );
+  const selectedSummary = pendingList.find((item) => item.resource_id === selectedId) ?? null;
+  const detail = detailState.data;
+  const pendingReview = detail?.review_history?.find((review) => review.review_status === "pending") ?? null;
+
+  const handleSelect = (resourceId: number) => {
+    setSelectedId(resourceId);
+    setScores(DEFAULT_SCORES);
+    setReviewComment("");
+  };
+
+  const finishReview = async (decision: "approved" | "rejected") => {
+    if (!selectedId) return;
+    if (decision === "rejected" && !reviewComment.trim()) {
+      notify.warning("退回资源时必须填写审核意见");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await resourcesApi.completeReview(selectedId, {
+        decision,
+        accuracy_score: decision === "approved" ? scores.accuracy : undefined,
+        completeness_score: decision === "approved" ? scores.completeness : undefined,
+        logic_score: decision === "approved" ? scores.logic : undefined,
+        format_score: decision === "approved" ? scores.format : undefined,
+        usability_score: decision === "approved" ? scores.usability : undefined,
+        review_comment: reviewComment.trim() || undefined,
+      });
+      notify.success(decision === "approved" ? "资源审核通过，已向学生开放" : "资源已退回修改");
+      setSelectedId(null);
+      setReviewComment("");
+      setScores(DEFAULT_SCORES);
+      await pendingState.refetch();
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "审核提交失败");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:gap-6">
+      <aside className="flex w-full shrink-0 flex-col gap-3 lg:w-[380px]">
+        <div className="flex items-center justify-between">
+          <h2 className="font-black text-slate-800">待审核学习资源</h2>
+          <span className="rounded bg-orange-50 px-2 py-1 text-xs font-bold text-orange-700">{pendingList.length} 项</span>
+        </div>
+        <div className="custom-scrollbar flex-1 space-y-3 overflow-y-auto pb-4 pr-0 lg:pr-2">
+          {pendingState.loading ? (
+            <div className="flex h-32 items-center justify-center text-sm text-slate-400">加载中...</div>
+          ) : pendingState.error ? (
+            <ReviewError message={pendingState.error.message} onRetry={() => void pendingState.refetch()} />
+          ) : pendingList.length === 0 ? (
+            <EmptyReview message="暂无待审核学习资源" />
+          ) : pendingList.map((item) => (
+            <ResourceReviewCard
+              key={item.resource_id}
+              item={item}
+              selected={item.resource_id === selectedId}
+              onClick={() => handleSelect(item.resource_id)}
+            />
+          ))}
+        </div>
+      </aside>
+
+      <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.04)]" aria-label="学习资源审核详情">
+        <header className="shrink-0 border-b border-slate-100 bg-slate-50/70 p-4 sm:p-6">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded bg-orange-100 px-2 py-0.5 font-bold text-orange-700">待审核</span>
+            {selectedSummary && <span className="text-slate-500">{selectedSummary.course_name}</span>}
+            {pendingReview && <span className="text-slate-500">送审人：{pendingReview.submitter_name}</span>}
+          </div>
+          <h2 className="mt-2 text-xl font-black text-slate-900">{selectedSummary?.resource_title ?? "选择一项资源开始审核"}</h2>
+        </header>
+
+        <div className="custom-scrollbar flex-1 overflow-y-auto">
+          {detailState.loading && selectedId ? (
+            <div className="flex h-48 items-center justify-center text-sm text-slate-400">加载详情中...</div>
+          ) : detailState.error ? (
+            <ReviewError message={detailState.error.message} onRetry={() => void detailState.refetch()} />
+          ) : detail ? (
+            <>
+              <div className="border-b border-slate-100 p-4 sm:p-6">
+                <div className="mb-4 flex flex-wrap gap-2 text-xs">
+                  <span className="rounded bg-blue-50 px-2 py-1 font-medium text-blue-700">
+                    {RESOURCE_TYPE_LABELS[detail.resource_type] ?? detail.resource_type}
+                  </span>
+                  <span className="rounded bg-slate-100 px-2 py-1 font-medium text-slate-600">
+                    难度：{DIFFICULTY_LABELS[detail.difficulty] ?? detail.difficulty}
+                  </span>
+                  {detail.target_kp_names?.map((name) => (
+                    <span key={name} className="rounded bg-emerald-50 px-2 py-1 font-medium text-emerald-700">{name}</span>
+                  ))}
+                </div>
+                {pendingReview?.submit_note && (
+                  <div className="mb-5 flex items-start gap-2 border-l-2 border-blue-300 pl-3 text-sm text-slate-600">
+                    <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+                    <span>送审说明：{pendingReview.submit_note}</span>
+                  </div>
+                )}
+                <ResourceRenderer resource={detail} />
+              </div>
+
+              <div className="p-4 sm:p-6">
+                <h3 className="mb-5 flex items-center gap-2 text-base font-black text-slate-900">
+                  <ClipboardCheck className="h-5 w-5 text-blue-600" /> 质量评价
+                </h3>
+                <div className="max-w-4xl space-y-5">
+                  <ScoreFields
+                    scores={scores}
+                    onChange={(key, value) => setScores((current) => ({ ...current, [key]: value }))}
+                  />
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="resource-review-comment">
+                      审核意见 / 修改建议
+                    </label>
+                    <textarea
+                      id="resource-review-comment"
+                      value={reviewComment}
+                      onChange={(event) => setReviewComment(event.target.value)}
+                      maxLength={2000}
+                      rows={4}
+                      placeholder="记录事实核验、难度适配或教学使用建议（退回时必填）"
+                      className="edu-focus-ring w-full resize-none rounded-lg border border-slate-300 p-3 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <EmptyReview message="请从左侧选择一个待审核学习资源" />
+          )}
+        </div>
+
+        {detail && (
+          <footer className="flex shrink-0 flex-col gap-3 border-t border-slate-100 bg-slate-50 p-4 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={() => void finishReview("rejected")}
+              disabled={submitting}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-6 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              <XCircle className="h-4 w-4" /> 退回修改
+            </button>
+            <button
+              type="button"
+              onClick={() => void finishReview("approved")}
+              disabled={submitting}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-7 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60"
+            >
+              <CheckCircle2 className="h-4 w-4" /> {submitting ? "提交中..." : "审核通过并开放"}
+            </button>
+          </footer>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function ProjectReviewCard({ item, selected, onClick }: {
   item: ReviewRequest;
   selected: boolean;
   onClick: () => void;
 }) {
-  const isHighRisk = item.request_status === "high_risk" || item.request_status === "pending_high";
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
-      className={`cursor-pointer rounded-xl border p-4 transition-all ${
-        selected
-          ? "bg-blue-50 border-blue-200 shadow-sm"
-          : "bg-white border-slate-200 hover:border-blue-300 hover:shadow-md"
+      className={`w-full rounded-lg border p-4 text-left transition ${
+        selected ? "border-blue-200 bg-blue-50 shadow-sm" : "border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm"
       }`}
     >
-      <div className="mb-2 flex items-start justify-between gap-2">
-        <h3 className={`font-bold text-[15px] ${selected ? "text-blue-900" : "text-slate-800"}`}>
-          {item.output_title || "—"}
-        </h3>
-        {isHighRisk && (
-          <span className="shrink-0 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700">高风险</span>
+      <h3 className={`text-[15px] font-bold leading-5 ${selected ? "text-blue-900" : "text-slate-800"}`}>
+        {item.output_title || "未命名输出"}
+      </h3>
+      <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+        <span className="rounded bg-slate-100 px-2 py-0.5 font-medium text-slate-600">
+          提交人：{item.submitter_real_name || item.submitter_username || "—"}
+        </span>
+        <span className="rounded bg-orange-50 px-2 py-0.5 font-bold text-orange-700">待审核</span>
+      </div>
+      <p className="mt-3 text-xs text-slate-400">{formatTimeAgo(item.created_at)}提交</p>
+    </button>
+  );
+}
+
+function ProjectOutputReviewPanel() {
+  const [selectedId, setSelectedId] = React.useState<number | null>(null);
+  const [scores, setScores] = React.useState<Scores>(DEFAULT_SCORES);
+  const [reviewComment, setReviewComment] = React.useState("");
+  const [submitting, setSubmitting] = React.useState(false);
+
+  const pendingState = useApi(() => reviewsApi.getPending({ page: 1, page_size: 50 }), []);
+  const pendingList = pendingState.data?.items ?? [];
+
+  React.useEffect(() => {
+    if (pendingList.length === 0) {
+      setSelectedId(null);
+      return;
+    }
+    if (!selectedId || !pendingList.some((item) => item.request_id === selectedId)) {
+      setSelectedId(pendingList[0].request_id);
+    }
+  }, [pendingList, selectedId]);
+
+  const detailState = useApi(
+    () => selectedId ? reviewsApi.getById(selectedId) : Promise.resolve(null as ReviewDetail | null),
+    [selectedId],
+  );
+  const currentItem = pendingList.find((item) => item.request_id === selectedId) ?? null;
+
+  const handleSelect = (requestId: number) => {
+    setSelectedId(requestId);
+    setScores(DEFAULT_SCORES);
+    setReviewComment("");
+  };
+
+  const finishReview = async (reviewStatus: "approved" | "revision_required") => {
+    if (!selectedId) return;
+    if (reviewStatus === "revision_required" && !reviewComment.trim()) {
+      notify.warning("退回输出时必须填写修改意见");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await reviewsApi.complete(selectedId, {
+        review_status: reviewStatus,
+        accuracy_score: reviewStatus === "approved" ? scores.accuracy : undefined,
+        completeness_score: reviewStatus === "approved" ? scores.completeness : undefined,
+        logic_score: reviewStatus === "approved" ? scores.logic : undefined,
+        format_score: reviewStatus === "approved" ? scores.format : undefined,
+        usability_score: reviewStatus === "approved" ? scores.usability : undefined,
+        review_comment: reviewComment.trim() || undefined,
+      });
+      notify.success(reviewStatus === "approved" ? "项目输出审核通过" : "项目输出已退回修改");
+      setSelectedId(null);
+      setReviewComment("");
+      setScores(DEFAULT_SCORES);
+      await pendingState.refetch();
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "审核提交失败");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:gap-6">
+      <aside className="flex w-full shrink-0 flex-col gap-3 lg:w-[380px]">
+        <div className="flex items-center justify-between">
+          <h2 className="font-black text-slate-800">待审核项目输出</h2>
+          <span className="rounded bg-orange-50 px-2 py-1 text-xs font-bold text-orange-700">{pendingList.length} 项</span>
+        </div>
+        <div className="custom-scrollbar flex-1 space-y-3 overflow-y-auto pb-4 pr-0 lg:pr-2">
+          {pendingState.loading ? (
+            <div className="flex h-32 items-center justify-center text-sm text-slate-400">加载中...</div>
+          ) : pendingState.error ? (
+            <ReviewError message={pendingState.error.message} onRetry={() => void pendingState.refetch()} />
+          ) : pendingList.length === 0 ? (
+            <EmptyReview message="暂无待审核项目输出" />
+          ) : pendingList.map((item) => (
+            <ProjectReviewCard
+              key={item.request_id}
+              item={item}
+              selected={item.request_id === selectedId}
+              onClick={() => handleSelect(item.request_id)}
+            />
+          ))}
+        </div>
+      </aside>
+
+      <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.04)]" aria-label="项目输出审核详情">
+        <header className="shrink-0 border-b border-slate-100 bg-slate-50/70 p-4 sm:p-6">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded bg-orange-100 px-2 py-0.5 font-bold text-orange-700">待审核</span>
+            {currentItem && (
+              <span className="text-slate-500">提交人：{currentItem.submitter_real_name || currentItem.submitter_username || "—"}</span>
+            )}
+          </div>
+          <h2 className="mt-2 text-xl font-black text-slate-900">{currentItem?.output_title ?? "选择一项输出开始审核"}</h2>
+        </header>
+
+        <div className="custom-scrollbar flex-1 overflow-y-auto">
+          {detailState.loading && selectedId ? (
+            <div className="flex h-48 items-center justify-center text-sm text-slate-400">加载详情中...</div>
+          ) : detailState.error ? (
+            <ReviewError message={detailState.error.message} onRetry={() => void detailState.refetch()} />
+          ) : detailState.data ? (
+            <>
+              <div className="border-b border-slate-100 p-4 sm:p-6">
+                {detailState.data.submit_note && (
+                  <div className="mb-5 flex items-start gap-2 border-l-2 border-blue-300 pl-3 text-sm text-slate-600">
+                    <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+                    <span>提交说明：{detailState.data.submit_note}</span>
+                  </div>
+                )}
+                <MarkdownOutput content={detailState.data.output_content || "暂无输出内容"} />
+              </div>
+              <div className="p-4 sm:p-6">
+                <h3 className="mb-5 flex items-center gap-2 text-base font-black text-slate-900">
+                  <ClipboardCheck className="h-5 w-5 text-blue-600" /> 质量评价
+                </h3>
+                <div className="max-w-4xl space-y-5">
+                  <ScoreFields
+                    scores={scores}
+                    onChange={(key, value) => setScores((current) => ({ ...current, [key]: value }))}
+                  />
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="project-review-comment">
+                      审核意见 / 修改建议
+                    </label>
+                    <textarea
+                      id="project-review-comment"
+                      value={reviewComment}
+                      onChange={(event) => setReviewComment(event.target.value)}
+                      maxLength={2000}
+                      rows={4}
+                      placeholder="记录审核结论或需要修改的内容（退回时必填）"
+                      className="edu-focus-ring w-full resize-none rounded-lg border border-slate-300 p-3 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <EmptyReview message="请从左侧选择一个待审核项目输出" />
+          )}
+        </div>
+
+        {detailState.data && (
+          <footer className="flex shrink-0 flex-col gap-3 border-t border-slate-100 bg-slate-50 p-4 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={() => void finishReview("revision_required")}
+              disabled={submitting}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-6 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              <XCircle className="h-4 w-4" /> 退回修改
+            </button>
+            <button
+              type="button"
+              onClick={() => void finishReview("approved")}
+              disabled={submitting}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-7 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60"
+            >
+              <CheckCircle2 className="h-4 w-4" /> {submitting ? "提交中..." : "审核通过"}
+            </button>
+          </footer>
         )}
-      </div>
-      <div className="mb-3 flex flex-wrap gap-2">
-        <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-          学生：{item.submitter_real_name || item.submitter_username || "—"}
-        </span>
-        <span className={`rounded px-2 py-0.5 text-[11px] font-bold ${
-          item.request_status === "approved" ? "bg-emerald-50 text-emerald-700" :
-          item.request_status === "rejected" ? "bg-red-50 text-red-700" :
-          "bg-orange-50 text-orange-700"
-        }`}>
-          {item.request_status === "approved" ? "已通过" :
-           item.request_status === "rejected" ? "已驳回" :
-           item.request_status === "revision_required" ? "需修改" : "待审核"}
-        </span>
-      </div>
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-slate-400">{formatTimeAgo(item.created_at)}提交</span>
-      </div>
+      </section>
     </div>
   );
 }
 
 export function TeacherReview() {
-  const [selectedId, setSelectedId] = React.useState<number | null>(null);
-  const [submitting, setSubmitting] = React.useState(false);
-
-  // Form state
-  const [accuracyScore, setAccuracyScore] = React.useState(5);
-  const [completenessScore, setCompletenessScore] = React.useState(5);
-  const [logicScore, setLogicScore] = React.useState(5);
-  const [formatScore, setFormatScore] = React.useState(5);
-  const [reviewComment, setReviewComment] = React.useState("");
-
-  const { data: pendingData, loading: loadingPending, refetch: refetchPending } = useApi(
-    () => reviewsApi.getPending({ page: 1, page_size: 50 }),
-    []
-  );
-  const { data: detailData, loading: loadingDetail, refetch: refetchDetail } = useApi(
-    () => selectedId != null ? reviewsApi.getById(selectedId) : Promise.resolve(null as ReviewDetail | null),
-    [selectedId]
-  );
-
-  const pendingList = pendingData?.items ?? [];
-  const currentItem = pendingList.find((r) => r.request_id === selectedId) ?? pendingList[0];
-  const detail = detailData;
-
-  const highRiskCount = pendingList.filter((r) => r.request_status === "pending_high" || r.request_status === "high_risk").length;
-
-  const handleApprove = async () => {
-    if (!selectedId) return;
-    setSubmitting(true);
-    try {
-      await reviewsApi.complete(selectedId, {
-        review_status: "approved",
-        accuracy_score: accuracyScore,
-        completeness_score: completenessScore,
-        logic_score: logicScore,
-        format_score: formatScore,
-        review_comment: reviewComment,
-      });
-      notify.success("审核通过，已推送给学生");
-      setReviewComment("");
-      refetchPending();
-      refetchDetail();
-    } catch (e) {
-      notify.error("操作失败：" + String(e));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleReject = async () => {
-    if (!selectedId) return;
-    if (!reviewComment.trim()) {
-      notify.warning("请填写驳回理由");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await reviewsApi.complete(selectedId, {
-        review_status: "revision_required",
-        review_comment: reviewComment,
-      });
-      notify.success("已退回修改，学生会收到通知");
-      setReviewComment("");
-      refetchPending();
-      refetchDetail();
-    } catch (e) {
-      notify.error("操作失败：" + String(e));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleSelectItem = (id: number) => {
-    setSelectedId(id);
-    setAccuracyScore(5);
-    setCompletenessScore(5);
-    setLogicScore(5);
-    setFormatScore(5);
-    setReviewComment("");
-  };
+  const [mode, setMode] = React.useState<ReviewMode>("resource");
 
   return (
-    <div className="page-shell flex min-h-0 flex-col pb-6">
-      {/* 页面内容直接开始 */}
-      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:gap-6">
-        {/* Left: Pending Review List */}
-        <div className="flex w-full shrink-0 flex-col gap-4 lg:w-[400px]">
-          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="font-black text-slate-800">待审核资源 ({pendingList.length})</h2>
-            <div className="flex gap-2">
-              {highRiskCount > 0 && (
-                <span className="rounded bg-red-50 px-2 py-1 text-xs font-bold text-red-600">{highRiskCount} 高风险</span>
-              )}
-              <span className="rounded bg-orange-50 px-2 py-1 text-xs font-bold text-orange-600">{pendingList.length - highRiskCount} 建议复核</span>
-            </div>
-          </div>
-
-          <div className="custom-scrollbar flex-1 space-y-3 overflow-y-auto pb-4 pr-0 lg:pr-2">
-            {loadingPending ? (
-              <div className="flex h-32 items-center justify-center text-slate-400">加载中...</div>
-            ) : pendingList.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-8 text-slate-400">
-                <SafeLottie source="empty" className="h-20 w-28" speed={0.8} />
-                <span className="text-sm">暂无待审核资源</span>
-              </div>
-            ) : (
-              pendingList.map((item) => (
-                <ReviewCard
-                  key={item.request_id}
-                  item={item}
-                  selected={item.request_id === selectedId}
-                  onClick={() => handleSelectItem(item.request_id)}
-                />
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Right: Review Detail Pane */}
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-          <div className="flex shrink-0 flex-col gap-3 border-b border-slate-100 bg-slate-50/50 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-            <div>
-              <div className="mb-2 flex items-center gap-2">
-                <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">待审核</span>
-                <span className="text-sm text-slate-500">提交人：{currentItem?.submitter_real_name || currentItem?.submitter_username || "—"}</span>
-              </div>
-              <h2 className="text-xl font-black text-slate-900">{currentItem?.output_title || "—"}</h2>
-            </div>
-          </div>
-
-          <div className="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
-            {loadingDetail && selectedId ? (
-              <div className="flex h-48 items-center justify-center text-slate-400">加载详情中...</div>
-            ) : detail ? (
-              <>
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
-                  <div className="space-y-4">
-                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-                      <h3 className="mb-2 flex items-center gap-2 font-bold text-emerald-800">
-                        <ShieldCheck className="h-4 w-4" /> 内容预览
-                      </h3>
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-emerald-700">
-                        {detail.output_content?.slice(0, 500) || "—"}
-                        {(detail.output_content?.length ?? 0) > 500 ? "..." : ""}
-                      </p>
-                    </div>
-
-                    {detail.submit_note && (
-                      <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                        <h3 className="mb-2 flex items-center gap-2 font-bold text-slate-800">
-                          <MessageSquare className="h-4 w-4" /> 提交说明
-                        </h3>
-                        <p className="text-sm leading-relaxed text-slate-700">{detail.submit_note}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="rounded-xl border border-orange-100 bg-orange-50 p-4">
-                    <h3 className="mb-2 flex items-center gap-2 font-bold text-orange-800">
-                      <AlertCircle className="h-4 w-4" /> 潜在风险提示
-                    </h3>
-                    <p className="text-sm leading-relaxed text-orange-700">
-                      请根据资源内容判断是否存在事实准确性、引用覆盖率和难度适配性风险。
-                    </p>
-                    <button className="mt-3 self-start text-sm font-medium text-orange-600 hover:underline">
-                      查看 AI 批注详情
-                    </button>
-                  </div>
-                </div>
-
-                <div className="border-t border-slate-100 pt-6">
-                  <h3 className="mb-4 flex items-center gap-2 text-base font-black text-slate-900">
-                    <CheckCircle2 className="h-5 w-5 text-blue-500" /> 教师审核表单
-                  </h3>
-
-                  <div className="max-w-3xl space-y-5">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      {[
-                        { label: "内容准确性", score: accuracyScore, setter: setAccuracyScore },
-                        { label: "内容完整性", score: completenessScore, setter: setCompletenessScore },
-                        { label: "逻辑严谨性", score: logicScore, setter: setLogicScore },
-                        { label: "格式规范性", score: formatScore, setter: setFormatScore },
-                      ].map(({ label, score, setter }) => (
-                        <div key={label}>
-                          <label className="mb-2 block text-sm font-medium text-slate-700">{label}（{score}分）</label>
-                          <input
-                            type="range" min="1" max="5" value={score}
-                            onChange={(e) => setter(Number(e.target.value))}
-                            className="h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600"
-                          />
-                          <div className="mt-1 flex justify-between text-xs text-slate-400">
-                            <span>1分</span><span>3分</span><span>5分</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">审核意见 / 修改建议</label>
-                      <textarea
-                        className="edu-focus-ring h-24 w-full resize-none rounded-lg border border-slate-300 p-3 text-sm"
-                        value={reviewComment}
-                        onChange={(e) => setReviewComment(e.target.value)}
-                        placeholder="填写审核意见（驳回时必须填写）"
-                        aria-label="审核意见或修改建议"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="flex h-48 flex-col items-center justify-center text-slate-400">
-                <AlertTriangle className="mb-3 h-10 w-10" />
-                <p className="text-sm">请从左侧选择一个待审核资源</p>
-              </div>
-            )}
-          </div>
-
-          {detail && (
-            <div className="flex shrink-0 flex-col gap-3 border-t border-slate-100 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <label className="flex min-h-11 cursor-pointer items-center gap-2">
-                <input type="checkbox" className="h-4 w-4 rounded text-blue-600 accent-blue-600" />
-                <span className="text-sm font-medium text-slate-700">标记为优秀资源库模板</span>
-              </label>
-
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <button
-                  onClick={handleReject}
-                  disabled={submitting}
-                  className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-6 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
-                >
-                  <XCircle className="h-4 w-4" /> 退回修改
-                </button>
-                <button
-                  onClick={handleApprove}
-                  disabled={submitting}
-                  className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg bg-blue-600 px-8 text-sm font-bold text-white shadow-md shadow-blue-500/20 transition hover:bg-blue-700 disabled:opacity-60"
-                >
-                  {submitting ? "提交中..." : "审核通过并推送给学生"}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+    <div className="page-shell flex min-h-0 flex-col gap-4 pb-6">
+      <div className="flex shrink-0 items-center gap-1 self-start rounded-lg border border-slate-200 bg-white p-1" role="tablist" aria-label="审核类型">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "resource"}
+          onClick={() => setMode("resource")}
+          className={`inline-flex min-h-10 items-center gap-2 rounded-md px-4 text-sm font-bold transition ${
+            mode === "resource" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          <BookOpenCheck className="h-4 w-4" /> 学习资源
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "project"}
+          onClick={() => setMode("project")}
+          className={`inline-flex min-h-10 items-center gap-2 rounded-md px-4 text-sm font-bold transition ${
+            mode === "project" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          <FileCheck2 className="h-4 w-4" /> 项目输出
+        </button>
       </div>
+
+      {mode === "resource" ? <LearningResourceReviewPanel /> : <ProjectOutputReviewPanel />}
     </div>
   );
 }

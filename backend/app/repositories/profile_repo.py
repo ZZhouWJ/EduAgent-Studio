@@ -465,6 +465,7 @@ class ProfileRepository:
         kp_id: int,
         mastery_level: float,
         update_reason: Optional[str] = None,
+        assessment_score: Optional[float] = None,
     ) -> Optional[Dict[str, Any]]:
         now = datetime.now()
 
@@ -488,8 +489,8 @@ class ProfileRepository:
         update_sql = """
             UPDATE student_knowledge_mastery
             SET mastery_level = %s,
-                last_test_score = %s,
-                last_test_date = %s,
+                last_test_score = CASE WHEN %s IS NULL THEN last_test_score ELSE %s END,
+                last_test_date = CASE WHEN %s IS NULL THEN last_test_date ELSE %s END,
                 update_reason = %s,
                 updated_at = %s
             WHERE profile_id = %s AND kp_id = %s AND is_deleted = 0
@@ -497,7 +498,17 @@ class ProfileRepository:
         with get_db_cursor() as cursor:
             cursor.execute(
                 update_sql,
-                (mastery_level, int(mastery_level * 100), now, update_reason, now, profile_id, kp_id),
+                (
+                    mastery_level,
+                    assessment_score,
+                    assessment_score,
+                    assessment_score,
+                    now,
+                    update_reason,
+                    now,
+                    profile_id,
+                    kp_id,
+                ),
             )
             updated = cursor.rowcount
 
@@ -513,7 +524,7 @@ class ProfileRepository:
                     insert_sql,
                     (
                         profile_id, kp_id, mastery_level,
-                        int(mastery_level * 100), now,
+                        assessment_score, now if assessment_score is not None else None,
                         update_reason, now, now,
                     ),
                 )

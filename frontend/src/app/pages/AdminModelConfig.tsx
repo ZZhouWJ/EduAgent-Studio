@@ -15,7 +15,7 @@ function mapModel(m: AIModel) {
     status: statusMap[m.status] ?? m.status,
     rawStatus: m.status,
     abilities,
-    latency: m.max_context ? `${m.max_context}K ctx` : "—",
+    latency: m.max_context ? `${m.max_context >= 1000 ? `${Number((m.max_context / 1000).toFixed(1))}K` : m.max_context} ctx` : "—",
     calls: "-",
     cost: m.price_unit ? `¥${m.input_price}/${m.price_unit}` : "—",
     raw: m,
@@ -28,24 +28,29 @@ export function AdminModelConfig() {
   const [statusFilter, setStatusFilter] = React.useState("全部");
   const [editing, setEditing] = React.useState<ReturnType<typeof mapModel> | null>(null);
   const [open, setOpen] = React.useState(false);
-  const [localEnabled, setLocalEnabled] = React.useState<Record<string, boolean>>({});
+  const [saving, setSaving] = React.useState(false);
+  const [updatingId, setUpdatingId] = React.useState<string | null>(null);
+  const [form, setForm] = React.useState({
+    displayName: "",
+    capabilityTags: "",
+    maxContext: "4096",
+    inputPrice: "0",
+    outputPrice: "0",
+    priceUnit: "1K_TOKENS",
+    status: "active" as "active" | "disabled",
+  });
 
   const modelsState = useApi(() => modelsApi.getModels({ page: 1, page_size: 100 }), []);
+  const providersState = useApi(() => modelsApi.getProviders(), []);
+  const configsState = useApi(() => modelsApi.getApiConfigs({ page: 1, page_size: 500 }), []);
   const costsState = useApi(() => statisticsApi.costs(), []);
   const modelCallsState = useApi(() => statisticsApi.modelCalls(), []);
 
-  const models = (modelsState.data?.items ?? []).map((m) => {
-    const mapped = mapModel(m);
-    if (mapped.id in localEnabled) {
-      mapped.status = localEnabled[m.model_id] ? "启用" : "停用";
-      mapped.rawStatus = localEnabled[m.model_id] ? "active" : "inactive";
-    }
-    return mapped;
-  });
+  const models = (modelsState.data?.items ?? []).map(mapModel);
 
   const filtered = models.filter((item) => {
-    const statusMap2: Record<string, string> = { "启用": "active", "停用": "inactive", "观察": "observing" };
-    const statusMatch = statusFilter === "全部" || (statusMap2[statusFilter] && (item.rawStatus === statusMap2[statusFilter] || item.status === statusFilter));
+    const statusMap2: Record<string, string> = { "启用": "active", "停用": "disabled" };
+    const statusMatch = statusFilter === "全部" || item.rawStatus === statusMap2[statusFilter];
     const keywordMatch = `${item.name}${item.provider}${item.abilities.join("")}`.toLowerCase().includes(query.toLowerCase());
     return statusMatch && keywordMatch;
   });
@@ -59,22 +64,112 @@ export function AdminModelConfig() {
     { label: "异常次数", value: `${modelCallsState.data?.reduce((sum, item) => sum + item.failed_count, 0) ?? "-"}`, hint: "全平台", icon: ToggleLeft, tone: "red" as const },
   ];
 
-  const setEnabled = (id: string, currentStatus: string) => {
-    const newStatus = currentStatus === "启用";
-    setLocalEnabled((prev) => ({ ...prev, [id]: !newStatus }));
-    notify.success(`模型 ${!newStatus ? "已启用" : "已停用"}（本地演示）`);
+  const updateModel = async (model: ReturnType<typeof mapModel>, status: "active" | "disabled") => {
+    await modelsApi.updateModel(Number(model.id), {
+      display_name: model.raw.display_name,
+      capability_tags: model.raw.capability_tags,
+      max_context: model.raw.max_context ?? 4096,
+      input_price: model.raw.input_price,
+      output_price: model.raw.output_price,
+      price_unit: model.raw.price_unit,
+      status,
+    });
   };
 
-  const handleTestConnection = async (model: ReturnType<typeof mapModel>) => {
-    notify.info(`${model.name} 的凭证由服务端安全管理，请通过系统巡检验证连接`);
+  const setEnabled = async (model: ReturnType<typeof mapModel>) => {
+    const nextStatus = model.rawStatus === "active" ? "disabled" : "active";
+    setUpdatingId(model.id);
+    try {
+      await updateModel(model, nextStatus);
+      notify.success(`模型已${nextStatus === "active" ? "启用" : "停用"}`);
+      await modelsState.refetch();
+    } catch (error) {
+      notify.error("状态更新失败：" + String(error));
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleCheckConfig = (model: ReturnType<typeof mapModel>) => {
+    const provider = providersState.data?.find((item) => item.provider_id === model.raw.provider_id);
+    const hasCredential = (configsState.data?.items ?? []).some(
+      (item) => item.provider_id === model.raw.provider_id && item.status === "active",
+    );
+    if (model.rawStatus !== "active") {
+      notify.warning(`${model.name} 当前已停用`);
+    } else if (provider?.status !== "active") {
+      notify.warning(`${model.name} 的供应商当前不可用`);
+    } else if (provider.provider_code === "mock" || hasCredential) {
+      notify.success(`${model.name} 配置完整，可供智能体调用`);
+    } else {
+      notify.warning(`${model.name} 尚未配置启用的服务端凭证`);
+    }
   };
 
   const handleHealthCheck = () => {
-    notify.info("模型配置巡检中...");
-    setTimeout(() => {
-      const enabledCount = models.filter((m) => m.status === "启用").length;
-      notify.success(`巡检完成：${enabledCount} 个模型可用，所有可用模型均可连接`);
-    }, 1500);
+    const activeConfigs = new Set(
+      (configsState.data?.items ?? []).filter((item) => item.status === "active").map((item) => item.provider_id),
+    );
+    const activeProviders = new Set(
+      (providersState.data ?? []).filter((item) => item.status === "active").map((item) => item.provider_id),
+    );
+    const enabled = models.filter((model) => model.rawStatus === "active");
+    const ready = enabled.filter((model) => {
+      const provider = providersState.data?.find((item) => item.provider_id === model.raw.provider_id);
+      return activeProviders.has(model.raw.provider_id) && (provider?.provider_code === "mock" || activeConfigs.has(model.raw.provider_id));
+    });
+    if (ready.length === enabled.length) {
+      notify.success(`配置巡检完成：${ready.length} 个启用模型配置完整`);
+    } else {
+      notify.warning(`配置巡检完成：${ready.length}/${enabled.length} 个启用模型配置完整`);
+    }
+  };
+
+  const openEditor = (model: ReturnType<typeof mapModel>) => {
+    setEditing(model);
+    setForm({
+      displayName: model.raw.display_name,
+      capabilityTags: model.raw.capability_tags ?? "",
+      maxContext: String(model.raw.max_context ?? 4096),
+      inputPrice: String(model.raw.input_price),
+      outputPrice: String(model.raw.output_price),
+      priceUnit: model.raw.price_unit || "1K_TOKENS",
+      status: model.rawStatus === "active" ? "active" : "disabled",
+    });
+    setOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!editing || !form.displayName.trim()) {
+      notify.warning("请填写模型显示名称");
+      return;
+    }
+    const maxContext = Number(form.maxContext);
+    const inputPrice = Number(form.inputPrice);
+    const outputPrice = Number(form.outputPrice);
+    if (![maxContext, inputPrice, outputPrice].every(Number.isFinite) || maxContext < 1 || inputPrice < 0 || outputPrice < 0) {
+      notify.warning("请检查上下文长度和价格配置");
+      return;
+    }
+    setSaving(true);
+    try {
+      await modelsApi.updateModel(Number(editing.id), {
+        display_name: form.displayName.trim(),
+        capability_tags: form.capabilityTags.trim() || undefined,
+        max_context: maxContext,
+        input_price: inputPrice,
+        output_price: outputPrice,
+        price_unit: form.priceUnit,
+        status: form.status,
+      });
+      notify.success("模型配置已保存");
+      setOpen(false);
+      await modelsState.refetch();
+    } catch (error) {
+      notify.error("保存失败：" + String(error));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -115,14 +210,14 @@ export function AdminModelConfig() {
               </div>
               <div className="mt-5 grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => handleTestConnection(model)}
+                  onClick={() => handleCheckConfig(model)}
                   className={`${primaryButton} cursor-pointer`}
                 >
-                  检查连接
+                  检查配置
                 </button>
-                <button onClick={() => { setEditing(model); setOpen(true); }} className={`${secondaryButton} cursor-pointer`}>编辑配置</button>
+                <button onClick={() => openEditor(model)} className={`${secondaryButton} cursor-pointer`}>编辑配置</button>
                 <button onClick={() => navigate(`/admin/audit?model=${model.id}`)} className={`${secondaryButton} cursor-pointer`}>查看调用</button>
-                <button onClick={() => setEnabled(model.id, model.status)} className={`${secondaryButton} cursor-pointer`}>{model.status === "启用" ? "停用" : "启用"}</button>
+                <button disabled={updatingId === model.id} onClick={() => setEnabled(model)} className={`${secondaryButton} cursor-pointer disabled:cursor-not-allowed disabled:opacity-50`}>{updatingId === model.id ? "更新中..." : model.status === "启用" ? "停用" : "启用"}</button>
               </div>
             </article>
           ))}
@@ -132,20 +227,46 @@ export function AdminModelConfig() {
         <div className="space-y-4">
           <label className="block text-sm font-bold text-slate-700">
             模型名称
-            <input className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" defaultValue={editing?.name ?? ""} />
+            <input className="edu-focus-ring mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" value={form.displayName} onChange={(event) => setForm((value) => ({ ...value, displayName: event.target.value }))} />
           </label>
           <label className="block text-sm font-bold text-slate-700">
             供应商
-            <input className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" defaultValue={editing?.provider ?? ""} />
+            <input readOnly className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm text-slate-500" value={editing?.provider ?? ""} />
           </label>
           <label className="block text-sm font-bold text-slate-700">
-            API Key
-            <input className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-mono" type="password" placeholder="凭证通过 API 配置管理" disabled />
+            能力标签
+            <input className="edu-focus-ring mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" value={form.capabilityTags} onChange={(event) => setForm((value) => ({ ...value, capabilityTags: event.target.value }))} placeholder="多个标签使用逗号分隔" />
           </label>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <label className="block text-sm font-bold text-slate-700">最大上下文
+              <input type="number" min="1" className="edu-focus-ring mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" value={form.maxContext} onChange={(event) => setForm((value) => ({ ...value, maxContext: event.target.value }))} />
+            </label>
+            <label className="block text-sm font-bold text-slate-700">输入价格
+              <input type="number" min="0" step="0.000001" className="edu-focus-ring mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" value={form.inputPrice} onChange={(event) => setForm((value) => ({ ...value, inputPrice: event.target.value }))} />
+            </label>
+            <label className="block text-sm font-bold text-slate-700">输出价格
+              <input type="number" min="0" step="0.000001" className="edu-focus-ring mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" value={form.outputPrice} onChange={(event) => setForm((value) => ({ ...value, outputPrice: event.target.value }))} />
+            </label>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block text-sm font-bold text-slate-700">价格单位
+              <select className="edu-focus-ring mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" value={form.priceUnit} onChange={(event) => setForm((value) => ({ ...value, priceUnit: event.target.value }))}>
+                <option value="1K_TOKENS">每千 Token</option>
+                <option value="1M_TOKENS">每百万 Token</option>
+              </select>
+            </label>
+            <label className="block text-sm font-bold text-slate-700">状态
+              <select className="edu-focus-ring mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" value={form.status} onChange={(event) => setForm((value) => ({ ...value, status: event.target.value as "active" | "disabled" }))}>
+                <option value="active">启用</option>
+                <option value="disabled">停用</option>
+              </select>
+            </label>
+          </div>
+          <p className="text-xs leading-5 text-slate-500">服务凭证由后端加密保存，不在模型编辑表单中回显。</p>
         </div>
         <div className="mt-5 flex justify-end gap-3">
           <button onClick={() => setOpen(false)} className={`${secondaryButton} cursor-pointer`}>取消</button>
-          <button onClick={() => { setOpen(false); notify.success("模型配置已保存（演示模式）"); }} className={`${primaryButton} cursor-pointer`}><Save className="h-4 w-4" />保存配置</button>
+          <button disabled={saving} onClick={handleSave} className={`${primaryButton} cursor-pointer disabled:cursor-not-allowed disabled:opacity-50`}><Save className="h-4 w-4" />{saving ? "保存中..." : "保存配置"}</button>
         </div>
       </ModalShell>
     </div>

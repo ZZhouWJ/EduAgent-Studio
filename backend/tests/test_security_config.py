@@ -37,6 +37,40 @@ class SecurityConfigTests(unittest.TestCase):
                 CORS_ORIGINS="*",
             )
 
+    def test_rejects_mock_provider_in_production(self):
+        with self.assertRaises(ValidationError):
+            Settings(
+                _env_file=None,
+                APP_ENV="production",
+                JWT_SECRET_KEY="a" * 64,
+                CORS_ORIGINS="https://studio.example.com",
+                LLM_PROVIDER="mock",
+                LLM_API_KEY="development-only",
+            )
+
+    def test_rejects_missing_model_credentials_in_production(self):
+        with self.assertRaises(ValidationError):
+            Settings(
+                _env_file=None,
+                APP_ENV="production",
+                JWT_SECRET_KEY="a" * 64,
+                CORS_ORIGINS="https://studio.example.com",
+                LLM_PROVIDER="deepseek",
+                LLM_API_KEY="",
+            )
+
+    def test_accepts_configured_real_provider_in_production(self):
+        settings = Settings(
+            _env_file=None,
+            APP_ENV="production",
+            JWT_SECRET_KEY="a" * 64,
+            CORS_ORIGINS="https://studio.example.com",
+            LLM_PROVIDER="deepseek",
+            LLM_API_KEY="configured-secret",
+        )
+
+        self.assertEqual(settings.llm_provider, "deepseek")
+
     def test_token_round_trip_uses_managed_settings(self):
         settings = Settings(
             _env_file=None,

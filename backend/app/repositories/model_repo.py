@@ -271,6 +271,56 @@ def create_model(
             return cursor.lastrowid
 
 
+def update_model(
+    model_id: int,
+    display_name: str,
+    capability_tags: Optional[str],
+    max_context: int,
+    input_price: float,
+    output_price: float,
+    price_unit: str,
+    status: str,
+    updated_by: int,
+    conn: Optional[Connection] = None,
+) -> int:
+    """更新 AI 模型的可配置字段。"""
+    sql = """
+        UPDATE ai_models
+        SET display_name = %s,
+            capability_tags = %s,
+            max_context = %s,
+            input_price = %s,
+            output_price = %s,
+            price_unit = %s,
+            status = %s,
+            updated_at = %s,
+            updated_by = %s
+        WHERE model_id = %s AND is_deleted = 0
+    """
+    params = (
+        display_name,
+        capability_tags,
+        max_context,
+        input_price,
+        output_price,
+        price_unit,
+        status,
+        datetime.now(),
+        updated_by,
+        model_id,
+    )
+    if conn is not None:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql, params)
+            return cursor.rowcount
+        finally:
+            cursor.close()
+    with get_db_cursor() as cursor:
+        cursor.execute(sql, params)
+        return cursor.rowcount
+
+
 # =============================================================================
 # API 配置查询
 # =============================================================================

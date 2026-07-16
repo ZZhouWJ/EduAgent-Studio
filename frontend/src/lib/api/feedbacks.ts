@@ -18,9 +18,13 @@ export interface LearningFeedback {
 }
 
 export interface FeedbackResult {
+  feedback?: LearningFeedback
   mastery_changes: MasteryChange[]
   next_resources: RecommendedResource[]
-  path_adjustment?: string
+  path_adjustment?: {
+    priority_change: string
+    new_recommendations: string[]
+  }
 }
 
 export const feedbackApi = {
@@ -28,7 +32,8 @@ export const feedbackApi = {
     page?: number
     page_size?: number
     course_id?: number
-    feedback_type?: string
+    student_id?: number
+    feedback_type?: 'quiz_result' | 'self_report' | 'study_note' | 'question'
   }) {
     return client.get<{ items: LearningFeedback[]; total: number }>('/learning/feedbacks', { params })
   },
@@ -40,7 +45,7 @@ export const feedbackApi = {
     content?: string
     quiz_score?: number
     self_mastery?: number
-    difficulty_rating?: string
+    difficulty_rating?: 'too_easy' | 'appropriate' | 'too_hard'
   }) {
     return client.post<FeedbackResult>('/learning/feedbacks', data)
   },

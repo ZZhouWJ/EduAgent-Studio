@@ -7,6 +7,12 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.repositories import user_repo
+from app.utils.roles import (
+    PLATFORM_ROLE_CODES,
+    filter_platform_roles,
+    list_platform_capabilities,
+    permissions_for_roles,
+)
 
 
 def get_user_detail(user_id: int) -> Optional[Dict[str, Any]]:
@@ -24,7 +30,7 @@ def get_user_detail(user_id: int) -> Optional[Dict[str, Any]]:
         return None
 
     roles = user_repo.get_user_roles(user_id)
-    permissions = user_repo.get_user_permissions(user_id)
+    permissions = permissions_for_roles(roles)
 
     return {
         "user_id": user["user_id"],
@@ -106,7 +112,7 @@ def update_user_status_service(
         user_id: 要更新的用户 ID
         new_status: 新状态（active/inactive/suspended）
     """
-    valid_statuses = {"active", "inactive", "suspended"}
+    valid_statuses = {"active", "disabled"}
     if new_status not in valid_statuses:
         from app.utils.exceptions import ValidationException
         raise ValidationException(
@@ -135,6 +141,22 @@ def update_user_roles_service(
         from app.utils.exceptions import NotFoundException
         raise NotFoundException(message="用户不存在")
 
+    roles_by_id = {
+        int(role["role_id"]): role for role in filter_platform_roles(user_repo.list_roles())
+    }
+    if not role_ids:
+        from app.utils.exceptions import ValidationException
+        raise ValidationException(message="用户至少需要一个角色")
+    for role_id in role_ids:
+        role = roles_by_id.get(int(role_id))
+        if (
+            role is None
+            or role.get("status", "active") != "active"
+            or role["role_code"] not in PLATFORM_ROLE_CODES
+        ):
+            from app.utils.exceptions import ValidationException
+            raise ValidationException(message="选择的角色不存在或不可分配")
+
     user_repo.update_user_roles(user_id, role_ids)
 
 
@@ -145,7 +167,7 @@ def list_roles_service() -> List[Dict[str, Any]]:
     Returns:
         角色列表
     """
-    return user_repo.list_roles()
+    return filter_platform_roles(user_repo.list_roles())
 
 
 def list_permissions_service() -> List[Dict[str, Any]]:
@@ -155,7 +177,7 @@ def list_permissions_service() -> List[Dict[str, Any]]:
     Returns:
         权限列表
     """
-    return user_repo.list_permissions()
+    return list_platform_capabilities()
 
 
 def get_user_roles_service(user_id: int) -> List[str]:
@@ -164,8 +186,8 @@ def get_user_roles_service(user_id: int) -> List[str]:
 
 
 def get_user_permissions_service(user_id: int) -> List[str]:
-    """获取用户角色代码列表。"""
-    return user_repo.get_user_permissions(user_id)
+    """获取用户在当前教育平台中的能力代码列表。"""
+    return permissions_for_roles(user_repo.get_user_roles(user_id))
 
 
 def list_operation_logs_service(

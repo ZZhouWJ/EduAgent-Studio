@@ -3,10 +3,53 @@ from unittest.mock import Mock, patch
 
 from app.routers import feedbacks
 from app.routers.feedbacks import SubmitFeedbackRequest
-from app.utils.exceptions import ValidationException
+from app.utils.exceptions import ForbiddenException, NotFoundException, ValidationException
 
 
 class FeedbackIntegrityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_teacher_can_filter_feedbacks_by_course_student(self):
+        access = Mock()
+        access.list_accessible_course_ids.return_value = [1]
+        repo = Mock()
+        repo.list_feedbacks.return_value = {"items": [], "total": 0}
+        user = {"user_id": 7, "roles": ["teacher"]}
+
+        with patch("app.routers.feedbacks.CourseAccessService", return_value=access), patch.object(
+            feedbacks, "_repo", repo
+        ):
+            await feedbacks.list_feedbacks(
+                page=1,
+                page_size=20,
+                course_id=1,
+                student_id=12,
+                feedback_type=None,
+                user=user,
+            )
+
+        access.require_course_access.assert_called_once_with(1, user)
+        access.require_student_course.assert_called_once_with(1, 12)
+        repo.list_feedbacks.assert_called_once_with(
+            page=1,
+            page_size=20,
+            course_id=1,
+            feedback_type=None,
+            student_id=12,
+            course_ids=None,
+        )
+
+    async def test_student_cannot_filter_another_students_feedbacks(self):
+        user = {"user_id": 12, "roles": ["student_member"]}
+
+        with self.assertRaises(ForbiddenException):
+            await feedbacks.list_feedbacks(
+                page=1,
+                page_size=20,
+                course_id=1,
+                student_id=13,
+                feedback_type=None,
+                user=user,
+            )
+
     async def test_feedback_rejects_resource_course_mismatch(self):
         access = Mock()
         access.require_resource_access.return_value = 2
@@ -18,6 +61,39 @@ class FeedbackIntegrityTests(unittest.IsolatedAsyncioTestCase):
                     SubmitFeedbackRequest(course_id=1, resource_id=9), user
                 )
 
+    async def test_feedback_rejects_unapproved_resource(self):
+        access = Mock()
+        access.require_resource_access.return_value = 1
+        resource = Mock()
+        resource.get_resource.return_value = {
+            "resource_id": 9,
+            "course_id": 1,
+            "status": "draft",
+        }
+        user = {"user_id": 12, "roles": ["student_member"]}
+
+        with patch("app.routers.feedbacks.CourseAccessService", return_value=access), patch.object(
+            feedbacks, "_resource_repo", resource
+        ):
+            with self.assertRaisesRegex(NotFoundException, "资源不存在"):
+                await feedbacks.submit_feedback(
+                    SubmitFeedbackRequest(resource_id=9, self_mastery=0.6), user
+                )
+
+    async def test_question_feedback_requires_content(self):
+        with self.assertRaisesRegex(ValidationException, "必须填写具体内容"):
+            await feedbacks.submit_feedback(
+                SubmitFeedbackRequest(feedback_type="question", content=" "),
+                {"user_id": 12, "roles": ["student_member"]},
+            )
+
+    async def test_quiz_feedback_requires_score(self):
+        with self.assertRaisesRegex(ValidationException, "必须包含测验得分"):
+            await feedbacks.submit_feedback(
+                SubmitFeedbackRequest(feedback_type="quiz_result"),
+                {"user_id": 12, "roles": ["student_member"]},
+            )
+
     async def test_self_mastery_is_normalized_and_uses_real_previous_value(self):
         access = Mock()
         access.list_accessible_course_ids.return_value = [1]
@@ -28,11 +104,11 @@ class FeedbackIntegrityTests(unittest.IsolatedAsyncioTestCase):
         profile.update_mastery.return_value = {
             "kp_id": 4,
             "kp_name": "事务",
-            "mastery_level": 2 / 3,
+            "mastery_level": 0.67,
         }
         profile.get_profile.return_value = {"profile_id": 22}
         resource = Mock()
-        resource.get_resource.return_value = {"target_kp_ids": [4]}
+        resource.get_resource.return_value = {"target_kp_ids": [4], "status": "approved"}
         repo = Mock()
         repo.create_feedback.return_value = {"feedback_id": 5, "course_id": 1}
         learning = Mock()
@@ -45,16 +121,61 @@ class FeedbackIntegrityTests(unittest.IsolatedAsyncioTestCase):
             feedbacks, "_repo", repo
         ), patch.object(feedbacks, "_learning_service", learning):
             response = await feedbacks.submit_feedback(
-                SubmitFeedbackRequest(resource_id=9, self_mastery=2), user
+                SubmitFeedbackRequest(resource_id=9, self_mastery=0.67), user
             )
 
         profile.update_mastery.assert_called_once_with(
-            22, 4, 2 / 3, "自评掌握度 2/3"
+            22, 4, 0.67, "自评掌握度 67%", assessment_score=None
         )
         payload = __import__("json").loads(response.body)
         change = payload["data"]["mastery_changes"][0]
         self.assertEqual(change["before"], 0.4)
         self.assertEqual(change["after"], 0.67)
+
+    async def test_quiz_score_is_forwarded_as_assessment_score(self):
+        access = Mock()
+        access.require_resource_access.return_value = 1
+        profile = Mock()
+        profile.get_profile_id_by_student_and_course.return_value = 22
+        profile.get_mastery_level.return_value = 0.4
+        profile.update_mastery.return_value = {
+            "kp_id": 4,
+            "kp_name": "事务",
+            "mastery_level": 0.82,
+        }
+        profile.get_profile.return_value = {"profile_id": 22}
+        resource = Mock()
+        resource.get_resource.return_value = {
+            "target_kp_ids": [4],
+            "status": "approved",
+        }
+        repo = Mock()
+        repo.create_feedback.return_value = {"feedback_id": 6, "course_id": 1}
+        learning = Mock()
+        learning.recommend_resources.return_value = []
+        user = {"user_id": 12, "roles": ["student_member"]}
+
+        with patch("app.routers.feedbacks.CourseAccessService", return_value=access), patch.object(
+            feedbacks, "_profile_repo", profile
+        ), patch.object(feedbacks, "_resource_repo", resource), patch.object(
+            feedbacks, "_repo", repo
+        ), patch.object(feedbacks, "_learning_service", learning):
+            await feedbacks.submit_feedback(
+                SubmitFeedbackRequest(
+                    resource_id=9,
+                    feedback_type="quiz_result",
+                    quiz_score=0.82,
+                ),
+                user,
+            )
+
+        profile.update_mastery.assert_called_once_with(
+            22,
+            4,
+            0.82,
+            "测验得分 82%",
+            assessment_score=0.82,
+        )
 
 
 if __name__ == "__main__":

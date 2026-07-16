@@ -90,6 +90,7 @@ def get_model_call_stats(
 def get_cost_stats(
     token: str,
     project_id: Optional[int] = None,
+    model_id: Optional[int] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -111,6 +112,7 @@ def get_cost_stats(
         is_admin=is_admin,
         user_id=user_id,
         project_id=project_id,
+        model_id=model_id,
         date_from=date_from,
         date_to=date_to,
     )

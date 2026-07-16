@@ -1,5 +1,5 @@
 """学习反馈 API"""
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
@@ -10,7 +10,7 @@ from app.repositories.learning_resource_repo import LearningResourceRepository
 from app.services.course_access_service import CourseAccessService
 from app.services.learning_service import LearningService
 from app.utils.dependencies import get_current_user_dep, require_role
-from app.utils.exceptions import NotFoundException, ValidationException
+from app.utils.exceptions import ForbiddenException, NotFoundException, ValidationException
 from app.utils.response import success_response
 
 router = APIRouter(prefix="/learning", tags=["学习反馈"])
@@ -23,11 +23,15 @@ _learning_service = LearningService()
 class SubmitFeedbackRequest(BaseModel):
     course_id: Optional[int] = Field(None, gt=0)
     resource_id: Optional[int] = Field(None, gt=0)
-    feedback_type: str = Field("self_report", min_length=1, max_length=50)
+    feedback_type: Literal[
+        "quiz_result", "self_report", "study_note", "question"
+    ] = "self_report"
     content: Optional[str] = Field(None, max_length=4000)
     quiz_score: Optional[float] = Field(None, ge=0, le=1)
-    self_mastery: Optional[float] = Field(None, ge=1, le=3)
-    difficulty_rating: Optional[str] = Field(None, max_length=30)
+    self_mastery: Optional[float] = Field(None, ge=0, le=1)
+    difficulty_rating: Optional[
+        Literal["too_easy", "appropriate", "too_hard"]
+    ] = None
 
 
 @router.get("/feedbacks")
@@ -35,22 +39,34 @@ async def list_feedbacks(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     course_id: Optional[int] = None,
+    student_id: Optional[int] = Query(None, gt=0),
     feedback_type: Optional[str] = None,
     user: dict = Depends(get_current_user_dep),
 ):
     """获取学习反馈列表"""
     roles = set(user.get("roles") or [])
-    student_id = None if roles.intersection({"teacher", "admin"}) else int(user["user_id"])
+    is_teacher_or_admin = bool(roles.intersection({"teacher", "admin"}))
+    effective_student_id = student_id
+    if not is_teacher_or_admin:
+        current_student_id = int(user["user_id"])
+        if student_id is not None and student_id != current_student_id:
+            raise ForbiddenException("无权查看其他学生的学习反馈")
+        effective_student_id = current_student_id
+
     access = CourseAccessService()
     course_ids = access.list_accessible_course_ids(user)
     if course_id is not None:
         access.require_course_access(course_id, user)
+    if is_teacher_or_admin and effective_student_id is not None:
+        if course_id is None:
+            raise ValidationException("按学生筛选时必须指定课程")
+        access.require_student_course(course_id, effective_student_id)
     result = _repo.list_feedbacks(
         page=page,
         page_size=page_size,
         course_id=course_id,
         feedback_type=feedback_type,
-        student_id=student_id,
+        student_id=effective_student_id,
         course_ids=course_ids if course_id is None else None,
     )
     return success_response(data=result)
@@ -64,6 +80,11 @@ async def submit_feedback(
     """
     提交学习反馈，并自动更新知识点掌握度和学生画像。
     """
+    if data.feedback_type == "question" and not str(data.content or "").strip():
+        raise ValidationException("提交问题时必须填写具体内容")
+    if data.feedback_type == "quiz_result" and data.quiz_score is None:
+        raise ValidationException("测验反馈必须包含测验得分")
+
     user_id = int(user["user_id"])
     access = CourseAccessService()
     course_id = data.course_id
@@ -74,6 +95,8 @@ async def submit_feedback(
             raise ValidationException("反馈课程与学习资源课程不一致")
         course_id = resource_course_id
         resource = _resource_repo.get_resource(data.resource_id)
+        if resource is None or resource.get("status") != "approved":
+            raise NotFoundException("资源不存在")
 
     if course_id is None:
         accessible_course_ids = access.list_accessible_course_ids(user) or []
@@ -100,7 +123,7 @@ async def submit_feedback(
     new_mastery = (
         data.quiz_score
         if data.quiz_score is not None
-        else data.self_mastery / 3
+        else data.self_mastery
         if data.self_mastery is not None
         else None
     )
@@ -111,7 +134,7 @@ async def submit_feedback(
         before_mastery = _profile_repo.get_mastery_level(profile_id, primary_kp_id)
         update_reason = (
             f"测验得分 {data.quiz_score * 100:.0f}%" if data.quiz_score is not None
-            else f"自评掌握度 {int(data.self_mastery)}/3" if data.self_mastery is not None
+            else f"自评掌握度 {data.self_mastery:.0%}" if data.self_mastery is not None
             else "学习反馈更新"
         )
         mastery = _profile_repo.update_mastery(
@@ -119,6 +142,7 @@ async def submit_feedback(
             primary_kp_id,
             float(new_mastery),
             update_reason,
+            assessment_score=data.quiz_score,
         )
         if mastery is not None:
             after_mastery = float(mastery["mastery_level"])

@@ -115,6 +115,13 @@ def hash_password(pw: str) -> str:
 DEMO_PASSWORD = "Pass@1234"
 DEMO_PWHASH = hash_password(DEMO_PASSWORD)
 
+ROLE_METADATA = {
+    "student_member": ("学生", "使用个性化辅导、学习路径、任务、资源与学习反馈", "active"),
+    "teacher": ("教师", "管理本人课程、学生画像、学习任务、知识库与 AI 生成资源", "active"),
+    "admin": ("系统管理员", "负责平台用户、课程、模型、智能体、审计、成本与内容安全治理", "active"),
+    "project_leader": ("历史项目负责人", "旧协作模块兼容角色，当前教育平台不再分配", "disabled"),
+}
+
 
 # (username, real_name, email, student_no, phone, role_codes)
 DEMO_USERS: List[Tuple[str, str, str, Optional[str], str, List[str]]] = [
@@ -172,6 +179,17 @@ def assign_role(cur, user_id: int, role_code: str) -> None:
            VALUES (%s, %s, 0)""",
         (user_id, rid),
     )
+
+
+def align_platform_roles(cur) -> None:
+    """同步角色元数据，并停用不再分配的旧协作角色。"""
+    for role_code, (role_name, description, status) in ROLE_METADATA.items():
+        cur.execute(
+            """UPDATE roles
+               SET role_name=%s, description=%s, status=%s
+               WHERE role_code=%s AND is_deleted=0""",
+            (role_name, description, status, role_code),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -235,6 +253,363 @@ KNOWLEDGE_POINTS: Dict[str, List[Tuple[str, str, str, float]]] = {
         ("kp_se_agile", "敏捷与 Scrum", "intermediate", 3.0),
         ("kp_se_test", "测试与质量保障", "intermediate", 3.0),
     ],
+}
+
+LEARNING_RESOURCE_CONTENTS: Dict[Tuple[str, str], str] = {
+    ("CS301", "lecture"): """# 数据库系统原理学习导读
+
+## 学习目标
+- 说明数据库、数据库管理系统与应用系统之间的关系。
+- 使用关系、元组、属性、主键和外键描述关系模型。
+- 编写带筛选、排序与聚合的基础 SQL 查询。
+
+## 知识主线
+1. **数据管理**：数据库负责持久化数据，DBMS 负责定义、查询、约束、并发与恢复。
+2. **关系模型**：表结构表达实体及联系，主键保证行唯一，外键维护表间引用完整性。
+3. **查询过程**：先明确输出列与数据来源，再逐步添加筛选、分组、排序和结果数量限制。
+
+## 示例任务
+为选课系统设计 `student`、`course`、`enrollment` 三张表。列出每门课程的选课人数，并找出选课人数不少于 30 的课程。提交表结构、主外键说明和查询语句。
+
+## 学习检查
+- 能否区分模式、实例与视图？
+- 能否解释实体完整性和参照完整性？
+- 能否说明 `WHERE` 与 `HAVING` 的使用时机？""",
+    ("CS301", "quiz"): """# 数据库系统原理阶段性测验
+
+## 作答要求
+本测验覆盖关系模型、基础 SQL、多表连接与子查询。先写结论，再说明依据；SQL 题需给出完整语句。
+
+## 题目
+1. 候选键、主键和外键分别解决什么问题？请用一个选课关系举例。（15 分）
+2. 表 `score(student_id, course_id, grade)` 中，写出查询平均分高于 80 的课程及其平均分的 SQL。（20 分）
+3. 说明内连接与左连接的结果差异，并给出应使用左连接的业务场景。（20 分）
+4. 找出从未选修任何课程的学生，分别使用 `NOT EXISTS` 和左连接实现。（25 分）
+5. 一条查询同时包含 `WHERE`、`GROUP BY`、`HAVING`、`ORDER BY`，写出它们的逻辑执行顺序。（20 分）
+
+## 评分标准
+- 结论与语法正确：60 分
+- 能解释关系语义和空值影响：25 分
+- 命名清晰、边界条件完整：15 分
+
+完成后将错题对应到知识点，并记录错误原因，而不是只记录正确答案。""",
+    ("CS301", "case"): """# 电商订单查询与索引优化案例
+
+## 业务情境
+订单系统包含用户、订单、订单明细和商品表。运营人员需要按时间、地区与商品类别统计销售额，当前月度报表耗时超过 12 秒。
+
+## 任务
+1. 设计四张表的主键、外键和关键约束。
+2. 编写月度分区间销售额与订单量统计 SQL，正确处理取消订单。
+3. 使用执行计划定位全表扫描、低选择性过滤或连接顺序问题。
+4. 给出不超过 3 个索引方案，并说明字段顺序和适用查询。
+5. 比较优化前后的执行计划、扫描行数和耗时。
+
+## 约束
+- 不允许以冗余索引替代分析。
+- 金额统计必须说明精度与退款处理方式。
+- 查询结果需覆盖无订单地区和空值场景。
+
+## 验收标准
+- SQL 结果与给定校验数据一致。
+- 索引方案可由执行计划证据支撑。
+- 报告包含风险、回滚方式和后续监控指标。""",
+    ("CS201", "lecture"): """# Python 程序设计学习导读
+
+## 学习目标
+- 正确选择基础数据类型与控制结构。
+- 使用函数、参数和模块拆分可复用逻辑。
+- 通过类、对象与组合表达业务模型。
+
+## 知识主线
+1. **语法与数据**：变量引用对象，容器类型承担批量数据组织，不同类型具有不同的可变性。
+2. **函数与模块**：函数应具有清晰输入输出；模块负责组织相关能力并控制依赖方向。
+3. **面向对象**：类封装状态和行为，优先使用组合表达可替换协作关系。
+
+## 示例任务
+实现课程成绩统计模块：读取学生成绩，计算均值与等级分布，按课程输出报告。将读取、计算和展示拆成独立函数，并用 `CourseReport` 类封装一份报告。
+
+## 学习检查
+- 能否解释可变对象作为默认参数的风险？
+- 能否区分位置参数、关键字参数与可变参数？
+- 能否说明实例属性、类属性和方法的作用域？""",
+    ("CS201", "quiz"): """# Python 程序设计阶段性测验
+
+## 作答要求
+本测验覆盖函数与模块、面向对象、异常处理与测试。代码题应包含异常分支和最小测试用例。
+
+## 题目
+1. 为什么不应把空列表直接作为函数默认参数？给出正确写法。（15 分）
+2. 实现 `normalize_scores(scores)`：校验输入、过滤非法分数并返回 0 到 1 的归一化结果。（25 分）
+3. 为课程、学生和选课记录建立类模型，说明你选择继承或组合的理由。（20 分）
+4. 读取成绩文件时可能出现哪些异常？请设计异常处理边界，避免吞掉未知错误。（20 分）
+5. 使用 `pytest` 风格写出正常、空输入和非法分数三个测试用例。（20 分）
+
+## 评分标准
+- 结果正确且边界明确：50 分
+- 异常处理与类型契约合理：30 分
+- 结构清晰、测试可重复：20 分""",
+    ("CS201", "case"): """# 学习进度服务开发案例
+
+## 业务情境
+开发一个轻量学习进度服务，支持创建学习任务、更新完成度、查询逾期任务和返回课程汇总。服务需在输入错误和存储失败时返回可诊断结果。
+
+## 任务
+1. 使用类建模 `LearningTask` 与 `ProgressService`，明确状态转换规则。
+2. 为创建、更新和查询操作设计函数接口与类型标注。
+3. 使用 Flask 或 FastAPI 提供三个 HTTP 接口，并定义统一错误响应。
+4. 为非法进度、重复任务和不存在任务编写异常与测试。
+5. 将业务逻辑与 Web 路由分层，说明模块依赖关系。
+
+## 验收标准
+- 完成度只能在 0 到 100 之间且状态转换一致。
+- 路由、业务逻辑和数据访问可独立测试。
+- 至少覆盖成功、参数错误、资源不存在和内部异常四类测试。
+- README 给出启动方式、接口示例和已知限制。""",
+    ("CS401", "lecture"): """# 软件工程实践学习导读
+
+## 学习目标
+- 根据需求不确定性选择合适的软件过程。
+- 将业务目标转化为可验证的功能与非功能需求。
+- 从职责、接口、数据和部署视角形成系统设计。
+
+## 知识主线
+1. **过程模型**：瀑布、迭代、增量和敏捷适用于不同风险与反馈周期。
+2. **需求工程**：需求需明确参与者、触发条件、主流程、异常和验收标准。
+3. **系统设计**：模块边界应降低耦合，接口契约需覆盖数据、错误和版本演进。
+
+## 示例任务
+为校园预约系统完成一次从问题陈述到概要设计的推演：识别参与者和范围，编写核心用户故事及验收标准，绘制上下文关系并定义两个关键接口。
+
+## 学习检查
+- 能否说明迭代开发与无计划修改的区别？
+- 能否把“系统要稳定”改写为可测量指标？
+- 能否识别跨模块事务、权限和故障恢复风险？""",
+    ("CS401", "quiz"): """# 软件工程实践阶段性测验
+
+## 作答要求
+本测验覆盖需求分析、系统设计、敏捷与 Scrum。答案必须结合场景和可验收证据。
+
+## 题目
+1. 将“平台操作简单”改写为两条可测量的非功能需求。（15 分）
+2. 为“教师发布作业”编写用户故事、前置条件、主流程和两个异常流程。（25 分）
+3. 某模块同时负责身份认证、报表和消息推送，指出设计问题并给出拆分依据。（20 分）
+4. 说明 Product Backlog、Sprint Backlog 与 Increment 的关系。（20 分）
+5. 需求在迭代中发生变化时，团队应如何评估影响并保持可追溯性？（20 分）
+
+## 评分标准
+- 需求可验证、场景完整：40 分
+- 设计理由与权衡清楚：35 分
+- 能体现追溯、风险和团队协作：25 分""",
+    ("CS401", "case"): """# 校园预约平台迭代交付案例
+
+## 业务情境
+团队需要在两周内交付校园场地预约最小可用版本，支持资源查询、预约冲突检测、审批和取消。后续将接入消息通知与信用规则。
+
+## 任务
+1. 明确 MVP 范围、关键参与者和不在本迭代处理的事项。
+2. 编写不少于 6 条用户故事，并为高优先级故事定义验收标准。
+3. 设计模块边界、核心数据模型和预约冲突检测接口。
+4. 建立 Sprint Backlog，估算工作量并说明依赖与风险。
+5. 制定单元、接口和端到端测试策略，定义发布与回滚条件。
+
+## 约束
+- 审批和取消操作必须可审计。
+- 同一场地同一时间段不得产生两个有效预约。
+- 设计需预留通知能力，但本迭代不实现第三方短信。
+
+## 验收标准
+- 需求、设计、任务与测试之间可以双向追溯。
+- 核心流程有自动化测试证据。
+- 演示环境可重复部署，并提供已知风险与下一迭代计划。""",
+}
+
+PROJECT_OUTPUT_CONTENTS: Dict[str, str] = {
+    "事务隔离级别图解讲义": """# 事务隔离级别图解讲义
+
+## 学习目标
+理解脏读、不可重复读和幻读的产生条件，并能根据一致性要求与并发代价选择隔离级别。
+
+## 并发现象
+| 现象 | 过程 | 风险 |
+| --- | --- | --- |
+| 脏读 | T1 修改后未提交，T2 已读到该值，随后 T1 回滚 | T2 基于不存在的数据继续计算 |
+| 不可重复读 | T1 两次读取同一行，期间 T2 提交了更新 | 同一事务内行值不一致 |
+| 幻读 | T1 两次执行同一范围查询，期间 T2 插入或删除匹配行 | 结果集行数发生变化 |
+
+## 隔离级别
+- **读未提交**：允许读取未提交数据，并发高但一致性风险最大。
+- **读已提交**：每条语句读取已提交快照，可避免脏读。
+- **可重复读**：事务内保持一致快照；具体幻读行为取决于数据库实现与锁策略。
+- **串行化**：效果接近事务顺序执行，一致性最强，但等待与死锁概率上升。
+
+## 判断方法
+先标出每个事务的读写对象和提交点，再判断后一次读取是否必须看到前一次相同的版本。不要仅凭隔离级别名称推断，应结合数据库实现、查询范围和锁信息验证。
+
+## 自检
+库存扣减、余额查询和月度报表分别需要什么隔离保证？请说明允许出现的偏差、锁等待上限和失败重试策略。""",
+    "多表连接练习题集": """# 多表连接练习题集
+
+## 数据模型
+使用学生 `student`、课程 `course`、教师 `teacher`、选课 `enrollment`、成绩 `score` 五张表。先画出主外键关系，再完成查询。
+
+## 基础题（1-6）
+1. 查询每名学生及其已选课程名称。
+2. 查询每门课程及授课教师姓名。
+3. 列出选修数据库课程的学生学号与姓名。
+4. 查询每名学生的课程数，未选课学生也要显示为 0。
+5. 查询没有任何学生选修的课程。
+6. 查询同时选修数据库和 Python 的学生。
+
+## 进阶题（7-14）
+7. 统计每门课程的平均分、最高分与最低分。
+8. 查询平均分高于全校平均分的学生。
+9. 查询每门课程成绩排名前三的学生，正确处理并列。
+10. 找出选课人数高于本院课程平均选课人数的课程。
+11. 查询至少教授两门课程的教师及课程数。
+12. 查询选修了某教师全部课程的学生。
+13. 找出只选修一门课程且成绩及格的学生。
+14. 查询每个院系平均分最高的课程。
+
+## 综合题（15-20）
+15. 生成学生成绩单，包含课程、学分、成绩和加权平均分。
+16. 查询连续两个学期成绩提升的学生。
+17. 识别同一时间段存在课程冲突的选课记录。
+18. 查询先修课未通过却选修后续课程的学生。
+19. 使用窗口函数统计课程成绩分位数，并解释与子查询方案的差异。
+20. 为第 7、9、12 题分析执行计划并提出索引方案。
+
+## 提交与评分
+每题提交 SQL、结果行数和边界说明。正确性占 60%，空值与重复行处理占 20%，可读性占 10%，执行计划与索引依据占 10%。""",
+    "银行转账并发案例": """# 银行转账并发案例
+
+## 场景
+账户 A 向账户 B 转账 500 元，同时账户 A 可能收到另一笔扣款。系统必须保证余额不为负、借贷两端金额守恒、重复请求不会重复入账。
+
+## 初始数据
+`account(id, balance, version)` 保存余额，`transfer(id, request_no, from_id, to_id, amount, status)` 保存转账流水，其中 `request_no` 唯一。
+
+## 并发风险
+1. 两个事务先后读取相同余额并分别扣减，造成丢失更新。
+2. 借方已扣款但贷方写入失败，造成金额不守恒。
+3. 客户端超时重试，造成同一请求重复转账。
+4. 两笔反向转账以不同顺序锁定账户，造成死锁。
+
+## 实现任务
+- 在一个数据库事务内创建流水、锁定账户、校验余额、更新双方余额并提交。
+- 始终按账户 ID 升序加锁，降低死锁概率。
+- 以唯一请求号实现幂等；重复请求返回原流水结果。
+- 对死锁与锁等待超时采用有上限的退避重试，并记录审计事件。
+
+## 验证
+并发执行 100 组转账，校验总余额不变、无负余额、请求号唯一、失败事务不产生单边记账。报告隔离级别、SQL、锁顺序、重试次数和最终校验结果。""",
+    "Flask 路由与蓝图": """# Flask 路由与蓝图
+
+## 学习目标
+掌握 URL 规则、HTTP 方法、请求参数与响应状态码，并使用蓝图拆分可独立维护的业务模块。
+
+## 路由契约
+路由函数负责把 HTTP 请求转换为业务调用，再把结果转换为响应。参数校验失败返回 400，未认证返回 401，无权限返回 403，资源不存在返回 404；不要把所有异常都返回 200。
+
+```python
+students = Blueprint("students", __name__, url_prefix="/api/students")
+
+@students.get("/<int:student_id>")
+def get_student(student_id: int):
+    student = student_service.get(student_id)
+    if student is None:
+        return {"message": "student not found"}, 404
+    return student.to_dict(), 200
+```
+
+## 蓝图组织
+- `routes.py`：声明路径、方法、输入与响应。
+- `service.py`：实现业务规则，不依赖 Flask 全局请求对象。
+- `repository.py`：封装持久化操作。
+- `errors.py`：统一业务异常到 HTTP 响应的映射。
+
+在应用工厂中注册蓝图，测试环境可注入独立配置与存储。跨域、鉴权、日志与追踪应通过扩展或中间件统一处理。
+
+## 练习
+实现学生列表和详情接口，支持分页与姓名筛选；分别测试成功、参数非法、资源不存在和仓储异常，确认状态码与错误结构一致。""",
+    "Python 函数练习": """# Python 函数练习
+
+## 要求
+每题写出函数签名、类型标注、边界约定和至少两个测试用例。除题目明确允许外，不修改传入对象。
+
+1. `clamp(value, lower, upper)`：将数值限制在闭区间内，并校验上下界。
+2. `deduplicate(items)`：保持原顺序去重，支持不可哈希元素时给出明确策略。
+3. `group_by(items, key)`：按回调结果分组，返回字典。
+4. `moving_average(values, window)`：计算滑动平均，处理窗口大于序列长度的情况。
+5. `retry(operation, attempts, retry_on)`：对指定异常执行有限重试。
+6. `parse_score(text)`：解析成绩字符串，拒绝空值、非数字和区间外数值。
+7. `compose(*functions)`：从右到左组合单参数函数。
+8. `summarize(records, field)`：统计指定字段的数量、均值、最小值和最大值。
+9. `memoize(function)`：实现保留函数元信息的简单缓存装饰器，并说明参数限制。
+10. `batch(items, size)`：将可迭代对象按固定大小分批，最后一批允许不足。
+
+## 评分标准
+正确性 50%，边界与异常 20%，类型和可读性 15%，测试覆盖 15%。测试至少包含正常输入、空输入和一个非法输入。""",
+    "数据看板实战案例": """# 数据看板实战案例
+
+## 业务目标
+为课程负责人构建学习数据看板，回答活跃学生数量、任务完成趋势、知识点薄弱分布和高风险学生变化四个问题。
+
+## 数据与指标
+- 学生活跃：按自然日去重的有效学习事件用户数。
+- 任务完成率：截止时间内完成任务数除以到期任务数。
+- 知识点掌握：最近有效测评按时间衰减后的加权结果。
+- 风险学生：连续 7 天无学习、逾期任务不少于 2 个或掌握度显著下降。
+
+## 实现任务
+1. 使用 Flask 蓝图实现 `/api/dashboard/summary` 与 `/api/dashboard/trends`。
+2. 在服务层定义统计口径、时间范围和权限范围，禁止学生读取全班数据。
+3. 对高频聚合增加合适索引与短时缓存，并提供缓存失效策略。
+4. 前端实现指标概览、趋势图、薄弱知识点排序和风险学生表格。
+5. 为无数据、部分数据失败、超时和窄屏场景提供明确状态。
+
+## 验收标准
+接口口径可追溯，测试数据下计算结果准确；教师只能访问本人课程；图表有标题、单位和可读的键盘替代信息；首屏接口在目标数据量下 P95 小于 800ms。""",
+    "Scrum 角色与流程总结": """# Scrum 角色与流程总结
+
+## 三类责任
+- **Product Owner**：最大化产品价值，管理并排序 Product Backlog，确保目标和条目清晰。
+- **Scrum Master**：帮助团队理解并实践 Scrum，移除组织障碍，促进持续改进。
+- **Developers**：共同制定 Sprint Backlog、保证交付质量，并对可用增量负责。
+
+## 核心流程
+1. Product Backlog 持续梳理，条目围绕产品目标排序。
+2. Sprint Planning 明确 Sprint Goal，选择条目并制定实现计划。
+3. Daily Scrum 检查实现 Sprint Goal 的进展并调整当天计划。
+4. Sprint Review 与利益相关者检查增量并调整后续方向。
+5. Sprint Retrospective 改进人员、协作、流程和工具。
+
+## 三个工件及承诺
+Product Backlog 对应 Product Goal，Sprint Backlog 对应 Sprint Goal，Increment 对应 Definition of Done。只有满足完成定义的工作才能计入增量。
+
+## 常见误区
+Daily Scrum 不是向管理者汇报；Scrum Master 不是任务分配者；Sprint Review 不是单纯演示会；未完成条目不能通过降低质量标准“转为完成”。团队应以透明、检查和适应形成可持续反馈闭环。""",
+    "团队迭代 1 评审": """# 团队迭代 1 评审报告
+
+## 评审范围
+本次评审覆盖预约查询、预约创建、冲突检测与取消流程，以及对应需求、接口文档、自动化测试和部署说明。
+
+## 结论
+核心主流程可运行，但当前版本暂不满足发布条件。冲突检测在并发请求下缺少数据库唯一约束，取消操作未记录操作者与原因，接口错误结构也不一致。
+
+## 发现
+| 级别 | 问题 | 验收证据 |
+| --- | --- | --- |
+| 阻断 | 并发创建可能产生重叠预约 | 增加约束或事务锁，并通过并发测试 |
+| 高 | 取消记录缺少审计字段 | 审计日志包含用户、时间、原因和原状态 |
+| 中 | 400 与 404 响应结构不统一 | 契约测试覆盖全部公开接口 |
+| 中 | 部署文档未说明回滚 | 提供版本回退和数据库兼容步骤 |
+
+## 后续行动
+负责人在下一次提交前修复阻断与高等级问题，补充并发、权限和回滚测试。修复后由评审人复核证据；中等级问题进入下一 Sprint，但必须明确负责人和截止时间。
+
+## 通过条件
+阻断和高等级问题归零，核心端到端测试通过，部署与回滚演练完成，遗留风险得到 Product Owner 明确认可。""",
 }
 
 LEGACY_KP_CODES = (
@@ -357,6 +732,27 @@ def seed_mastery(cur, profile_id: int, kp_ids: List[int], base: float) -> None:
                  round(score + random.uniform(-0.05, 0.1), 3),
                  date.today() - timedelta(days=random.randint(1, 14))),
             )
+
+
+def refresh_profile_mastery_score(cur, profile_id: int) -> float:
+    """Derive the profile summary from its persisted knowledge-point evidence."""
+    cur.execute(
+        """UPDATE student_profiles sp
+           SET sp.mastery_score = COALESCE(
+               (SELECT AVG(skm.mastery_level)
+                FROM student_knowledge_mastery skm
+                WHERE skm.profile_id = sp.profile_id AND skm.is_deleted = 0),
+               sp.mastery_score
+           )
+           WHERE sp.profile_id = %s AND sp.is_deleted = 0""",
+        (profile_id,),
+    )
+    row = fetchone(
+        cur,
+        "SELECT mastery_score FROM student_profiles WHERE profile_id=%s",
+        profile_id,
+    )
+    return float(row["mastery_score"]) if row else 0.0
 
 
 def upsert_learning_task(
@@ -851,6 +1247,7 @@ def main() -> int:
             log.info("  cleanup done")
 
             log.info("=== users & roles ===")
+            align_platform_roles(cur)
             for username, real_name, email, student_no, phone, roles in DEMO_USERS:
                 uid = upsert_user(cur, username, real_name, email, student_no, phone)
                 # Always reset password to the demo password so re-runs stay usable.
@@ -890,7 +1287,14 @@ def main() -> int:
                                               interests, weekly, mastery)
                 profile_ids[(username, code)] = pid
                 seed_mastery(cur, pid, kp_ids_by_course[cid], mastery)
-                log.info("  profile %s/%s (id=%s) mastery=%.2f", username, code, pid, mastery)
+                actual_mastery = refresh_profile_mastery_score(cur, pid)
+                log.info(
+                    "  profile %s/%s (id=%s) mastery=%.3f",
+                    username,
+                    code,
+                    pid,
+                    actual_mastery,
+                )
 
             log.info("=== learning tasks ===")
             learning_task_specs = [
@@ -1046,7 +1450,7 @@ def main() -> int:
                         inv = upsert_invocation(
                             cur, pid, tid, bid, model_id, None,
                             f"请生成关于 {title} 的内容。\n\n要求：{tdesc}",
-                            f"# {title}\n\n本文为多智能体协同生成的草稿。\n\n核心要点：\n1. 概念与原理\n2. 示例与代码\n3. 练习与思考\n\n（演示内容）",
+                            PROJECT_OUTPUT_CONTENTS[title],
                             in_tok, out_tok, latency,
                             round(in_tok * 0.001 / 1000 + out_tok * 0.002 / 1000, 4),
                             "success", creator_id,
@@ -1063,7 +1467,7 @@ def main() -> int:
                         }.get(status, "draft")
                         out_id = upsert_output(
                             cur, tid, bid, inv, title,
-                            f"# {title}\n\n（AI 生成内容）\n\n{tdesc}\n\n## 重点\n- 要点 1\n- 要点 2\n- 要点 3",
+                            PROJECT_OUTPUT_CONTENTS[title],
                             "ai_generated", out_status, creator_id,
                             is_final=(out_status == "approved"),
                         )
@@ -1107,7 +1511,7 @@ def main() -> int:
                     kp_csv = ",".join(str(x) for x in kps_subset)
                     rid = upsert_learning_resource(
                         cur, cid, title, rtype, "intermediate",
-                        f"# {title}\n\n本资源为多智能体协同生成的演示内容。",
+                        LEARNING_RESOURCE_CONTENTS[(code, rtype)],
                         kp_csv, "deepseek-chat", "approved", teacher_li_id if code == "CS301" else teacher_wang_id,
                     )
 

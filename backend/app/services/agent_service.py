@@ -10,10 +10,7 @@ from app.llm.openai_compatible_provider import OpenAICompatibleProvider
 from app.llm.minimax_provider import MiniMaxProvider
 from app.llm.iflytek_provider import IFlyTekProvider
 from app.llm.gateway import llm_gateway
-from app.services.storage_service import (
-    save_resource_content,
-    list_storage_files,
-)
+from app.database import get_db_transaction
 from app.utils.exceptions import NotFoundException, ValidationException
 
 settings = get_settings()
@@ -21,25 +18,27 @@ settings = get_settings()
 _llm_registered = False
 if not _llm_registered:
     llm_gateway.register_provider("mock", MockProvider())
-    llm_gateway.register_provider("openai_compatible", OpenAICompatibleProvider(
+    openai_compatible_provider = OpenAICompatibleProvider(
         model_name=settings.llm_model,
         base_url=settings.llm_base_url,
         api_key=settings.llm_api_key,
-    ))
+    )
+    for provider_code in ("openai_compatible", "openai", "deepseek", "qwen"):
+        llm_gateway.register_provider(provider_code, openai_compatible_provider)
     llm_gateway.register_provider("minimax", MiniMaxProvider(
         model_name=settings.llm_model,
         base_url=settings.llm_base_url,
         api_key=settings.llm_api_key,
     ))
     # 讯飞星火（当 LLM_PROVIDER=iflytek 时由 gateway 路由至此）
-    if settings.iflytek_app_id and settings.iflytek_api_key:
+    if all((settings.iflytek_app_id, settings.iflytek_api_key, settings.iflytek_api_secret)):
         llm_gateway.register_provider("iflytek", IFlyTekProvider(
             model_name=settings.llm_model,        # 星火 domain，如 "general"
             api_key=settings.iflytek_api_key,
             api_secret=settings.iflytek_api_secret,
             app_id=settings.iflytek_app_id,
         ))
-        logger.info(f"[IFlyTek] Registered: app_id={settings.iflytek_app_id}, model={settings.llm_model}")
+        logger.info("[IFlyTek] Provider registered for model=%s", settings.llm_model)
     _llm_registered = True
 
 from app.agents.workflow import run_workflow, stream_workflow, get_compiled_graph
@@ -203,6 +202,7 @@ class AgentService:
             knowledge_point_ids=req.knowledge_point_ids,
             resource_type=req.resource_type,
             difficulty=req.difficulty,
+            generation_goal=req.generation_goal,
             student_profile=student_profile,
             knowledge_points=selected_kps,
             learning_history=learning_history,
@@ -225,6 +225,7 @@ class AgentService:
             knowledge_point_ids=req.knowledge_point_ids,
             resource_type=req.resource_type,
             difficulty=req.difficulty,
+            generation_goal=req.generation_goal,
             student_profile=student_profile,
             knowledge_points=selected_kps,
             learning_history=learning_history,
@@ -239,20 +240,26 @@ class AgentService:
         return {"code": 404, "message": "未找到运行记录", "data": None}
 
     def save_resource(self, req: Any, user_id: int = 0) -> Dict[str, Any]:
+        from app.repositories import user_repo
+        from app.repositories.evidence_repo import EvidenceRepository
+        from app.repositories.learning_resource_repo import LearningResourceRepository
+
         payload = _extract_save_payload(req.result)
         references = extract_resource_references(req.result)
         resource = payload["resource"]
         evidence_links = payload["evidence_links"]
         trustworthiness = payload["trustworthiness"]
 
-        title = req.title or resource.get("title", "学习资源")
-        content = resource.get("content", "")
+        title = (req.title or resource.get("title") or "").strip()
+        content = str(resource.get("content") or "").strip()
+        if not title:
+            raise ValidationException("资源标题不能为空")
+        if not content:
+            raise ValidationException("资源内容不能为空")
 
-        # 保存到 learning_resources 表（主表，有 resource_id）
-        try:
-            from app.repositories.learning_resource_repo import LearningResourceRepository
-            lr_repo = LearningResourceRepository()
-            db_resource = lr_repo.create_resource(
+        lr_repo = LearningResourceRepository()
+        with get_db_transaction() as conn:
+            created = lr_repo.create_resource(
                 data={
                     "course_id": req.course_id,
                     "resource_title": title,
@@ -262,50 +269,36 @@ class AgentService:
                     "target_kp_ids": references["kp_ids"],
                     "generation_model": resource.get("generation_metadata", {}).get("model"),
                     "generation_agent": resource.get("generation_metadata", {}).get("agent"),
-                    "status": "pending_review",
+                    "status": "draft",
                 },
                 created_by=user_id,
+                conn=conn,
             )
-            saved_resource_id = db_resource.get("resource_id")
-            logger.info(f"[AgentService] 资源写入 learning_resources: resource_id={saved_resource_id}")
-        except Exception as e:
-            logger.warning(f"[AgentService] 写入 learning_resources 失败: {e}")
-            saved_resource_id = None
+            resource_id = int(created["resource_id"])
+            if evidence_links:
+                EvidenceRepository().insert_resource_evidence_links(
+                    [{**link, "resource_id": resource_id} for link in evidence_links],
+                    conn=conn,
+                )
+            user_repo.insert_operation_log_with_conn(
+                user_id=user_id,
+                action_type="learning_resource:create",
+                action_desc=f"保存智能体生成资源草稿: {title}",
+                target_type="learning_resource",
+                target_id=resource_id,
+                conn=conn,
+            )
 
-        # 同时保存到文件存储（保留原有逻辑）
-        saved = save_resource_content(
-            title=title,
-            content=content,
-            resource_type=resource.get("type", "lecture"),
-            course_id=req.course_id,
-            metadata={
-                "difficulty": resource.get("difficulty"),
-                "knowledge_points": resource.get("knowledge_points", []),
-                "target_kp_ids": resource.get("target_kp_ids", ""),
-                "generation_model": resource.get("generation_metadata", {}).get("model"),
-                "quality_score": payload["quality_score"],
-                "step_history": payload["step_history"],
+        saved = lr_repo.get_resource(resource_id)
+        if saved is None:
+            raise NotFoundException("资源保存后无法读取")
+        return {
+            "code": 0,
+            "message": "资源草稿已保存",
+            "data": {
+                **saved,
+                "evidence_count": len(evidence_links),
                 "trustworthiness": trustworthiness,
-                "db_resource_id": saved_resource_id,
+                "quality_score": payload["quality_score"],
             },
-        )
-
-        # 如果有 db_resource_id，则写入 evidence_links
-        if saved_resource_id and evidence_links:
-            try:
-                from app.repositories.evidence_repo import EvidenceRepository
-                ev_repo = EvidenceRepository()
-                links_to_save = [
-                    {**link, "resource_id": saved_resource_id}
-                    for link in evidence_links
-                ]
-                ev_repo.insert_resource_evidence_links(links_to_save)
-                logger.info(f"[AgentService] 写入 {len(evidence_links)} 条 evidence_links，resource_id={saved_resource_id}")
-            except Exception as e:
-                logger.warning(f"[AgentService] 写入 evidence_links 失败: {e}")
-
-        return {"code": 0, "message": "资源已保存到学习资源库", "data": {**saved, "db_resource_id": saved_resource_id}}
-
-    def list_saved_resources(self, course_id: int = None, page: int = 1, page_size: int = 20) -> Dict[str, Any]:
-        result = list_storage_files(course_id=course_id, page=page, page_size=page_size)
-        return {"code": 0, "message": "success", "data": result}
+        }

@@ -10,6 +10,8 @@ import math
 import re
 from typing import Any, Dict, List, Optional
 
+from pymysql.cursors import DictCursor
+
 from app.database import get_db_cursor
 
 
@@ -275,6 +277,7 @@ class EvidenceRepository:
     def insert_resource_evidence_links(
         self,
         links: List[Dict[str, Any]],
+        conn: Any = None,
     ) -> int:
         """
         批量插入资源-证据关联。
@@ -302,7 +305,7 @@ class EvidenceRepository:
                 (resource_id, chunk_id, kp_id, quote_text, relevance_score, usage_type, source_page, source_paragraph)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
-        with get_db_cursor() as cursor:
+        def insert(cursor: Any) -> int:
             for link in links:
                 cursor.execute(sql, (
                     link["resource_id"],
@@ -315,6 +318,13 @@ class EvidenceRepository:
                     link.get("source_paragraph"),
                 ))
             return len(links)
+
+        if conn is not None:
+            with conn.cursor(DictCursor) as cursor:
+                return insert(cursor)
+
+        with get_db_cursor() as cursor:
+            return insert(cursor)
 
     def get_evidence_by_resource(
         self,
