@@ -23,6 +23,8 @@ mysql -u root -p ai_collab_audit_system < database/09_create_a3_tables.sql
 mysql -u root -p ai_collab_audit_system < database/10_insert_a3_initial_data.sql
 mysql -u root -p ai_collab_audit_system < database/27_create_learning_task_progress.sql
 mysql -u root -p ai_collab_audit_system < database/28_cleanup_orphan_learning_profiles.sql
+mysql -u root -p ai_collab_audit_system < database/29_align_education_prompt_templates.sql
+mysql -u root -p ai_collab_audit_system < database/30_remove_demo_model_configs.sql
 
 # PostgreSQL（Phase 2/3 使用）
 # 方式一：仅创建 schema（推荐先试）
@@ -31,7 +33,7 @@ psql -U postgres -d eduagent_studio -f database/pgvector/02_create_embeddings_ta
 psql -U postgres -d eduagent_studio -f database/11_postgresql_migration.sql
 
 # 方式二：完整迁移（需先从 MySQL 导出数据）
-# mysqldump -h 127.0.0.1 -P 3306 -u root -p061202 \
+# mysqldump -h 127.0.0.1 -P 3306 -u root -p \
 #   ai_collab_audit_system \
 #   courses knowledge_points learning_tasks \
 #   student_profiles student_knowledge_mastery learning_resources learning_feedbacks \

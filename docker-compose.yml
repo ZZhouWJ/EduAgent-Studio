@@ -62,6 +62,8 @@ services:
       - ./database/26_productize_seed_project_outputs.sql:/docker-entrypoint-initdb.d/26_productize_seed_project_outputs.sql:ro
       - ./database/27_create_learning_task_progress.sql:/docker-entrypoint-initdb.d/27_create_learning_task_progress.sql:ro
       - ./database/28_cleanup_orphan_learning_profiles.sql:/docker-entrypoint-initdb.d/28_cleanup_orphan_learning_profiles.sql:ro
+      - ./database/29_align_education_prompt_templates.sql:/docker-entrypoint-initdb.d/29_align_education_prompt_templates.sql:ro
+      - ./database/30_remove_demo_model_configs.sql:/docker-entrypoint-initdb.d/30_remove_demo_model_configs.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s
