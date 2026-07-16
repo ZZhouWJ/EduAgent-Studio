@@ -130,7 +130,7 @@ class TutorAgentCoordinator:
 
             for r in results:
                 if isinstance(r, Exception):
-                    logger.error(f"Resource generation error: {r}")
+                    logger.error("Resource generation error (%s)", type(r).__name__)
                 else:
                     content_blocks.append(r)
 

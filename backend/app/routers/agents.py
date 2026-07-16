@@ -119,8 +119,8 @@ async def generate_stream(
         try:
             for step_event in service.generate_stream(req):
                 yield f"data: {__import__('json').dumps(step_event, ensure_ascii=False)}\n\n"
-        except Exception:
-            logger.exception("智能体流式生成失败")
+        except Exception as exc:
+            logger.error("智能体流式生成失败 (%s)", type(exc).__name__)
             yield f"data: {__import__('json').dumps({'type': 'error', 'message': '生成失败，请稍后重试'}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(

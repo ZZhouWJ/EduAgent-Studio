@@ -136,7 +136,7 @@ def _diagnosis_node(state: WorkflowState) -> Dict[str, Any]:
         }
     except Exception as e:
         duration = int((time.time() - start) * 1000)
-        logger.error(f"[DiagnosisNode] {e}")
+        logger.error("[DiagnosisNode] failed (%s)", type(e).__name__)
         return {
             "diagnosis": None,
             "current_step": WorkflowStep.FAILED.value,
@@ -174,7 +174,7 @@ def _planning_node(state: WorkflowState) -> Dict[str, Any]:
         }
     except Exception as e:
         duration = int((time.time() - start) * 1000)
-        logger.error(f"[PlanningNode] {e}")
+        logger.error("[PlanningNode] failed (%s)", type(e).__name__)
         return {
             "current_step": WorkflowStep.FAILED.value,
             "step_history": state.get("step_history", []) + [
@@ -216,7 +216,7 @@ def _resource_generation_node(state: WorkflowState) -> Dict[str, Any]:
         }
     except Exception as e:
         duration = int((time.time() - start) * 1000)
-        logger.error(f"[ResourceGenerationNode] {e}")
+        logger.error("[ResourceGenerationNode] failed (%s)", type(e).__name__)
         return {
             "current_step": WorkflowStep.FAILED.value,
             "step_history": state.get("step_history", []) + [
@@ -250,7 +250,7 @@ def _assessment_node(state: WorkflowState) -> Dict[str, Any]:
         }
     except Exception as e:
         duration = int((time.time() - start) * 1000)
-        logger.error(f"[AssessmentNode] {e}")
+        logger.error("[AssessmentNode] failed (%s)", type(e).__name__)
         return {
             "current_step": WorkflowStep.FAILED.value,
             "step_history": state.get("step_history", []) + [
@@ -288,7 +288,7 @@ def _teacher_review_node(state: WorkflowState) -> Dict[str, Any]:
         }
     except Exception as e:
         duration = int((time.time() - start) * 1000)
-        logger.error(f"[TeacherReviewNode] {e}")
+        logger.error("[TeacherReviewNode] failed (%s)", type(e).__name__)
         return {
             "current_step": WorkflowStep.FAILED.value,
             "step_history": state.get("step_history", []) + [
@@ -344,7 +344,7 @@ def _revision_node(state: WorkflowState) -> Dict[str, Any]:
         }
     except Exception as e:
         duration = int((time.time() - start) * 1000)
-        logger.error(f"[RevisionNode] {e}")
+        logger.error("[RevisionNode] failed (%s)", type(e).__name__)
         return {
             "revision_count": revision_count,
             "current_step": WorkflowStep.FAILED.value,

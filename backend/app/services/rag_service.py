@@ -67,13 +67,13 @@ def get_context_for_agent(
             chunks = [c for c in chunks if c.get("course_id") == course_id]
         chunks = chunks[:top_k]
         if not chunks:
-            logger.info(f"[RAG] local BM25 query='{query}' 无结果")
+            logger.info("[RAG] local BM25 query returned no results")
             return ""
         context = retriever.format_context(chunks)
-        logger.info(f"[RAG] local BM25 query='{query}' 返回 {len(chunks)} 个片段")
+        logger.info("[RAG] local BM25 returned %s fragments", len(chunks))
         return context
     except Exception as e:
-        logger.warning(f"[RAG] 本地检索异常，回退到空字符串: {e}")
+        logger.warning("[RAG] 本地检索异常，回退到空字符串 (%s)", type(e).__name__)
         return ""
 
 
@@ -103,14 +103,14 @@ def _iflytek_rag_context(
             top_k=top_k,
         )
         if result:
-            logger.info(f"[RAG] IFlyTek ChatDoc query='{search_query}' 检索到 {len(result)//100} 字")
+            logger.info("[RAG] IFlyTek ChatDoc returned %s hundred characters", len(result) // 100)
         else:
-            logger.info(f"[RAG] IFlyTek ChatDoc query='{search_query}' 无结果，回退到本地 BM25")
+            logger.info("[RAG] IFlyTek ChatDoc returned no results; using local BM25")
             # 无结果时回退到本地
             return _local_bm25_fallback(query, course_id, kp_name, top_k)
         return result
     except Exception as e:
-        logger.warning(f"[RAG] IFlyTek ChatDoc 检索失败，回退到本地: {e}")
+        logger.warning("[RAG] IFlyTek ChatDoc 检索失败，回退到本地 (%s)", type(e).__name__)
         return _local_bm25_fallback(query, course_id, kp_name, top_k)
 
 
@@ -130,10 +130,10 @@ def _local_bm25_fallback(
         if not chunks:
             return ""
         context = retriever.format_context(chunks)
-        logger.info(f"[RAG] BM25 fallback query='{query}' 返回 {len(chunks)} 个片段")
+        logger.info("[RAG] BM25 fallback returned %s fragments", len(chunks))
         return context
     except Exception as e:
-        logger.warning(f"[RAG] BM25 fallback 失败: {e}")
+        logger.warning("[RAG] BM25 fallback 失败 (%s)", type(e).__name__)
         return ""
 
 
@@ -151,5 +151,5 @@ def search_materials(
         retriever = _get_retriever()
         return retriever.search(query=query, top_k=top_k, kp_name_filter=kp_name)
     except Exception as e:
-        logger.warning(f"[RAG] 检索异常: {e}")
+        logger.warning("[RAG] 检索异常 (%s)", type(e).__name__)
         return []

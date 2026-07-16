@@ -72,5 +72,5 @@ async def understand_image(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"[Multimodal] image understand failed: {e}")
+        logger.error("[Multimodal] image understand failed (%s)", type(e).__name__)
         return ImageUnderstandResponse(success=False, error="图片分析失败，请稍后重试")

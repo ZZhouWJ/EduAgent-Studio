@@ -89,8 +89,8 @@ def compute_knowledge_point_embeddings(self, course_id: int) -> dict:
             "details": results,
         }
     except Exception as e:
-        logger.error(f"[Embedding] 计算失败: {e}")
-        raise self.retry(exc=e)
+        logger.error("[Embedding] 计算失败 (%s)", type(e).__name__)
+        raise self.retry(exc=RuntimeError("embedding calculation failed"))
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
@@ -136,8 +136,8 @@ def compute_resource_embedding(self, resource_id: int) -> dict:
             "stored": result.get("stored", 0),
         }
     except Exception as e:
-        logger.error(f"[Embedding] 资源 {resource_id} 计算失败: {e}")
-        raise self.retry(exc=e)
+        logger.error("[Embedding] 资源 %s 计算失败 (%s)", resource_id, type(e).__name__)
+        raise self.retry(exc=RuntimeError("resource embedding calculation failed"))
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=300)
@@ -166,5 +166,5 @@ def rebuild_all_embeddings(self) -> dict:
             "tasks": results,
         }
     except Exception as e:
-        logger.error(f"[Embedding] 全量重建失败: {e}")
-        raise self.retry(exc=e)
+        logger.error("[Embedding] 全量重建失败 (%s)", type(e).__name__)
+        raise self.retry(exc=RuntimeError("embedding rebuild failed"))

@@ -20,30 +20,36 @@ class ErrorSanitizationTests(unittest.TestCase):
     def test_database_health_does_not_return_driver_error(self, get_connection):
         get_connection.side_effect = pymysql.OperationalError(1045, SECRET)
 
-        result = test_connection()
+        with self.assertLogs("app.database", level="WARNING") as logs:
+            result = test_connection()
 
         self.assertFalse(result["connected"])
         self.assertNotIn(SECRET, result["message"])
+        self.assertNotIn(SECRET, "\n".join(logs.output))
 
     def test_knowledge_service_does_not_return_repository_error(self):
         service = KnowledgeService()
         service._repo = Mock()
         service._repo.search_chunks.side_effect = RuntimeError(SECRET)
 
-        result = service.search(1, "事务")
+        with self.assertLogs("app.services.knowledge_service", level="ERROR") as logs:
+            result = service.search(1, "事务")
 
         self.assertEqual(result["code"], 500)
         self.assertNotIn(SECRET, result["message"])
+        self.assertNotIn(SECRET, "\n".join(logs.output))
 
     def test_learning_service_does_not_return_repository_error(self):
         service = LearningService()
         service._repo = Mock()
         service._repo.create_task.side_effect = RuntimeError(SECRET)
 
-        result = service.create_task(1, "测试")
+        with self.assertLogs("app.services.learning_service", level="ERROR") as logs:
+            result = service.create_task(1, "测试")
 
         self.assertEqual(result["code"], 500)
         self.assertNotIn(SECRET, result["message"])
+        self.assertNotIn(SECRET, "\n".join(logs.output))
 
     def test_profile_service_does_not_return_repository_error(self):
         service = ProfileService()
@@ -52,10 +58,12 @@ class ErrorSanitizationTests(unittest.TestCase):
         service._access.list_accessible_course_ids.return_value = [1]
         service._repo.list_profiles.side_effect = RuntimeError(SECRET)
 
-        result = service.list_profiles({"user_id": 7, "roles": ["teacher"]})
+        with self.assertLogs("app.services.profile_service", level="ERROR") as logs:
+            result = service.list_profiles({"user_id": 7, "roles": ["teacher"]})
 
         self.assertEqual(result["code"], 500)
         self.assertNotIn(SECRET, result["message"])
+        self.assertNotIn(SECRET, "\n".join(logs.output))
 
     @patch("app.routers.auth.auth_service.register")
     def test_auth_route_does_not_return_unexpected_error(self, register_user):
@@ -70,11 +78,13 @@ class ErrorSanitizationTests(unittest.TestCase):
         request.headers = {}
         request.client = None
 
-        response = asyncio.run(register(request, body))
+        with self.assertLogs("app.routers.auth", level="ERROR") as logs:
+            response = asyncio.run(register(request, body))
         payload = json.loads(response.body)
 
         self.assertEqual(response.status_code, 500)
         self.assertNotIn(SECRET, payload["message"])
+        self.assertNotIn(SECRET, "\n".join(logs.output))
 
 
 if __name__ == "__main__":

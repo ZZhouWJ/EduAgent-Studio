@@ -113,7 +113,7 @@ class AgentService:
             selected = [kp for kp in all_kps if kp.get("id") in kp_ids]
             return selected
         except Exception as e:
-            logger.warning(f"加载知识点失败，使用空列表: {e}")
+            logger.warning("加载知识点失败，使用空列表 (%s)", type(e).__name__)
             return []
 
     def _load_learning_history(
@@ -142,7 +142,7 @@ class AgentService:
                 history.append(entry)
             return history
         except Exception as e:
-            logger.warning(f"加载学习历史失败，使用空列表: {e}")
+            logger.warning("加载学习历史失败，使用空列表 (%s)", type(e).__name__)
             return []
 
     def _resolve_profile(self, student_id: int, course_id: int):

@@ -95,7 +95,12 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-        logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
+        logger.error(
+            "Unhandled exception on %s %s (%s)",
+            request.method,
+            request.url.path,
+            type(exc).__name__,
+        )
         return error_response(
             message="系统内部错误，请稍后重试",
             code=5000,

@@ -58,9 +58,9 @@ def _load_index() -> None:
         try:
             with open(index_path, "r", encoding="utf-8") as f:
                 _storage_index = json.load(f)
-            logger.info("已从 %s 加载存储索引，共 %d 条记录", index_path, len(_storage_index))
+            logger.info("已加载存储索引，共 %d 条记录", len(_storage_index))
         except Exception as e:
-            logger.warning("加载存储索引失败: %s，使用空索引", e)
+            logger.warning("加载存储索引失败 (%s)，使用空索引", type(e).__name__)
             _storage_index = {}
     else:
         _storage_index = {}
@@ -77,7 +77,7 @@ def _save_index() -> None:
         with open(index_path, "w", encoding="utf-8") as f:
             json.dump(_storage_index, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        logger.error("保存存储索引失败: %s", e)
+        logger.error("保存存储索引失败 (%s)", type(e).__name__)
         raise
 
 
@@ -142,7 +142,7 @@ def save_resource_content(
     }
     _save_index()
 
-    logger.info("已保存资源: %s (file_id=%s, course_id=%d)", title, file_id, course_id)
+    logger.info("已保存资源: file_id=%s course_id=%d", file_id, course_id)
 
     return {
         "file_id": file_id,
@@ -186,7 +186,7 @@ def get_resource_content(file_id: str) -> Optional[dict[str, Any]]:
             "url": entry.get("url"),
         }
     except Exception as e:
-        logger.error("读取资源文件失败: %s (%s)", file_path, e)
+        logger.error("读取资源文件失败 (%s)", type(e).__name__)
         return None
 
 

@@ -411,7 +411,7 @@ class ResourceGenerationAgent:
             }
 
         except Exception as e:
-            logger.warning(f"[{self.AGENT_NAME}] 证据检索失败: {e}")
+            logger.warning("[%s] 证据检索失败 (%s)", self.AGENT_NAME, type(e).__name__)
             return {
                 "evidence_chunks": [],
                 "context_text": "",
@@ -568,7 +568,11 @@ class ResourceGenerationAgent:
             context = get_context_for_agent(query=query, course_id=course_id, top_k=5)
             return context if context else ""
         except Exception as e:
-            logger.warning(f"[{self.AGENT_NAME}] RAG 检索失败，跳过幻觉检测: {e}")
+            logger.warning(
+                "[%s] RAG 检索失败，跳过幻觉检测 (%s)",
+                self.AGENT_NAME,
+                type(e).__name__,
+            )
             return ""
 
     def _hallucination_check(self, content: str, rag_context: str) -> Optional[Dict[str, Any]]:
@@ -589,7 +593,7 @@ class ResourceGenerationAgent:
             config.max_tokens = 1024
             llm_result = self.llm_gateway.generate(messages, config)
             if llm_result.status == "failed":
-                logger.warning(f"[{self.AGENT_NAME}] 幻觉检测 LLM 调用失败: {llm_result.error}")
+                logger.warning("[%s] 幻觉检测 LLM 调用失败", self.AGENT_NAME)
                 return None
             raw = llm_result.content.strip()
             if raw.startswith("```"):
@@ -598,9 +602,13 @@ class ResourceGenerationAgent:
                 raw = raw.replace("```", "").strip()
             return json.loads(raw)
         except json.JSONDecodeError as e:
-            logger.warning(f"[{self.AGENT_NAME}] 幻觉检测 JSON 解析失败: {e}")
+            logger.warning(
+                "[%s] 幻觉检测 JSON 解析失败 (%s)",
+                self.AGENT_NAME,
+                type(e).__name__,
+            )
         except Exception as e:
-            logger.warning(f"[{self.AGENT_NAME}] 幻觉检测异常: {e}")
+            logger.warning("[%s] 幻觉检测异常 (%s)", self.AGENT_NAME, type(e).__name__)
         return None
 
     def _call_llm(self, messages: List[Dict[str, str]]) -> Optional[str]:
@@ -612,12 +620,12 @@ class ResourceGenerationAgent:
             config.max_tokens = 4096
             llm_result = self.llm_gateway.generate(messages, config)
             if llm_result.status == "failed":
-                logger.error(f"[{self.AGENT_NAME}] LLM 调用失败: {llm_result.error}")
+                logger.error("[%s] LLM 调用失败", self.AGENT_NAME)
                 return None
             logger.info(f"[{self.AGENT_NAME}] LLM 生成完成，{llm_result.output_tokens} tokens")
             return llm_result.content.strip()
         except Exception as e:
-            logger.error(f"[{self.AGENT_NAME}] LLM 调用异常: {e}")
+            logger.error("[%s] LLM 调用异常 (%s)", self.AGENT_NAME, type(e).__name__)
         return None
 
     def _generate_content(

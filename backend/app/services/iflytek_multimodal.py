@@ -149,7 +149,7 @@ def image_understand(
             timeout_guard.cancel()
 
         if error_msg:
-            logger.error(f"[IFlyTek ImageUnderstand] error: {error_msg[0]}")
+            logger.error("[IFlyTek ImageUnderstand] provider returned an error")
             return ""
 
         answer = "".join(result)
@@ -157,7 +157,7 @@ def image_understand(
         return answer
 
     except Exception as e:
-        logger.error(f"[IFlyTek ImageUnderstand] failed: {e}")
+        logger.error("[IFlyTek ImageUnderstand] failed (%s)", type(e).__name__)
         return ""
 
 
@@ -223,9 +223,8 @@ def generate_image(
         header = data.get("header", {})
         if header.get("code", 0) != 0:
             logger.error(
-                "[IFlyTek ImageGenerate] code=%s message=%s",
+                "[IFlyTek ImageGenerate] provider error code=%s",
                 header.get("code"),
-                header.get("message", "unknown"),
             )
             return ""
         choices = data.get("payload", {}).get("choices", {})
@@ -234,7 +233,7 @@ def generate_image(
         logger.info(f"[IFlyTek ImageGenerate] OK, length={len(img)}")
         return img
     except Exception as e:
-        logger.error(f"[IFlyTek ImageGenerate failed: {e}")
+        logger.error("[IFlyTek ImageGenerate] failed (%s)", type(e).__name__)
         return ""
 
 
@@ -320,10 +319,10 @@ def text_to_speech(
             timeout_guard.cancel()
 
         if errors:
-            logger.error(f"[IFlyTek TTS] error: {errors[0]}")
+            logger.error("[IFlyTek TTS] provider returned an error")
             return b""
         return b"".join(chunks)
 
     except Exception as e:
-        logger.error(f"[IFlyTek TTS failed: {e}")
+        logger.error("[IFlyTek TTS] failed (%s)", type(e).__name__)
         return b""

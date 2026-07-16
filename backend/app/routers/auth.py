@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 def _unexpected_auth_error(action: str, exc: Exception):
-    logger.exception("认证操作失败: action=%s error=%s", action, exc)
+    logger.error("认证操作失败: action=%s (%s)", action, type(exc).__name__)
     return error_response(
         message="操作失败，请稍后重试",
         code=5000,

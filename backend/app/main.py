@@ -161,7 +161,7 @@ def create_app() -> FastAPI:
                 message="数据库连接正常",
             )
         else:
-            logger.warning("数据库健康检查失败: %s", db_result["message"])
+            logger.warning("数据库健康检查失败")
             return error_response(
                 message=db_result["message"],
                 code=5002,

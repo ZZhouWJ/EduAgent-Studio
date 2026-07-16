@@ -83,7 +83,7 @@ def chatdoc_retrieve(
 
         code = data.get("header", {}).get("code", 0)
         if code != 0:
-            logger.warning(f"[IFlyTek ChatDoc] API error code={code}: {data.get('header', {}).get('message', '')}")
+            logger.warning("[IFlyTek ChatDoc] API error code=%s", code)
             return ""
 
         # 解析检索结果
@@ -109,12 +109,12 @@ def chatdoc_retrieve(
                 texts.append(content)
 
         result = "\n---\n".join(texts)
-        logger.info(f"[IFlyTek ChatDoc] retrieved {len(texts)} fragments for query='{query[:30]}...'")
+        logger.info("[IFlyTek ChatDoc] retrieved %s fragments", len(texts))
         return result
 
     except httpx.HTTPStatusError as e:
-        logger.error(f"[IFlyTek ChatDoc] HTTP error: {e.response.status_code} - {e.response.text}")
+        logger.error("[IFlyTek ChatDoc] HTTP error: %s", e.response.status_code)
         return ""
     except Exception as e:
-        logger.error(f"[IFlyTek ChatDoc] call failed: {e}")
+        logger.error("[IFlyTek ChatDoc] call failed (%s)", type(e).__name__)
         return ""

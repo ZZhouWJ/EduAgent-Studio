@@ -24,7 +24,8 @@ class KnowledgeReparseTests(unittest.TestCase):
     def test_failed_reparse_preserves_previous_version(self, parser, _exists):
         parser.side_effect = RuntimeError("/private/server/path leaked")
 
-        result = self.service.reparse_material(8)
+        with self.assertLogs("app.services.knowledge_service", level="ERROR") as logs:
+            result = self.service.reparse_material(8)
 
         self.assertEqual(result["message"], "重新解析失败，已保留上一版本")
         self.service._repo.replace_material_chunks.assert_not_called()
@@ -32,6 +33,7 @@ class KnowledgeReparseTests(unittest.TestCase):
             8, "parsed", error_message="重新解析失败，已保留上一版本"
         )
         self.assertNotIn("/private", result["message"])
+        self.assertNotIn("/private", "\n".join(logs.output))
 
     @patch("app.services.knowledge_service.os.path.exists", return_value=True)
     @patch("app.services.knowledge_service.parse_document_file")

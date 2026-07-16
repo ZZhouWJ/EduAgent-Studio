@@ -399,7 +399,7 @@ class TutorService:
             result = self._llm_gateway.generate(messages, config)
 
             if result.status == "failed":
-                logger.error(f"LLM call failed: {result.error}")
+                logger.error("LLM call failed")
                 return self._fallback_answer(question, weak_points_str)
 
             content = result.content.strip()

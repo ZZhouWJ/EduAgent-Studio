@@ -134,7 +134,11 @@ class DiagnosisAgent:
                 return context
             return "（RAG 检索结果为空）"
         except Exception as e:
-            logger.warning(f"[{self.AGENT_NAME}] RAG 检索失败，回退到无上下文: {e}")
+            logger.warning(
+                "[%s] RAG 检索失败，回退到无上下文 (%s)",
+                self.AGENT_NAME,
+                type(e).__name__,
+            )
             return "（RAG 检索暂不可用）"
 
     def _call_llm(self, messages: List[Dict[str, str]]) -> Optional[Dict[str, Any]]:
@@ -147,7 +151,7 @@ class DiagnosisAgent:
             config = settings.llm_config()
             llm_result = self.llm_gateway.generate(messages, config)
             if llm_result.status == "failed":
-                logger.error(f"[{self.AGENT_NAME}] LLM 调用失败: {llm_result.error}")
+                logger.error("[%s] LLM 调用失败", self.AGENT_NAME)
                 return None
             content = llm_result.content.strip()
             if content.startswith("```"):
@@ -159,9 +163,13 @@ class DiagnosisAgent:
             logger.info(f"[{self.AGENT_NAME}] LLM 诊断完成: {len(data.get('weak_points', []))} 个薄弱点")
             return data
         except json.JSONDecodeError as e:
-            logger.error(f"[{self.AGENT_NAME}] LLM 返回 JSON 解析失败: {e}")
+            logger.error(
+                "[%s] LLM 返回 JSON 解析失败 (%s)",
+                self.AGENT_NAME,
+                type(e).__name__,
+            )
         except Exception as e:
-            logger.error(f"[{self.AGENT_NAME}] LLM 调用异常: {e}")
+            logger.error("[%s] LLM 调用异常 (%s)", self.AGENT_NAME, type(e).__name__)
         return None
 
     def _fallback(self, knowledge_points: List[Dict[str, Any]]) -> Dict[str, Any]:

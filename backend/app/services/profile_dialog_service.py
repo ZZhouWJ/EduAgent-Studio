@@ -306,7 +306,7 @@ class ProfileDialogService:
                     return json.loads(json_str)
 
             # 如果 LLM 调用失败或解析失败，返回默认结构
-            logger.warning(f"LLM extraction failed, using default: {result.error if hasattr(result, 'error') else 'unknown'}")
+            logger.warning("LLM extraction failed, using default")
             return self._get_default_extraction()
 
         except Exception as e:

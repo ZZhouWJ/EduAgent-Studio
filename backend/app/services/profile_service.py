@@ -65,8 +65,8 @@ class ProfileService:
             }
         except (ForbiddenException, NotFoundException):
             raise
-        except Exception:
-            logger.exception("查询学生画像列表失败")
+        except Exception as e:
+            logger.error("查询学生画像列表失败 (%s)", type(e).__name__)
             return {
                 "code": 500,
                 "message": "查询失败，请稍后重试",
@@ -85,8 +85,8 @@ class ProfileService:
             return {"code": 0, "message": "success", "data": profile}
         except (ForbiddenException, NotFoundException):
             raise
-        except Exception:
-            logger.exception("查询学生画像失败: profile_id=%s", profile_id)
+        except Exception as e:
+            logger.error("查询学生画像失败: profile_id=%s (%s)", profile_id, type(e).__name__)
             return {"code": 500, "message": "查询失败，请稍后重试", "data": None}
 
     def get_my_profile(self, user: Any) -> Dict[str, Any]:
@@ -107,8 +107,8 @@ class ProfileService:
             if profile is None:
                 return {"code": 404, "message": "您还没有创建学生画像，请先通过学习反馈或教师导入建立画像", "data": None}
             return {"code": 0, "message": "success", "data": profile}
-        except Exception:
-            logger.exception("查询本人学生画像失败")
+        except Exception as e:
+            logger.error("查询本人学生画像失败 (%s)", type(e).__name__)
             return {"code": 500, "message": "查询失败，请稍后重试", "data": None}
 
     def update_profile(
@@ -125,8 +125,8 @@ class ProfileService:
             return {"code": 0, "message": "更新成功", "data": updated}
         except (ForbiddenException, NotFoundException):
             raise
-        except Exception:
-            logger.exception("更新学生画像失败: profile_id=%s", profile_id)
+        except Exception as e:
+            logger.error("更新学生画像失败: profile_id=%s (%s)", profile_id, type(e).__name__)
             return {"code": 500, "message": "更新失败，请稍后重试", "data": None}
 
     def update_mastery(
@@ -169,6 +169,6 @@ class ProfileService:
             }
         except (ForbiddenException, NotFoundException):
             raise
-        except Exception:
-            logger.exception("更新学生掌握度失败: profile_id=%s", profile_id)
+        except Exception as e:
+            logger.error("更新学生掌握度失败: profile_id=%s (%s)", profile_id, type(e).__name__)
             return {"code": 500, "message": "掌握度更新失败，请稍后重试", "data": None}

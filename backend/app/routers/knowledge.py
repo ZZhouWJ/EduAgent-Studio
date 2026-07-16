@@ -173,8 +173,8 @@ async def get_pending_kp_chunk_links(
         repo = EvidenceRepository()
         links = repo.get_pending_kp_chunk_links(course_id=course_id, limit=50)
         return {"code": 0, "message": "success", "data": links}
-    except Exception:
-        logger.exception("查询待审核知识点关联失败: course_id=%s", course_id)
+    except Exception as exc:
+        logger.error("查询待审核知识点关联失败: course_id=%s (%s)", course_id, type(exc).__name__)
         return {"code": 500, "message": "查询失败，请稍后重试", "data": None}
 
 
@@ -199,8 +199,8 @@ async def verify_kp_chunk_link(
         if success:
             return {"code": 0, "message": f"已{'确认' if status == 'confirmed' else '拒绝'}", "data": {"link_id": link_id}}
         return {"code": 404, "message": "记录不存在", "data": None}
-    except Exception:
-        logger.exception("审核知识点关联失败: link_id=%s", link_id)
+    except Exception as exc:
+        logger.error("审核知识点关联失败: link_id=%s (%s)", link_id, type(exc).__name__)
         return {"code": 500, "message": "审核失败，请稍后重试", "data": None}
 
 
@@ -220,8 +220,8 @@ async def get_resource_evidence(
         repo = EvidenceRepository()
         evidence = repo.get_evidence_by_resource(resource_id)
         return {"code": 0, "message": "success", "data": evidence}
-    except Exception:
-        logger.exception("查询资源证据失败: resource_id=%s", resource_id)
+    except Exception as exc:
+        logger.error("查询资源证据失败: resource_id=%s (%s)", resource_id, type(exc).__name__)
         return {"code": 500, "message": "查询失败，请稍后重试", "data": None}
 
 
@@ -245,8 +245,8 @@ async def verify_resource_evidence(
         if success:
             return {"code": 0, "message": f"已{'确认' if status == 'verified' else '拒绝'}", "data": {"link_id": link_id}}
         return {"code": 404, "message": "记录不存在", "data": None}
-    except Exception:
-        logger.exception("审核资源证据失败: link_id=%s", link_id)
+    except Exception as exc:
+        logger.error("审核资源证据失败: link_id=%s (%s)", link_id, type(exc).__name__)
         return {"code": 500, "message": "审核失败，请稍后重试", "data": None}
 
 

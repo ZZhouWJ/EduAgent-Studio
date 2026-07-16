@@ -100,8 +100,8 @@ class LearningService:
                 creator_id=creator_id,
             )
             return {"code": 0, "message": "任务创建成功", "data": result}
-        except Exception:
-            logger.exception("创建学习任务失败: course_id=%s", course_id)
+        except Exception as e:
+            logger.error("创建学习任务失败: course_id=%s (%s)", course_id, type(e).__name__)
             return {"code": 500, "message": "创建任务失败，请稍后重试", "data": None}
 
     def update_task_status(
@@ -170,8 +170,8 @@ class LearningService:
             return {"code": 0, "message": "课程状态已更新", "data": result}
         except ValueError as e:
             return {"code": 400, "message": str(e), "data": None}
-        except Exception:
-            logger.exception("更新课程状态失败: course_id=%s", course_id)
+        except Exception as e:
+            logger.error("更新课程状态失败: course_id=%s (%s)", course_id, type(e).__name__)
             return {"code": 500, "message": "更新课程状态失败，请稍后重试", "data": None}
 
     def get_learning_path(self, course_id: int, profile_id: Optional[int] = None) -> Dict[str, Any]:
@@ -179,8 +179,8 @@ class LearningService:
         try:
             path_data = self._repo.get_learning_path(course_id, profile_id=profile_id)
             return {"code": 0, "message": "success", "data": path_data}
-        except Exception:
-            logger.exception("获取学习路径失败: course_id=%s", course_id)
+        except Exception as e:
+            logger.error("获取学习路径失败: course_id=%s (%s)", course_id, type(e).__name__)
             return {"code": 500, "message": "获取学习路径失败，请稍后重试", "data": None}
 
     def recommend_resources(self, profile_id: int, course_id: int) -> List[Dict[str, Any]]:
@@ -196,10 +196,11 @@ class LearningService:
         try:
             resources = self._repo.get_recommended_resources(profile_id, course_id)
             return resources
-        except Exception:
-            logger.exception(
-                "获取推荐资源失败: profile_id=%s course_id=%s",
+        except Exception as e:
+            logger.error(
+                "获取推荐资源失败: profile_id=%s course_id=%s (%s)",
                 profile_id,
                 course_id,
+                type(e).__name__,
             )
             return []

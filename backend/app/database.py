@@ -135,14 +135,14 @@ def test_connection() -> Dict[str, Any]:
         finally:
             conn.close()
     except pymysql.Error as e:
-        logger.warning("数据库连接测试失败: %s", e)
+        logger.warning("数据库连接测试失败 (%s)", type(e).__name__)
         return {
             "connected": False,
             "message": "数据库连接失败",
             "server_version": None,
         }
     except Exception as e:
-        logger.warning("数据库连接测试异常: %s", e)
+        logger.warning("数据库连接测试异常 (%s)", type(e).__name__)
         return {
             "connected": False,
             "message": "数据库连接异常",

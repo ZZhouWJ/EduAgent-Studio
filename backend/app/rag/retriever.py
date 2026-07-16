@@ -72,7 +72,7 @@ def _search_db_chunks(
             cursor.execute(sql, params)
             rows = cursor.fetchall()
     except Exception as e:
-        logger.warning("查询数据库 chunks 失败: %s", e)
+        logger.warning("查询数据库 chunks 失败 (%s)", type(e).__name__)
         return []
 
     if not rows:

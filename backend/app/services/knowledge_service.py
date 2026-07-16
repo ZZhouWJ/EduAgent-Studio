@@ -133,13 +133,16 @@ class KnowledgeService:
 
         except ValueError as exc:
             return {"code": 400, "message": str(exc), "data": None}
-        except Exception:
+        except Exception as e:
             if storage_path and os.path.exists(storage_path):
                 try:
                     os.remove(storage_path)
-                except OSError:
-                    logger.warning("无法清理上传失败的临时文件: %s", storage_path)
-            logger.exception("课程资料上传失败")
+                except OSError as cleanup_error:
+                    logger.warning(
+                        "无法清理上传失败的临时文件 (%s)",
+                        type(cleanup_error).__name__,
+                    )
+            logger.error("课程资料上传失败 (%s)", type(e).__name__)
             return {
                 "code": 500,
                 "message": "上传失败，请稍后重试",
@@ -222,8 +225,8 @@ class KnowledgeService:
                 },
             }
 
-        except Exception:
-            logger.exception("资料解析失败: material_id=%s", material_id)
+        except Exception as e:
+            logger.error("资料解析失败: material_id=%s (%s)", material_id, type(e).__name__)
             self._repo.update_material_status(
                 material_id, "failed", error_message="解析失败，请检查文件内容"
             )
@@ -269,8 +272,8 @@ class KnowledgeService:
                 },
             }
 
-        except Exception:
-            logger.exception("知识库检索失败: course_id=%s", course_id)
+        except Exception as e:
+            logger.error("知识库检索失败: course_id=%s (%s)", course_id, type(e).__name__)
             return {"code": 500, "message": "检索失败，请稍后重试", "data": None}
 
     @staticmethod
@@ -369,8 +372,8 @@ class KnowledgeService:
                 },
             }
 
-        except Exception:
-            logger.exception("资料重新解析失败: material_id=%s", material_id)
+        except Exception as e:
+            logger.error("资料重新解析失败: material_id=%s (%s)", material_id, type(e).__name__)
             self._repo.update_material_status(
                 material_id, "parsed", error_message="重新解析失败，已保留上一版本"
             )
@@ -452,8 +455,8 @@ class KnowledgeService:
                     "materials": materials,
                 },
             }
-        except Exception:
-            logger.exception("获取课程资料列表失败: course_id=%s", course_id)
+        except Exception as e:
+            logger.error("获取课程资料列表失败: course_id=%s (%s)", course_id, type(e).__name__)
             return {"code": 500, "message": "获取资料列表失败，请稍后重试", "data": None}
 
     def get_material_detail(self, material_id: int) -> Dict[str, Any]:
@@ -481,8 +484,8 @@ class KnowledgeService:
                     "chunks": chunks,
                 },
             }
-        except Exception:
-            logger.exception("获取资料详情失败: material_id=%s", material_id)
+        except Exception as e:
+            logger.error("获取资料详情失败: material_id=%s (%s)", material_id, type(e).__name__)
             return {"code": 500, "message": "获取资料详情失败，请稍后重试", "data": None}
 
     def delete_material(self, material_id: int) -> Dict[str, Any]:
@@ -506,6 +509,6 @@ class KnowledgeService:
             else:
                 return {"code": 500, "message": "删除失败", "data": None}
 
-        except Exception:
-            logger.exception("删除课程资料失败: material_id=%s", material_id)
+        except Exception as e:
+            logger.error("删除课程资料失败: material_id=%s (%s)", material_id, type(e).__name__)
             return {"code": 500, "message": "删除失败，请稍后重试", "data": None}

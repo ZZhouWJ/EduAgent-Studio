@@ -143,8 +143,8 @@ async def tutor_chat_stream(
             ):
                 yield sse_line
 
-        except Exception:
-            logger.exception("流式答疑失败")
+        except Exception as exc:
+            logger.error("流式答疑失败 (%s)", type(exc).__name__)
             yield f"data: {json.dumps({'type': 'error', 'message': '答疑失败，请稍后重试'}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(

@@ -111,7 +111,7 @@ class AssessmentAgent:
             config = settings.llm_config()
             llm_result = self.llm_gateway.generate(messages, config)
             if llm_result.status == "failed":
-                logger.error(f"[{self.AGENT_NAME}] LLM 调用失败: {llm_result.error}")
+                logger.error("[%s] LLM 调用失败", self.AGENT_NAME)
                 return None
             content = llm_result.content.strip()
             if content.startswith("```"):
@@ -123,9 +123,9 @@ class AssessmentAgent:
             logger.info(f"[{self.AGENT_NAME}] LLM 评测完成")
             return data
         except json.JSONDecodeError as e:
-            logger.error(f"[{self.AGENT_NAME}] JSON 解析失败: {e}")
+            logger.error("[%s] JSON 解析失败 (%s)", self.AGENT_NAME, type(e).__name__)
         except Exception as e:
-            logger.error(f"[{self.AGENT_NAME}] LLM 调用异常: {e}")
+            logger.error("[%s] LLM 调用异常 (%s)", self.AGENT_NAME, type(e).__name__)
         return None
 
     def _fallback(self, accuracy: float, total: int, correct: int, student_profile: Dict) -> Dict[str, Any]:
