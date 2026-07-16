@@ -1,7 +1,7 @@
 import React from "react";
-import { CalendarClock, CheckSquare, ClipboardList, Plus, RefreshCw, Save, Users } from "lucide-react";
+import { BookOpen, CalendarClock, CheckSquare, ClipboardList, Plus, RefreshCw, Save, Users } from "lucide-react";
 import { useApi } from "@/lib/useApi";
-import { learningApi, statisticsApi } from "@/lib/api";
+import { learningApi } from "@/lib/api";
 import { taskTypeLabel } from "@/lib/educationLabels";
 import { EmptyState, ModalShell, PageHeader, ProgressBar, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, notify } from "../components/common/ProductUI";
 
@@ -31,7 +31,6 @@ export function TeacherTasks() {
     () => learningApi.listTasks({ page_size: 50 }),
     []
   );
-  const { data: statsData } = useApi(() => statisticsApi.overview(), []);
   const { data: courseData } = useApi(() => learningApi.listCourses(), []);
 
   const courses = courseData ?? [];
@@ -67,13 +66,14 @@ export function TeacherTasks() {
   const avgCompletion = items.length > 0
     ? Math.round(items.reduce((sum, i) => sum + i.completion, 0) / items.length)
     : 0;
+  const coveredCourseCount = new Set(items.map((item) => item.raw.course_id)).size;
 
   const stats = [
     { label: "已发布任务", value: `${items.length}`, hint: "覆盖多门课程", icon: ClipboardList, tone: "blue" as const },
     { label: "进行中任务", value: `${inProgressCount}`, hint: "本周跟踪", icon: CalendarClock, tone: "purple" as const },
     { label: "平均完成率", value: `${avgCompletion}%`, hint: "整体情况", icon: CheckSquare, tone: "emerald" as const },
     { label: "低完成率任务", value: `${lowCompletionCount}`, hint: "需提醒", icon: Users, tone: "orange" as const },
-    { label: "总任务数", value: `${statsData?.task_count ?? items.length}`, hint: "平台任务", icon: Plus, tone: "cyan" as const },
+    { label: "涉及课程", value: `${coveredCourseCount}`, hint: "本人课程范围", icon: BookOpen, tone: "cyan" as const },
   ];
 
   const handleCreateTask = async () => {
