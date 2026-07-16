@@ -34,6 +34,15 @@ export const usersApi = {
     return client.get<{ items: User[]; total: number }>('/users', { params })
   },
 
+  create(data: {
+    username: string
+    password: string
+    real_name: string
+    role_ids: number[]
+  }) {
+    return client.post<User>('/users', data)
+  },
+
   updateStatus(user_id: number, status: string) {
     return client.put(`/users/${user_id}/status`, { status })
   },

@@ -87,8 +87,12 @@ export function AdminUsers() {
   const [roleEditUser, setRoleEditUser] = React.useState<ReturnType<typeof mapUser> | null>(null);
   const [newUsername, setNewUsername] = React.useState("");
   const [newRealName, setNewRealName] = React.useState("");
+  const [newPassword, setNewPassword] = React.useState("");
+  const [newRoleId, setNewRoleId] = React.useState<number | null>(null);
+  const [creating, setCreating] = React.useState(false);
 
   const pageState = useApi(() => usersApi.list({ page: 1, page_size: 100, keyword: query || undefined }), [query]);
+  const rolesState = useApi(() => usersApi.listRoles(), []);
 
   const rows = (pageState.data?.items ?? []).map(mapUser);
   const filtered = rows.filter((user) => {
@@ -119,15 +123,40 @@ export function AdminUsers() {
     }
   };
 
-  const handleAddUser = () => {
-    if (!newUsername.trim()) {
-      notify.warning("请输入用户名");
+  const handleAddUser = async () => {
+    if (!newUsername.trim() || !newRealName.trim()) {
+      notify.warning("请填写用户名和姓名");
       return;
     }
-    notify.success(`用户 ${newUsername} 已创建（演示模式）`);
-    setNewUsername("");
-    setNewRealName("");
-    setOpen(false);
+    if (newPassword.length < 6) {
+      notify.warning("初始密码至少 6 位");
+      return;
+    }
+    const roleId = newRoleId ?? rolesState.data?.[0]?.role_id;
+    if (!roleId) {
+      notify.warning("请选择角色");
+      return;
+    }
+    setCreating(true);
+    try {
+      await usersApi.create({
+        username: newUsername.trim(),
+        password: newPassword,
+        real_name: newRealName.trim(),
+        role_ids: [roleId],
+      });
+      notify.success(`用户 ${newUsername.trim()} 已创建`);
+      setNewUsername("");
+      setNewRealName("");
+      setNewPassword("");
+      setNewRoleId(null);
+      setOpen(false);
+      pageState.refetch();
+    } catch (e) {
+      notify.error("创建失败：" + String(e));
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -210,14 +239,24 @@ export function AdminUsers() {
             <input className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} placeholder="输入用户名" />
           </label>
           <label className="block text-sm font-bold text-slate-700">
-            姓名（选填）
+            姓名
             <input className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" value={newRealName} onChange={(e) => setNewRealName(e.target.value)} placeholder="输入真实姓名" />
           </label>
-          <p className="text-xs text-slate-400">注：完整用户创建需通过管理后台数据库操作</p>
+          <label className="block text-sm font-bold text-slate-700">
+            初始密码
+            <input type="password" autoComplete="new-password" className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="至少 6 位" />
+          </label>
+          <label className="block text-sm font-bold text-slate-700">
+            角色
+            <select className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" value={newRoleId ?? ""} onChange={(e) => setNewRoleId(Number(e.target.value) || null)}>
+              <option value="">请选择角色</option>
+              {(rolesState.data ?? []).map((role) => <option key={role.role_id} value={role.role_id}>{role.role_name}</option>)}
+            </select>
+          </label>
         </div>
         <div className="mt-5 flex justify-end gap-3">
           <button onClick={() => setOpen(false)} className={`${secondaryButton} cursor-pointer`}>取消</button>
-          <button onClick={handleAddUser} className={`${primaryButton} cursor-pointer`}><Save className="h-4 w-4" />创建用户</button>
+          <button onClick={handleAddUser} disabled={creating} className={`${primaryButton} cursor-pointer disabled:opacity-60`}><Save className="h-4 w-4" />{creating ? "创建中..." : "创建用户"}</button>
         </div>
       </ModalShell>
     </PageShell>

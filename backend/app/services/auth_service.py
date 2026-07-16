@@ -180,6 +180,8 @@ def register(
     role_ids: Optional[list[int]] = None,
     ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
+    created_by: Optional[int] = None,
+    allow_admin_role: bool = False,
 ) -> Dict[str, Any]:
     """
     用户注册（事务保证 users/user_roles/operation_logs 原子性）。
@@ -227,7 +229,7 @@ def register(
         raise ConflictException(message="用户名已存在")
 
     if role_ids is not None:
-        _validate_role_ids_for_user(role_ids)
+        _validate_role_ids_for_user(role_ids, allow_admin=allow_admin_role)
 
     password_hash = hash_password(password)
 
@@ -241,7 +243,7 @@ def register(
             student_no=(student_no.strip() if student_no else None),
             email=(email.strip() if email else None),
             phone=(phone.strip() if phone else None),
-            created_by=None,
+            created_by=created_by,
         )
 
         user_repo.assign_roles_with_conn(
@@ -252,9 +254,9 @@ def register(
 
         user_repo.insert_operation_log_with_conn(
             conn=conn,
-            user_id=user_id,
-            action_type="register",
-            action_desc=f"用户注册: {username}",
+            user_id=created_by or user_id,
+            action_type="user:create" if created_by else "register",
+            action_desc=f"创建用户: {username}" if created_by else f"用户注册: {username}",
             target_type="user",
             target_id=user_id,
             ip_address=ip_address,
@@ -323,7 +325,9 @@ def list_roles_public() -> list[dict]:
 # 用户自主角色与资料管理
 # =============================================================================
 
-def _validate_role_ids_for_user(role_ids: list[int]) -> None:
+def _validate_role_ids_for_user(
+    role_ids: list[int], allow_admin: bool = False
+) -> None:
     """
     校验 role_ids 不包含 admin。
 
@@ -331,9 +335,12 @@ def _validate_role_ids_for_user(role_ids: list[int]) -> None:
         ValidationException: 如果包含 admin 角色
     """
     all_roles = user_repo.list_roles()
-    admin_role_ids = {r["role_id"] for r in all_roles if r["role_code"] == "admin"}
+    roles_by_id = {int(role["role_id"]): role for role in all_roles}
     for rid in role_ids:
-        if rid in admin_role_ids:
+        role = roles_by_id.get(int(rid))
+        if role is None:
+            raise ValidationException(message="选择的角色不存在")
+        if role["role_code"] == "admin" and not allow_admin:
             raise ValidationException(message="无法选择管理员角色")
 
 

@@ -106,7 +106,7 @@ def update_user_status_service(
         user_id: 要更新的用户 ID
         new_status: 新状态（active/inactive/suspended）
     """
-    valid_statuses = {"active", "inactive", "suspended"}
+    valid_statuses = {"active", "disabled"}
     if new_status not in valid_statuses:
         from app.utils.exceptions import ValidationException
         raise ValidationException(

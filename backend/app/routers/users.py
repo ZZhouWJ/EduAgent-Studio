@@ -21,11 +21,21 @@ router = APIRouter(prefix="", tags=["用户与权限"])
 
 
 class UpdateStatusBody(BaseModel):
-    status: str = Field(..., description="新状态（active/inactive/suspended）")
+    status: str = Field(..., description="新状态（active/disabled）")
 
 
 class UpdateRolesBody(BaseModel):
     role_ids: list[int] = Field(..., description="角色 ID 列表")
+
+
+class CreateUserBody(BaseModel):
+    username: str = Field(..., min_length=1, max_length=50)
+    password: str = Field(..., min_length=6, max_length=100)
+    real_name: str = Field(..., min_length=1, max_length=50)
+    role_ids: list[int] = Field(..., min_length=1, max_length=5)
+    student_no: Optional[str] = Field(None, max_length=20)
+    email: Optional[str] = Field(None, max_length=100)
+    phone: Optional[str] = Field(None, max_length=20)
 
 
 @router.get("/users")
@@ -34,7 +44,7 @@ async def list_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=500),
     keyword: Optional[str] = Query(None),
-    status: Optional[str] = Query(None, description="按状态过滤（active/inactive/suspended）"),
+    status: Optional[str] = Query(None, description="按状态过滤（active/disabled）"),
 ) -> dict:
     """获取用户列表（分页 + 关键字搜索 + 状态过滤）。仅管理员可访问。"""
     result = user_service.list_users_service(
@@ -44,6 +54,27 @@ async def list_users(
         status=status,
     )
     return success_response(data=result)
+
+
+@router.post("/users")
+async def create_user(
+    body: CreateUserBody,
+    user: dict = Depends(require_role("admin")),
+) -> dict:
+    """创建用户并分配角色。仅管理员可操作。"""
+    created = auth_service.register(
+        username=body.username,
+        password=body.password,
+        confirm_password=body.password,
+        real_name=body.real_name,
+        student_no=body.student_no,
+        email=body.email,
+        phone=body.phone,
+        role_ids=body.role_ids,
+        created_by=int(user["user_id"]),
+        allow_admin_role=True,
+    )
+    return success_response(data=created, message="用户创建成功")
 
 
 @router.put("/users/{user_id}/status")
@@ -72,8 +103,12 @@ async def update_user_roles(
 async def list_roles(
     user: dict = Depends(get_current_user_dep),
 ) -> dict:
-    """获取角色列表（不含 admin）。登录用户均可访问。"""
-    roles = auth_service.list_roles_public()
+    """获取角色列表；管理员可查看全部角色。"""
+    roles = (
+        user_service.list_roles_service()
+        if "admin" in user.get("roles", [])
+        else auth_service.list_roles_public()
+    )
     return success_response(data=roles)
 
 
