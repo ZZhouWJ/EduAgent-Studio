@@ -76,6 +76,7 @@ export {
   type CreateTemplateBody,
   type UpdateTemplateBody,
   type CreateVersionBody,
+  type PromptRenderResult,
 } from './prompts'
 
 // Reviews

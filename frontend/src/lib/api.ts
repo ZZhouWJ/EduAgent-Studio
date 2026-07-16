@@ -77,6 +77,7 @@ export {
   type CreateTemplateBody,
   type UpdateTemplateBody,
   type CreateVersionBody,
+  type PromptRenderResult,
   type ReviewRequest,
   type ReviewDetail,
   type IssueTag,

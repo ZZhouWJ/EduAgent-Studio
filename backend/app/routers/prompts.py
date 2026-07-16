@@ -17,7 +17,7 @@ POST   /api/prompt-templates/{template_id}/versions
 POST   /api/prompt-templates/{template_id}/versions/{version_id}/activate
 """
 
-from typing import Optional
+from typing import Dict, Optional
 
 from fastapi import APIRouter, Body, Header, Path, Query, Request
 from pydantic import BaseModel, Field
@@ -67,6 +67,11 @@ class CreateVersionRequest(BaseModel):
     version_no: Optional[str] = Field(None, max_length=20)
     prompt_content: str = Field(..., min_length=1)
     change_note: Optional[str] = Field(None, max_length=500)
+
+
+class RenderTemplateRequest(BaseModel):
+    version_id: Optional[int] = Field(None, gt=0)
+    variables: Dict[str, str] = Field(default_factory=dict)
 
 
 # =============================================================================
@@ -226,6 +231,28 @@ async def list_template_versions(
     result = prompt_service.list_template_versions(
         token=token,
         template_id=template_id,
+    )
+    return success_response(data=result)
+
+
+# =============================================================================
+# 渲染提示词预览
+# =============================================================================
+
+@router.post("/prompt-templates/{template_id}/render")
+async def render_template(
+    request: Request,
+    template_id: int = Path(..., gt=0),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    body: RenderTemplateRequest = Body(...),
+) -> dict:
+    """使用受控变量替换渲染提示词，不执行模型调用。"""
+    token = _extract_token(authorization)
+    result = prompt_service.render_template(
+        token=token,
+        template_id=template_id,
+        version_id=body.version_id,
+        variables=body.variables,
     )
     return success_response(data=result)
 

@@ -53,6 +53,15 @@ export interface CreateVersionBody {
   change_note?: string
 }
 
+export interface PromptRenderResult {
+  template_id: number
+  version_id: number
+  version_no: string
+  required_variables: string[]
+  missing_variables: string[]
+  rendered_content: string
+}
+
 export const promptsApi = {
   getTaskTypes() {
     return client.get<PromptTaskType[]>('/task-types')
@@ -93,5 +102,9 @@ export const promptsApi = {
 
   activateVersion(template_id: number, version_id: number) {
     return client.post(`/prompt-templates/${template_id}/versions/${version_id}/activate`)
+  },
+
+  renderTemplate(template_id: number, data: { version_id?: number; variables: Record<string, string> }) {
+    return client.post<PromptRenderResult>(`/prompt-templates/${template_id}/render`, data)
   },
 }

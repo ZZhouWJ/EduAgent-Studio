@@ -5,6 +5,7 @@
 复用 user_repo / project_repo 中的权限判断工具。
 """
 
+import re
 from typing import Any, Dict, List, Optional
 
 from app.database import get_db_transaction
@@ -15,6 +16,14 @@ from app.utils.exceptions import (
     UnauthorizedException,
     ValidationException,
 )
+
+
+PROMPT_VARIABLE_PATTERN = re.compile(
+    r"\{\{\s*([A-Za-z_][A-Za-z0-9_.-]{0,63})\s*\}\}"
+)
+MAX_PREVIEW_VARIABLES = 100
+MAX_PREVIEW_VALUE_LENGTH = 50_000
+MAX_PREVIEW_TOTAL_LENGTH = 200_000
 
 
 # =============================================================================
@@ -434,6 +443,78 @@ def activate_version(
 
     updated_template = prompt_repo.get_template_by_id(template_id)
     return _template_detail_to_dict(updated_template)
+
+
+# =============================================================================
+# 渲染提示词预览
+# =============================================================================
+
+def render_template(
+    token: str,
+    template_id: int,
+    version_id: Optional[int] = None,
+    variables: Optional[Dict[str, str]] = None,
+) -> Dict[str, Any]:
+    """安全替换模板占位符并返回预览，不执行表达式或模型调用。"""
+    _require_auth(token)
+
+    template = prompt_repo.get_template_by_id(template_id)
+    if template is None:
+        raise NotFoundException(message="模板不存在")
+
+    selected_version_id = version_id or template.get("current_version_id")
+    if selected_version_id is None:
+        raise ValidationException(message="模板尚无可渲染版本")
+
+    if version_id is not None:
+        owned_version = prompt_repo.get_version_by_template_and_id(
+            version_id=version_id,
+            template_id=template_id,
+        )
+        if owned_version is None:
+            raise NotFoundException(message="版本不存在或不属于此模板")
+
+    version = prompt_repo.get_version_by_id(selected_version_id)
+    if version is None:
+        raise NotFoundException(message="提示词版本不存在")
+
+    content = version.get("prompt_content") or ""
+    required_variables = list(dict.fromkeys(PROMPT_VARIABLE_PATTERN.findall(content)))
+    supplied = variables or {}
+
+    if len(supplied) > MAX_PREVIEW_VARIABLES:
+        raise ValidationException(message="预览变量数量不能超过 100 个")
+
+    unknown_variables = sorted(set(supplied) - set(required_variables))
+    if unknown_variables:
+        names = "、".join(unknown_variables[:5])
+        raise ValidationException(message=f"模板未声明以下变量：{names}")
+
+    total_length = 0
+    for name, value in supplied.items():
+        if not isinstance(value, str):
+            raise ValidationException(message=f"变量 {name} 必须是文本")
+        if len(value) > MAX_PREVIEW_VALUE_LENGTH:
+            raise ValidationException(message=f"变量 {name} 内容过长")
+        total_length += len(value)
+    if total_length > MAX_PREVIEW_TOTAL_LENGTH:
+        raise ValidationException(message="预览变量总内容过长")
+
+    def replace_variable(match: re.Match[str]) -> str:
+        name = match.group(1)
+        return supplied[name] if name in supplied else match.group(0)
+
+    rendered_content = PROMPT_VARIABLE_PATTERN.sub(replace_variable, content)
+    missing_variables = [name for name in required_variables if name not in supplied]
+
+    return {
+        "template_id": template_id,
+        "version_id": version["prompt_version_id"],
+        "version_no": version["version_no"],
+        "required_variables": required_variables,
+        "missing_variables": missing_variables,
+        "rendered_content": rendered_content,
+    }
 
 
 # =============================================================================

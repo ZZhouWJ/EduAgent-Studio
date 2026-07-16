@@ -1,7 +1,7 @@
 import React from "react";
 import { Copy, FileText, History, Play, Plus, ScrollText } from "lucide-react";
 import { useApi } from "@/lib/useApi";
-import { promptsApi, PromptTaskType, PromptTemplate, PromptVersion } from "@/lib/api";
+import { promptsApi, PromptRenderResult, PromptTaskType, PromptTemplate, PromptVersion } from "@/lib/api";
 import { DetailDrawer, ModalShell, PageHeader, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, notify } from "../components/common/ProductUI";
 
 function mapTemplate(t: PromptTemplate) {
@@ -41,6 +41,12 @@ export function AdminPrompts() {
   const [newTemplateName, setNewTemplateName] = React.useState("");
   const [newTaskTypeId, setNewTaskTypeId] = React.useState<number | "">("");
   const [creatingTemplate, setCreatingTemplate] = React.useState(false);
+  const [previewOpen, setPreviewOpen] = React.useState(false);
+  const [previewVersionId, setPreviewVersionId] = React.useState<number | null>(null);
+  const [previewValues, setPreviewValues] = React.useState<Record<string, string>>({});
+  const [previewResult, setPreviewResult] = React.useState<PromptRenderResult | null>(null);
+  const [previewLoading, setPreviewLoading] = React.useState(false);
+  const [previewError, setPreviewError] = React.useState("");
 
   const taskTypesState = useApi(() => promptsApi.getTaskTypes(), []);
   const templatesState = useApi(() => promptsApi.getTemplates({ page: 1, page_size: 100, keyword: query || undefined }), [query]);
@@ -90,6 +96,9 @@ export function AdminPrompts() {
     setHistoryOpen(false);
     setPromptContent("");
     setChangeNote("");
+    setPreviewOpen(false);
+    setPreviewResult(null);
+    setPreviewValues({});
   };
 
   const handleSaveVersion = async () => {
@@ -158,6 +167,53 @@ export function AdminPrompts() {
     }
   };
 
+  const renderPreview = async (versionId: number, variables: Record<string, string>) => {
+    if (!selectedTemplate) return;
+    setPreviewLoading(true);
+    setPreviewError("");
+    try {
+      const result = await promptsApi.renderTemplate(Number(selectedTemplate.id), {
+        version_id: versionId,
+        variables,
+      });
+      setPreviewResult(result);
+    } catch (e) {
+      setPreviewError(String(e));
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleOpenPreview = () => {
+    const versionId = activeVersion?.raw.prompt_version_id;
+    if (!versionId) {
+      notify.warning("当前模板尚无可渲染版本");
+      return;
+    }
+    setPreviewVersionId(versionId);
+    setPreviewValues({});
+    setPreviewResult(null);
+    setPreviewOpen(true);
+    void renderPreview(versionId, {});
+  };
+
+  const handlePreviewVersionChange = (versionId: number) => {
+    setPreviewVersionId(versionId);
+    setPreviewValues({});
+    setPreviewResult(null);
+    void renderPreview(versionId, {});
+  };
+
+  const handleCopyPreview = async () => {
+    if (!previewResult) return;
+    try {
+      await navigator.clipboard.writeText(previewResult.rendered_content);
+      notify.success("渲染结果已复制到剪贴板");
+    } catch {
+      notify.error("复制失败，请手动复制");
+    }
+  };
+
   const taskTypes: PromptTaskType[] = taskTypesState.data ?? [];
 
   return (
@@ -209,7 +265,7 @@ export function AdminPrompts() {
                 <button onClick={() => setModalMode("edit")} className={`${primaryButton} cursor-pointer`}>编辑模板</button>
                 <button onClick={handleCopyTemplate} className={`${secondaryButton} cursor-pointer`}><Copy className="h-4 w-4" />复制模板</button>
                 <button onClick={() => setHistoryOpen(true)} className={`${secondaryButton} cursor-pointer`}>版本历史</button>
-                <button onClick={() => notify.info("模拟渲染需要运行智能体工作流")} className={`${secondaryButton} cursor-pointer`}><Play className="h-4 w-4" />模拟渲染</button>
+                <button onClick={handleOpenPreview} disabled={!activeVersion} className={`${secondaryButton} cursor-pointer disabled:cursor-not-allowed disabled:opacity-50`}><Play className="h-4 w-4" />渲染预览</button>
               </div>
             </>
           )}
@@ -278,6 +334,82 @@ export function AdminPrompts() {
               </button>
             )}
           </div>
+        </div>
+      </ModalShell>
+
+      <ModalShell title="Prompt 渲染预览" open={previewOpen} onClose={() => setPreviewOpen(false)}>
+        <div className="space-y-5">
+          <label className="block text-sm font-bold text-slate-700">
+            模板版本
+            <select
+              className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
+              value={previewVersionId ?? ""}
+              onChange={(event) => handlePreviewVersionChange(Number(event.target.value))}
+            >
+              {versions.map((version) => (
+                <option key={version.id} value={version.id}>{version.no}{version.active ? "（当前）" : ""}</option>
+              ))}
+            </select>
+          </label>
+
+          {previewLoading && !previewResult ? (
+            <div className="flex items-center justify-center py-10"><div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" /></div>
+          ) : previewError ? (
+            <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{previewError}</div>
+          ) : previewResult ? (
+            <>
+              <section>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-black text-slate-900">模板变量</h3>
+                  <span className="text-xs font-semibold text-slate-500">
+                    {Object.keys(previewValues).length}/{previewResult.required_variables.length} 已填写
+                  </span>
+                </div>
+                {previewResult.required_variables.length === 0 ? (
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-500">此版本不包含变量</div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {previewResult.required_variables.map((name: string) => (
+                      <label key={name} className="block text-xs font-bold text-slate-600">
+                        <code>{name}</code>
+                        <textarea
+                          className="edu-focus-ring mt-1.5 min-h-20 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-5 text-slate-800"
+                          value={previewValues[name] ?? ""}
+                          onChange={(event) => setPreviewValues((current) => ({ ...current, [name]: event.target.value }))}
+                          placeholder={`输入 ${name}`}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={() => previewVersionId && void renderPreview(previewVersionId, previewValues)}
+                  disabled={previewLoading}
+                  className={`${primaryButton} cursor-pointer disabled:cursor-not-allowed disabled:opacity-60`}
+                >
+                  <Play className="h-4 w-4" />{previewLoading ? "渲染中..." : "生成预览"}
+                </button>
+              </div>
+
+              <section>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-black text-slate-900">渲染结果</h3>
+                    {previewResult.missing_variables.length > 0 && (
+                      <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700">
+                        缺少 {previewResult.missing_variables.length} 项
+                      </span>
+                    )}
+                  </div>
+                  <button onClick={handleCopyPreview} className={`${secondaryButton} min-h-9 cursor-pointer px-3`}><Copy className="h-4 w-4" />复制</button>
+                </div>
+                <pre className="custom-scrollbar max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-slate-950 p-4 text-xs leading-6 text-slate-200">{previewResult.rendered_content}</pre>
+              </section>
+            </>
+          ) : null}
         </div>
       </ModalShell>
 
