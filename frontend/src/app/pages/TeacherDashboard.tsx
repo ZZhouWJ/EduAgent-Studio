@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
-import { AlertTriangle, ArrowRight, BookOpen, CheckSquare, Database, FileText, GraduationCap, Library, MessageSquare, ShieldAlert, Target, Users } from "lucide-react";
+import { AlertTriangle, ArrowRight, BookOpen, CheckSquare, Database, FileText, GraduationCap, Library, ListTodo, MessageSquare, Target, Users } from "lucide-react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useApi } from "@/lib/useApi";
-import { reviewsApi, statisticsApi, learningApi } from "@/lib/api";
+import { learningApi, resourcesApi, statisticsApi } from "@/lib/api";
 import { taskTypeLabel } from "@/lib/educationLabels";
 import { useAuthStore } from "@/stores/auth";
 
@@ -19,22 +19,24 @@ const toneClass: Record<string, string> = {
 export function TeacherDashboard() {
   const user = useAuthStore((s) => s.user);
   const greetingName = user?.real_name ?? "老师";
-  const { data: overview, loading: loadingOverview } = useApi(() => statisticsApi.overview(), []);
   const { data: learningData, loading: loadingLearning } = useApi(() => statisticsApi.learningOverview(), []);
   const { data: weakPoints, loading: loadingWeak } = useApi(() => statisticsApi.weakKnowledgePoints(5), []);
-  const { data: pendingReviews } = useApi(() => reviewsApi.getPending({ page_size: 5 }), []);
+  const { data: pendingReviews, loading: loadingReviews } = useApi(
+    () => resourcesApi.list({ status: "pending_review", page: 1, page_size: 5 }),
+    [],
+  );
   const { data: lowMastery } = useApi(() => statisticsApi.masteryDistribution(), []);
   const { data: tasksData } = useApi(() => learningApi.listTasks({ page_size: 6 }), []);
 
-  const loading = loadingOverview || loadingLearning || loadingWeak;
+  const loading = loadingLearning || loadingWeak || loadingReviews;
 
   const stats = [
     { label: "管理课程数", value: String(learningData?.course_count ?? "—"), hint: "本人负责", icon: BookOpen, tone: "blue" },
     { label: "学生人数", value: String(learningData?.student_count ?? "—"), hint: learningData ? `覆盖 ${learningData.course_count} 门课程` : "—", icon: Users, tone: "slate" },
-    { label: "待审核产出", value: String(pendingReviews?.total ?? "—"), hint: pendingReviews?.total ? `${pendingReviews.total} 条待处理` : "暂无", icon: CheckSquare, tone: "orange" },
+    { label: "待审核资源", value: String(pendingReviews?.total ?? "—"), hint: pendingReviews?.total ? `${pendingReviews.total} 条待处理` : "暂无", icon: CheckSquare, tone: "orange" },
     { label: "班级平均掌握度", value: learningData ? `${Math.round(learningData.avg_mastery * 100)}%` : "—", hint: "实时统计", icon: Target, tone: "emerald" },
     { label: "累计学习反馈", value: String(learningData?.feedback_count ?? "—"), hint: "本人课程范围", icon: MessageSquare, tone: "cyan" },
-    { label: "失败调用", value: String(overview?.failed_invocation_count ?? 0), hint: "需检查调用日志", icon: ShieldAlert, tone: "red" },
+    { label: "进行中任务", value: String(learningData?.active_tasks ?? "—"), hint: "本人课程范围", icon: ListTodo, tone: "red" },
   ];
 
   const weaknessData = (weakPoints ?? []).map((wp) => ({ name: wp.kp_name, score: Math.round(wp.avg_mastery * 100) }));
@@ -43,7 +45,7 @@ export function TeacherDashboard() {
     .filter((bucket) => bucket.range === "0-20%" || bucket.range === "20-40%")
     .reduce((total, bucket) => total + bucket.count, 0);
   const actionItems = [
-    { title: `${pendingReviews?.total ?? 0} 个项目产出待审核`, desc: pendingReviews?.items?.length ? `最新：${pendingReviews.items[0]?.output_title ?? "—"}` : "暂无新提交", icon: CheckSquare, tone: "orange", action: "进入审核", link: "/teacher/review" },
+    { title: `${pendingReviews?.total ?? 0} 个学习资源待审核`, desc: pendingReviews?.items?.length ? `最新：${pendingReviews.items[0]?.resource_title ?? "—"}` : "暂无新提交", icon: CheckSquare, tone: "orange", action: "进入审核", link: "/teacher/review" },
     { title: `${lowMasteryCount} 名学生综合掌握度低于 40%`, desc: weaknessData.length ? `集中在 ${weaknessData[0]?.name ?? "—"} 等 ${weaknessData.length} 个知识点` : "等待数据", icon: Users, tone: "red", action: "查看学生", link: "/teacher/students" },
     { title: `${learningData?.feedback_count ?? 0} 条累计学习反馈`, desc: "来自本人课程范围内的学生记录", icon: MessageSquare, tone: "blue", action: "查看反馈", link: "/teacher/feedback" },
     { title: `${learningData?.resource_count ?? 0} 个课程资源`, desc: "包含草稿、待审核与已发布状态", icon: Database, tone: "slate", action: "管理资源", link: "/teacher/resources" },
