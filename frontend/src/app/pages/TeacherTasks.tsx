@@ -76,6 +76,7 @@ export function TeacherTasks() {
     targetKnowledgePoints: t.target_kp_ids
       .map((id) => knowledgePointNames.get(id))
       .filter((name): name is string => Boolean(name)),
+    studentCount: t.student_count,
     raw: t,
   }));
 
@@ -92,9 +93,14 @@ export function TeacherTasks() {
   const selected = searched.find((item) => item.id === selectedId) ?? searched[0];
 
   const inProgressCount = items.filter((i) => i.rawStatus === "in_progress").length;
-  const lowCompletionCount = items.filter((i) => i.completion < 45).length;
-  const avgCompletion = items.length > 0
-    ? Math.round(items.reduce((sum, i) => sum + i.completion, 0) / items.length)
+  const trackableItems = items.filter((item) => item.studentCount > 0);
+  const lowCompletionCount = trackableItems.filter((item) => item.completion < 45).length;
+  const totalStudentAssignments = trackableItems.reduce((sum, item) => sum + item.studentCount, 0);
+  const avgCompletion = totalStudentAssignments > 0
+    ? Math.round(trackableItems.reduce(
+        (sum, item) => sum + item.raw.completion_rate * item.studentCount,
+        0
+      ) / totalStudentAssignments * 100)
     : 0;
   const coveredCourseCount = new Set(items.map((item) => item.raw.course_id)).size;
 
@@ -216,6 +222,7 @@ export function TeacherTasks() {
                   {[
                     ["任务目标", selected.description || "暂无描述"],
                     ["指派对象", selected.assignee],
+                    ["覆盖学生", `${selected.studentCount} 人`],
                     ["目标知识点", selected.targetKnowledgePoints.join("、") || "未限定知识点"],
                     ["任务类型", selected.type],
                     ["当前完成率", `${selected.completion}%`],

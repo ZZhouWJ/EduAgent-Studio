@@ -49,7 +49,7 @@ class LearningServiceTests(unittest.TestCase):
         user = {"user_id": 12, "roles": ["student_member"]}
         task = {"id": 19, "status": "assigned", "title": "事务练习"}
         self.service._repo.get_task.return_value = task
-        self.service._repo.update_task_status.return_value = 1
+        self.service._repo.update_task_progress.return_value = 1
         transaction = MagicMock()
         conn = transaction.__enter__.return_value
         get_transaction.return_value = transaction
@@ -57,8 +57,9 @@ class LearningServiceTests(unittest.TestCase):
         result = self.service.update_task_status(user, 19, "completed")
 
         self.service._access.require_task_update_access.assert_called_once_with(19, user)
-        self.service._repo.update_task_status.assert_called_once_with(
-            19, "completed", conn=conn
+        self.service._repo.get_task.assert_called_once_with(19, student_id=12)
+        self.service._repo.update_task_progress.assert_called_once_with(
+            19, 12, "completed", conn=conn
         )
         insert_log.assert_called_once_with(
             user_id=12,
@@ -82,7 +83,7 @@ class LearningServiceTests(unittest.TestCase):
         with self.assertRaises(ForbiddenException):
             self.service.update_task_status(user, 19, "in_progress")
 
-        self.service._repo.update_task_status.assert_not_called()
+        self.service._repo.update_task_progress.assert_not_called()
 
 
 if __name__ == "__main__":

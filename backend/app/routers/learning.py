@@ -84,7 +84,7 @@ async def get_learning_task(
 ):
     """获取学习任务详情"""
     CourseAccessService().require_task_access(task_id, user)
-    return learning_service.LearningService().get_task(task_id)
+    return learning_service.LearningService().get_task(task_id, user)
 
 
 @router.patch("/tasks/{task_id}/status")

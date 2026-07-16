@@ -6,6 +6,7 @@ from app.repositories.learning_repo import (
     LearningRepository,
     _current_semester,
     _estimate_resource_minutes,
+    _derive_task_status,
     _parse_id_list,
     _serialize_due_date,
 )
@@ -48,6 +49,13 @@ class LearningRepositoryTests(unittest.TestCase):
             "2026-07-30T18:05:04",
         )
         self.assertIsNone(_serialize_due_date(None))
+
+    def test_teacher_task_status_is_derived_from_student_progress(self):
+        self.assertEqual(_derive_task_status("assigned", 5, 1, 0), "in_progress")
+        self.assertEqual(_derive_task_status("assigned", 5, 0, 5), "completed")
+        self.assertEqual(_derive_task_status("assigned", 5, 0, 2), "in_progress")
+        self.assertEqual(_derive_task_status("assigned", 0, 0, 0), "assigned")
+        self.assertEqual(_derive_task_status("archived", 5, 0, 5), "archived")
 
     @patch("app.repositories.learning_repo.get_db_cursor")
     def test_recommendations_use_approved_status_and_exact_kp_membership(self, get_cursor):

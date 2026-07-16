@@ -66,8 +66,15 @@ class LearningService:
             ),
         }
 
-    def get_task(self, task_id: int) -> Dict[str, Any]:
-        task = self._repo.get_task(task_id)
+    def get_task(self, task_id: int, user: Dict[str, Any]) -> Dict[str, Any]:
+        roles = set(user.get("roles", []))
+        is_student_only = "student_member" in roles and not roles.intersection(
+            {"teacher", "admin"}
+        )
+        task = self._repo.get_task(
+            task_id,
+            student_id=int(user["user_id"]) if is_student_only else None,
+        )
         if task is None:
             return {"code": 404, "message": "任务不存在", "data": None}
         return {"code": 0, "message": "success", "data": task}
@@ -105,7 +112,14 @@ class LearningService:
     ) -> Dict[str, Any]:
         """按角色和状态迁移规则更新学习任务。"""
         self._access.require_task_update_access(task_id, user)
-        task = self._repo.get_task(task_id)
+        roles = set(user.get("roles", []))
+        is_student_only = "student_member" in roles and not roles.intersection(
+            {"teacher", "admin"}
+        )
+        task = self._repo.get_task(
+            task_id,
+            student_id=int(user["user_id"]) if is_student_only else None,
+        )
         if task is None:
             raise NotFoundException("任务不存在")
 
@@ -113,9 +127,8 @@ class LearningService:
         if status not in valid_statuses:
             raise ValidationException("无效的学习任务状态")
 
-        roles = set(user.get("roles", []))
         current_status = str(task["status"])
-        if "student_member" in roles and not roles.intersection({"teacher", "admin"}):
+        if is_student_only:
             allowed_transitions = {
                 "assigned": {"in_progress", "completed"},
                 "in_progress": {"completed"},
@@ -125,9 +138,17 @@ class LearningService:
                 raise ForbiddenException("学生不能执行该任务状态变更")
 
         with get_db_transaction() as conn:
-            affected = self._repo.update_task_status(task_id, status, conn=conn)
-            if affected == 0 and status != current_status:
-                raise NotFoundException("任务不存在或无法更新")
+            if is_student_only:
+                self._repo.update_task_progress(
+                    task_id,
+                    int(user["user_id"]),
+                    status,
+                    conn=conn,
+                )
+            else:
+                affected = self._repo.update_task_status(task_id, status, conn=conn)
+                if affected == 0 and status != current_status:
+                    raise NotFoundException("任务不存在或无法更新")
             user_repo.insert_operation_log_with_conn(
                 user_id=int(user["user_id"]),
                 action_type="learning_task:update_status",

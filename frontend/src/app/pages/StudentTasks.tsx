@@ -176,7 +176,7 @@ export function StudentTasks() {
                         priority: task.priority,
                         description: task.description,
                         course_id: task.course_id,
-                        canUpdate: task.assignee_id !== null,
+                        canUpdate: ["assigned", "in_progress"].includes(task.status),
                       })}
                       className={`group cursor-pointer rounded-2xl border bg-white p-4 text-left transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-lg ${
                         isDone

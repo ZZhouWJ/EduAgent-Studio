@@ -60,6 +60,7 @@ services:
       - ./database/24_align_profile_mastery_scores.sql:/docker-entrypoint-initdb.d/24_align_profile_mastery_scores.sql:ro
       - ./database/25_productize_seed_learning_resources.sql:/docker-entrypoint-initdb.d/25_productize_seed_learning_resources.sql:ro
       - ./database/26_productize_seed_project_outputs.sql:/docker-entrypoint-initdb.d/26_productize_seed_project_outputs.sql:ro
+      - ./database/27_create_learning_task_progress.sql:/docker-entrypoint-initdb.d/27_create_learning_task_progress.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s

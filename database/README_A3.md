@@ -21,6 +21,7 @@
 # MySQL（Phase 1 当前）
 mysql -u root -p ai_collab_audit_system < database/09_create_a3_tables.sql
 mysql -u root -p ai_collab_audit_system < database/10_insert_a3_initial_data.sql
+mysql -u root -p ai_collab_audit_system < database/27_create_learning_task_progress.sql
 
 # PostgreSQL（Phase 2/3 使用）
 # 方式一：仅创建 schema（推荐先试）
@@ -45,6 +46,7 @@ psql -U postgres -d eduagent_studio -f database/11_postgresql_migration.sql
 |---------|------|---------------|
 | courses | 课程空间 | projects |
 | learning_tasks | 学习任务 | project_tasks |
+| learning_task_progress | 学生任务进度 | （新增）|
 | learning_resources | 学习资源 | task_outputs |
 | student_profiles | 学生画像 | （新增）|
 | knowledge_points | 知识点 | （新增）|

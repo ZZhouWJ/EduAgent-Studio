@@ -8,6 +8,7 @@ Tables:
 - courses: course_id, course_name, course_code, description, teacher_id, status, is_deleted, created_at, updated_at
 - knowledge_points: kp_id, course_id, kp_name, kp_code, parent_kp_id, difficulty_level, description, estimated_hours, is_deleted, created_at, updated_at
 - learning_tasks: task_id, course_id, title, description, target_kp_ids, creator_id, assignee_id, status, due_date, is_deleted, created_at, updated_at
+- learning_task_progress: task_id, student_id, status, started_at, completed_at, is_deleted, created_at, updated_at
 - users: user_id, username, real_name (teacher name)
 - student_profiles: profile_id, student_id, course_id, is_deleted
 """
@@ -17,7 +18,7 @@ from typing import Any, Dict, List, Optional
 
 from pymysql.connections import Connection
 
-from app.database import get_db_cursor
+from app.database import get_db_cursor, get_db_transaction
 
 COVER_COLORS = ["#409eff", "#67c23a", "#e6a23c", "#f56c6c", "#909399"]
 
@@ -82,6 +83,21 @@ def _serialize_due_date(value: Any) -> Optional[str]:
     if isinstance(value, datetime):
         return value.isoformat(timespec="seconds")
     return str(value)
+
+
+def _derive_task_status(
+    base_status: str,
+    student_count: int,
+    in_progress_count: int,
+    completed_count: int,
+) -> str:
+    if base_status in {"draft", "archived"} or student_count == 0:
+        return base_status
+    if completed_count >= student_count:
+        return "completed"
+    if in_progress_count > 0 or completed_count > 0:
+        return "in_progress"
+    return "assigned"
 
 
 def _current_semester(reference: Optional[datetime] = None) -> str:
@@ -341,6 +357,56 @@ class LearningRepository:
 
         where_clause = " AND ".join(filters)
 
+        if assignee_user_id is not None:
+            progress_select = """
+                    COALESCE(tp.status, t.status) AS effective_status,
+                    1 AS student_count,
+                    CASE WHEN COALESCE(tp.status, t.status) = 'in_progress' THEN 1 ELSE 0 END AS in_progress_count,
+                    CASE WHEN COALESCE(tp.status, t.status) = 'completed' THEN 1 ELSE 0 END AS completed_count
+            """
+            progress_join = """
+                LEFT JOIN learning_task_progress tp
+                  ON tp.task_id = t.task_id
+                 AND tp.student_id = %s
+                 AND tp.is_deleted = 0
+            """
+            progress_params: List[Any] = [assignee_user_id]
+        else:
+            progress_select = """
+                    t.status AS effective_status,
+                    COALESCE(progress_stats.student_count, 0) AS student_count,
+                    COALESCE(progress_stats.in_progress_count, 0) AS in_progress_count,
+                    COALESCE(progress_stats.completed_count, 0) AS completed_count
+            """
+            progress_join = """
+                LEFT JOIN (
+                    SELECT
+                        lt.task_id,
+                        COUNT(DISTINCT sp.student_id) AS student_count,
+                        COUNT(DISTINCT CASE
+                            WHEN COALESCE(tp.status, lt.status) = 'in_progress' THEN sp.student_id
+                        END) AS in_progress_count,
+                        COUNT(DISTINCT CASE
+                            WHEN COALESCE(tp.status, lt.status) = 'completed' THEN sp.student_id
+                        END) AS completed_count
+                    FROM learning_tasks lt
+                    INNER JOIN student_profiles sp
+                      ON sp.course_id = lt.course_id
+                     AND sp.is_deleted = 0
+                     AND (lt.assignee_id IS NULL OR lt.assignee_id = sp.student_id)
+                    INNER JOIN users eligible_student
+                      ON eligible_student.user_id = sp.student_id
+                     AND eligible_student.is_deleted = 0
+                    LEFT JOIN learning_task_progress tp
+                      ON tp.task_id = lt.task_id
+                     AND tp.student_id = sp.student_id
+                     AND tp.is_deleted = 0
+                    WHERE lt.is_deleted = 0
+                    GROUP BY lt.task_id
+                ) progress_stats ON progress_stats.task_id = t.task_id
+            """
+            progress_params = []
+
         with get_db_cursor() as cursor:
             count_sql = f"SELECT COUNT(*) AS total FROM learning_tasks t WHERE {where_clause}"
             cursor.execute(count_sql, params)
@@ -353,20 +419,22 @@ class LearningRepository:
                     t.title,
                     t.description,
                     t.target_kp_ids,
-                    t.status,
+                    t.status AS base_status,
                     t.assignee_id,
                     assignee.real_name AS assignee_name,
                     t.due_date,
-                    c.course_name
+                    c.course_name,
+                    {progress_select}
                 FROM learning_tasks t
                 INNER JOIN courses c ON t.course_id = c.course_id AND c.is_deleted = 0
                 LEFT JOIN users assignee
                   ON t.assignee_id = assignee.user_id AND assignee.is_deleted = 0
+                {progress_join}
                 WHERE {where_clause}
                 ORDER BY t.task_id ASC
                 LIMIT %s OFFSET %s
             """
-            cursor.execute(data_sql, params + [page_size, offset])
+            cursor.execute(data_sql, progress_params + params + [page_size, offset])
             rows = cursor.fetchall()
 
         now = datetime.now()
@@ -375,6 +443,20 @@ class LearningRepository:
             due_date = row["due_date"]
             priority = self._compute_priority(due_date, now)
             task_type = self._detect_task_type(row["title"])
+            student_count = int(row["student_count"] or 0)
+            in_progress_count = int(row["in_progress_count"] or 0)
+            completed_count = int(row["completed_count"] or 0)
+            effective_status = str(row["effective_status"])
+            resolved_status = (
+                effective_status
+                if assignee_user_id is not None
+                else _derive_task_status(
+                    str(row["base_status"]),
+                    student_count,
+                    in_progress_count,
+                    completed_count,
+                )
+            )
 
             items.append(
                 {
@@ -383,15 +465,17 @@ class LearningRepository:
                     "course_name": row["course_name"],
                     "title": row["title"],
                     "type": task_type,
-                    "status": row["status"],
+                    "status": resolved_status,
                     "assignee_id": row["assignee_id"],
                     "assignee_name": row["assignee_name"],
                     "target_kp_ids": _parse_id_list(row["target_kp_ids"]),
                     "priority": priority,
                     "due_date": _serialize_due_date(due_date),
                     "description": row["description"] or "",
-                    "student_count": 0,
-                    "completion_rate": 0.0,
+                    "student_count": student_count,
+                    "completion_rate": (
+                        completed_count / student_count if student_count > 0 else 0.0
+                    ),
                 }
             )
 
@@ -402,7 +486,9 @@ class LearningRepository:
             "page_size": page_size,
         }
 
-    def get_task(self, task_id: int) -> Optional[Dict[str, Any]]:
+    def get_task(
+        self, task_id: int, student_id: Optional[int] = None
+    ) -> Optional[Dict[str, Any]]:
         """Returns single task dict with course_name, course_description."""
         sql = """
             SELECT
@@ -430,6 +516,62 @@ class LearningRepository:
         if not row:
             return None
 
+        with get_db_cursor() as cursor:
+            if student_id is not None:
+                cursor.execute(
+                    """
+                    SELECT COALESCE(tp.status, t.status) AS effective_status
+                    FROM learning_tasks t
+                    LEFT JOIN learning_task_progress tp
+                      ON tp.task_id = t.task_id
+                     AND tp.student_id = %s
+                     AND tp.is_deleted = 0
+                    WHERE t.task_id = %s AND t.is_deleted = 0
+                    """,
+                    (student_id, task_id),
+                )
+                progress_row = cursor.fetchone() or {}
+                resolved_status = str(progress_row.get("effective_status") or row["status"])
+                student_count = 1
+                completed_count = 1 if resolved_status == "completed" else 0
+            else:
+                cursor.execute(
+                    """
+                    SELECT
+                        COUNT(DISTINCT sp.student_id) AS student_count,
+                        COUNT(DISTINCT CASE
+                            WHEN COALESCE(tp.status, t.status) = 'in_progress' THEN sp.student_id
+                        END) AS in_progress_count,
+                        COUNT(DISTINCT CASE
+                            WHEN COALESCE(tp.status, t.status) = 'completed' THEN sp.student_id
+                        END) AS completed_count
+                    FROM learning_tasks t
+                    INNER JOIN student_profiles sp
+                      ON sp.course_id = t.course_id
+                     AND sp.is_deleted = 0
+                     AND (t.assignee_id IS NULL OR t.assignee_id = sp.student_id)
+                    INNER JOIN users eligible_student
+                      ON eligible_student.user_id = sp.student_id
+                     AND eligible_student.is_deleted = 0
+                    LEFT JOIN learning_task_progress tp
+                      ON tp.task_id = t.task_id
+                     AND tp.student_id = sp.student_id
+                     AND tp.is_deleted = 0
+                    WHERE t.task_id = %s AND t.is_deleted = 0
+                    GROUP BY t.task_id
+                    """,
+                    (task_id,),
+                )
+                progress_row = cursor.fetchone() or {}
+                student_count = int(progress_row.get("student_count") or 0)
+                completed_count = int(progress_row.get("completed_count") or 0)
+                resolved_status = _derive_task_status(
+                    str(row["status"]),
+                    student_count,
+                    int(progress_row.get("in_progress_count") or 0),
+                    completed_count,
+                )
+
         due_date = row["due_date"]
         now = datetime.now()
         priority = self._compute_priority(due_date, now)
@@ -442,15 +584,17 @@ class LearningRepository:
             "course_description": row["course_description"] or "",
             "title": row["title"],
             "type": task_type,
-            "status": row["status"],
+            "status": resolved_status,
             "assignee_id": row["assignee_id"],
             "assignee_name": row["assignee_name"],
             "target_kp_ids": _parse_id_list(row["target_kp_ids"]),
             "priority": priority,
             "due_date": _serialize_due_date(due_date),
             "description": row["description"] or "",
-            "student_count": 0,
-            "completion_rate": 0.0,
+            "student_count": student_count,
+            "completion_rate": (
+                completed_count / student_count if student_count > 0 else 0.0
+            ),
         }
 
     def create_task(
@@ -466,17 +610,73 @@ class LearningRepository:
         """创建学习任务。"""
         kp_str = ",".join(str(k) for k in target_kp_ids) if target_kp_ids else None
         due_dt = due_date if due_date else None
-        with get_db_cursor() as cursor:
-            cursor.execute(
+        with get_db_transaction() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
                 """
                 INSERT INTO learning_tasks
                     (course_id, title, description, target_kp_ids, assignee_id, due_date, creator_id, status, created_at, updated_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, 'assigned', NOW(), NOW())
                 """,
                 (course_id, title, description, kp_str, assignee_id, due_dt, creator_id),
-            )
-            task_id = cursor.lastrowid
+                )
+                task_id = cursor.lastrowid
+                cursor.execute(
+                    """
+                    INSERT INTO learning_task_progress
+                        (task_id, student_id, status, is_deleted, created_at, updated_at)
+                    SELECT DISTINCT %s, sp.student_id, 'assigned', 0, NOW(), NOW()
+                    FROM student_profiles sp
+                    INNER JOIN users eligible_student
+                      ON eligible_student.user_id = sp.student_id
+                     AND eligible_student.is_deleted = 0
+                    WHERE sp.course_id = %s
+                      AND sp.is_deleted = 0
+                      AND (%s IS NULL OR sp.student_id = %s)
+                    """,
+                    (task_id, course_id, assignee_id, assignee_id),
+                )
+            finally:
+                cursor.close()
         return self.get_task(task_id) or {"id": task_id, "course_id": course_id, "title": title}
+
+    def update_task_progress(
+        self,
+        task_id: int,
+        student_id: int,
+        status: str,
+        conn: Connection,
+    ) -> int:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                INSERT INTO learning_task_progress
+                    (task_id, student_id, status, started_at, completed_at,
+                     is_deleted, created_at, updated_at)
+                VALUES (
+                    %s, %s, %s,
+                    IF(%s IN ('in_progress', 'completed'), NOW(), NULL),
+                    IF(%s = 'completed', NOW(), NULL),
+                    0, NOW(), NOW()
+                )
+                ON DUPLICATE KEY UPDATE
+                    status = VALUES(status),
+                    started_at = COALESCE(started_at, VALUES(started_at)),
+                    completed_at = IF(
+                        VALUES(status) = 'completed',
+                        COALESCE(completed_at, NOW()),
+                        NULL
+                    ),
+                    is_deleted = 0,
+                    updated_at = NOW()
+                """,
+                (task_id, student_id, status, status, status),
+            )
+            return cursor.rowcount
+        finally:
+            cursor.close()
 
     def update_task_status(
         self,
