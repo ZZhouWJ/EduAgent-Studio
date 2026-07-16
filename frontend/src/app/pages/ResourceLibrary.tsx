@@ -1,6 +1,6 @@
 import React from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search, FileText, CheckCircle2, AlertCircle, PlayCircle, Code, ListTree, MoreVertical, X, Calendar, BookOpen } from "lucide-react";
+import { Search, FileText, CheckCircle2, AlertCircle, PlayCircle, Code, ListTree, X, Calendar, BookOpen, Archive } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { learningApi, resourcesApi } from "@/lib/api";
 import { SafeLottie } from "../components/SafeLottie";
@@ -23,12 +23,38 @@ function formatTimeAgo(dateStr: string): string {
 
 function resourceIcon(type: string) {
   const t = (type ?? "").toLowerCase();
-  if (t.includes("讲义") || t.includes("文档")) return FileText;
-  if (t.includes("练习") || t.includes("题库")) return ListTree;
-  if (t.includes("代码") || t.includes("案例")) return Code;
-  if (t.includes("视频") || t.includes("动画")) return PlayCircle;
+  if (["quiz", "test", "error_analysis", "learning_card"].includes(t)) return ListTree;
+  if (["code_case", "case", "experiment_report"].includes(t)) return Code;
+  if (t === "video_script") return PlayCircle;
   return FileText;
 }
+
+const RESOURCE_TYPE_OPTIONS = [
+  { value: "", label: "全部" },
+  { value: "lecture", label: "课程讲义" },
+  { value: "mindmap", label: "思维导图" },
+  { value: "quiz", label: "练习题" },
+  { value: "case", label: "案例材料" },
+  { value: "code_case", label: "代码实操" },
+  { value: "ppt", label: "PPT 大纲" },
+  { value: "video_script", label: "视频脚本" },
+  { value: "experiment_report", label: "实验报告" },
+  { value: "error_analysis", label: "错题解析" },
+  { value: "learning_card", label: "学习卡片" },
+  { value: "review", label: "复习计划" },
+  { value: "test", label: "阶段测验" },
+  { value: "other", label: "其他" },
+] as const;
+
+const RESOURCE_TYPE_LABELS = Object.fromEntries(
+  RESOURCE_TYPE_OPTIONS.filter((item) => item.value).map((item) => [item.value, item.label]),
+) as Record<string, string>;
+
+const DIFFICULTY_LABELS: Record<string, string> = {
+  basic: "基础",
+  intermediate: "标准",
+  advanced: "进阶",
+};
 
 const STATUS_LABELS: Record<string, string> = {
   approved: "已通过",
@@ -76,7 +102,7 @@ export function ResourceLibrary() {
       course_id: Number(courseFilter) || undefined,
       page_size: 100,
     }),
-    [typeFilter, courseFilter]
+    [typeFilter, statusFilter, courseFilter]
   );
   const coursesState = useApi(() => learningApi.listCourses(), []);
 
@@ -85,18 +111,14 @@ export function ResourceLibrary() {
   const resources = (data?.items ?? []).map((r) => ({
     id: r.resource_id,
     title: r.resource_title,
-    type: r.resource_type || "资源",
+    type: RESOURCE_TYPE_LABELS[r.resource_type] ?? r.resource_type ?? "资源",
     course: r.course_name,
     status: STATUS_LABELS[r.status] ?? r.status,
     rawStatus: r.status,
-    difficulty: r.difficulty || "—",
+    difficulty: DIFFICULTY_LABELS[r.difficulty] ?? r.difficulty ?? "—",
     time: formatTimeAgo(r.created_at),
     icon: resourceIcon(r.resource_type ?? ""),
   }));
-
-  // Dynamic tabs from real data
-  const allTypes = Array.from(new Set(resources.map((r) => r.type))).filter(Boolean);
-  const tabs = ["全部", ...allTypes];
 
   const filtered = resources.filter((r) => {
     const statusMatch = !statusFilter || r.rawStatus === statusFilter;
@@ -107,9 +129,9 @@ export function ResourceLibrary() {
   return (
     <div className="mx-auto flex h-full max-w-[1400px] flex-col space-y-6 pb-6">
       {/* Filters */}
-      <div className="flex shrink-0 items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-        <div className="flex items-center gap-2 flex-1">
-          <div className="relative w-full max-w-xs">
+      <div className="flex shrink-0 flex-col items-stretch justify-between gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:flex-row sm:items-center">
+        <div className="flex flex-1 flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+          <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -121,7 +143,8 @@ export function ResourceLibrary() {
             />
           </div>
           <select
-            className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm"
+            aria-label="筛选课程"
+            className="h-9 w-full cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm sm:w-auto"
             value={courseFilter}
             onChange={(e) => handleCourseFilterChange(e.target.value)}
           >
@@ -131,31 +154,34 @@ export function ResourceLibrary() {
             ))}
           </select>
           <select
-            className="h-9 cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm"
+            aria-label="筛选状态"
+            className="h-9 w-full cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm sm:w-auto"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="">全部状态</option>
+            <option value="draft">草稿</option>
             <option value="approved">已通过</option>
             <option value="pending_review">待审核</option>
             <option value="rejected">被退回</option>
+            <option value="archived">已归档</option>
           </select>
         </div>
       </div>
 
       {/* Type Tabs */}
-      <div className="flex shrink-0 gap-2 border-b border-slate-200">
-        {tabs.map((tab) => (
+      <div className="flex shrink-0 gap-2 overflow-x-auto border-b border-slate-200">
+        {RESOURCE_TYPE_OPTIONS.map((tab) => (
           <button
-            key={tab}
-            onClick={() => setTypeFilter(tab === "全部" ? "" : tab)}
-            className={`cursor-pointer border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-              (tab === "全部" && !typeFilter) || typeFilter === tab
+            key={tab.value || "all"}
+            onClick={() => setTypeFilter(tab.value)}
+            className={`shrink-0 cursor-pointer border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+              typeFilter === tab.value
                 ? "border-blue-600 text-blue-600"
                 : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
             }`}
           >
-            {tab}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -174,20 +200,27 @@ export function ResourceLibrary() {
             const Icon = res.icon;
             const statusColor =
               res.rawStatus === "approved" ? "text-emerald-600" :
-              res.rawStatus === "pending_review" ? "text-orange-600" : "text-red-600";
+              res.rawStatus === "pending_review" ? "text-orange-600" :
+              res.rawStatus === "rejected" ? "text-red-600" : "text-slate-600";
             return (
               <div
                 key={res.id}
                 onClick={() => handleResourceClick(res)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    handleResourceClick(res);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label={`查看资源：${res.title}`}
                 className="group flex flex-col rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-1 hover:shadow-lg cursor-pointer"
               >
                 <div className="mb-4 flex items-start justify-between">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
                     <Icon className="h-5 w-5 cursor-pointer text-blue-500" />
                   </div>
-                  <button className="text-slate-400 opacity-0 transition-opacity group-hover:opacity-100">
-                    <MoreVertical className="h-5 w-5 cursor-pointer" />
-                  </button>
                 </div>
 
                 <h3 className="mb-2 line-clamp-2 text-[15px] font-black leading-tight text-slate-900">{res.title}</h3>
@@ -209,6 +242,8 @@ export function ResourceLibrary() {
                     {res.rawStatus === "approved" && <CheckCircle2 className="h-4 w-4 cursor-pointer text-emerald-500" />}
                     {res.rawStatus === "pending_review" && <AlertCircle className="h-4 w-4 cursor-pointer text-orange-500" />}
                     {res.rawStatus === "rejected" && <AlertCircle className="h-4 w-4 cursor-pointer text-red-500" />}
+                    {res.rawStatus === "draft" && <FileText className="h-4 w-4 text-slate-500" />}
+                    {res.rawStatus === "archived" && <Archive className="h-4 w-4 text-slate-500" />}
                     <span className={`text-xs font-bold ${statusColor}`}>{res.status}</span>
                   </div>
                   <span className="text-[11px] text-slate-400">{res.time}</span>
@@ -225,7 +260,7 @@ export function ResourceLibrary() {
           <DrawerHeader>
             <DrawerTitle className="text-lg font-black">{selectedResource?.title}</DrawerTitle>
             <DrawerClose asChild>
-              <button className="absolute right-4 top-4 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+              <button aria-label="关闭资源详情" className="absolute right-4 top-4 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
                 <X className="h-5 w-5" />
               </button>
             </DrawerClose>
@@ -241,7 +276,7 @@ export function ResourceLibrary() {
                     {drawerResource.course_name}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-600">
-                    {drawerResource.resource_type}
+                    {RESOURCE_TYPE_LABELS[drawerResource.resource_type] ?? drawerResource.resource_type}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
                     <Calendar className="h-3 w-3" />
