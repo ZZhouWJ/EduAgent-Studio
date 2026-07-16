@@ -1,16 +1,43 @@
 """学习资源 API"""
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query, Request
+from pydantic import BaseModel, Field
 
 from app.repositories.learning_resource_repo import LearningResourceRepository
 from app.services.auth_service import get_current_user_dependency as get_current_user
 from app.services.course_access_service import CourseAccessService
+from app.services.learning_resource_review_service import LearningResourceReviewService
 from app.utils.exceptions import NotFoundException
 from app.utils.response import success_response
 
 router = APIRouter(prefix="/learning", tags=["学习资源"])
 _repo = LearningResourceRepository()
+_review_service = LearningResourceReviewService(_repo)
+
+
+class SubmitResourceReviewRequest(BaseModel):
+    submit_note: Optional[str] = Field(None, max_length=500)
+
+
+class CompleteResourceReviewRequest(BaseModel):
+    decision: Literal["approved", "rejected"]
+    accuracy_score: Optional[float] = Field(None, ge=0, le=10)
+    completeness_score: Optional[float] = Field(None, ge=0, le=10)
+    logic_score: Optional[float] = Field(None, ge=0, le=10)
+    format_score: Optional[float] = Field(None, ge=0, le=10)
+    usability_score: Optional[float] = Field(None, ge=0, le=10)
+    review_comment: Optional[str] = Field(None, max_length=2000)
+
+
+def _client_context(request: Request) -> tuple[str, str]:
+    forwarded = request.headers.get("X-Forwarded-For")
+    ip_address = (
+        forwarded.split(",")[0].strip()
+        if forwarded
+        else request.client.host if request.client else "unknown"
+    )
+    return ip_address, request.headers.get("User-Agent", "")
 
 
 def _is_student_only(user: dict) -> bool:
@@ -52,3 +79,45 @@ async def get_resource(
     if detail is None or (_is_student_only(user) and detail.get("status") != "approved"):
         raise NotFoundException("资源不存在")
     return success_response(data=detail)
+
+
+@router.post("/resources/{resource_id}/submit-review")
+async def submit_resource_review(
+    request: Request,
+    resource_id: int,
+    body: SubmitResourceReviewRequest = Body(...),
+    user: dict = Depends(get_current_user),
+):
+    ip_address, user_agent = _client_context(request)
+    result = _review_service.submit_for_review(
+        resource_id=resource_id,
+        user=user,
+        submit_note=body.submit_note,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    return success_response(data=result, message="资源已提交审核")
+
+
+@router.post("/resources/{resource_id}/review")
+async def complete_resource_review(
+    request: Request,
+    resource_id: int,
+    body: CompleteResourceReviewRequest = Body(...),
+    user: dict = Depends(get_current_user),
+):
+    ip_address, user_agent = _client_context(request)
+    result = _review_service.complete_review(
+        resource_id=resource_id,
+        user=user,
+        decision=body.decision,
+        accuracy_score=body.accuracy_score,
+        completeness_score=body.completeness_score,
+        logic_score=body.logic_score,
+        format_score=body.format_score,
+        usability_score=body.usability_score,
+        review_comment=body.review_comment,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    return success_response(data=result, message="资源审核已完成")

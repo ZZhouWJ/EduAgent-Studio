@@ -55,6 +55,8 @@ services:
       - ./database/19_enhance_student_profiles.sql:/docker-entrypoint-initdb.d/19_enhance_student_profiles.sql:ro
       - ./database/20_align_education_roles.sql:/docker-entrypoint-initdb.d/20_align_education_roles.sql:ro
       - ./database/21_create_platform_settings.sql:/docker-entrypoint-initdb.d/21_create_platform_settings.sql:ro
+      - ./database/22_extend_learning_resource_types.sql:/docker-entrypoint-initdb.d/22_extend_learning_resource_types.sql:ro
+      - ./database/23_create_learning_resource_reviews.sql:/docker-entrypoint-initdb.d/23_create_learning_resource_reviews.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s
