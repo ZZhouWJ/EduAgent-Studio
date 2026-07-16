@@ -285,7 +285,7 @@ export function StudentDashboard() {
               return (
                 <Link
                   key={r.id}
-                  to={`/student/resources/${r.id}`}
+                  to={`/student/resources?resource=${r.id}`}
                   className="ds-hover-lift ds-press group flex flex-col rounded-md border border-slate-200 bg-white p-3.5"
                 >
                   <div className="flex items-center justify-between">
@@ -330,7 +330,7 @@ export function StudentDashboard() {
               return (
                 <Link
                   key={r.resource_id}
-                  to={`/student/resources/${r.resource_id}`}
+                  to={`/student/resources?resource=${r.resource_id}`}
                   className="ds-hover-lift ds-press group flex flex-col rounded-md border border-slate-200 bg-white p-3.5"
                 >
                   <div className="flex items-center justify-between">
