@@ -41,7 +41,7 @@ export function TeacherDashboard() {
   const actionItems = [
     { title: `${overview?.pending_review_count ?? 0} 个资源待审核`, desc: pendingReviews?.items?.length ? `最新：${pendingReviews.items[0]?.output_title ?? "—"}` : "暂无新提交", icon: CheckSquare, tone: "orange", action: "进入审核", link: "/teacher/review" },
     { title: `${lowMasteryCount} 名学生知识点掌握度低于 50%`, desc: weaknessData.length ? `集中在 ${weaknessData[0]?.name ?? "—"} 等 ${weaknessData.length} 个知识点` : "等待数据", icon: Users, tone: "red", action: "查看学生", link: "/teacher/students" },
-    { title: `${learningData?.feedback_count ?? 0} 条学习反馈需要关注`, desc: "来自本班学生近 7 天", icon: MessageSquare, tone: "blue", action: "查看反馈", link: "/student/feedback" },
+    { title: `${learningData?.feedback_count ?? 0} 条学习反馈需要关注`, desc: "来自本班学生近 7 天", icon: MessageSquare, tone: "blue", action: "查看反馈", link: "/teacher/feedback" },
     { title: `${learningData?.resource_count ?? 0} 个学习资源可发布`, desc: "已审核通过，等待分发", icon: Database, tone: "slate", action: "补充资料", link: "/teacher/resources" },
   ];
 

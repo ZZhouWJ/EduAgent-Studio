@@ -47,6 +47,7 @@ export const router = createBrowserRouter(
         { path: "teacher/agent-workbench", lazy: async () => ({ Component: (await import("./pages/AgentWorkbench")).AgentWorkbench }) },
         { path: "teacher/review", lazy: async () => ({ Component: (await import("./pages/TeacherReview")).TeacherReview }) },
         { path: "teacher/tasks", lazy: async () => ({ Component: (await import("./pages/TeacherTasks")).TeacherTasks }) },
+        { path: "teacher/feedback", lazy: async () => ({ Component: (await import("./pages/TeacherFeedback")).TeacherFeedback }) },
         { path: "teacher/knowledge-base", lazy: async () => ({ Component: (await import("./pages/TeacherKnowledgeBase")).TeacherKnowledgeBase }) },
         { path: "teacher/analytics", lazy: async () => ({ Component: (await import("./pages/LearningAnalytics")).LearningAnalytics }) },
 
