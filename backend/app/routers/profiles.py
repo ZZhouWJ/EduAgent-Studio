@@ -1,7 +1,9 @@
 """学生画像 API"""
+import json
+from typing import Annotated, Optional
+
 from fastapi import APIRouter, Depends, Path, Query
-from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from app.utils.dependencies import get_current_user_dep, require_role
 from app.services.profile_service import ProfileService
 from app.services.profile_dialog_service import ProfileDialogService
@@ -13,6 +15,54 @@ class UpdateMasteryRequest(BaseModel):
     kp_id: int = Field(..., gt=0)
     mastery: float = Field(..., ge=0, le=1)
     update_reason: Optional[str] = Field(None, max_length=500)
+
+
+ShortProfileText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)
+]
+
+
+class UpdateProfileRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    learning_goal: Optional[str] = Field(None, max_length=5000)
+    knowledge_base: Optional[str] = Field(None, max_length=5000)
+    current_level: Optional[str] = Field(None, max_length=2000)
+    cognitive_style: Optional[str] = Field(None, max_length=100)
+    time_constraints: Optional[str] = Field(None, max_length=255)
+    practice_level: Optional[str] = Field(None, max_length=100)
+    motivation: Optional[str] = Field(None, max_length=255)
+    error_prone_points: Optional[list[ShortProfileText]] = Field(None, max_length=50)
+    interests: Optional[list[ShortProfileText]] = Field(None, max_length=20)
+    resource_preferences: Optional[list[ShortProfileText]] = Field(None, max_length=20)
+    weekly_hours: Optional[int] = Field(None, ge=0, le=168)
+    mastery_score: Optional[float] = Field(None, ge=0, le=1)
+
+
+class DialogMessageRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)
+    ]
+
+
+class ApplyExtractionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message_id: int = Field(..., gt=0)
+
+
+def _profile_update_payload(data: UpdateProfileRequest) -> dict:
+    payload = data.model_dump(exclude_unset=True)
+    if isinstance(payload.get("error_prone_points"), list):
+        payload["error_prone_points"] = json.dumps(
+            payload["error_prone_points"], ensure_ascii=False
+        )
+    for field in ("interests", "resource_preferences"):
+        if isinstance(payload.get(field), list):
+            payload[field] = ",".join(payload[field])
+    return payload
 
 
 @router.get("/me")
@@ -58,13 +108,13 @@ async def get_profile_feedback_history(
 
 @router.put("/{profile_id}")
 async def update_profile(
-    profile_id: int,
-    data: dict,
+    data: UpdateProfileRequest,
+    profile_id: int = Path(..., gt=0),
     user: dict = Depends(require_role("teacher", "admin")),
 ):
     """更新学生画像（仅教师/管理员可操作）"""
     service = ProfileService()
-    return service.update_profile(profile_id, data, user)
+    return service.update_profile(profile_id, _profile_update_payload(data), user)
 
 
 @router.post("/{profile_id}/mastery")
@@ -92,8 +142,8 @@ async def get_dialog_history(
 
 @router.post("/{profile_id}/dialog")
 async def send_dialog_message(
+    data: DialogMessageRequest,
     profile_id: int = Path(..., gt=0, description="画像 ID"),
-    data: dict = None,
     user: dict = Depends(get_current_user_dep),
 ):
     """
@@ -112,21 +162,15 @@ async def send_dialog_message(
         "pending_changes": [...]  # 待确认的变更列表
     }
     """
-    if data is None:
-        data = {}
-    message = data.get("message", "")
-    if not message or not message.strip():
-        return {"code": 400, "message": "消息不能为空", "data": None}
-
     ProfileService().require_profile_access(profile_id, user)
     service = ProfileDialogService()
-    return service.chat(profile_id, message.strip(), user)
+    return service.chat(profile_id, data.message, user)
 
 
 @router.post("/{profile_id}/apply-extraction")
 async def apply_extraction(
+    data: ApplyExtractionRequest,
     profile_id: int = Path(..., gt=0, description="画像 ID"),
-    data: dict = None,
     user: dict = Depends(require_role("teacher", "admin", "student_member")),
 ):
     """
@@ -139,12 +183,6 @@ async def apply_extraction(
 
     只有消息的发送者或教师/管理员可以应用。
     """
-    if data is None:
-        data = {}
-    message_id = data.get("message_id")
-    if not message_id:
-        return {"code": 400, "message": "message_id 不能为空", "data": None}
-
     ProfileService().require_profile_access(profile_id, user)
     service = ProfileDialogService()
-    return service.apply_extraction(profile_id, message_id)
+    return service.apply_extraction(profile_id, data.message_id)
