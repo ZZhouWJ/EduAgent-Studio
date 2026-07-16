@@ -87,6 +87,18 @@ export const modelsApi = {
     return client.post<AIModel>('/ai-models', data)
   },
 
+  updateModel(model_id: number, data: {
+    display_name: string
+    capability_tags?: string
+    max_context: number
+    input_price: number
+    output_price: number
+    price_unit: string
+    status: 'active' | 'disabled'
+  }) {
+    return client.patch<{ model_id: number }>(`/ai-models/${model_id}`, data)
+  },
+
   getApiConfigs(params?: {
     provider_id?: number
     page?: number
