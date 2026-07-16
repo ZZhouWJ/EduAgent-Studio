@@ -65,7 +65,7 @@ export function TeacherCourses() {
         action={<button onClick={() => { reloadCourses(); reloadOverview(); showToast("课程数据已刷新"); }} className={primaryButton}>同步课程数据</button>}
       />
 
-      <section className="grid grid-cols-6 gap-4">
+      <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
         {stats.map((stat) => <StatCard key={stat.label} {...stat} />)}
       </section>
 
