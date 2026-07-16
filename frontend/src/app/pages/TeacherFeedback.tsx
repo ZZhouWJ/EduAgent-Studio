@@ -22,8 +22,7 @@ import {
 
 const FEEDBACK_TYPES = [
   { value: "", label: "全部类型" },
-  { value: "self_assessment", label: "自评反馈" },
-  { value: "self_report", label: "学习反馈" },
+  { value: "self_report", label: "自评反馈" },
   { value: "quiz_result", label: "测验结果" },
   { value: "study_note", label: "学习笔记" },
   { value: "question", label: "问题提问" },
@@ -32,6 +31,8 @@ const FEEDBACK_TYPES = [
 const FEEDBACK_TYPE_LABELS: Record<string, string> = Object.fromEntries(
   FEEDBACK_TYPES.filter((item) => item.value).map((item) => [item.value, item.label]),
 );
+
+type FeedbackTypeFilter = (typeof FEEDBACK_TYPES)[number]["value"];
 
 const DIFFICULTY_LABELS: Record<string, string> = {
   too_easy: "偏简单",
@@ -54,7 +55,7 @@ export function TeacherFeedback() {
   const courses = coursesState.data ?? [];
   const [courseId, setCourseId] = React.useState(0);
   const [studentId, setStudentId] = React.useState(0);
-  const [feedbackType, setFeedbackType] = React.useState("");
+  const [feedbackType, setFeedbackType] = React.useState<FeedbackTypeFilter>("");
   const [selected, setSelected] = React.useState<LearningFeedback | null>(null);
 
   React.useEffect(() => {
@@ -161,7 +162,7 @@ export function TeacherFeedback() {
           <select
             aria-label="筛选反馈类型"
             value={feedbackType}
-            onChange={(event) => setFeedbackType(event.target.value)}
+            onChange={(event) => setFeedbackType(event.target.value as FeedbackTypeFilter)}
             className="edu-focus-ring mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700"
           >
             {FEEDBACK_TYPES.map((item) => <option key={item.value || "all"} value={item.value}>{item.label}</option>)}
