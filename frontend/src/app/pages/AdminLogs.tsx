@@ -24,6 +24,7 @@ function formatRoles(roleCodes?: string) {
 function mapOpLog(l: OperationLog) {
   return {
     id: `operation:${l.log_id}`,
+    sortTime: l.created_at ? Date.parse(l.created_at) : 0,
     time: l.created_at ? new Date(l.created_at).toLocaleString("zh-CN") : "—",
     actor: l.operator_real_name || l.operator_username || "—",
     role: formatRoles(l.role_codes),
@@ -38,6 +39,7 @@ function mapOpLog(l: OperationLog) {
 function mapLoginLog(l: LoginLog) {
   return {
     id: `login:${l.login_id}`,
+    sortTime: l.login_time ? Date.parse(l.login_time) : 0,
     time: l.login_time ? new Date(l.login_time).toLocaleString("zh-CN") : "—",
     actor: l.real_name || l.username || "—",
     role: formatRoles(l.role_codes),
@@ -80,9 +82,10 @@ export function AdminLogs() {
   const opTypes = Array.from(new Set(opLogs.map((l) => l.type))).filter(Boolean);
   const logTabs = ["全部", "登录日志", ...opTypes];
 
-  const combinedLogs: LogEntry[] = type === "全部" || type === "登录日志"
+  const combinedLogs: LogEntry[] = (type === "全部" || type === "登录日志"
     ? type === "登录日志" ? loginLogs : [...loginLogs, ...opLogs]
-    : opLogs.filter((l) => l.type === type);
+    : opLogs.filter((l) => l.type === type)
+  ).sort((left, right) => right.sortTime - left.sortTime);
 
   const filtered = combinedLogs.filter((log) => {
     const typeMatch = type === "全部" || log.type === type ||
