@@ -70,12 +70,13 @@ export function StudentTasks() {
     .filter((task) => !normalized || `${task.title}${task.knowledge}`.toLowerCase().includes(normalized));
 
   const taskSections = ["今日任务", "本周任务", "已完成任务"];
+  const inProgressCount = allTasks.filter((task) => task.status === "in_progress").length;
 
   const stats = [
     { label: "待完成任务", value: String(allTasks.filter((t) => ["assigned", "not_started"].includes(t.status)).length), hint: "本周任务", icon: Target, tone: "orange" as const },
-    { label: "进行中任务", value: String(allTasks.filter((t) => t.status === "in_progress").length), hint: "今日任务", icon: PlayCircle, tone: "blue" as const },
+    { label: "进行中任务", value: String(inProgressCount), hint: "今日任务", icon: PlayCircle, tone: "blue" as const },
     { label: "已完成任务", value: String(allTasks.filter((t) => t.status === "completed").length), hint: "本周持续更新", icon: CheckCircle2, tone: "emerald" as const },
-    { label: "今日建议时长", value: `${Math.max(30, allTasks.filter((t) => t.status === "in_progress").length * 15)} 分钟`, hint: "轻量化拆分", icon: Clock3, tone: "purple" as const },
+    { label: "今日建议时长", value: `${inProgressCount * 30} 分钟`, hint: inProgressCount > 0 ? "按进行中任务估算" : "暂无进行中任务", icon: Clock3, tone: "purple" as const },
   ];
 
   const recommendedResources = (resourcesData?.items ?? []).slice(0, 3).map((r) => ({

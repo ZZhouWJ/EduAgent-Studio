@@ -72,8 +72,8 @@ export function StudentDashboard() {
         />
         <MetricTile
           label="待完成任务"
-          value={String(pendingCount || "—")}
-          hint={`今日 ${todayCount} 项`}
+          value={tasksData ? String(pendingCount) : "—"}
+          hint={tasksData ? `今日 ${todayCount} 项` : "正在统计"}
           icon={CheckCircle2}
           tone="purple"
           delay={0.06}
