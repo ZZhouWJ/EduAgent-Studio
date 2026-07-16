@@ -1,8 +1,10 @@
 import React from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search, FileText, CheckCircle2, AlertCircle, PlayCircle, Code, ListTree, X, Calendar, BookOpen, Archive } from "lucide-react";
+import { Search, FileText, CheckCircle2, AlertCircle, PlayCircle, Code, ListTree, X, Calendar, BookOpen, Archive, Send, History, LoaderCircle } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { learningApi, resourcesApi } from "@/lib/api";
+import { notify } from "@/lib/toast";
+import { useAuthStore } from "@/stores/auth";
 import { SafeLottie } from "../components/SafeLottie";
 import { ResourceRenderer } from "../components/resource/ResourceRenderer";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from "../components/ui/drawer";
@@ -71,6 +73,10 @@ export function ResourceLibrary() {
   const [courseFilter, setCourseFilter] = React.useState(() => searchParams.get("course") ?? "");
   const [keyword, setKeyword] = React.useState("");
   const [selectedResource, setSelectedResource] = React.useState<(typeof resources)[0] | null>(null);
+  const [submitNote, setSubmitNote] = React.useState("");
+  const [submittingReview, setSubmittingReview] = React.useState(false);
+  const user = useAuthStore((state) => state.user);
+  const canManageReviews = user?.roles?.some((role) => role === "teacher" || role === "admin") ?? false;
 
   React.useEffect(() => {
     const course = searchParams.get("course") ?? "";
@@ -85,7 +91,7 @@ export function ResourceLibrary() {
     setSearchParams(next, { replace: true });
   };
 
-  const { data: drawerResource, loading: detailLoading } = useApi(
+  const { data: drawerResource, loading: detailLoading, refetch: refetchDetail } = useApi(
     () => selectedResource ? resourcesApi.getById(selectedResource.id) : Promise.resolve(null),
     [selectedResource?.id]
   );
@@ -95,7 +101,7 @@ export function ResourceLibrary() {
     setSelectedResource(resource)
   }
 
-  const { data, loading } = useApi(
+  const { data, loading, refetch: refetchResources } = useApi(
     () => resourcesApi.list({
       type: typeFilter || undefined,
       status: statusFilter || undefined,
@@ -125,6 +131,21 @@ export function ResourceLibrary() {
     const keywordMatch = !keyword || r.title.toLowerCase().includes(keyword.toLowerCase());
     return statusMatch && keywordMatch;
   });
+
+  const handleSubmitReview = async () => {
+    if (!drawerResource || !canManageReviews) return;
+    setSubmittingReview(true);
+    try {
+      await resourcesApi.submitReview(drawerResource.resource_id, submitNote);
+      notify.success("资源已提交审核");
+      setSubmitNote("");
+      await Promise.all([refetchDetail(), refetchResources()]);
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "提交审核失败");
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   return (
     <div className="mx-auto flex h-full max-w-[1400px] flex-col space-y-6 pb-6">
@@ -255,7 +276,15 @@ export function ResourceLibrary() {
       )}
 
       {/* Detail Drawer */}
-      <Drawer open={!!selectedResource} onOpenChange={(open) => !open && setSelectedResource(null)}>
+      <Drawer
+        open={!!selectedResource}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedResource(null);
+            setSubmitNote("");
+          }
+        }}
+      >
         <DrawerContent className="max-h-[85vh]">
           <DrawerHeader>
             <DrawerTitle className="text-lg font-black">{selectedResource?.title}</DrawerTitle>
@@ -282,8 +311,80 @@ export function ResourceLibrary() {
                     <Calendar className="h-3 w-3" />
                     {new Date(drawerResource.created_at).toLocaleDateString("zh-CN")}
                   </span>
+                  <span className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-bold ${
+                    drawerResource.status === "approved" ? "bg-emerald-50 text-emerald-700" :
+                    drawerResource.status === "pending_review" ? "bg-orange-50 text-orange-700" :
+                    drawerResource.status === "rejected" ? "bg-red-50 text-red-700" :
+                    "bg-slate-100 text-slate-600"
+                  }`}>
+                    {STATUS_LABELS[drawerResource.status] ?? drawerResource.status}
+                  </span>
                 </div>
                 <ResourceRenderer resource={drawerResource} />
+
+                {canManageReviews && (drawerResource.review_history?.length ?? 0) > 0 && (
+                  <section className="mt-6 border-t border-slate-200 pt-5" aria-labelledby="resource-review-history">
+                    <h3 id="resource-review-history" className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
+                      <History className="h-4 w-4 text-slate-500" /> 审核记录
+                    </h3>
+                    <div className="space-y-4">
+                      {drawerResource.review_history?.map((review) => (
+                        <div key={review.review_id} className="border-l-2 border-slate-200 pl-4">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                            <span className={`font-bold ${
+                              review.review_status === "approved" ? "text-emerald-700" :
+                              review.review_status === "rejected" ? "text-red-700" : "text-orange-700"
+                            }`}>
+                              {review.review_status === "approved" ? "审核通过" : review.review_status === "rejected" ? "退回修改" : "等待审核"}
+                            </span>
+                            <span className="text-slate-500">
+                              {new Date(review.submitted_at).toLocaleString("zh-CN")}
+                            </span>
+                            <span className="text-slate-500">送审人：{review.submitter_name}</span>
+                            {review.reviewer_name && <span className="text-slate-500">审核人：{review.reviewer_name}</span>}
+                          </div>
+                          {review.submit_note && <p className="mt-2 text-sm text-slate-600">送审说明：{review.submit_note}</p>}
+                          {review.review_comment && <p className="mt-2 text-sm font-medium text-slate-700">审核意见：{review.review_comment}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {canManageReviews && ["draft", "rejected"].includes(drawerResource.status) && (
+                  <section className="mt-6 border-t border-slate-200 pt-5" aria-labelledby="submit-resource-review">
+                    <h3 id="submit-resource-review" className="text-sm font-black text-slate-900">提交教师审核</h3>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">提交后资源进入待审核状态，通过后才会出现在学生资源库。</p>
+                    <label className="mt-3 block text-xs font-medium text-slate-700" htmlFor="resource-submit-note">送审说明（可选）</label>
+                    <textarea
+                      id="resource-submit-note"
+                      value={submitNote}
+                      onChange={(event) => setSubmitNote(event.target.value)}
+                      maxLength={500}
+                      rows={3}
+                      placeholder="说明适用对象、教学目标或需要重点核验的内容"
+                      className="edu-focus-ring mt-2 w-full resize-none rounded-lg border border-slate-300 p-3 text-sm text-slate-800"
+                    />
+                    <div className="mt-3 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={handleSubmitReview}
+                        disabled={submittingReview}
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {submittingReview ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        {submittingReview ? "提交中..." : "提交审核"}
+                      </button>
+                    </div>
+                  </section>
+                )}
+
+                {canManageReviews && drawerResource.status === "pending_review" && (
+                  <div className="mt-6 flex items-start gap-2 border-t border-slate-200 pt-5 text-sm text-orange-700">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    资源正在等待教师审核，审核完成前不会向学生开放。
+                  </div>
+                )}
               </>
             ) : (
               <div className="text-center text-slate-400 py-8">暂无详情</div>

@@ -33,7 +33,13 @@ export {
 export { coursesApi, type CourseUpdateBody } from './courses'
 
 // Resources
-export { resourcesApi, type LearningResource } from './resources'
+export {
+  resourcesApi,
+  type LearningResource,
+  type LearningResourceReview,
+  type CompleteResourceReviewBody,
+  type ResourceReviewResult,
+} from './resources'
 
 // Feedbacks
 export { feedbackApi, type LearningFeedback } from './feedbacks'
