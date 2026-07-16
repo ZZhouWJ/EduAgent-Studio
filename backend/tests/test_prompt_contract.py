@@ -2,7 +2,9 @@ import unittest
 from unittest.mock import patch
 
 from app.services import prompt_service
+from app.routers import prompts as prompt_router
 from app.utils.exceptions import NotFoundException, ValidationException
+from starlette.requests import Request
 
 
 class PromptContractTests(unittest.TestCase):
@@ -70,6 +72,7 @@ class PromptContractTests(unittest.TestCase):
         self.assertEqual(insert_log.call_args.kwargs["conn"], transaction)
         transaction.commit.assert_called_once()
 
+
     @patch("app.services.prompt_service.prompt_repo.get_task_type_by_id")
     @patch("app.services.prompt_service._require_auth")
     def test_create_template_cannot_activate_without_version(
@@ -86,6 +89,54 @@ class PromptContractTests(unittest.TestCase):
             )
 
         get_task_type.assert_not_called()
+
+    @patch("app.services.prompt_service.prompt_repo.get_version_by_id")
+    @patch("app.services.prompt_service.user_repo.insert_operation_log_with_conn")
+    @patch("app.services.prompt_service.prompt_repo.set_current_version")
+    @patch("app.services.prompt_service.prompt_repo.create_version")
+    @patch("app.services.prompt_service.prompt_repo.get_next_version_no")
+    @patch("app.services.prompt_service.prompt_repo.get_template_created_by")
+    @patch("app.services.prompt_service.prompt_repo.get_template_by_id")
+    @patch("app.services.prompt_service.get_db_transaction")
+    @patch("app.services.prompt_service._require_auth")
+    def test_create_version_can_publish_in_same_transaction(
+        self,
+        require_auth,
+        get_transaction,
+        get_template,
+        get_created_by,
+        get_next_version,
+        create_version,
+        set_current_version,
+        insert_log,
+        get_version,
+    ):
+        require_auth.return_value = {"user_id": 1, "roles": ["admin"]}
+        get_template.return_value = {"current_version_id": 10}
+        get_created_by.return_value = 1
+        get_next_version.return_value = 2
+        create_version.return_value = 20
+        get_version.return_value = {
+            "prompt_version_id": 20,
+            "template_id": 7,
+            "version_no": "2",
+        }
+        transaction = get_transaction.return_value.__enter__.return_value
+
+        prompt_service.create_version(
+            token="token",
+            template_id=7,
+            prompt_content="新版本",
+            auto_activate=True,
+        )
+
+        set_current_version.assert_called_once_with(
+            template_id=7,
+            version_id=20,
+            conn=transaction,
+        )
+        self.assertEqual(insert_log.call_args.kwargs["conn"], transaction)
+        transaction.commit.assert_called_once()
 
     def test_template_row_exposes_current_version_and_update_time(self):
         result = prompt_service._template_row_to_dict({
@@ -200,6 +251,56 @@ class PromptContractTests(unittest.TestCase):
                 version_id=23,
                 variables={},
             )
+
+
+class PromptRouterContractTests(unittest.IsolatedAsyncioTestCase):
+    def make_request(self) -> Request:
+        return Request({
+            "type": "http",
+            "method": "POST",
+            "path": "/api/prompt-templates",
+            "headers": [],
+            "client": ("127.0.0.1", 12345),
+        })
+
+    @patch("app.routers.prompts.prompt_service.create_template")
+    async def test_create_template_routes_activation_to_template_service(
+        self, create_template
+    ):
+        create_template.return_value = {"template_id": 7}
+
+        await prompt_router.create_template(
+            request=self.make_request(),
+            authorization="Bearer token",
+            body=prompt_router.CreateTemplateRequest(
+                template_name="模板",
+                task_type_id=3,
+                initial_prompt_content="内容",
+                activate=True,
+            ),
+        )
+
+        self.assertTrue(create_template.call_args.kwargs["activate"])
+        self.assertNotIn("auto_activate", create_template.call_args.kwargs)
+
+    @patch("app.routers.prompts.prompt_service.create_version")
+    async def test_create_version_routes_activation_to_version_service(
+        self, create_version
+    ):
+        create_version.return_value = {"prompt_version_id": 20}
+
+        await prompt_router.create_version(
+            request=self.make_request(),
+            template_id=7,
+            authorization="Bearer token",
+            body=prompt_router.CreateVersionRequest(
+                prompt_content="新版本",
+                activate=True,
+            ),
+        )
+
+        self.assertTrue(create_version.call_args.kwargs["auto_activate"])
+        self.assertNotIn("activate", create_version.call_args.kwargs)
 
 
 if __name__ == "__main__":

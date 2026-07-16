@@ -70,6 +70,7 @@ class CreateVersionRequest(BaseModel):
     version_no: Optional[str] = Field(None, max_length=20)
     prompt_content: str = Field(..., min_length=1)
     change_note: Optional[str] = Field(None, max_length=500)
+    activate: bool = Field(False)
 
 
 class RenderTemplateRequest(BaseModel):
@@ -285,6 +286,7 @@ async def create_version(
         version_no=body.version_no,
         prompt_content=body.prompt_content,
         change_note=body.change_note,
+        auto_activate=body.activate,
         ip_address=ip,
         user_agent=ua,
     )

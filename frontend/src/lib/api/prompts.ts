@@ -53,6 +53,7 @@ export interface CreateVersionBody {
   version_no?: string
   prompt_content: string
   change_note?: string
+  activate?: boolean
 }
 
 export interface PromptRenderResult {

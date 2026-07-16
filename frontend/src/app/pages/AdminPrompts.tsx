@@ -71,8 +71,9 @@ export function AdminPrompts() {
   );
 
   React.useEffect(() => {
-    if (versionsState.data?.length && versionsState.data[0]?.prompt_content) {
-      setPromptContent(versionsState.data[0].prompt_content);
+    if (versionsState.data?.length) {
+      const currentVersion = versionsState.data.find((version) => version.is_active) ?? versionsState.data[0];
+      setPromptContent(currentVersion.prompt_content ?? "");
     }
   }, [versionsState.data]);
 
@@ -111,8 +112,9 @@ export function AdminPrompts() {
       await promptsApi.createVersion(Number(selected.id), {
         prompt_content: promptContent,
         change_note: changeNote || "更新 Prompt 内容",
+        activate: true,
       });
-      notify.success("版本已保存");
+      notify.success("新版本已保存并激活");
       versionsState.refetch();
       templatesState.refetch();
       setModalMode(null);
