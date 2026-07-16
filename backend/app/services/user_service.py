@@ -7,6 +7,7 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.repositories import user_repo
+from app.utils.exceptions import NotFoundException, ValidationException
 from app.utils.roles import (
     PLATFORM_ROLE_CODES,
     filter_platform_roles,
@@ -104,6 +105,7 @@ def list_users_service(
 def update_user_status_service(
     user_id: int,
     new_status: str,
+    actor_user_id: int,
 ) -> None:
     """
     更新用户状态。
@@ -114,20 +116,31 @@ def update_user_status_service(
     """
     valid_statuses = {"active", "disabled"}
     if new_status not in valid_statuses:
-        from app.utils.exceptions import ValidationException
         raise ValidationException(
             message=f"无效的状态: {new_status}，允许值: {', '.join(valid_statuses)}"
         )
 
+    target = user_repo.get_user_by_id(user_id)
+    if not target:
+        raise NotFoundException(message="用户不存在")
+    if new_status == "disabled":
+        if user_id == actor_user_id:
+            raise ValidationException(message="不能停用当前登录账号")
+        if (
+            "admin" in user_repo.get_user_roles(user_id)
+            and user_repo.count_active_users_with_role("admin") <= 1
+        ):
+            raise ValidationException(message="平台必须保留至少一个启用的管理员")
+
     affected = user_repo.update_user_status(user_id, new_status)
     if affected == 0:
-        from app.utils.exceptions import NotFoundException
         raise NotFoundException(message="用户不存在或无权更新")
 
 
 def update_user_roles_service(
     user_id: int,
     role_ids: List[int],
+    actor_user_id: int,
 ) -> None:
     """
     更新用户角色。
@@ -138,15 +151,14 @@ def update_user_roles_service(
     """
     user = user_repo.get_user_by_id(user_id)
     if not user:
-        from app.utils.exceptions import NotFoundException
         raise NotFoundException(message="用户不存在")
 
     roles_by_id = {
         int(role["role_id"]): role for role in filter_platform_roles(user_repo.list_roles())
     }
     if not role_ids:
-        from app.utils.exceptions import ValidationException
         raise ValidationException(message="用户至少需要一个角色")
+    new_role_codes = set()
     for role_id in role_ids:
         role = roles_by_id.get(int(role_id))
         if (
@@ -154,8 +166,15 @@ def update_user_roles_service(
             or role.get("status", "active") != "active"
             or role["role_code"] not in PLATFORM_ROLE_CODES
         ):
-            from app.utils.exceptions import ValidationException
             raise ValidationException(message="选择的角色不存在或不可分配")
+        new_role_codes.add(role["role_code"])
+
+    current_role_codes = set(user_repo.get_user_roles(user_id))
+    removes_admin = "admin" in current_role_codes and "admin" not in new_role_codes
+    if removes_admin and user_id == actor_user_id:
+        raise ValidationException(message="不能移除当前登录账号的管理员角色")
+    if removes_admin and user_repo.count_active_users_with_role("admin") <= 1:
+        raise ValidationException(message="平台必须保留至少一个启用的管理员")
 
     user_repo.update_user_roles(user_id, role_ids)
 

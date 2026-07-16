@@ -46,7 +46,35 @@ class RoleSecurityTests(unittest.TestCase):
         self, _get_user, _list_roles, update_roles
     ):
         with self.assertRaises(ValidationException):
-            user_service.update_user_roles_service(9, [2])
+            user_service.update_user_roles_service(9, [2], actor_user_id=1)
+        update_roles.assert_not_called()
+
+    @patch("app.services.user_service.user_repo.update_user_roles")
+    @patch("app.services.user_service.user_repo.get_user_roles", return_value=["admin"])
+    @patch("app.services.user_service.user_repo.list_roles", return_value=ROLES)
+    @patch("app.services.user_service.user_repo.get_user_by_id", return_value={"user_id": 4})
+    def test_admin_cannot_remove_own_admin_role(
+        self, _get_user, _list_roles, _get_roles, update_roles
+    ):
+        with self.assertRaisesRegex(ValidationException, "当前登录账号"):
+            user_service.update_user_roles_service(4, [3], actor_user_id=4)
+
+        update_roles.assert_not_called()
+
+    @patch("app.services.user_service.user_repo.update_user_roles")
+    @patch(
+        "app.services.user_service.user_repo.count_active_users_with_role",
+        return_value=1,
+    )
+    @patch("app.services.user_service.user_repo.get_user_roles", return_value=["admin"])
+    @patch("app.services.user_service.user_repo.list_roles", return_value=ROLES)
+    @patch("app.services.user_service.user_repo.get_user_by_id", return_value={"user_id": 4})
+    def test_last_admin_role_cannot_be_removed(
+        self, _get_user, _list_roles, _get_roles, _count_admins, update_roles
+    ):
+        with self.assertRaisesRegex(ValidationException, "至少一个启用的管理员"):
+            user_service.update_user_roles_service(4, [3], actor_user_id=1)
+
         update_roles.assert_not_called()
 
     def test_capabilities_match_current_education_product(self):

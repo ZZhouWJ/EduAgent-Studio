@@ -110,6 +110,25 @@ def get_user_roles(user_id: int) -> List[str]:
         return [row["role_code"] for row in rows]
 
 
+def count_active_users_with_role(role_code: str) -> int:
+    """Count active, non-deleted users assigned to an active platform role."""
+    sql = """
+        SELECT COUNT(DISTINCT u.user_id) AS total
+        FROM users u
+        INNER JOIN user_roles ur
+            ON ur.user_id = u.user_id AND ur.is_deleted = 0
+        INNER JOIN roles r
+            ON r.role_id = ur.role_id AND r.is_deleted = 0 AND r.status = 'active'
+        WHERE u.is_deleted = 0
+          AND u.status = 'active'
+          AND r.role_code = %s
+    """
+    with get_db_cursor() as cursor:
+        cursor.execute(sql, (role_code,))
+        row = cursor.fetchone()
+        return int((row or {}).get("total") or 0)
+
+
 def get_user_permissions(user_id: int) -> List[str]:
     """
     获取用户权限代码列表。

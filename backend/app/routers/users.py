@@ -84,7 +84,11 @@ async def update_user_status(
     user: dict = Depends(require_role("admin")),
 ) -> dict:
     """启用或禁用用户账户（仅管理员可操作）。"""
-    user_service.update_user_status_service(user_id=user_id, new_status=body.status)
+    user_service.update_user_status_service(
+        user_id=user_id,
+        new_status=body.status,
+        actor_user_id=int(user["user_id"]),
+    )
     return success_response(data={})
 
 
@@ -95,7 +99,11 @@ async def update_user_roles(
     user: dict = Depends(require_role("admin")),
 ) -> dict:
     """更新用户角色（仅管理员可操作）。"""
-    user_service.update_user_roles_service(user_id=user_id, role_ids=body.role_ids)
+    user_service.update_user_roles_service(
+        user_id=user_id,
+        role_ids=body.role_ids,
+        actor_user_id=int(user["user_id"]),
+    )
     return success_response(data={})
 
 

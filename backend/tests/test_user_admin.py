@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from app.routers.users import CreateUserBody, create_user, list_roles
 from app.services.user_service import update_user_status_service
+from app.utils.exceptions import ValidationException
 
 
 class AdminUserTests(unittest.IsolatedAsyncioTestCase):
@@ -34,12 +35,39 @@ class AdminUserTests(unittest.IsolatedAsyncioTestCase):
         list_all.assert_called_once_with()
 
     @patch("app.services.user_service.user_repo.update_user_status")
-    def test_disabled_status_matches_database_contract(self, update_status):
+    @patch("app.services.user_service.user_repo.get_user_roles", return_value=[])
+    @patch("app.services.user_service.user_repo.get_user_by_id", return_value={"user_id": 9})
+    def test_disabled_status_matches_database_contract(
+        self, _get_user, _get_roles, update_status
+    ):
         update_status.return_value = 1
 
-        update_user_status_service(9, "disabled")
+        update_user_status_service(9, "disabled", actor_user_id=1)
 
         update_status.assert_called_once_with(9, "disabled")
+
+    @patch("app.services.user_service.user_repo.update_user_status")
+    @patch("app.services.user_service.user_repo.get_user_by_id", return_value={"user_id": 1})
+    def test_admin_cannot_disable_current_account(self, _get_user, update_status):
+        with self.assertRaisesRegex(ValidationException, "当前登录账号"):
+            update_user_status_service(1, "disabled", actor_user_id=1)
+
+        update_status.assert_not_called()
+
+    @patch("app.services.user_service.user_repo.update_user_status")
+    @patch(
+        "app.services.user_service.user_repo.count_active_users_with_role",
+        return_value=1,
+    )
+    @patch("app.services.user_service.user_repo.get_user_roles", return_value=["admin"])
+    @patch("app.services.user_service.user_repo.get_user_by_id", return_value={"user_id": 9})
+    def test_last_admin_cannot_be_disabled(
+        self, _get_user, _get_roles, _count_admins, update_status
+    ):
+        with self.assertRaisesRegex(ValidationException, "至少一个启用的管理员"):
+            update_user_status_service(9, "disabled", actor_user_id=1)
+
+        update_status.assert_not_called()
 
 
 if __name__ == "__main__":
