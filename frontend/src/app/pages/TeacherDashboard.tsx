@@ -28,22 +28,24 @@ export function TeacherDashboard() {
   const loading = loadingOverview || loadingLearning || loadingWeak;
 
   const stats = [
-    { label: "管理课程数", value: String(overview?.active_project_count ?? "—"), hint: "本学期", icon: BookOpen, tone: "blue" },
-    { label: "学生人数", value: String(learningData?.student_count ?? "—"), hint: overview ? `${overview?.artifact_count ?? 0} 个班级` : "—", icon: Users, tone: "slate" },
-    { label: "待审核资源", value: String(overview?.pending_review_count ?? "—"), hint: pendingReviews?.total ? `${pendingReviews.total} 条待处理` : "暂无", icon: CheckSquare, tone: "orange" },
+    { label: "管理课程数", value: String(learningData?.course_count ?? "—"), hint: "本人负责", icon: BookOpen, tone: "blue" },
+    { label: "学生人数", value: String(learningData?.student_count ?? "—"), hint: learningData ? `覆盖 ${learningData.course_count} 门课程` : "—", icon: Users, tone: "slate" },
+    { label: "待审核产出", value: String(pendingReviews?.total ?? "—"), hint: pendingReviews?.total ? `${pendingReviews.total} 条待处理` : "暂无", icon: CheckSquare, tone: "orange" },
     { label: "班级平均掌握度", value: learningData ? `${Math.round(learningData.avg_mastery * 100)}%` : "—", hint: "实时统计", icon: Target, tone: "emerald" },
-    { label: "本周新增反馈", value: String(learningData?.feedback_count ?? "—"), hint: "全部学生", icon: MessageSquare, tone: "cyan" },
-    { label: "高风险资源", value: String(overview?.failed_invocation_count ?? 0), hint: "需人工复核", icon: ShieldAlert, tone: "red" },
+    { label: "累计学习反馈", value: String(learningData?.feedback_count ?? "—"), hint: "本人课程范围", icon: MessageSquare, tone: "cyan" },
+    { label: "失败调用", value: String(overview?.failed_invocation_count ?? 0), hint: "需检查调用日志", icon: ShieldAlert, tone: "red" },
   ];
 
   const weaknessData = (weakPoints ?? []).map((wp) => ({ name: wp.kp_name, score: Math.round(wp.avg_mastery * 100) }));
 
-  const lowMasteryCount = (lowMastery ?? []).filter((m) => m.range.includes("0%") || m.range.includes("1-30") || m.range.includes("30-50")).reduce((acc, m) => acc + m.count, 0);
+  const lowMasteryCount = (lowMastery ?? [])
+    .filter((bucket) => bucket.range === "0-20%" || bucket.range === "20-40%")
+    .reduce((total, bucket) => total + bucket.count, 0);
   const actionItems = [
-    { title: `${overview?.pending_review_count ?? 0} 个资源待审核`, desc: pendingReviews?.items?.length ? `最新：${pendingReviews.items[0]?.output_title ?? "—"}` : "暂无新提交", icon: CheckSquare, tone: "orange", action: "进入审核", link: "/teacher/review" },
-    { title: `${lowMasteryCount} 名学生知识点掌握度低于 50%`, desc: weaknessData.length ? `集中在 ${weaknessData[0]?.name ?? "—"} 等 ${weaknessData.length} 个知识点` : "等待数据", icon: Users, tone: "red", action: "查看学生", link: "/teacher/students" },
-    { title: `${learningData?.feedback_count ?? 0} 条学习反馈需要关注`, desc: "来自本班学生近 7 天", icon: MessageSquare, tone: "blue", action: "查看反馈", link: "/teacher/feedback" },
-    { title: `${learningData?.resource_count ?? 0} 个学习资源可发布`, desc: "已审核通过，等待分发", icon: Database, tone: "slate", action: "补充资料", link: "/teacher/resources" },
+    { title: `${pendingReviews?.total ?? 0} 个项目产出待审核`, desc: pendingReviews?.items?.length ? `最新：${pendingReviews.items[0]?.output_title ?? "—"}` : "暂无新提交", icon: CheckSquare, tone: "orange", action: "进入审核", link: "/teacher/review" },
+    { title: `${lowMasteryCount} 名学生综合掌握度低于 40%`, desc: weaknessData.length ? `集中在 ${weaknessData[0]?.name ?? "—"} 等 ${weaknessData.length} 个知识点` : "等待数据", icon: Users, tone: "red", action: "查看学生", link: "/teacher/students" },
+    { title: `${learningData?.feedback_count ?? 0} 条累计学习反馈`, desc: "来自本人课程范围内的学生记录", icon: MessageSquare, tone: "blue", action: "查看反馈", link: "/teacher/feedback" },
+    { title: `${learningData?.resource_count ?? 0} 个课程资源`, desc: "包含草稿、待审核与已发布状态", icon: Database, tone: "slate", action: "管理资源", link: "/teacher/resources" },
   ];
 
   const taskSuggestions = (tasksData?.items ?? []).slice(0, 4).map((t) => ({
@@ -96,9 +98,9 @@ export function TeacherDashboard() {
           <div className="grid grid-cols-2 gap-2">
               {[
                 ["今日待办", String((pendingReviews?.total ?? 0) + (tasksData?.items?.filter((t) => t.status === "in_progress").length ?? 0)), "按优先级处理"],
-                ["重点学生", String(lowMasteryCount), "掌握度低于 50%"],
-                ["建议生成", String(taskSuggestions.length), "资源生成机会"],
-                ["课程资源", String(learningData?.resource_count ?? 0), "本课程已发布"],
+                ["重点学生", String(lowMasteryCount), "掌握度低于 40%"],
+                ["任务参考", String(taskSuggestions.length), "可用于生成资源"],
+                ["课程资源", String(learningData?.resource_count ?? 0), "本人课程范围"],
               ].map(([label, value, hint]) => (
                 <div key={label} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
                   <div className="text-[11px] font-semibold text-slate-400">{label}</div>
