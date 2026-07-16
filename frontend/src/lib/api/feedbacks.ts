@@ -28,6 +28,7 @@ export const feedbackApi = {
     page?: number
     page_size?: number
     course_id?: number
+    student_id?: number
     feedback_type?: string
   }) {
     return client.get<{ items: LearningFeedback[]; total: number }>('/learning/feedbacks', { params })

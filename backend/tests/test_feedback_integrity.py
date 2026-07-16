@@ -3,10 +3,53 @@ from unittest.mock import Mock, patch
 
 from app.routers import feedbacks
 from app.routers.feedbacks import SubmitFeedbackRequest
-from app.utils.exceptions import ValidationException
+from app.utils.exceptions import ForbiddenException, ValidationException
 
 
 class FeedbackIntegrityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_teacher_can_filter_feedbacks_by_course_student(self):
+        access = Mock()
+        access.list_accessible_course_ids.return_value = [1]
+        repo = Mock()
+        repo.list_feedbacks.return_value = {"items": [], "total": 0}
+        user = {"user_id": 7, "roles": ["teacher"]}
+
+        with patch("app.routers.feedbacks.CourseAccessService", return_value=access), patch.object(
+            feedbacks, "_repo", repo
+        ):
+            await feedbacks.list_feedbacks(
+                page=1,
+                page_size=20,
+                course_id=1,
+                student_id=12,
+                feedback_type=None,
+                user=user,
+            )
+
+        access.require_course_access.assert_called_once_with(1, user)
+        access.require_student_course.assert_called_once_with(1, 12)
+        repo.list_feedbacks.assert_called_once_with(
+            page=1,
+            page_size=20,
+            course_id=1,
+            feedback_type=None,
+            student_id=12,
+            course_ids=None,
+        )
+
+    async def test_student_cannot_filter_another_students_feedbacks(self):
+        user = {"user_id": 12, "roles": ["student_member"]}
+
+        with self.assertRaises(ForbiddenException):
+            await feedbacks.list_feedbacks(
+                page=1,
+                page_size=20,
+                course_id=1,
+                student_id=13,
+                feedback_type=None,
+                user=user,
+            )
+
     async def test_feedback_rejects_resource_course_mismatch(self):
         access = Mock()
         access.require_resource_access.return_value = 2

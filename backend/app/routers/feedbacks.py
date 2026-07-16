@@ -10,7 +10,7 @@ from app.repositories.learning_resource_repo import LearningResourceRepository
 from app.services.course_access_service import CourseAccessService
 from app.services.learning_service import LearningService
 from app.utils.dependencies import get_current_user_dep, require_role
-from app.utils.exceptions import NotFoundException, ValidationException
+from app.utils.exceptions import ForbiddenException, NotFoundException, ValidationException
 from app.utils.response import success_response
 
 router = APIRouter(prefix="/learning", tags=["学习反馈"])
@@ -35,22 +35,34 @@ async def list_feedbacks(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     course_id: Optional[int] = None,
+    student_id: Optional[int] = Query(None, gt=0),
     feedback_type: Optional[str] = None,
     user: dict = Depends(get_current_user_dep),
 ):
     """获取学习反馈列表"""
     roles = set(user.get("roles") or [])
-    student_id = None if roles.intersection({"teacher", "admin"}) else int(user["user_id"])
+    is_teacher_or_admin = bool(roles.intersection({"teacher", "admin"}))
+    effective_student_id = student_id
+    if not is_teacher_or_admin:
+        current_student_id = int(user["user_id"])
+        if student_id is not None and student_id != current_student_id:
+            raise ForbiddenException("无权查看其他学生的学习反馈")
+        effective_student_id = current_student_id
+
     access = CourseAccessService()
     course_ids = access.list_accessible_course_ids(user)
     if course_id is not None:
         access.require_course_access(course_id, user)
+    if is_teacher_or_admin and effective_student_id is not None:
+        if course_id is None:
+            raise ValidationException("按学生筛选时必须指定课程")
+        access.require_student_course(course_id, effective_student_id)
     result = _repo.list_feedbacks(
         page=page,
         page_size=page_size,
         course_id=course_id,
         feedback_type=feedback_type,
-        student_id=student_id,
+        student_id=effective_student_id,
         course_ids=course_ids if course_id is None else None,
     )
     return success_response(data=result)
