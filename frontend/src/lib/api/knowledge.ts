@@ -1,28 +1,39 @@
 import client from './client'
 
 export interface Material {
-  id: number
+  material_id: number
   course_id: number
-  file_name: string
+  filename: string
   file_type: string
-  file_size: number
   status: 'pending' | 'parsing' | 'parsed' | 'failed'
-  chunk_count: number
-  page_count: number | null
-  created_at: string
-  updated_at: string
+  error_message?: string | null
+  total_chunks: number
+  material_version: number
+  total_chars: number
+  last_reparse_at?: string | null
+  created_by?: number
+  creator_name?: string
+  created_at: string | null
+  updated_at: string | null
 }
 
 export interface MaterialChunk {
-  id: number
+  chunk_id: number
   material_id: number
-  page_num: number | null
+  course_id: number
+  kp_id: number | null
+  title: string | null
+  source_page: number | null
+  source_paragraph: number | null
+  bm25_terms: string | null
   chunk_index: number
   content: string
-  keywords: string[]
-  knowledge_point_id: number | null
-  knowledge_point_name: string | null
-  created_at: string
+  created_at: string | null
+}
+
+interface MaterialDetail {
+  material: Material
+  chunks: MaterialChunk[]
 }
 
 export interface SearchResult {
@@ -67,7 +78,7 @@ export interface ResourceEvidence {
 export const knowledgeApi = {
   // 上传资料
   uploadMaterial(formData: FormData) {
-    return client.post<Material>('/knowledge/materials', formData, {
+    return client.post<Pick<Material, 'material_id' | 'filename' | 'file_type' | 'status'>>('/knowledge/materials', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
   },
@@ -80,14 +91,14 @@ export const knowledgeApi = {
 
   // 资料详情（返回 data）
   getMaterial(materialId: number) {
-    return client.get<{ material: Material }>(`/knowledge/materials/${materialId}`)
+    return client.get<MaterialDetail>(`/knowledge/materials/${materialId}`)
       .then(r => r.material)
   },
 
-  // 获取资料 chunks（返回 data）
+  // 资料详情接口同时返回 chunks
   getMaterialChunks(materialId: number) {
-    return client.get<MaterialChunk[]>(`/knowledge/materials/${materialId}/chunks`)
-      .then(r => r ?? [])
+    return client.get<MaterialDetail>(`/knowledge/materials/${materialId}`)
+      .then(r => r.chunks ?? [])
   },
 
   // 解析资料

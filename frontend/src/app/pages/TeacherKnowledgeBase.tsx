@@ -7,6 +7,21 @@ import { learningApi } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { PageHeader, PageShell, ProgressBar, SearchInput, StatCard, StatusBadge, primaryButton, secondaryButton, useInlineToast, EmptyState } from "../components/common/ProductUI";
 
+function parseChunkTerms(value: string | null | undefined): string[] {
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.map(String).map((term) => term.trim()).filter(Boolean);
+    }
+  } catch {
+    // Older records may store terms as comma- or whitespace-separated text.
+  }
+
+  return value.split(/[,，\s]+/).map((term) => term.trim()).filter(Boolean);
+}
+
 export function TeacherKnowledgeBase() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = React.useState("");
@@ -76,7 +91,7 @@ export function TeacherKnowledgeBase() {
   const stats = [
     { label: "课程资料", value: String(materialsData?.length ?? 0), hint: "已上传", icon: FileUp, tone: "blue" as const },
     { label: "知识点", value: String(knowledgePoints?.length ?? 0), hint: "含依赖关系", icon: GitBranch, tone: "purple" as const },
-    { label: "知识片段", value: String(materialsData?.reduce((acc, m) => acc + m.chunk_count, 0) ?? 0), hint: "可追溯引用", icon: Layers3, tone: "emerald" as const },
+    { label: "知识片段", value: String(materialsData?.reduce((acc, m) => acc + (m.total_chunks ?? 0), 0) ?? 0), hint: "可追溯引用", icon: Layers3, tone: "emerald" as const },
     { label: "待解析", value: String(materialsData?.filter(m => m.status === 'pending').length ?? 0), hint: "需解析", icon: AlertCircle, tone: "orange" as const },
   ];
 
@@ -119,14 +134,14 @@ export function TeacherKnowledgeBase() {
   // 解析资料
   const handleParse = async (material: Material) => {
     if (pollTimeoutRef.current !== null) window.clearTimeout(pollTimeoutRef.current);
-    setParsing(material.id);
+    setParsing(material.material_id);
     try {
-      await knowledgeApi.parseMaterial(material.id);
+      await knowledgeApi.parseMaterial(material.material_id);
       showToast('解析任务已启动');
       let attempts = 0;
       const poll = async () => {
         try {
-          const updated = await knowledgeApi.getMaterial(material.id);
+          const updated = await knowledgeApi.getMaterial(material.material_id);
           if (!mountedRef.current) return;
           if (updated.status === 'parsed' || updated.status === 'failed') {
             await refreshMaterials();
@@ -158,7 +173,7 @@ export function TeacherKnowledgeBase() {
   const handleViewMaterial = async (material: Material) => {
     setSelectedMaterial(material);
     try {
-      const chunks = await knowledgeApi.getMaterialChunks(material.id);
+      const chunks = await knowledgeApi.getMaterialChunks(material.material_id);
       setSelectedChunks(chunks);
     } catch (err) {
       console.error(err);
@@ -296,32 +311,34 @@ export function TeacherKnowledgeBase() {
               />
             ) : (
               materialsData?.map((doc) => (
-                <div key={doc.id} className="w-full space-y-2">
+                <div key={doc.material_id} className="w-full space-y-2">
                   <button
                     onClick={() => handleViewMaterial(doc)}
                     className={`w-full rounded-2xl border p-4 text-left transition ${
-                      selectedMaterial?.id === doc.id ? "border-blue-200 bg-blue-50" : "border-slate-100 bg-white hover:border-blue-200"
+                      selectedMaterial?.material_id === doc.material_id ? "border-blue-200 bg-blue-50" : "border-slate-100 bg-white hover:border-blue-200"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <h3 className="truncate text-sm font-black leading-5 text-slate-900">{doc.file_name}</h3>
-                        <p className="mt-1 text-xs text-slate-500">{doc.file_type.toUpperCase()} · {Math.round(doc.file_size / 1024)}KB</p>
+                        <h3 className="truncate text-sm font-black leading-5 text-slate-900">{doc.filename}</h3>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {doc.file_type.toUpperCase()} · {doc.total_chars > 0 ? `${doc.total_chars.toLocaleString("zh-CN")} 字` : "待统计字数"}
+                        </p>
                       </div>
                       <StatusBadge status={statusMap[doc.status]} />
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                      <span className="font-bold text-slate-500">{doc.chunk_count} 片段</span>
-                      <span className="font-bold text-slate-500">{doc.page_count ? `${doc.page_count} 页` : '-'}</span>
+                      <span className="font-bold text-slate-500">{doc.total_chunks ?? 0} 片段</span>
+                      <span className="font-bold text-slate-500">v{doc.material_version ?? 1}</span>
                     </div>
                   </button>
                   {doc.status === 'pending' && (
                     <button
                       onClick={() => handleParse(doc)}
-                      disabled={parsing === doc.id}
+                      disabled={parsing === doc.material_id}
                       className={`mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100 disabled:opacity-50`}
                     >
-                      {parsing === doc.id ? (
+                      {parsing === doc.material_id ? (
                         <><Loader2 className="h-3 w-3 animate-spin" /> 解析中...</>
                       ) : (
                         <><RefreshCw className="h-3 w-3" /> 解析资料</>
@@ -366,34 +383,37 @@ export function TeacherKnowledgeBase() {
           {/* 文档 Chunk 列表 */}
           {selectedMaterial && (
             <div className="mt-5">
-              <h3 className="mb-3 text-sm font-black text-slate-950">文档片段 - {selectedMaterial.file_name}</h3>
+              <h3 className="mb-3 text-sm font-black text-slate-950">文档片段 - {selectedMaterial.filename}</h3>
               <div className="custom-scrollbar max-h-[200px] space-y-2 overflow-y-auto">
                 {selectedChunks.length === 0 ? (
                   <p className="text-xs text-slate-500">暂无片段，请先解析文档</p>
                 ) : (
-                  selectedChunks.map((chunk) => (
-                    <div key={chunk.id} className="rounded-xl border border-slate-100 bg-white p-3">
-                      <div className="mb-1 flex items-center justify-between">
-                        <span className="text-[11px] font-black text-slate-400">
-                          片段 {chunk.chunk_index + 1}
-                          {chunk.page_num !== null && ` · 第 ${chunk.page_num} 页`}
-                        </span>
-                        {chunk.knowledge_point_name && (
-                          <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700">
-                            {chunk.knowledge_point_name}
+                  selectedChunks.map((chunk) => {
+                    const terms = parseChunkTerms(chunk.bm25_terms);
+                    return (
+                      <div key={chunk.chunk_id} className="rounded-xl border border-slate-100 bg-white p-3">
+                        <div className="mb-1 flex items-center justify-between">
+                          <span className="text-[11px] font-black text-slate-400">
+                            片段 {chunk.chunk_index + 1}
+                            {chunk.source_page !== null && ` · 第 ${chunk.source_page} 页`}
                           </span>
+                          {chunk.kp_id !== null && (
+                            <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700">
+                              KP {chunk.kp_id}
+                            </span>
+                          )}
+                        </div>
+                        <p className="line-clamp-3 text-xs leading-5 text-slate-600">{chunk.content}</p>
+                        {terms.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {terms.slice(0, 5).map((kw) => (
+                              <span key={kw} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">{kw}</span>
+                            ))}
+                          </div>
                         )}
                       </div>
-                      <p className="line-clamp-3 text-xs leading-5 text-slate-600">{chunk.content}</p>
-                      {chunk.keywords.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {chunk.keywords.slice(0, 5).map((kw) => (
-                            <span key={kw} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">{kw}</span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>

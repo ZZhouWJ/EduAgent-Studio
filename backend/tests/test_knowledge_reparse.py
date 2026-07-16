@@ -49,6 +49,35 @@ class KnowledgeReparseTests(unittest.TestCase):
 
 
 class KnowledgeRepositoryReplacementTests(unittest.TestCase):
+    @patch("app.repositories.knowledge_repo.get_db_cursor")
+    def test_material_list_exposes_version_and_character_count(self, get_cursor):
+        cursor = MagicMock()
+        cursor.fetchall.return_value = [{
+            "material_id": 8,
+            "course_id": 3,
+            "filename": "lesson.md",
+            "file_type": "markdown",
+            "status": "pending",
+            "error_message": None,
+            "total_chunks": 0,
+            "material_version": 2,
+            "total_chars": 1234,
+            "last_reparse_at": None,
+            "created_by": 7,
+            "created_at": None,
+            "updated_at": None,
+            "creator_name": "Teacher",
+        }]
+        context = MagicMock()
+        context.__enter__.return_value = cursor
+        context.__exit__.return_value = False
+        get_cursor.return_value = context
+
+        materials = KnowledgeRepository().list_materials(3)
+
+        self.assertEqual(materials[0]["material_version"], 2)
+        self.assertEqual(materials[0]["total_chars"], 1234)
+
     @patch("app.repositories.knowledge_repo.get_db_transaction")
     def test_replacement_uses_one_transaction(self, transaction):
         connection = MagicMock()
