@@ -518,22 +518,9 @@ export function Login() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-1">
-                <label className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                    defaultChecked
-                  />
-                  <span className="text-xs text-slate-600">记住我</span>
-                </label>
-                <a
-                  href="/login"
-                  className="text-xs font-medium text-blue-600 transition-colors hover:text-blue-700"
-                >
-                  忘记密码？
-                </a>
-              </div>
+              <p className="pt-1 text-right text-xs text-slate-500">
+                账号或密码异常请联系平台管理员
+              </p>
 
               <button
                 type="submit"
