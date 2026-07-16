@@ -3,6 +3,38 @@ from unittest.mock import Mock, patch
 
 from app.routers.learning import CreateLearningTaskRequest, create_learning_task
 from app.routers import feedbacks
+from app.services import auth_service
+
+
+class ActiveSessionTests(unittest.TestCase):
+    def test_disabled_user_cannot_restore_an_existing_session(self):
+        user = {
+            "user_id": 42,
+            "username": "disabled-user",
+            "real_name": "Disabled User",
+            "student_no": None,
+            "email": None,
+            "phone": None,
+            "status": "disabled",
+            "last_login_at": None,
+        }
+
+        with patch.object(
+            auth_service,
+            "decode_access_token",
+            return_value={"user_id": 42},
+        ), patch.object(
+            auth_service.user_repo,
+            "get_user_by_id",
+            return_value=user,
+        ), patch.object(
+            auth_service.user_repo,
+            "get_user_roles",
+        ) as get_roles:
+            result = auth_service.get_current_user("existing-token")
+
+        self.assertIsNone(result)
+        get_roles.assert_not_called()
 
 
 class AuthenticatedContextTests(unittest.IsolatedAsyncioTestCase):

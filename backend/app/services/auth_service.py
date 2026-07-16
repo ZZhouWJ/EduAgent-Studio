@@ -131,7 +131,7 @@ def get_current_user(token: str) -> Optional[Dict[str, Any]]:
         return None
 
     user = user_repo.get_user_by_id(user_id)
-    if not user:
+    if not user or user.get("status") != "active":
         return None
 
     roles = user_repo.get_user_roles(user_id)
