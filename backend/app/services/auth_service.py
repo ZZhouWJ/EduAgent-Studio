@@ -6,9 +6,11 @@
 
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
+from uuid import uuid4
 
 from fastapi import Header
 
+from app.config import get_settings
 from app.repositories import user_repo
 from app.utils.exceptions import ConflictException, ForbiddenException, UnauthorizedException, ValidationException
 from app.utils.password import get_password_policy_error, hash_password, verify_password
@@ -113,11 +115,21 @@ def login(
     user_repo.update_user_last_login(user["user_id"])
 
     roles = user_repo.get_user_roles(user["user_id"])
+    session_id = uuid4().hex
+    expires_delta = timedelta(minutes=get_settings().jwt_expire_minutes)
     token = create_access_token(data={
         "user_id": user["user_id"],
         "username": user["username"],
         "roles": roles,
-    })
+        "jti": session_id,
+    }, expires_delta=expires_delta)
+    user_repo.create_auth_session(
+        session_id=session_id,
+        user_id=user["user_id"],
+        expires_at=datetime.now() + expires_delta,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
 
     user_repo.insert_login_log(
         user_id=user["user_id"],
@@ -154,11 +166,14 @@ def get_current_user(token: str) -> Optional[Dict[str, Any]]:
         return None
 
     user_id = payload.get("user_id")
-    if not user_id:
+    session_id = payload.get("jti")
+    if not user_id or not session_id:
         return None
 
     user = user_repo.get_user_by_id(user_id)
     if not user or user.get("status") != "active":
+        return None
+    if not user_repo.is_auth_session_active(session_id, user_id):
         return None
 
     roles = user_repo.get_user_roles(user_id)
@@ -179,6 +194,7 @@ def get_current_user(token: str) -> Optional[Dict[str, Any]]:
 
 
 def logout(
+    token: str,
     user_id: int,
     ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
@@ -186,13 +202,18 @@ def logout(
     """
     用户登出。
 
-    课程版不实现 token 黑名单，仅写入操作日志。
+    撤销当前 token 会话并写入操作日志。
 
     Args:
+        token: 当前访问令牌
         user_id: 当前用户 ID
         ip_address: 客户端 IP
         user_agent: 客户端 UA
     """
+    payload = decode_access_token(token)
+    if payload and payload.get("user_id") == user_id and payload.get("jti"):
+        user_repo.revoke_auth_session(payload["jti"], user_id, reason="logout")
+
     user_repo.insert_operation_log(
         user_id=user_id,
         action_type="logout",

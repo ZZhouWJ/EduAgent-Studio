@@ -194,6 +194,62 @@ def count_recent_failed_login_attempts(username: str, since: datetime) -> int:
         return int((row or {}).get("total") or 0)
 
 
+def create_auth_session(
+    session_id: str,
+    user_id: int,
+    expires_at: datetime,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
+) -> None:
+    """Persist a revocable access-token session."""
+    now = datetime.now()
+    with get_db_cursor() as cursor:
+        cursor.execute("DELETE FROM auth_sessions WHERE expires_at <= %s", (now,))
+        cursor.execute(
+            """
+            INSERT INTO auth_sessions
+                (session_id, user_id, expires_at, ip_address, user_agent, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (
+                session_id,
+                user_id,
+                expires_at,
+                ip_address,
+                user_agent[:500] if user_agent else None,
+                now,
+            ),
+        )
+
+
+def is_auth_session_active(session_id: str, user_id: int) -> bool:
+    """Return whether a token session exists, is unexpired, and is not revoked."""
+    sql = """
+        SELECT 1 AS active
+        FROM auth_sessions
+        WHERE session_id = %s
+          AND user_id = %s
+          AND revoked_at IS NULL
+          AND expires_at > %s
+        LIMIT 1
+    """
+    with get_db_cursor() as cursor:
+        cursor.execute(sql, (session_id, user_id, datetime.now()))
+        return cursor.fetchone() is not None
+
+
+def revoke_auth_session(session_id: str, user_id: int, reason: str = "logout") -> int:
+    """Revoke one active token session."""
+    sql = """
+        UPDATE auth_sessions
+        SET revoked_at = %s, revoke_reason = %s
+        WHERE session_id = %s AND user_id = %s AND revoked_at IS NULL
+    """
+    with get_db_cursor() as cursor:
+        cursor.execute(sql, (datetime.now(), reason, session_id, user_id))
+        return cursor.rowcount
+
+
 def insert_operation_log(
     user_id: int,
     action_type: str,
@@ -666,7 +722,17 @@ def update_user_status(user_id: int, status: str) -> int:
     """
     with get_db_cursor() as cursor:
         cursor.execute(sql, (status, datetime.now(), user_id))
-        return cursor.rowcount
+        affected = cursor.rowcount
+        if affected and status == "disabled":
+            cursor.execute(
+                """
+                UPDATE auth_sessions
+                SET revoked_at = %s, revoke_reason = 'account_disabled'
+                WHERE user_id = %s AND revoked_at IS NULL
+                """,
+                (datetime.now(), user_id),
+            )
+        return affected
 
 
 def update_user_profile(
@@ -748,7 +814,17 @@ def update_password(user_id: int, new_password_hash: str) -> int:
     """
     with get_db_cursor() as cursor:
         cursor.execute(sql, (new_password_hash, datetime.now(), user_id))
-        return cursor.rowcount
+        affected = cursor.rowcount
+        if affected:
+            cursor.execute(
+                """
+                UPDATE auth_sessions
+                SET revoked_at = %s, revoke_reason = 'password_changed'
+                WHERE user_id = %s AND revoked_at IS NULL
+                """,
+                (datetime.now(), user_id),
+            )
+        return affected
 
 
 # =============================================================================

@@ -10,6 +10,64 @@ from app.utils.password import MAX_PASSWORD_BYTES, get_password_policy_error, ha
 
 
 class LoginRateLimitTests(unittest.TestCase):
+    def test_successful_login_persists_the_token_session(self):
+        user = {
+            "user_id": 7,
+            "username": "student",
+            "real_name": "Student",
+            "status": "active",
+            "password_hash": "stored-hash",
+        }
+        settings = Mock(jwt_expire_minutes=30)
+
+        with patch.object(
+            auth_service.user_repo,
+            "count_recent_failed_login_attempts",
+            return_value=0,
+        ), patch.object(
+            auth_service.user_repo,
+            "get_user_by_username",
+            return_value=user,
+        ), patch.object(
+            auth_service,
+            "verify_password",
+            return_value=True,
+        ), patch.object(
+            auth_service.user_repo,
+            "update_user_last_login",
+        ), patch.object(
+            auth_service.user_repo,
+            "get_user_roles",
+            return_value=["student_member"],
+        ), patch.object(
+            auth_service,
+            "get_settings",
+            return_value=settings,
+        ), patch.object(
+            auth_service,
+            "uuid4",
+            return_value=Mock(hex="session-7"),
+        ), patch.object(
+            auth_service,
+            "create_access_token",
+            return_value="access-token",
+        ) as create_token, patch.object(
+            auth_service.user_repo,
+            "create_auth_session",
+        ) as create_session, patch.object(
+            auth_service.user_repo,
+            "insert_login_log",
+        ):
+            result = auth_service.login("student", "valid-password")
+
+        self.assertTrue(result["success"])
+        self.assertEqual(
+            create_token.call_args.kwargs["data"]["jti"],
+            "session-7",
+        )
+        self.assertEqual(create_session.call_args.kwargs["session_id"], "session-7")
+        self.assertEqual(create_session.call_args.kwargs["user_id"], 7)
+
     @patch.object(auth_service.user_repo, "insert_login_log")
     @patch.object(auth_service.user_repo, "get_user_by_username")
     @patch.object(auth_service.user_repo, "count_recent_failed_login_attempts")

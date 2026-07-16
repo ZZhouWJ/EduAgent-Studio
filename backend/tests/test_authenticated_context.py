@@ -22,7 +22,7 @@ class ActiveSessionTests(unittest.TestCase):
         with patch.object(
             auth_service,
             "decode_access_token",
-            return_value={"user_id": 42},
+            return_value={"user_id": 42, "jti": "session-42"},
         ), patch.object(
             auth_service.user_repo,
             "get_user_by_id",
@@ -35,6 +35,51 @@ class ActiveSessionTests(unittest.TestCase):
 
         self.assertIsNone(result)
         get_roles.assert_not_called()
+
+    def test_revoked_session_cannot_restore_an_active_user(self):
+        user = {
+            "user_id": 42,
+            "username": "active-user",
+            "real_name": "Active User",
+            "student_no": None,
+            "email": None,
+            "phone": None,
+            "status": "active",
+            "last_login_at": None,
+        }
+
+        with patch.object(
+            auth_service,
+            "decode_access_token",
+            return_value={"user_id": 42, "jti": "revoked-session"},
+        ), patch.object(
+            auth_service.user_repo,
+            "get_user_by_id",
+            return_value=user,
+        ), patch.object(
+            auth_service.user_repo,
+            "is_auth_session_active",
+            return_value=False,
+        ), patch.object(
+            auth_service.user_repo,
+            "get_user_roles",
+        ) as get_roles:
+            result = auth_service.get_current_user("revoked-token")
+
+        self.assertIsNone(result)
+        get_roles.assert_not_called()
+
+    @patch.object(auth_service.user_repo, "insert_operation_log")
+    @patch.object(auth_service.user_repo, "revoke_auth_session")
+    @patch.object(
+        auth_service,
+        "decode_access_token",
+        return_value={"user_id": 42, "jti": "session-42"},
+    )
+    def test_logout_revokes_current_session(self, _decode, revoke, _log):
+        auth_service.logout(token="access-token", user_id=42)
+
+        revoke.assert_called_once_with("session-42", 42, reason="logout")
 
 
 class AuthenticatedContextTests(unittest.IsolatedAsyncioTestCase):

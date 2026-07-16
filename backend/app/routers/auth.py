@@ -151,7 +151,7 @@ async def logout(
     """
     用户登出。
 
-    课程版不实现 token 黑名单，仅写入操作日志后返回成功。
+    撤销当前 token 会话并写入操作日志后返回成功。
     """
     try:
         token = _extract_token(authorization)
@@ -163,6 +163,7 @@ async def logout(
         ip_address = _get_client_ip(request)
         user_agent = request.headers.get("User-Agent", "")
         auth_service.logout(
+            token=token,
             user_id=user["user_id"],
             ip_address=ip_address,
             user_agent=user_agent,

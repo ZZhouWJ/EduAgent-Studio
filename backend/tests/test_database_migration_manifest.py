@@ -32,13 +32,14 @@ class DatabaseMigrationManifestTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        for migration_number in ("27", "28", "29", "30"):
+        for migration_number in ("27", "28", "29", "30", "31"):
             self.assertIn(migration_number, readme)
         for migration in (
             "27_create_learning_task_progress.sql",
             "28_cleanup_orphan_learning_profiles.sql",
             "29_align_education_prompt_templates.sql",
             "30_remove_demo_model_configs.sql",
+            "31_create_auth_sessions.sql",
         ):
             self.assertIn(migration, database_readme)
 

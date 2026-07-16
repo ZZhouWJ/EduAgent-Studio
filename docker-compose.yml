@@ -64,6 +64,7 @@ services:
       - ./database/28_cleanup_orphan_learning_profiles.sql:/docker-entrypoint-initdb.d/28_cleanup_orphan_learning_profiles.sql:ro
       - ./database/29_align_education_prompt_templates.sql:/docker-entrypoint-initdb.d/29_align_education_prompt_templates.sql:ro
       - ./database/30_remove_demo_model_configs.sql:/docker-entrypoint-initdb.d/30_remove_demo_model_configs.sql:ro
+      - ./database/31_create_auth_sessions.sql:/docker-entrypoint-initdb.d/31_create_auth_sessions.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s
