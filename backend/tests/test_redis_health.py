@@ -1,7 +1,9 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from app.main import _check_redis_connection
+from fastapi.testclient import TestClient
+
+from app.main import _check_redis_connection, create_app
 
 
 class RedisHealthTests(unittest.TestCase):
@@ -23,6 +25,39 @@ class RedisHealthTests(unittest.TestCase):
         result = _check_redis_connection("redis://user:secret@example.invalid")
 
         self.assertEqual(result, {"connected": False})
+
+    def test_dependency_health_failures_return_http_503(self):
+        client = TestClient(create_app())
+
+        with patch(
+            "app.main._check_redis_connection", return_value={"connected": False}
+        ):
+            redis_response = client.get("/api/health/redis")
+        with patch(
+            "app.main.test_connection",
+            return_value={
+                "connected": False,
+                "message": "数据库连接失败",
+                "server_version": None,
+            },
+        ):
+            database_response = client.get("/api/health/db")
+
+        self.assertEqual(redis_response.status_code, 503)
+        self.assertEqual(redis_response.json()["code"], 5003)
+        self.assertEqual(database_response.status_code, 503)
+        self.assertEqual(database_response.json()["code"], 5002)
+
+    def test_liveness_does_not_depend_on_database_or_redis(self):
+        client = TestClient(create_app())
+
+        with patch("app.main.test_connection", side_effect=RuntimeError), patch(
+            "app.main._check_redis_connection", side_effect=RuntimeError
+        ):
+            response = client.get("/api/health")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["status"], "ok")
 
 
 if __name__ == "__main__":

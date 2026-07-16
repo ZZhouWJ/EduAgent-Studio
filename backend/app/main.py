@@ -169,6 +169,7 @@ def create_app() -> FastAPI:
                     "status": "degraded",
                     "database": "disconnected",
                 },
+                status_code=503,
             )
 
     @app.get(f"{settings.api_prefix}/health/redis")
@@ -183,6 +184,7 @@ def create_app() -> FastAPI:
             message="Redis 连接失败",
             code=5003,
             data={"status": "degraded", "redis": "disconnected"},
+            status_code=503,
         )
 
     logger.info(
