@@ -320,10 +320,6 @@
     max-width: 100%;
   }
 
-  #main-content .grid {
-    grid-template-columns: minmax(0, 1fr) !important;
-  }
-
   #main-content .flex {
     min-width: 0;
   }
@@ -343,15 +339,6 @@
 
   #main-content table {
     min-width: 760px;
-  }
-
-  #main-content [class*="grid-cols-["],
-  #main-content [class*="grid-cols-2"],
-  #main-content [class*="grid-cols-3"],
-  #main-content [class*="grid-cols-4"],
-  #main-content [class*="grid-cols-5"],
-  #main-content [class*="grid-cols-6"] {
-    grid-template-columns: minmax(0, 1fr) !important;
   }
 
   #main-content [class*="w-[300px]"],
