@@ -23,6 +23,17 @@ interface LearningPathGraphProps {
   onNodeClick?: (kpId: number) => void
 }
 
+function escapeHtml(value: string) {
+  const entities: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }
+  return value.replace(/[&<>"']/g, (character) => entities[character])
+}
+
 export function LearningPathGraph({ nodes, currentKpId, onNodeClick }: LearningPathGraphProps) {
   const chartRef = useRef<HTMLDivElement>(null)
   const chartInstance = useRef<ECharts | null>(null)
@@ -77,9 +88,10 @@ export function LearningPathGraph({ nodes, currentKpId, onNodeClick }: LearningP
           const p = params as { data?: { name?: string; mastery?: number; description?: string } }
           if (p.data && p.data.name) {
             const pct = p.data.mastery !== undefined ? Math.round(p.data.mastery * 100) : 0
-            const desc = (p.data as { description?: string }).description || '无描述'
+            const name = escapeHtml(p.data.name)
+            const desc = escapeHtml((p.data as { description?: string }).description || '无描述')
             const color = pct >= 75 ? '#22c55e' : pct >= 50 ? '#f97316' : '#ef4444'
-            return `<div style="font-weight:bold;margin-bottom:4px">${p.data.name}</div>
+            return `<div style="font-weight:bold;margin-bottom:4px">${name}</div>
                     <div style="color:#64748b;font-size:12px">掌握度: <span style="color:${color};font-weight:bold">${pct}%</span></div>
                     <div style="color:#64748b;font-size:12px;margin-top:4px">${desc}</div>`
           }
