@@ -931,7 +931,12 @@ export function StudentTutor() {
               <div className="mb-3 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
                 <Image className="h-4 w-4 text-blue-500" />
                 <span className="flex-1 text-xs text-slate-600 truncate">{selectedImage.filename}</span>
-                <button onClick={() => setSelectedImage(null)} className="text-slate-400 hover:text-red-500">
+                <button
+                  onClick={() => setSelectedImage(null)}
+                  className="text-slate-400 hover:text-red-500"
+                  aria-label="移除已选图片"
+                  title="移除图片"
+                >
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -974,6 +979,8 @@ export function StudentTutor() {
                   onClick={() => handleSend(input)}
                   disabled={!contextReady || pendingAi || (!input.trim() && !selectedImage)}
                   className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="发送问题"
+                  title="发送问题"
                 >
                   <Send className="h-4 w-4" />
                 </button>
