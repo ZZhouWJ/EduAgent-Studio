@@ -290,7 +290,7 @@ export function LearningFeedback() {
             return (
               <Link
                 key={res.id}
-                to={`/student/resources/${res.id}`}
+                to={`/student/resources?resource=${res.id}`}
                 className="group cursor-pointer rounded-xl border border-slate-200 bg-white p-4 transition-all hover:-translate-y-1 hover:border-emerald-300 hover:shadow-md"
               >
                 <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">

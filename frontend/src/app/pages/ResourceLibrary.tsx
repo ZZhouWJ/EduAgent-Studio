@@ -99,6 +99,9 @@ export function ResourceLibrary() {
   const handleResourceClick = (resource: typeof resources[0]) => {
     if (!resource?.id) return
     setSelectedResource(resource)
+    const next = new URLSearchParams(searchParams);
+    next.set("resource", String(resource.id));
+    setSearchParams(next, { replace: true });
   }
 
   const { data, loading, refetch: refetchResources } = useApi(
@@ -114,7 +117,7 @@ export function ResourceLibrary() {
 
   const courses = coursesState.data ?? [];
 
-  const resources = (data?.items ?? []).map((r) => ({
+  const resources = React.useMemo(() => (data?.items ?? []).map((r) => ({
     id: r.resource_id,
     title: r.resource_title,
     type: RESOURCE_TYPE_LABELS[r.resource_type] ?? r.resource_type ?? "资源",
@@ -124,7 +127,21 @@ export function ResourceLibrary() {
     difficulty: DIFFICULTY_LABELS[r.difficulty] ?? r.difficulty ?? "—",
     time: formatTimeAgo(r.created_at),
     icon: resourceIcon(r.resource_type ?? ""),
-  }));
+  })), [data?.items]);
+
+  const requestedResourceId = Number(searchParams.get("resource")) || 0;
+
+  React.useEffect(() => {
+    if (!requestedResourceId || loading) return;
+    const requested = resources.find((resource) => resource.id === requestedResourceId);
+    if (requested) {
+      setSelectedResource((current) => current?.id === requested.id ? current : requested);
+      return;
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete("resource");
+    setSearchParams(next, { replace: true });
+  }, [loading, requestedResourceId, resources, searchParams, setSearchParams]);
 
   const filtered = resources.filter((r) => {
     const statusMatch = !statusFilter || r.rawStatus === statusFilter;
@@ -282,6 +299,9 @@ export function ResourceLibrary() {
           if (!open) {
             setSelectedResource(null);
             setSubmitNote("");
+            const next = new URLSearchParams(searchParams);
+            next.delete("resource");
+            setSearchParams(next, { replace: true });
           }
         }}
       >
