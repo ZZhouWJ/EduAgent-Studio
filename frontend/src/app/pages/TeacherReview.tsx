@@ -1,4 +1,6 @@
 import React from "react";
+import DOMPurify from "dompurify";
+import { marked } from "marked";
 import {
   AlertTriangle,
   BookOpenCheck,
@@ -106,6 +108,20 @@ function EmptyReview({ message }: { message: string }) {
       <SafeLottie source="empty" className="h-20 w-28" speed={0.8} />
       <span className="text-sm">{message}</span>
     </div>
+  );
+}
+
+function MarkdownOutput({ content }: { content: string }) {
+  const sanitizedHtml = React.useMemo(
+    () => DOMPurify.sanitize(marked.parse(content, { async: false }) as string),
+    [content],
+  );
+
+  return (
+    <div
+      className="prose prose-sm prose-slate max-w-none break-words prose-headings:scroll-mt-4 prose-pre:overflow-x-auto prose-table:block prose-table:max-w-full prose-table:overflow-x-auto"
+      dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+    />
   );
 }
 
@@ -480,9 +496,7 @@ function ProjectOutputReviewPanel() {
                     <span>提交说明：{detailState.data.submit_note}</span>
                   </div>
                 )}
-                <div className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">
-                  {detailState.data.output_content || "暂无输出内容"}
-                </div>
+                <MarkdownOutput content={detailState.data.output_content || "暂无输出内容"} />
               </div>
               <div className="p-4 sm:p-6">
                 <h3 className="mb-5 flex items-center gap-2 text-base font-black text-slate-900">
