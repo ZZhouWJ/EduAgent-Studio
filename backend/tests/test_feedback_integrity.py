@@ -71,7 +71,7 @@ class FeedbackIntegrityTests(unittest.IsolatedAsyncioTestCase):
         profile.update_mastery.return_value = {
             "kp_id": 4,
             "kp_name": "事务",
-            "mastery_level": 2 / 3,
+            "mastery_level": 0.67,
         }
         profile.get_profile.return_value = {"profile_id": 22}
         resource = Mock()
@@ -88,11 +88,11 @@ class FeedbackIntegrityTests(unittest.IsolatedAsyncioTestCase):
             feedbacks, "_repo", repo
         ), patch.object(feedbacks, "_learning_service", learning):
             response = await feedbacks.submit_feedback(
-                SubmitFeedbackRequest(resource_id=9, self_mastery=2), user
+                SubmitFeedbackRequest(resource_id=9, self_mastery=0.67), user
             )
 
         profile.update_mastery.assert_called_once_with(
-            22, 4, 2 / 3, "自评掌握度 2/3"
+            22, 4, 0.67, "自评掌握度 67%"
         )
         payload = __import__("json").loads(response.body)
         change = payload["data"]["mastery_changes"][0]

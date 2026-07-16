@@ -16,7 +16,6 @@ function resourceIcon(type: string) {
   return BookOpen;
 }
 
-const MASTERY_LABELS = ["", "较低", "一般", "较高"];
 const DIFFICULTY_LABELS: Record<string, string> = {
   too_easy: "太简单",
   appropriate: "适中",
@@ -50,7 +49,7 @@ export function LearningFeedback() {
       const result = await feedbackApi.submit({
         feedback_type: "self_assessment",
         content: notes,
-        self_mastery: selfMastery === "较高" ? 3 : selfMastery === "一般" ? 2 : 1,
+        self_mastery: selfMastery === "较高" ? 0.85 : selfMastery === "一般" ? 0.6 : 0.3,
         difficulty_rating: rating >= 4 ? "appropriate" : rating >= 2 ? "appropriate" : "too_hard",
       });
       notify.success("反馈已提交，画像将自动更新");
@@ -94,7 +93,9 @@ export function LearningFeedback() {
                 <Target className="mt-0.5 h-5 w-5 cursor-pointer text-red-500" />
                 <div>
                   <div className="mb-1 text-sm font-medium text-slate-900">自评掌握度</div>
-                  <div className="text-sm font-bold text-slate-700">{MASTERY_LABELS[latestFeedback.self_mastery ?? 2] ?? "—"}（{latestFeedback.self_mastery ?? 2}/3）</div>
+                  <div className="text-sm font-bold text-slate-700">
+                    {latestFeedback.self_mastery == null ? "—" : `${Math.round(latestFeedback.self_mastery * 100)}%`}
+                  </div>
                 </div>
               </div>
               <div className="flex min-w-[200px] flex-1 items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-4">

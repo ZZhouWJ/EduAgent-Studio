@@ -26,7 +26,7 @@ class SubmitFeedbackRequest(BaseModel):
     feedback_type: str = Field("self_report", min_length=1, max_length=50)
     content: Optional[str] = Field(None, max_length=4000)
     quiz_score: Optional[float] = Field(None, ge=0, le=1)
-    self_mastery: Optional[float] = Field(None, ge=1, le=3)
+    self_mastery: Optional[float] = Field(None, ge=0, le=1)
     difficulty_rating: Optional[str] = Field(None, max_length=30)
 
 
@@ -112,7 +112,7 @@ async def submit_feedback(
     new_mastery = (
         data.quiz_score
         if data.quiz_score is not None
-        else data.self_mastery / 3
+        else data.self_mastery
         if data.self_mastery is not None
         else None
     )
@@ -123,7 +123,7 @@ async def submit_feedback(
         before_mastery = _profile_repo.get_mastery_level(profile_id, primary_kp_id)
         update_reason = (
             f"测验得分 {data.quiz_score * 100:.0f}%" if data.quiz_score is not None
-            else f"自评掌握度 {int(data.self_mastery)}/3" if data.self_mastery is not None
+            else f"自评掌握度 {data.self_mastery:.0%}" if data.self_mastery is not None
             else "学习反馈更新"
         )
         mastery = _profile_repo.update_mastery(
