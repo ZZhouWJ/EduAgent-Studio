@@ -56,15 +56,25 @@ class MockProvider:
 
         if "学生学习画像分析助手" in input_text:
             return self._mock_profile_extraction(input_text)
+        if "专业的学习诊断智能体" in input_text:
+            return self._mock_diagnosis()
+        if "专业的教育资源生成智能体" in input_text or (
+            "教材原文依据" in input_text and "直接输出 Markdown" in input_text
+        ):
+            return self._mock_resource(input_text, model_name)
+        if "专业的学习规划智能体" in input_text:
+            return self._mock_planning()
+        if "专业的学习评测反馈智能体" in input_text:
+            return self._mock_assessment()
+        if "专业的教学审核辅助智能体" in input_text:
+            return self._mock_teacher_review()
         if "诊断" in normalized_input or "薄弱" in normalized_input:
             return self._mock_diagnosis()
-        elif "教材原文依据" in input_text and "直接输出 Markdown" in input_text:
-            return self._mock_resource(input_text, model_name)
-        elif "规划" in normalized_input or "路径" in normalized_input:
+        if "规划" in normalized_input or "路径" in normalized_input:
             return self._mock_planning()
-        elif "评测" in normalized_input or "反馈" in normalized_input:
+        if "评测" in normalized_input or "反馈" in normalized_input:
             return self._mock_assessment()
-        elif "审核" in normalized_input or "质量" in normalized_input:
+        if "审核" in normalized_input or "质量" in normalized_input:
             return self._mock_teacher_review()
         else:
             return f"""# 个性化学习资源

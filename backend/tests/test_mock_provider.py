@@ -40,6 +40,23 @@ class MockProfileExtractionTests(unittest.TestCase):
         self.assertIn("[草稿:缺乏充分教材依据]", result)
         self.assertNotIn('"learning_path"', result)
 
+    def test_teacher_review_is_not_misclassified_by_embedded_resource(self):
+        prompt = """你是一个专业的教学审核辅助智能体。请进行质量评估。
+
+## 资源正文（仅供审核，不要照抄）：
+# 事务隔离专题讲义
+## 学习路径
+1. 理解并发控制
+## 学习反馈
+请根据反馈调整练习。
+"""
+
+        result = json.loads(MockProvider()._generate_response(prompt, "mock-model"))
+
+        self.assertEqual(result["quality_score"], 8.5)
+        self.assertIn("quality_checks", result)
+        self.assertNotIn("learning_path", result)
+
 
 if __name__ == "__main__":
     unittest.main()
