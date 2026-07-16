@@ -18,6 +18,27 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertGreater(gateway_limit, MAX_MATERIAL_SIZE)
         self.assertLessEqual(gateway_limit, MAX_MATERIAL_SIZE + 2 * 1024 * 1024)
 
+    def test_nginx_sets_browser_security_boundaries(self):
+        nginx = (ROOT / "frontend/nginx.conf").read_text(encoding="utf-8")
+
+        for header in (
+            "X-Content-Type-Options",
+            "X-Frame-Options",
+            "Referrer-Policy",
+            "Cross-Origin-Opener-Policy",
+            "Permissions-Policy",
+            "Content-Security-Policy",
+        ):
+            self.assertIn(f"add_header {header}", nginx)
+        for directive in (
+            "default-src 'self'",
+            "script-src 'self'",
+            "connect-src 'self'",
+            "object-src 'none'",
+            "frame-ancestors 'self'",
+        ):
+            self.assertIn(directive, nginx)
+
 
 if __name__ == "__main__":
     unittest.main()
