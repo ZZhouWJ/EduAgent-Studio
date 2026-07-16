@@ -60,7 +60,7 @@ export function AdminModelConfig() {
     { label: "可用模型", value: `${models.filter((p) => p.status === "启用").length}`, hint: "可被智能体调用", icon: PlugZap, tone: "emerald" as const },
     { label: "调用次数", value: `${modelCallsState.data?.reduce((sum, item) => sum + item.call_count, 0) ?? "-"}`, hint: "全平台累计", icon: ActivitySquare, tone: "purple" as const },
     { label: "平均响应时间", value: modelCallsState.data?.length ? `${Math.round(modelCallsState.data.reduce((sum, item) => sum + item.avg_latency_ms, 0) / modelCallsState.data.length)}ms` : "—", hint: "按模型平均", icon: Gauge, tone: "cyan" as const },
-    { label: "今日成本", value: costsState.data?.total_cost ? `¥${costsState.data.total_cost.toFixed(2)}` : "—", hint: "全平台", icon: Coins, tone: "orange" as const },
+    { label: "累计成本", value: costsState.loading ? "—" : `¥${(costsState.data?.total_cost ?? 0).toFixed(2)}`, hint: "全平台累计", icon: Coins, tone: "orange" as const },
     { label: "异常次数", value: `${modelCallsState.data?.reduce((sum, item) => sum + item.failed_count, 0) ?? "-"}`, hint: "全平台", icon: ToggleLeft, tone: "red" as const },
   ];
 
