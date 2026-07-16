@@ -39,12 +39,12 @@ function RoleEditModal({ user, onClose, onSuccess }: {
     setSaving(true);
     try {
       const role = roles.find((r) => r.role_code === selectedRole);
-      if (role) {
-        await usersApi.updateRoles(Number(user.id), [role.role_id]);
-        notify.success("角色已更新");
-      } else {
+      if (!role) {
         notify.warning("未找到对应角色");
+        return;
       }
+      await usersApi.updateRoles(Number(user.id), [role.role_id]);
+      notify.success("角色已更新");
       onSuccess();
       onClose();
     } catch (e) {
@@ -136,8 +136,7 @@ export function AdminUsers() {
       notify.warning("初始密码过长，请缩短后重试");
       return;
     }
-    const roleId = newRoleId ?? rolesState.data?.[0]?.role_id;
-    if (!roleId) {
+    if (!newRoleId) {
       notify.warning("请选择角色");
       return;
     }
@@ -147,7 +146,7 @@ export function AdminUsers() {
         username: newUsername.trim(),
         password: newPassword,
         real_name: newRealName.trim(),
-        role_ids: [roleId],
+        role_ids: [newRoleId],
       });
       notify.success(`用户 ${newUsername.trim()} 已创建`);
       setNewUsername("");
