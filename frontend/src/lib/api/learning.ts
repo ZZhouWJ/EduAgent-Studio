@@ -32,6 +32,7 @@ export interface LearningTask {
   title: string
   type: string
   status: string
+  assignee_id: number | null
   priority: string
   due_date: string
   description: string
@@ -127,6 +128,10 @@ export const learningApi = {
 
   getTask(task_id: number) {
     return client.get<LearningTask>(`/learning/tasks/${task_id}`)
+  },
+
+  updateTaskStatus(task_id: number, status: 'in_progress' | 'completed') {
+    return client.patch<LearningTask>(`/learning/tasks/${task_id}/status`, { status })
   },
 
   createTask(data: {

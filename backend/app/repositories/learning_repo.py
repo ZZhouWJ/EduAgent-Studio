@@ -15,6 +15,8 @@ Tables:
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from pymysql.connections import Connection
+
 from app.database import get_db_cursor
 
 COVER_COLORS = ["#409eff", "#67c23a", "#e6a23c", "#f56c6c", "#909399"]
@@ -250,6 +252,7 @@ class LearningRepository:
         course_ids: Optional[List[int]] = None,
         status: Optional[str] = None,
         assignee_user_id: Optional[int] = None,
+        visible_statuses: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Returns paginated task list:
@@ -284,6 +287,10 @@ class LearningRepository:
         if status:
             filters.append("t.status = %s")
             params.append(status)
+        if visible_statuses:
+            placeholders = ",".join(["%s"] * len(visible_statuses))
+            filters.append(f"t.status IN ({placeholders})")
+            params.extend(visible_statuses)
         if assignee_user_id is not None:
             filters.append("(t.assignee_id IS NULL OR t.assignee_id = %s)")
             params.append(assignee_user_id)
@@ -302,6 +309,7 @@ class LearningRepository:
                     t.title,
                     t.description,
                     t.status,
+                    t.assignee_id,
                     t.due_date,
                     c.course_name
                 FROM learning_tasks t
@@ -328,6 +336,7 @@ class LearningRepository:
                     "title": row["title"],
                     "type": task_type,
                     "status": row["status"],
+                    "assignee_id": row["assignee_id"],
                     "priority": priority,
                     "due_date": row["due_date"].strftime("%Y-%m-%d") if isinstance(due_date, datetime) else str(due_date),
                     "description": row["description"] or "",
@@ -352,6 +361,7 @@ class LearningRepository:
                 t.title,
                 t.description,
                 t.status,
+                t.assignee_id,
                 t.due_date,
                 c.course_name,
                 c.description AS course_description
@@ -379,6 +389,7 @@ class LearningRepository:
             "title": row["title"],
             "type": task_type,
             "status": row["status"],
+            "assignee_id": row["assignee_id"],
             "priority": priority,
             "due_date": row["due_date"].strftime("%Y-%m-%d") if isinstance(due_date, datetime) else str(due_date),
             "description": row["description"] or "",
@@ -410,6 +421,29 @@ class LearningRepository:
             )
             task_id = cursor.lastrowid
         return self.get_task(task_id) or {"id": task_id, "course_id": course_id, "title": title}
+
+    def update_task_status(
+        self,
+        task_id: int,
+        status: str,
+        conn: Optional[Connection] = None,
+    ) -> int:
+        """持久化学习任务状态。"""
+        sql = """
+            UPDATE learning_tasks
+            SET status = %s, updated_at = NOW()
+            WHERE task_id = %s AND is_deleted = 0
+        """
+        if conn is not None:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(sql, (status, task_id))
+                return cursor.rowcount
+            finally:
+                cursor.close()
+        with get_db_cursor() as cursor:
+            cursor.execute(sql, (status, task_id))
+            return cursor.rowcount
 
     @staticmethod
     def _detect_task_type(title: str) -> str:

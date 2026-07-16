@@ -28,6 +28,10 @@ class UpdateCourseStatusRequest(BaseModel):
     status: str = Field(..., description="课程状态: active / archived / draft")
 
 
+class UpdateLearningTaskStatusRequest(BaseModel):
+    status: str = Field(..., pattern="^(draft|assigned|in_progress|completed|archived)$")
+
+
 @router.get("/courses")
 async def list_courses(user: dict = Depends(get_current_user_dep)):
     """获取课程列表（包含知识点摘要）"""
@@ -81,6 +85,20 @@ async def get_learning_task(
     """获取学习任务详情"""
     CourseAccessService().require_task_access(task_id, user)
     return learning_service.LearningService().get_task(task_id)
+
+
+@router.patch("/tasks/{task_id}/status")
+async def update_learning_task_status(
+    body: UpdateLearningTaskStatusRequest,
+    task_id: int = Path(..., gt=0),
+    user: dict = Depends(get_current_user_dep),
+):
+    """更新学习任务状态；学生仅能推进本人任务。"""
+    return learning_service.LearningService().update_task_status(
+        user=user,
+        task_id=task_id,
+        status=body.status,
+    )
 
 
 @router.post("/tasks")

@@ -4,8 +4,10 @@ import logging
 
 from typing import Any, Dict, List, Optional
 
-from app.repositories import LearningRepository
+from app.database import get_db_transaction
+from app.repositories import LearningRepository, user_repo
 from app.services.course_access_service import CourseAccessService
+from app.utils.exceptions import ForbiddenException, NotFoundException, ValidationException
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +45,12 @@ class LearningService:
         if course_id is not None:
             self._access.require_course_access(course_id, user)
         roles = set(user.get("roles", []))
-        assignee_user_id = (
-            int(user["user_id"])
-            if "student_member" in roles
-            and not roles.intersection({"teacher", "admin"})
-            else None
+        is_student_only = "student_member" in roles and not roles.intersection(
+            {"teacher", "admin"}
+        )
+        assignee_user_id = int(user["user_id"]) if is_student_only else None
+        visible_statuses = (
+            ["assigned", "in_progress", "completed"] if is_student_only else None
         )
         return {
             "code": 0,
@@ -59,6 +62,7 @@ class LearningService:
                 course_ids=course_ids,
                 status=status,
                 assignee_user_id=assignee_user_id,
+                visible_statuses=visible_statuses,
             ),
         }
 
@@ -92,6 +96,50 @@ class LearningService:
         except Exception:
             logger.exception("创建学习任务失败: course_id=%s", course_id)
             return {"code": 500, "message": "创建任务失败，请稍后重试", "data": None}
+
+    def update_task_status(
+        self,
+        user: Dict[str, Any],
+        task_id: int,
+        status: str,
+    ) -> Dict[str, Any]:
+        """按角色和状态迁移规则更新学习任务。"""
+        self._access.require_task_update_access(task_id, user)
+        task = self._repo.get_task(task_id)
+        if task is None:
+            raise NotFoundException("任务不存在")
+
+        valid_statuses = {"draft", "assigned", "in_progress", "completed", "archived"}
+        if status not in valid_statuses:
+            raise ValidationException("无效的学习任务状态")
+
+        roles = set(user.get("roles", []))
+        current_status = str(task["status"])
+        if "student_member" in roles and not roles.intersection({"teacher", "admin"}):
+            allowed_transitions = {
+                "assigned": {"in_progress", "completed"},
+                "in_progress": {"completed"},
+                "completed": {"completed"},
+            }
+            if status not in allowed_transitions.get(current_status, set()):
+                raise ForbiddenException("学生不能执行该任务状态变更")
+
+        with get_db_transaction() as conn:
+            affected = self._repo.update_task_status(task_id, status, conn=conn)
+            if affected == 0 and status != current_status:
+                raise NotFoundException("任务不存在或无法更新")
+            user_repo.insert_operation_log_with_conn(
+                user_id=int(user["user_id"]),
+                action_type="learning_task:update_status",
+                action_desc=f"学习任务状态: {current_status} -> {status}",
+                target_type="learning_task",
+                target_id=task_id,
+                project_id=None,
+                task_id=None,
+                conn=conn,
+            )
+        updated = {**task, "status": status}
+        return {"code": 0, "message": "任务状态已更新", "data": updated}
 
     def update_course_status(self, course_id: int, status: str) -> Dict[str, Any]:
         try:

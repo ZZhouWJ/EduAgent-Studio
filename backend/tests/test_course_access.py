@@ -123,6 +123,32 @@ class CourseAccessTests(unittest.TestCase):
                 19, {"user_id": 12, "roles": ["student_member"]}
             )
 
+    def test_student_can_update_own_assigned_task(self):
+        self.service._repo.get_task_access_context.return_value = {
+            "course_id": 3,
+            "assignee_id": 12,
+        }
+        self.service._repo.is_student_enrolled.return_value = True
+
+        course_id = self.service.require_task_update_access(
+            19, {"user_id": 12, "roles": ["student_member"]}
+        )
+
+        self.assertEqual(course_id, 3)
+
+    def test_student_cannot_update_unassigned_or_another_students_task(self):
+        self.service._repo.is_student_enrolled.return_value = True
+        user = {"user_id": 12, "roles": ["student_member"]}
+
+        for assignee_id in (None, 99):
+            with self.subTest(assignee_id=assignee_id):
+                self.service._repo.get_task_access_context.return_value = {
+                    "course_id": 3,
+                    "assignee_id": assignee_id,
+                }
+                with self.assertRaises(ForbiddenException):
+                    self.service.require_task_update_access(19, user)
+
     def test_tutor_session_access_uses_owning_profile(self):
         self.service._repo.get_tutor_session_context.return_value = {
             "profile_id": 22,

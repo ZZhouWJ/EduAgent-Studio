@@ -1,14 +1,17 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { BookOpenCheck, CheckCircle2, Clock3, FileText, MessageSquare, PlayCircle, Target } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { learningApi, resourcesApi } from "@/lib/api";
 import { DetailDrawer, EmptyState, PageHeader, ProgressBar, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, notify } from "../components/common/ProductUI";
 
 const STATUS_LABELS: Record<string, string> = {
+  assigned: "未开始",
   in_progress: "进行中",
   completed: "已完成",
   not_started: "未开始",
+  draft: "草稿",
+  archived: "已归档",
 };
 
 const STATUS_OPTIONS = ["全部", "进行中", "未开始", "已完成"];
@@ -23,21 +26,24 @@ function resourceIcon(type: string) {
 }
 
 export function StudentTasks() {
+  const navigate = useNavigate();
   const [query, setQuery] = React.useState("");
   const [status, setStatus] = React.useState("全部");
   const [selected, setSelected] = React.useState<{
     id: number; title: string; course_name: string; type: string;
-    status: string; priority: string; description: string; course_id: number;
+    status: string; rawStatus: string; priority: string; description: string;
+    course_id: number; canUpdate: boolean;
   } | null>(null);
-  const [completed, setCompleted] = React.useState<string[]>([]);
-  const [markingId, setMarkingId] = React.useState<string | null>(null);
+  const [updatingTaskId, setUpdatingTaskId] = React.useState<number | null>(null);
 
   const { data: tasksData, loading, refetch } = useApi(
     () => learningApi.listTasks({ page_size: 100 }),
     []
   );
   const { data: resourcesData } = useApi(
-    () => resourcesApi.list({ course_id: selected?.course_id, page_size: 10 }),
+    () => selected?.course_id
+      ? resourcesApi.list({ course_id: selected.course_id, page_size: 10 })
+      : Promise.resolve({ items: [], total: 0 }),
     [selected?.course_id]
   );
 
@@ -50,12 +56,11 @@ export function StudentTasks() {
       displayStatus: STATUS_LABELS[task.status] ?? task.status,
       progress: task.status === "completed" ? 100 : task.status === "in_progress" ? 50 : 0,
       section:
-        completed.includes(String(task.id)) ? "已完成任务" :
+        task.status === "completed" ? "已完成任务" :
         task.status === "in_progress" ? "今日任务" :
-        task.status === "not_started" ? "本周任务" :
         "本周任务",
     }));
-  }, [tasksData, completed]);
+  }, [tasksData]);
 
   const normalized = query.trim().toLowerCase();
   const tasks = allTasks
@@ -65,9 +70,9 @@ export function StudentTasks() {
   const taskSections = ["今日任务", "本周任务", "已完成任务"];
 
   const stats = [
-    { label: "待完成任务", value: String(allTasks.filter((t) => t.status === "not_started" && !completed.includes(String(t.id))).length), hint: "本周任务", icon: Target, tone: "orange" as const },
-    { label: "进行中任务", value: String(allTasks.filter((t) => t.status === "in_progress" && !completed.includes(String(t.id))).length), hint: "今日任务", icon: PlayCircle, tone: "blue" as const },
-    { label: "已完成任务", value: String(allTasks.filter((t) => t.status === "completed" || completed.includes(String(t.id))).length), hint: "本周持续更新", icon: CheckCircle2, tone: "emerald" as const },
+    { label: "待完成任务", value: String(allTasks.filter((t) => ["assigned", "not_started"].includes(t.status)).length), hint: "本周任务", icon: Target, tone: "orange" as const },
+    { label: "进行中任务", value: String(allTasks.filter((t) => t.status === "in_progress").length), hint: "今日任务", icon: PlayCircle, tone: "blue" as const },
+    { label: "已完成任务", value: String(allTasks.filter((t) => t.status === "completed").length), hint: "本周持续更新", icon: CheckCircle2, tone: "emerald" as const },
     { label: "今日建议时长", value: `${Math.max(30, allTasks.filter((t) => t.status === "in_progress").length * 15)} 分钟`, hint: "轻量化拆分", icon: Clock3, tone: "purple" as const },
   ];
 
@@ -76,6 +81,38 @@ export function StudentTasks() {
     type: r.resource_type || "资源",
     icon: resourceIcon(r.resource_type),
   }));
+
+  const updateTaskStatus = async (taskId: number, nextStatus: "in_progress" | "completed") => {
+    setUpdatingTaskId(taskId);
+    try {
+      const updated = await learningApi.updateTaskStatus(taskId, nextStatus);
+      setSelected((current) => current?.id === taskId
+        ? {
+            ...current,
+            rawStatus: updated.status,
+            status: STATUS_LABELS[updated.status] ?? updated.status,
+          }
+        : current
+      );
+      await refetch();
+      notify.success(nextStatus === "completed" ? "任务已完成" : "任务已开始");
+      return true;
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "任务状态更新失败");
+      return false;
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  };
+
+  const startLearning = async () => {
+    if (!selected) return;
+    if (selected.canUpdate && selected.rawStatus === "assigned") {
+      const updated = await updateTaskStatus(selected.id, "in_progress");
+      if (!updated) return;
+    }
+    navigate("/student/resources");
+  };
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
@@ -118,7 +155,7 @@ export function StudentTasks() {
               </div>
               <div className="edu-stagger grid grid-cols-2 gap-4">
                 {sectionTasks.map((task) => {
-                  const isDone = completed.includes(String(task.id)) || task.progress === 100;
+                  const isDone = task.status === "completed";
                   return (
                     <button
                       key={task.id}
@@ -128,9 +165,11 @@ export function StudentTasks() {
                         course_name: task.course_name,
                         type: task.type,
                         status: task.displayStatus,
+                        rawStatus: task.status,
                         priority: task.priority,
                         description: task.description,
                         course_id: task.course_id,
+                        canUpdate: task.assignee_id !== null,
                       })}
                       className={`group cursor-pointer rounded-2xl border bg-white p-4 text-left transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-lg ${
                         isDone
@@ -211,23 +250,28 @@ export function StudentTasks() {
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-3 gap-3">
-              <Link to="/student/resources" className={`${primaryButton} cursor-pointer text-center`}>开始学习</Link>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <button
-                onClick={() => {
-                  const id = String(selected.id);
-                  setCompleted((items) => Array.from(new Set([...items, id])));
-                  setMarkingId(id);
-                  notify.success("任务已标记完成");
-                  window.setTimeout(() => setMarkingId(null), 1400);
-                }}
-                className={`${secondaryButton} cursor-pointer transition-all duration-300 ${
-                  markingId === String(selected.id)
-                    ? "!bg-emerald-500 !text-white !ring-emerald-400"
-                    : ""
-                }`}
+                type="button"
+                onClick={startLearning}
+                disabled={updatingTaskId === selected.id}
+                className={`${primaryButton} cursor-pointer text-center disabled:cursor-wait disabled:opacity-60`}
               >
-                {markingId === String(selected.id) ? "已完成 ✓" : "标记完成"}
+                {updatingTaskId === selected.id && selected.rawStatus === "assigned" ? "正在开始..." : "开始学习"}
+              </button>
+              <button
+                type="button"
+                onClick={() => updateTaskStatus(selected.id, "completed")}
+                disabled={!selected.canUpdate || selected.rawStatus === "completed" || updatingTaskId === selected.id}
+                className={`${secondaryButton} cursor-pointer transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60`}
+              >
+                {selected.rawStatus === "completed"
+                  ? "已完成"
+                  : !selected.canUpdate
+                    ? "仅供查看"
+                    : updatingTaskId === selected.id
+                      ? "正在更新..."
+                      : "标记完成"}
               </button>
               <Link to="/student/feedback" className={`${secondaryButton} flex cursor-pointer items-center justify-center gap-1`}>
                 <MessageSquare className="h-4 w-4" />
