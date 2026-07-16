@@ -2,6 +2,123 @@
 @import './tailwind.css';
 @import './theme.css';
 
+/* ─── 讯飞风格设计 Token（覆盖同名类 + 新增浅色玻璃工具） ─── */
+
+:root {
+  --edu-bg-primary: #F5F7FB;
+  --edu-bg-card: rgba(255, 255, 255, 0.88);
+  --edu-accent-blue: #165DFF;
+  --edu-accent-purple: #7B5CFF;
+  --edu-accent-cyan: #0EA5FF;
+  --edu-text-primary: #0F172A;
+  --edu-text-secondary: #475569;
+  --edu-text-muted: #94A3B8;
+  --edu-glow-blue: rgba(22, 93, 255, 0.07);
+  --edu-shadow-card: 0 8px 32px rgba(15, 23, 42, 0.06), 0 1px 4px rgba(15, 23, 42, 0.04);
+  --edu-shadow-hover: 0 16px 48px rgba(22, 93, 255, 0.1), 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+.edu-card {
+  border: 1px solid rgba(226, 232, 240, 0.7);
+  background: var(--edu-bg-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--edu-shadow-card);
+  border-radius: 0;
+}
+
+.edu-card-hover {
+  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+}
+
+.edu-card-hover:hover {
+  border-color: rgba(22, 93, 255, 0.25);
+  box-shadow: var(--edu-shadow-hover);
+  transform: translateY(-2px);
+}
+
+.edu-glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 0;
+}
+
+.edu-glass-deep {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  border-radius: 0;
+}
+
+.edu-glass-hover {
+  transition: box-shadow 200ms ease, border-color 200ms ease, transform 200ms ease;
+}
+
+.edu-glass-hover:hover {
+  border-color: rgba(22, 93, 255, 0.3);
+  box-shadow: var(--edu-shadow-hover);
+  transform: translateY(-2px);
+}
+
+.edu-gradient-text {
+  color: transparent;
+  background: linear-gradient(90deg, #165DFF 0%, #7B5CFF 50%, #0EA5FF 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.edu-ring-glow {
+  position: relative;
+}
+.edu-ring-glow::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(22, 93, 255, 0.5), rgba(123, 92, 255, 0.3), rgba(14, 165, 255, 0.3));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 200ms ease;
+  pointer-events: none;
+}
+.edu-ring-glow:hover::after { opacity: 1; }
+
+.edu-glow-bg {
+  background: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(22, 93, 255, 0.08) 0%, rgba(123, 92, 255, 0.05) 40%, transparent 70%);
+}
+
+.edu-top-bar {
+  position: relative;
+}
+.edu-top-bar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(22, 93, 255, 0.5) 30%, rgba(123, 92, 255, 0.5) 70%, transparent 100%);
+}
+
+.edu-accent-gradient {
+  background: linear-gradient(135deg, #165DFF 0%, #7B5CFF 100%);
+}
+
+.edu-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #165DFF, #7B5CFF);
+  transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 /* ─── Design Tokens：高级字体 / 角色色域 ─────────────────────── */
 :root {
   /* Display / Body：保留中文 PingFang 链路，引入 Plus Jakarta Sans 作为标题备选 */
@@ -393,4 +510,9 @@ h1, h2, h3, h4, .edu-display {
 /* ─── Tutor 页学习路径图谱固定高度 ─────────────── */
 .tutor-graph-chart .w-full.h-80 {
   height: 180px !important;
+}
+
+/* ─── 全局去掉圆角：所有 UI 元素强制直角 ─────────── */
+*, *::before, *::after {
+  border-radius: 0 !important;
 }

@@ -1,5 +1,5 @@
-import React from "react";
 import { Link } from "react-router-dom";
+import { motion } from "motion/react";
 import {
   ArrowRight,
   BookOpenCheck,
@@ -15,6 +15,7 @@ import {
 import { useApi } from "@/lib/useApi";
 import { learningApi, resourcesApi, statisticsApi, profilesApi } from "@/lib/api";
 import { SafeLottie } from "../components/SafeLottie";
+import { MetricTile } from "../components/common/MetricTile";
 
 function resourceIcon(type: string) {
   const t = type?.toLowerCase() ?? "";
@@ -23,45 +24,6 @@ function resourceIcon(type: string) {
   if (t.includes("代码") || t.includes("案例")) return BookOpenCheck;
   if (t.includes("视频") || t.includes("动画")) return PlayCircle;
   return Library;
-}
-
-/* ─── KPI 卡 ──────────────────────────────────────── */
-function StatCard({
-  label,
-  value,
-  hint,
-  icon: Icon,
-  tone = "slate",
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  icon: React.ComponentType<{ className?: string }>;
-  tone?: "slate" | "blue" | "purple" | "emerald" | "amber" | "rose";
-}) {
-  const tones: Record<string, string> = {
-    slate: "bg-slate-100 text-slate-700",
-    blue: "bg-blue-50 text-blue-700",
-    purple: "bg-violet-50 text-violet-700",
-    emerald: "bg-emerald-50 text-emerald-700",
-    amber: "bg-amber-50 text-amber-700",
-    rose: "bg-rose-50 text-rose-700",
-  };
-  return (
-    <div className="edu-card edu-card-hover group p-5">
-      <div className={`grid h-8 w-8 place-items-center rounded-md transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:rotate-[-4deg] ${tones[tone]}`}>
-        <Icon className="h-4 w-4" />
-      </div>
-      <div className="mt-5 text-[13px] font-medium text-slate-500">{label}</div>
-      <div
-        key={value}
-        className="mt-1 inline-block text-[26px] font-semibold leading-[1.15] tracking-tight text-slate-900 edu-count-up"
-      >
-        {value}
-      </div>
-      <div className="mt-1.5 text-xs text-slate-400">{hint}</div>
-    </div>
-  );
 }
 
 export function StudentDashboard() {
@@ -98,46 +60,56 @@ export function StudentDashboard() {
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6 ds-stagger">
       {/* ─── KPI ──────────────────────────────────────── */}
-      <section className="edu-stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard
+      <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        <MetricTile
           label="综合掌握度"
           value={statsData ? `${Math.round((statsData.avg_mastery ?? 0) * 100)}%` : "—"}
           hint="实时统计"
           icon={Target}
           tone="blue"
+          delay={0}
         />
-        <StatCard
+        <MetricTile
           label="待完成任务"
           value={String(pendingCount || "—")}
           hint={`今日 ${todayCount} 项`}
           icon={CheckCircle2}
           tone="purple"
+          delay={0.06}
         />
-        <StatCard
+        <MetricTile
           label="课程数量"
           value={String(learningData?.length ?? "—")}
           hint="已选课程"
           icon={Timer}
           tone="emerald"
+          delay={0.12}
         />
-        <StatCard
+        <MetricTile
           label="资源总数"
           value={String(resourcesData?.total ?? "—")}
           hint="已发布资源"
           icon={FileText}
-          tone="amber"
+          tone="orange"
+          delay={0.18}
         />
-        <StatCard
+        <MetricTile
           label="累计反馈"
           value={String(statsData?.feedback_count ?? "—")}
           hint="历史反馈总数"
           icon={Library}
-          tone="rose"
+          tone="slate"
+          delay={0.24}
         />
       </section>
 
       {/* ─── 今日学习路径 + 薄弱点 ──────────────────────── */}
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1.55fr_1fr]">
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        className="grid grid-cols-1 gap-4 lg:grid-cols-[1.55fr_1fr]"
+      >
         <div className="edu-card overflow-hidden p-0">
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
             <div>
@@ -264,10 +236,15 @@ export function StudentDashboard() {
             )}
           </ul>
         </div>
-      </section>
+      </motion.section>
 
       {/* ─── 推荐学习资源 ──────────────────────────────── */}
-      <section className="edu-card p-5">
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.45, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        className="edu-card p-5"
+      >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-[15px] font-semibold tracking-tight text-slate-900">推荐学习资源</h2>
           <Link
@@ -313,11 +290,16 @@ export function StudentDashboard() {
             <span className="text-sm">暂无学习资源</span>
           </div>
         )}
-      </section>
+      </motion.section>
 
       {/* ─── 今日推荐资源 ──────────────────────────── */}
       {recommendedResources && recommendedResources.length > 0 && (
-        <section className="edu-card p-5">
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          className="edu-card p-5"
+        >
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-[15px] font-semibold tracking-tight text-slate-900">今日推荐资源</h2>
             <span className="rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-600">
@@ -355,7 +337,7 @@ export function StudentDashboard() {
               );
             })}
           </div>
-        </section>
+        </motion.section>
       )}
     </div>
   );

@@ -1,9 +1,11 @@
 import React from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "motion/react";
 import { useAuthStore } from "@/stores/auth";
 import { useRouterGuard } from "@/lib/router-guard";
 import { Toaster } from "sonner";
+import { FloatingHelper } from "./common/FloatingHelper";
 import {
   ActivitySquare,
   BarChart3,
@@ -436,12 +438,13 @@ export function Layout() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="relative hidden lg:block">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <div className="group relative hidden lg:block">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors" />
               <input
                 type="search"
                 aria-label={config.searchHint}
-                className="edu-focus-ring h-10 w-[312px] rounded-xl border border-slate-200 bg-slate-50/80 pl-10 pr-10 text-sm text-slate-700"
+                placeholder={config.searchHint}
+                className="edu-focus-ring h-10 w-[300px] rounded-xl border border-slate-200 bg-white/80 pl-10 pr-10 text-sm text-slate-700 placeholder:text-slate-400 backdrop-blur transition-all duration-300 focus:w-[360px] focus:border-blue-400 focus:bg-white"
               />
               <Command className="pointer-events-none absolute right-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-300" />
             </div>
@@ -451,7 +454,7 @@ export function Layout() {
               aria-label="查看通知"
             >
               <Bell className="h-[18px] w-[18px]" />
-              <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+              <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white edu-badge-pulse" />
             </button>
 
             <div className="hidden h-8 w-px bg-slate-200 sm:block" />
@@ -469,8 +472,28 @@ export function Layout() {
           </div>
         </header>
 
-        <main id="main-content" className="custom-scrollbar min-h-[calc(100dvh-56px)] overflow-x-hidden overflow-y-auto p-4 sm:p-5 lg:min-h-0 lg:flex-1 lg:overflow-auto lg:p-6">
-          <Outlet />
+        <main
+          id="main-content"
+          className="relative min-h-[calc(100dvh-56px)] overflow-x-hidden overflow-y-auto p-4 custom-scrollbar sm:p-5 lg:min-h-0 lg:flex-1 lg:overflow-auto lg:p-6"
+        >
+          {/* Subtle top glow inside main area */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-48 select-none" style={{
+            background: `radial-gradient(ellipse 60% 40% at 50% -5%, rgba(22, 93, 255, 0.06) 0%, rgba(123, 92, 255, 0.04) 45%, transparent 70%)`,
+          }} aria-hidden />
+          <div className="relative z-10">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={location.pathname}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <Outlet />
+              </motion.div>
+            </AnimatePresence>
+          </div>
+          <FloatingHelper role={role} />
         </main>
       </div>
       <Toaster position="top-right" richColors />

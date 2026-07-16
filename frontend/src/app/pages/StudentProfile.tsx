@@ -26,6 +26,7 @@ import type {
   ProfileExtraction,
 } from "@/lib/api/profiles";
 import { notify } from "@/lib/toast";
+import { PageHero } from "../components/common/PageHero";
 
 type FeedbackRecord = Awaited<ReturnType<typeof profilesApi.getFeedbackHistory>>[number];
 
@@ -284,17 +285,13 @@ export function StudentProfile() {
 
   return (
     <div className="mx-auto min-h-full max-w-[1500px] space-y-6 py-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-semibold text-blue-700">{profile.course_name}</p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-950">我的学习画像</h1>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-slate-500">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
-          最近更新 {profile.last_updated || "暂无记录"}
-        </div>
-      </header>
-
+      <PageHero
+        eyebrow={profile.course_name}
+        title="我的学习画像"
+        description="AI 分析你的对话、测验和资源交互记录，构建多维度认知模型，持续指导个性化学习。"
+        icon={Brain}
+        role="student"
+      />
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="profile-dialog-title">
         <div className="grid min-h-[430px] lg:grid-cols-[minmax(0,1.65fr)_minmax(300px,0.85fr)]">
           <div className="flex min-w-0 flex-col border-b border-slate-200 lg:border-b-0 lg:border-r">

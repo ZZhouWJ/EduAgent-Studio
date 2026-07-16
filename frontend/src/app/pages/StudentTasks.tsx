@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { BookOpenCheck, CheckCircle2, Clock3, FileText, MessageSquare, PlayCircle, Target } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { learningApi, resourcesApi } from "@/lib/api";
-import { DetailDrawer, EmptyState, PageHeader, ProgressBar, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, notify } from "../components/common/ProductUI";
+import { DetailDrawer, EmptyState, ProgressBar, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, notify } from "../components/common/ProductUI";
+import { PageHero } from "../components/common/PageHero";
 
 const STATUS_LABELS: Record<string, string> = {
   in_progress: "进行中",
@@ -79,10 +80,12 @@ export function StudentTasks() {
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
-      <PageHeader
-        title="学习任务"
+      <PageHero
+        eyebrow="学习任务"
+        title="个性化学习任务"
         description="根据你的学习画像和课程进度，系统为你安排了个性化学习任务。"
         icon={BookOpenCheck}
+        role="student"
         action={<Link to="/student/resources" className={`${primaryButton} cursor-pointer`}>进入推荐资源</Link>}
       />
 

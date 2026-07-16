@@ -7,7 +7,8 @@ import { tutorApi, profilesApi, learningApi, multimodalApi } from "@/lib/api"
 import type { LearningPathNode } from "@/lib/api/learning"
 import { LearningPathGraph } from "../components/learning/LearningPathGraph"
 import type { Citation, PracticeQuestion, RecommendedResource, ContentBlock, IntentResult, SSEEvent } from "@/lib/api/tutor"
-import { PageShell, useInlineToast } from "../components/common/ProductUI"
+import { useInlineToast } from "../components/common/ProductUI"
+import { AuroraBackground } from "../components/common/AuroraBackground"
 import { marked } from "marked"
 import { ContentBlockRenderer, ContentBlockTypeLabel } from "../components/tutor/ContentBlockRenderer"
 
@@ -736,7 +737,7 @@ export function StudentTutor() {
   }
 
   return (
-    <PageShell>
+    <AuroraBackground className="mx-auto max-w-[1400px]">
       {/* GPT/Gemini 风格底部思考动画条 */}
       {(pendingAi || activeEvents.length > 0) && (
         <ThinkingBar events={activeEvents} isFirstThinking={isFirstThinking} />
@@ -996,6 +997,6 @@ export function StudentTutor() {
         </aside>
       </section>
       {toast}
-    </PageShell>
+    </AuroraBackground>
   )
 }

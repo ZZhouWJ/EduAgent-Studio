@@ -6,6 +6,7 @@ import { learningApi, resourcesApi } from "@/lib/api";
 import { SafeLottie } from "../components/SafeLottie";
 import { ResourceRenderer } from "../components/resource/ResourceRenderer";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from "../components/ui/drawer";
+import { PageHero } from "../components/common/PageHero";
 
 function formatTimeAgo(dateStr: string): string {
   try {
@@ -104,6 +105,13 @@ export function ResourceLibrary() {
 
   return (
     <div className="mx-auto flex h-full max-w-[1400px] flex-col space-y-6 pb-6">
+      <PageHero
+        eyebrow="推荐资源"
+        title="学习资源库"
+        description="浏览、搜索和收藏与你当前学习进度匹配的学习资源，支持按类型、课程和审核状态筛选。"
+        icon={BookOpen}
+        role="student"
+      />
       {/* Filters */}
       <div className="flex shrink-0 items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
         <div className="flex items-center gap-2 flex-1">

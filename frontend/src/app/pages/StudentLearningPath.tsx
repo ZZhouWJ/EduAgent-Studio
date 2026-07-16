@@ -5,6 +5,7 @@ import { useApi } from "@/lib/useApi";
 import { learningApi } from "@/lib/api/learning";
 import { profilesApi } from "@/lib/api/profiles";
 import { LearningPathGraph, KpNode } from "@/app/components/learning/LearningPathGraph";
+import { PageHero } from "../components/common/PageHero";
 
 export function StudentLearningPath() {
   const navigate = useNavigate();
@@ -94,16 +95,26 @@ export function StudentLearningPath() {
   };
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
-      <div className="flex items-start justify-end gap-4">
-        <Link to="/student/resources" className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.22)]">
-          继续学习当前推荐资源
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-      </div>
+      <PageHero
+        eyebrow="学习路径"
+        title="知识图谱与学习规划"
+        description="基于画像定制的知识点依赖图，红色节点表示薄弱点，建议优先学习。"
+        icon={Network}
+        role="student"
+        action={
+          <Link
+            to="/student/resources"
+            className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.22)] hover:brightness-110"
+          >
+            继续学习
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        }
+      />
 
       {/* 知识图谱 */}
-      <div className="edu-card p-4">
-        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+      <div className="edu-card p-5">
+        <h3 className="text-[15px] font-bold mb-4 flex items-center gap-2">
           <Network className="h-5 w-5 text-blue-600" />
           知识图谱
           {loading && <span className="ml-3 text-sm font-normal text-slate-400">加载中...</span>}
@@ -120,8 +131,8 @@ export function StudentLearningPath() {
       </div>
 
       {/* 今日学习顺序 */}
-      <div className="edu-card p-4">
-        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+      <div className="edu-card edu-card-hover p-5">
+        <h3 className="text-[15px] font-bold mb-4 flex items-center gap-2">
           <Target className="h-5 w-5 text-blue-600" />
           今日学习顺序
         </h3>

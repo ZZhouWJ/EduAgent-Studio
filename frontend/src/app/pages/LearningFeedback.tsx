@@ -5,6 +5,7 @@ import { useApi } from "@/lib/useApi";
 import { feedbackApi, resourcesApi, statisticsApi } from "@/lib/api";
 import type { MasteryChange, RecommendedResource } from "@/lib/api/learning";
 import { notify } from "@/lib/toast";
+import { PageHero } from "../components/common/PageHero";
 
 function resourceIcon(type: string) {
   const t = (type ?? "").toLowerCase();
@@ -71,6 +72,13 @@ export function LearningFeedback() {
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6 pb-6">
+      <PageHero
+        eyebrow="学习反馈"
+        title="测评与反馈"
+        description="提交自评反馈后，系统将基于你的表现自动更新学习画像，推荐下阶段最适合你的学习资源。"
+        icon={HelpCircle}
+        role="student"
+      />
       {/* Current Feedback / Latest */}
       <div className="relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
         <div className="absolute top-0 right-0 h-full w-64 bg-gradient-to-l from-blue-50 to-transparent pointer-events-none" />

@@ -1,5 +1,6 @@
 import React from "react";
 import { Search, X } from "lucide-react";
+import { motion } from "motion/react";
 import { notify } from "@/lib/toast";
 
 export { notify };
@@ -20,23 +21,34 @@ export function PageShell({ children, className = "" }: { children: React.ReactN
 
 export function PageHeader({ eyebrow, title, description, icon: Icon, action }: PageHeaderProps) {
   return (
-    <section className="edu-card relative overflow-hidden rounded-[20px] p-5 sm:rounded-[24px] sm:p-6 lg:p-7">
-      <div className="absolute inset-0 edu-grid-bg opacity-45" />
-      <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#2563EB,#7C3AED,#06B6D4)]" />
+    <motion.section
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className="edu-card edu-top-bar relative overflow-hidden rounded-[20px] p-5 sm:rounded-[24px] sm:p-6 lg:p-7"
+    >
+      {/* Background glow */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-40 select-none"
+        style={{
+          background: `radial-gradient(ellipse 80% 60% at 50% -10%, rgba(22, 93, 255, 0.07) 0%, rgba(123, 92, 255, 0.04) 45%, transparent 70%)`,
+        }}
+        aria-hidden
+      />
       <div className="relative flex flex-col items-stretch justify-between gap-5 lg:flex-row lg:items-start lg:gap-6">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           {eyebrow && (
-            <div className="mb-4 flex w-fit items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">
+            <div className="mb-4 flex w-fit items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-600">
               {Icon && <Icon className="h-3.5 w-3.5" />}
               {eyebrow}
             </div>
           )}
-          <h1 className="text-2xl font-black leading-tight text-slate-950 sm:text-[30px]">{title}</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{description}</p>
+          <h1 className="text-2xl font-black leading-tight tracking-tight text-slate-950 sm:text-[30px]">{title}</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">{description}</p>
         </div>
         {action && <div className="flex shrink-0 flex-col gap-2 sm:flex-row lg:justify-end">{action}</div>}
       </div>
-    </section>
+    </motion.section>
   );
 }
 
@@ -60,19 +72,29 @@ const toneClass: Record<NonNullable<StatCardProps["tone"]>, string> = {
 
 export function StatCard({ label, value, hint, icon: Icon, tone = "blue" }: StatCardProps) {
   return (
-    <div className="edu-card edu-card-hover group rounded-2xl p-4">
-      <div className={`mb-4 grid h-10 w-10 place-items-center rounded-xl ring-1 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:rotate-[-4deg] ${toneClass[tone]}`}>
+    <motion.div
+      whileHover={{ y: -3, transition: { duration: 0.2 } }}
+      className="edu-card edu-card-hover group relative flex flex-col gap-2 rounded-2xl p-4"
+    >
+      <div className={`mb-3 grid h-10 w-10 place-items-center rounded-xl ring-1 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:rotate-[-4deg] ${toneClass[tone]}`}>
         <Icon className="h-5 w-5" />
       </div>
       <div className="text-sm font-semibold text-slate-500">{label}</div>
       <div
         key={value}
-        className="mt-1 inline-block text-[25px] font-black leading-8 text-slate-950 edu-count-up"
+        className="text-[25px] font-black leading-8 text-slate-900 edu-num"
       >
         {value}
       </div>
-      {hint && <div className="mt-1 text-xs font-medium text-slate-400">{hint}</div>}
-    </div>
+      {hint && <div className="text-xs font-medium text-slate-400">{hint}</div>}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-[18px] opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+        style={{
+          background: `linear-gradient(90deg, transparent 0%, ${toneClass[tone].split(" ")[0].replace("bg-", "rgba(22,93,255,").replace("50", ".12)")} 40%, ${toneClass[tone].split(" ")[0].replace("bg-", "rgba(22,93,255,").replace("50", ".12)")} 60%, transparent 100%)`,
+        }}
+        aria-hidden
+      />
+    </motion.div>
   );
 }
 
@@ -209,11 +231,16 @@ export function ModalShell({
 
 export function EmptyState({ title, description, action }: { title: string; description: string; action?: React.ReactNode }) {
   return (
-    <div className="edu-card rounded-2xl p-8 text-center">
-      <h3 className="text-lg font-black text-slate-900">{title}</h3>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{description}</p>
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+      className="edu-glass flex flex-col items-center justify-center gap-4 rounded-2xl p-8 text-center"
+    >
+      <h3 className="text-lg font-black text-slate-800">{title}</h3>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-400">{description}</p>
       {action && <div className="mt-5 flex justify-center">{action}</div>}
-    </div>
+    </motion.div>
   );
 }
 

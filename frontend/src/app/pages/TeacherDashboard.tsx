@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { motion } from "motion/react";
 import { AlertTriangle, ArrowRight, BookOpen, CheckSquare, Database, FileText, GraduationCap, Library, MessageSquare, ShieldAlert, Target, Users } from "lucide-react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useApi } from "@/lib/useApi";
@@ -56,7 +57,12 @@ export function TeacherDashboard() {
   }
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
-      <section className="edu-card relative overflow-hidden rounded-2xl p-7">
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        className="edu-card relative overflow-hidden rounded-2xl p-7"
+      >
         <div className="relative grid grid-cols-[1.25fr_0.75fr] items-center gap-6">
           <div>
             <div className="mb-4 flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
@@ -103,12 +109,17 @@ export function TeacherDashboard() {
             </div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {loading ? (
         <div className="flex items-center justify-center h-32 text-slate-400">加载中...</div>
       ) : (
-      <section className="grid grid-cols-6 gap-4">
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        className="grid grid-cols-6 gap-4"
+      >
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
@@ -122,10 +133,15 @@ export function TeacherDashboard() {
             </div>
           );
         })}
-      </section>
+      </motion.section>
       )}
 
-      <section className="grid grid-cols-[1fr_0.95fr] gap-6">
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        className="grid grid-cols-[1fr_0.95fr] gap-6"
+      >
         <div className="edu-card rounded-2xl p-6">
           <h3 className="mb-5 flex items-center gap-2 text-lg font-semibold text-slate-900">
             <AlertTriangle className="h-5 w-5 text-orange-600" />
@@ -170,9 +186,14 @@ export function TeacherDashboard() {
             </ResponsiveContainer>
           </div>
         </div>
-      </section>
+      </motion.section>
 
-      <section className="edu-card rounded-2xl p-6">
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        className="edu-card rounded-2xl p-6"
+      >
         <div className="mb-5 flex items-center justify-between">
           <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
             资源生成建议
@@ -197,7 +218,7 @@ export function TeacherDashboard() {
             </Link>
           ))}
         </div>
-      </section>
+      </motion.section>
     </div>
   );
 }
