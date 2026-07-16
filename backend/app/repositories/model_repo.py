@@ -436,3 +436,39 @@ def get_api_config_by_id(config_id: int) -> Optional[Dict[str, Any]]:
     with get_db_cursor() as cursor:
         cursor.execute(sql, (config_id,))
         return cursor.fetchone()
+
+
+def get_runtime_model_config(
+    preferred_provider: str,
+    preferred_model: str,
+) -> Optional[Dict[str, Any]]:
+    """Return the best active model with a usable encrypted credential."""
+    sql = """
+        SELECT m.model_id, m.model_name, m.max_context,
+               p.provider_code, p.base_url,
+               c.api_config_id, c.encrypted_api_key, c.key_iv, c.key_tag
+        FROM ai_models m
+        INNER JOIN model_providers p
+            ON p.provider_id = m.provider_id
+           AND p.is_deleted = 0
+           AND p.status = 'active'
+        INNER JOIN api_configs c
+            ON c.provider_id = p.provider_id
+           AND c.is_deleted = 0
+           AND c.status = 'active'
+           AND (c.quota_limit <= 0 OR c.used_quota < c.quota_limit)
+        WHERE m.is_deleted = 0
+          AND m.status = 'active'
+          AND p.provider_code IN (
+              'openai_compatible', 'openai', 'deepseek', 'qwen', 'minimax'
+          )
+        ORDER BY (p.provider_code = %s) DESC,
+                 (m.model_name = %s) DESC,
+                 COALESCE(c.updated_at, c.created_at) DESC,
+                 COALESCE(m.updated_at, m.created_at) DESC,
+                 m.model_id DESC
+        LIMIT 1
+    """
+    with get_db_cursor() as cursor:
+        cursor.execute(sql, (preferred_provider, preferred_model))
+        return cursor.fetchone()

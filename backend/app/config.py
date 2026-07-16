@@ -133,20 +133,12 @@ class Settings(BaseSettings):
         return self
 
     def llm_config(self, model_name: str = None) -> "LLMConfig":
-        """返回当前 LLM 配置。"""
-        from app.llm.gateway import LLMConfig as LLMConfigCls
-        return LLMConfigCls(
-            model_id=0,
-            model_name=model_name or self.llm_model,
-            provider=self.llm_provider,
-            api_key=self.llm_api_key,
-            base_url=self.llm_base_url,
-            temperature=0.7,
-            max_tokens=2048,
-            timeout=60,
-            api_secret=self.iflytek_api_secret,
-            app_id=self.iflytek_app_id,
+        """优先返回管理端已启用的加密模型配置。"""
+        from app.services.runtime_model_config_service import (
+            resolve_runtime_llm_config,
         )
+
+        return resolve_runtime_llm_config(self, model_name)
 
 
 @lru_cache()

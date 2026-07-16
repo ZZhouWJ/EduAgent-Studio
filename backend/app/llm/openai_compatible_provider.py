@@ -38,9 +38,10 @@ class OpenAICompatibleProvider:
         **kwargs
     ) -> Dict[str, Any]:
         """调用 OpenAI-compatible API"""
-        url = f"{self.base_url}/chat/completions"
+        base_url = (config.base_url or self.base_url).rstrip("/")
+        url = f"{base_url}/chat/completions"
         headers = {
-            "Authorization": f"Bearer {self.api_key or config.api_key}",
+            "Authorization": f"Bearer {config.api_key or self.api_key}",
             "Content-Type": "application/json",
         }
         payload = {

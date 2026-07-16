@@ -15,7 +15,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
-from app.llm.gateway import LLMGateway, LLMConfig, llm_gateway as _default_llm
+from app.llm.gateway import LLMGateway, llm_gateway as _default_llm
 from app.config import get_settings
 
 settings = get_settings()
@@ -438,18 +438,11 @@ class TutorSupervisor:
     ) -> Dict[str, Any]:
         """调用 LLM，支持 function calling"""
         try:
-            result = self._llm.generate(
-                messages=messages,
-                config=LLMConfig(
-                    model_id=0,
-                    model_name=settings.llm_model,
-                    provider=settings.llm_provider,
-                    temperature=0.7,
-                    max_tokens=2000,
-                    tools=tools if tools else None,
-                    tool_choice="auto",
-                ),
-            )
+            config = settings.llm_config()
+            config.max_tokens = 2000
+            config.tools = tools if tools else None
+            config.tool_choice = "auto"
+            result = self._llm.generate(messages=messages, config=config)
 
             if hasattr(result, "tool_calls") and result.tool_calls:
                 # Provider 返回了 tool_calls（来自 OpenAI/讯飞等支持 function calling 的模型）
