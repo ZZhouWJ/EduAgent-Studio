@@ -52,26 +52,6 @@ export {
   type SaveResourceResponse,
 } from './agents'
 
-// Tasks
-export {
-  tasksApi,
-  type TaskOutput,
-  type TaskBranch,
-  type OutputComment,
-} from './tasks'
-
-// Projects
-export {
-  projectsApi,
-  type Project,
-  type ProjectMember,
-  type ProjectTask,
-  type CreateProjectBody,
-} from './projects'
-
-// Artifacts
-export { artifactsApi, type Artifact, type ArtifactDetail } from './artifacts'
-
 // Prompts
 export {
   promptsApi,
@@ -83,15 +63,6 @@ export {
   type CreateVersionBody,
   type PromptRenderResult,
 } from './prompts'
-
-// Reviews
-export {
-  reviewsApi,
-  type ReviewRequest,
-  type ReviewDetail,
-  type IssueTag,
-  type CompleteReviewBody,
-} from './reviews'
 
 // Invocations
 export { invocationsApi, type Invocation, type InvocationDetail } from './invocations'
@@ -129,13 +100,8 @@ export {
 // Statistics
 export {
   statisticsApi,
-  type StatisticsOverview,
-  type ProjectStats,
   type ModelCallStats,
   type CostStats,
-  type ReviewStats,
-  type MemberContribution,
-  type RecentActivity,
   type LearningOverview,
   type MasteryDist,
   type WeakKnowledgePoint,

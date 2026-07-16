@@ -1,30 +1,5 @@
 import client from './client'
 
-export interface StatisticsOverview {
-  project_count: number
-  active_project_count: number
-  task_count: number
-  pending_review_count: number
-  invocation_count: number
-  success_invocation_count: number
-  failed_invocation_count: number
-  artifact_count: number
-  total_tokens: number
-  total_cost: number
-}
-
-export interface ProjectStats {
-  project_id: number
-  project_name: string
-  member_count: number
-  task_count: number
-  output_count: number
-  approved_output_count: number
-  artifact_count: number
-  invocation_count: number
-  total_cost: number
-}
-
 export interface ModelCallStats {
   model_id: number
   model_name: string
@@ -53,43 +28,6 @@ export interface CostStats {
   cost_by_project: Array<{ project_id?: number; project_name: string; total_cost: number; task_count?: number }>
   cost_by_user: Array<{ user_id?: number; real_name: string; total_cost: number }>
   cost_trend: Array<{ date: string; call_count: number; total_tokens: number; total_cost: number }>
-}
-
-export interface ReviewStats {
-  review_count: number
-  approved_count: number
-  rejected_count: number
-  revision_required_count: number
-  avg_accuracy_score: number
-  avg_completeness_score: number
-  avg_logic_score: number
-  avg_format_score: number
-  avg_usability_score: number
-  avg_risk_score: number
-  top_issue_tags: Array<{ tag_name: string; count: number; severity: string }>
-}
-
-export interface MemberContribution {
-  user_id: number
-  real_name: string
-  project_count: number
-  task_created_count: number
-  task_assigned_count: number
-  output_created_count: number
-  review_count: number
-  artifact_adopted_count: number
-  invocation_count: number
-}
-
-export interface RecentActivity {
-  log_id: number
-  user_id: number
-  real_name: string
-  action_type: string
-  target_type: string
-  target_id: number
-  action_desc: string
-  created_at: string
 }
 
 export interface LearningOverview {
@@ -173,14 +111,6 @@ export interface ResourceStats {
 }
 
 export const statisticsApi = {
-  overview() {
-    return client.get<StatisticsOverview>('/statistics/overview')
-  },
-
-  projects(params?: { project_id?: number }) {
-    return client.get<ProjectStats[]>('/statistics/projects', { params })
-  },
-
   modelCalls(params?: {
     project_id?: number
     date_from?: string
@@ -196,18 +126,6 @@ export const statisticsApi = {
     date_to?: string
   }) {
     return client.get<CostStats>('/statistics/costs', { params })
-  },
-
-  reviews(params?: { project_id?: number }) {
-    return client.get<ReviewStats>('/statistics/reviews', { params })
-  },
-
-  memberContributions(params?: { project_id?: number }) {
-    return client.get<MemberContribution[]>('/statistics/member-contributions', { params })
-  },
-
-  recentActivities(params?: { project_id?: number; limit?: number }) {
-    return client.get<RecentActivity[]>('/statistics/recent-activities', { params })
   },
 
   learningOverview() {
