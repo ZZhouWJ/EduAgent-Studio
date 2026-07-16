@@ -46,9 +46,6 @@ export function AdminCosts() {
   const courses = coursesState.data ?? [];
   const models = modelsState.data?.items ?? [];
 
-  const courseOptions = ["全部课程", ...courses.map((c) => c.name)];
-  const modelOptions = ["全部模型", ...models.map((m) => m.display_name || m.model_name)];
-
   const stats = [
     { label: "今日成本", value: costs ? `¥${(costs.total_cost ?? 0).toFixed(2)}` : "—", hint: "预算可控", icon: Coins, tone: "blue" as const },
     { label: "Token 总消耗", value: costs ? `${((costs.total_tokens ?? 0) / 1000).toFixed(1)}K` : "—", hint: "输入输出合计", icon: WalletCards, tone: "purple" as const },
@@ -130,10 +127,14 @@ export function AdminCosts() {
         <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
           <SegmentedControl value={range} options={["今日", "近 7 日", "本月"]} onChange={setRange} />
           <select value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)} className="edu-focus-ring min-h-11 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-700">
-            {courseOptions.map((c, i) => <option key={c || i}>{c}</option>)}
+            <option>全部课程</option>
+            {courses.map((course) => <option key={course.id}>{course.name}</option>)}
           </select>
           <select value={modelFilter} onChange={(e) => setModelFilter(e.target.value)} className="edu-focus-ring min-h-11 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-700">
-            {modelOptions.map((m, i) => <option key={m || i}>{m}</option>)}
+            <option>全部模型</option>
+            {models.map((model) => (
+              <option key={model.model_id}>{model.display_name || model.model_name}</option>
+            ))}
           </select>
         </div>
       </section>
