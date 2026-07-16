@@ -16,7 +16,7 @@ export interface OperationLog {
 }
 
 export interface LoginLog {
-  log_id: number
+  login_id: number
   user_id: number
   username: string
   real_name: string

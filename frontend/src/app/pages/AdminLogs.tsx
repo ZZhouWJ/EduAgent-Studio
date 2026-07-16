@@ -6,7 +6,7 @@ import { DetailDrawer, PageHeader, SearchInput, SegmentedControl, StatCard, Stat
 
 function mapOpLog(l: OperationLog) {
   return {
-    id: String(l.log_id),
+    id: `operation:${l.log_id}`,
     time: l.created_at ? new Date(l.created_at).toLocaleString("zh-CN") : "—",
     actor: l.real_name || l.username || "—",
     role: "—",
@@ -20,7 +20,7 @@ function mapOpLog(l: OperationLog) {
 
 function mapLoginLog(l: LoginLog) {
   return {
-    id: String(l.log_id),
+    id: `login:${l.login_id}`,
     time: l.login_time ? new Date(l.login_time).toLocaleString("zh-CN") : "—",
     actor: l.real_name || l.username || "—",
     role: "—",
