@@ -70,6 +70,12 @@ def _estimate_resource_minutes(resource_type: Optional[str], difficulty: Optiona
     return max(10, int(round(base * multiplier / 5) * 5))
 
 
+def _parse_id_list(value: Optional[str]) -> List[int]:
+    if not value:
+        return []
+    return [int(item.strip()) for item in value.split(",") if item.strip().isdigit()]
+
+
 def _current_semester(reference: Optional[datetime] = None) -> str:
     current = reference or datetime.now()
     if current.month >= 9:
@@ -338,12 +344,16 @@ class LearningRepository:
                     t.course_id,
                     t.title,
                     t.description,
+                    t.target_kp_ids,
                     t.status,
                     t.assignee_id,
+                    assignee.real_name AS assignee_name,
                     t.due_date,
                     c.course_name
                 FROM learning_tasks t
                 INNER JOIN courses c ON t.course_id = c.course_id AND c.is_deleted = 0
+                LEFT JOIN users assignee
+                  ON t.assignee_id = assignee.user_id AND assignee.is_deleted = 0
                 WHERE {where_clause}
                 ORDER BY t.task_id ASC
                 LIMIT %s OFFSET %s
@@ -367,6 +377,8 @@ class LearningRepository:
                     "type": task_type,
                     "status": row["status"],
                     "assignee_id": row["assignee_id"],
+                    "assignee_name": row["assignee_name"],
+                    "target_kp_ids": _parse_id_list(row["target_kp_ids"]),
                     "priority": priority,
                     "due_date": row["due_date"].strftime("%Y-%m-%d") if isinstance(due_date, datetime) else str(due_date),
                     "description": row["description"] or "",
@@ -390,13 +402,17 @@ class LearningRepository:
                 t.course_id,
                 t.title,
                 t.description,
+                t.target_kp_ids,
                 t.status,
                 t.assignee_id,
+                assignee.real_name AS assignee_name,
                 t.due_date,
                 c.course_name,
                 c.description AS course_description
             FROM learning_tasks t
             INNER JOIN courses c ON t.course_id = c.course_id AND c.is_deleted = 0
+            LEFT JOIN users assignee
+              ON t.assignee_id = assignee.user_id AND assignee.is_deleted = 0
             WHERE t.task_id = %s AND t.is_deleted = 0
         """
         with get_db_cursor() as cursor:
@@ -420,6 +436,8 @@ class LearningRepository:
             "type": task_type,
             "status": row["status"],
             "assignee_id": row["assignee_id"],
+            "assignee_name": row["assignee_name"],
+            "target_kp_ids": _parse_id_list(row["target_kp_ids"]),
             "priority": priority,
             "due_date": row["due_date"].strftime("%Y-%m-%d") if isinstance(due_date, datetime) else str(due_date),
             "description": row["description"] or "",

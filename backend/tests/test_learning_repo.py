@@ -6,6 +6,7 @@ from app.repositories.learning_repo import (
     LearningRepository,
     _current_semester,
     _estimate_resource_minutes,
+    _parse_id_list,
 )
 
 
@@ -34,6 +35,11 @@ class LearningRepositoryTests(unittest.TestCase):
         self.assertEqual(_estimate_resource_minutes("case", "advanced"), 55)
         self.assertEqual(_estimate_resource_minutes("learning_card", "basic"), 10)
         self.assertEqual(_estimate_resource_minutes("unknown", "unknown"), 30)
+
+    def test_task_knowledge_point_ids_are_parsed_safely(self):
+        self.assertEqual(_parse_id_list("1, 10,2"), [1, 10, 2])
+        self.assertEqual(_parse_id_list("1,invalid, 3"), [1, 3])
+        self.assertEqual(_parse_id_list(None), [])
 
     @patch("app.repositories.learning_repo.get_db_cursor")
     def test_recommendations_use_approved_status_and_exact_kp_membership(self, get_cursor):

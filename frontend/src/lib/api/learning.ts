@@ -33,6 +33,8 @@ export interface LearningTask {
   type: string
   status: string
   assignee_id: number | null
+  assignee_name: string | null
+  target_kp_ids: number[]
   priority: string
   due_date: string
   description: string

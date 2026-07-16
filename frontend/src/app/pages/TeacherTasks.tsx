@@ -1,7 +1,7 @@
 import React from "react";
-import { BookOpen, CalendarClock, CheckSquare, ClipboardList, Plus, RefreshCw, Save, Users } from "lucide-react";
+import { BookOpen, CalendarClock, CheckSquare, ClipboardList, Loader2, Plus, RefreshCw, Save, Target, UserRound, Users } from "lucide-react";
 import { useApi } from "@/lib/useApi";
-import { learningApi } from "@/lib/api";
+import { learningApi, profilesApi } from "@/lib/api";
 import { taskTypeLabel } from "@/lib/educationLabels";
 import { EmptyState, ModalShell, PageHeader, ProgressBar, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, notify } from "../components/common/ProductUI";
 
@@ -12,6 +12,15 @@ const STATUS_LABELS: Record<string, string> = {
   draft: "草稿",
 };
 
+const emptyTaskForm = () => ({
+  course_id: 0,
+  title: "",
+  description: "",
+  due_date: "",
+  assignee_id: 0,
+  target_kp_ids: [] as number[],
+});
+
 export function TeacherTasks() {
   const [query, setQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("全部");
@@ -19,12 +28,7 @@ export function TeacherTasks() {
 
   // 新建任务 Modal
   const [modalOpen, setModalOpen] = React.useState(false);
-  const [form, setForm] = React.useState({
-    course_id: 0,
-    title: "",
-    description: "",
-    due_date: "",
-  });
+  const [form, setForm] = React.useState(emptyTaskForm);
   const [submitting, setSubmitting] = React.useState(false);
 
   const { data: taskData, loading: loadingTasks, refetch: reloadTasks } = useApi(
@@ -32,8 +36,30 @@ export function TeacherTasks() {
     []
   );
   const { data: courseData } = useApi(() => learningApi.listCourses(), []);
+  const {
+    data: profileData,
+    loading: loadingProfiles,
+    error: profileError,
+  } = useApi(
+    () => form.course_id
+      ? profilesApi.list({ course_id: form.course_id, page_size: 100 })
+      : Promise.resolve({ items: [], total: 0 }),
+    [form.course_id]
+  );
 
   const courses = courseData ?? [];
+  const selectedCourse = courses.find((course) => course.id === form.course_id);
+  const knowledgePoints = selectedCourse?.knowledge_points ?? [];
+  const courseProfiles = (profileData?.items ?? []).filter(
+    (profile) => profile.course_id === form.course_id
+  );
+  const knowledgePointNames = React.useMemo(() => {
+    const names = new Map<number, string>();
+    courses.forEach((course) => {
+      course.knowledge_points?.forEach((point) => names.set(point.id, point.name));
+    });
+    return names;
+  }, [courses]);
 
   const items = (taskData?.items ?? []).map((t) => ({
     id: t.id,
@@ -46,6 +72,10 @@ export function TeacherTasks() {
     rawStatus: t.status,
     priority: t.priority,
     description: t.description ?? "",
+    assignee: t.assignee_name || "全班学生",
+    targetKnowledgePoints: t.target_kp_ids
+      .map((id) => knowledgePointNames.get(id))
+      .filter((name): name is string => Boolean(name)),
     raw: t,
   }));
 
@@ -86,10 +116,12 @@ export function TeacherTasks() {
         title: form.title.trim(),
         description: form.description.trim() || undefined,
         due_date: form.due_date || undefined,
+        assignee_id: form.assignee_id || undefined,
+        target_kp_ids: form.target_kp_ids.length > 0 ? form.target_kp_ids : undefined,
       });
       notify.success("任务创建成功");
       setModalOpen(false);
-      setForm({ course_id: 0, title: "", description: "", due_date: "" });
+      setForm(emptyTaskForm());
       reloadTasks();
     } catch (e: any) {
       notify.error("创建失败：" + (e?.message || String(e)));
@@ -101,6 +133,15 @@ export function TeacherTasks() {
   const handleRefresh = () => {
     reloadTasks();
     notify.success("任务列表已刷新");
+  };
+
+  const toggleKnowledgePoint = (kpId: number) => {
+    setForm((current) => ({
+      ...current,
+      target_kp_ids: current.target_kp_ids.includes(kpId)
+        ? current.target_kp_ids.filter((id) => id !== kpId)
+        : [...current.target_kp_ids, kpId],
+    }));
   };
 
   return (
@@ -142,6 +183,7 @@ export function TeacherTasks() {
                     <p className="text-xs leading-5 text-slate-500">{task.course}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <span className="rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-600">{task.type}</span>
+                      <span className="rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-700">{task.assignee}</span>
                       {task.priority === "high" && <span className="rounded-lg bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700">紧急</span>}
                       {task.priority === "medium" && <span className="rounded-lg bg-orange-50 px-2 py-1 text-[11px] font-bold text-orange-700">中等</span>}
                       <span className="rounded-lg bg-orange-50 px-2 py-1 text-[11px] font-bold text-orange-700">截止 {task.due}</span>
@@ -173,6 +215,8 @@ export function TeacherTasks() {
                 <div className="grid grid-cols-2 gap-4">
                   {[
                     ["任务目标", selected.description || "暂无描述"],
+                    ["指派对象", selected.assignee],
+                    ["目标知识点", selected.targetKnowledgePoints.join("、") || "未限定知识点"],
                     ["任务类型", selected.type],
                     ["当前完成率", `${selected.completion}%`],
                     ["优先级别", selected.priority === "high" ? "紧急" : selected.priority === "medium" ? "中等" : "普通"],
@@ -217,14 +261,68 @@ export function TeacherTasks() {
             <select
               className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700"
               value={form.course_id}
-              onChange={(e) => setForm(f => ({ ...f, course_id: Number(e.target.value) }))}
+              onChange={(e) => setForm(f => ({
+                ...f,
+                course_id: Number(e.target.value),
+                assignee_id: 0,
+                target_kp_ids: [],
+              }))}
             >
               <option value={0}>— 选择课程 —</option>
-              {courses.map((c: any) => (
+              {courses.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
           </label>
+
+          <label className="text-sm font-bold text-slate-700">
+            <span className="flex items-center gap-2"><UserRound className="h-4 w-4 text-blue-600" />指派对象</span>
+            <select
+              className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+              value={form.assignee_id}
+              disabled={!form.course_id || loadingProfiles}
+              onChange={(e) => setForm(f => ({ ...f, assignee_id: Number(e.target.value) }))}
+            >
+              <option value={0}>{loadingProfiles ? "正在加载学生..." : "全班学生"}</option>
+              {courseProfiles.map((profile) => (
+                <option key={profile.student_id} value={profile.student_id}>
+                  {profile.student_name}{profile.student_no ? `（${profile.student_no}）` : ""}
+                </option>
+              ))}
+            </select>
+            {profileError && <span className="mt-2 block text-xs font-medium text-red-600">学生名单加载失败，请重新选择课程后重试。</span>}
+            {!profileError && form.course_id > 0 && !loadingProfiles && courseProfiles.length === 0 && (
+              <span className="mt-2 block text-xs font-medium text-slate-500">该课程暂无学生画像，将按全班任务发布。</span>
+            )}
+          </label>
+
+          <fieldset className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+            <legend className="px-1 text-sm font-bold text-slate-700">
+              <span className="flex items-center gap-2"><Target className="h-4 w-4 text-blue-600" />目标知识点</span>
+            </legend>
+            {!form.course_id ? (
+              <p className="text-xs leading-5 text-slate-500">选择课程后可限定任务对应的知识点。</p>
+            ) : knowledgePoints.length === 0 ? (
+              <p className="text-xs leading-5 text-slate-500">该课程暂未配置知识点。</p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {knowledgePoints.map((point) => (
+                  <label key={point.id} className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-blue-200">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      checked={form.target_kp_ids.includes(point.id)}
+                      onChange={() => toggleKnowledgePoint(point.id)}
+                    />
+                    <span>{point.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {form.target_kp_ids.length > 0 && (
+              <p className="mt-2 text-xs font-bold text-blue-700">已选择 {form.target_kp_ids.length} 个知识点</p>
+            )}
+          </fieldset>
 
           {/* 任务标题 */}
           <label className="text-sm font-bold text-slate-700">
@@ -275,8 +373,4 @@ export function TeacherTasks() {
       </ModalShell>
     </div>
   );
-}
-
-function Loader2({ className }: { className?: string }) {
-  return <span className={`inline-block animate-spin ${className}`}>⟳</span>;
 }
