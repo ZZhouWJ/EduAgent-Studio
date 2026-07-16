@@ -30,7 +30,7 @@ export function TeacherDashboard() {
     { label: "管理课程数", value: String(overview?.active_project_count ?? "—"), hint: "本学期", icon: BookOpen, tone: "blue" },
     { label: "学生人数", value: String(learningData?.student_count ?? "—"), hint: overview ? `${overview?.artifact_count ?? 0} 个班级` : "—", icon: Users, tone: "slate" },
     { label: "待审核资源", value: String(overview?.pending_review_count ?? "—"), hint: pendingReviews?.total ? `${pendingReviews.total} 条待处理` : "暂无", icon: CheckSquare, tone: "orange" },
-    { label: "班级平均掌握度", value: learningData ? `${learningData.avg_mastery}%` : "—", hint: "实时统计", icon: Target, tone: "emerald" },
+    { label: "班级平均掌握度", value: learningData ? `${Math.round(learningData.avg_mastery * 100)}%` : "—", hint: "实时统计", icon: Target, tone: "emerald" },
     { label: "本周新增反馈", value: String(learningData?.feedback_count ?? "—"), hint: "全部学生", icon: MessageSquare, tone: "cyan" },
     { label: "高风险资源", value: String(overview?.failed_invocation_count ?? 0), hint: "需人工复核", icon: ShieldAlert, tone: "red" },
   ];
