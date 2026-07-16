@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { ActivitySquare, Bot, Coins, Gauge, PlugZap, Save, Settings2, ToggleLeft } from "lucide-react";
+import { ActivitySquare, Bot, Coins, Gauge, KeyRound, PlugZap, Save, Settings2, ToggleLeft } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { modelsApi, statisticsApi, AIModel } from "@/lib/api";
 import { ModalShell, PageHeader, SearchInput, SegmentedControl, StatCard, StatusBadge, primaryButton, secondaryButton, notify } from "../components/common/ProductUI";
@@ -28,7 +28,9 @@ export function AdminModelConfig() {
   const [statusFilter, setStatusFilter] = React.useState("全部");
   const [editing, setEditing] = React.useState<ReturnType<typeof mapModel> | null>(null);
   const [open, setOpen] = React.useState(false);
+  const [credentialOpen, setCredentialOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const [savingCredential, setSavingCredential] = React.useState(false);
   const [updatingId, setUpdatingId] = React.useState<string | null>(null);
   const [form, setForm] = React.useState({
     displayName: "",
@@ -39,6 +41,12 @@ export function AdminModelConfig() {
     priceUnit: "1K_TOKENS",
     status: "active" as "active" | "disabled",
   });
+  const [credentialForm, setCredentialForm] = React.useState({
+    providerId: "",
+    configName: "",
+    apiKey: "",
+    quotaLimit: "0",
+  });
 
   const modelsState = useApi(() => modelsApi.getModels({ page: 1, page_size: 100 }), []);
   const providersState = useApi(() => modelsApi.getProviders(), []);
@@ -46,16 +54,14 @@ export function AdminModelConfig() {
   const costsState = useApi(() => statisticsApi.costs(), []);
   const modelCallsState = useApi(() => statisticsApi.modelCalls(), []);
 
-  const activeProviderIds = new Set(
-    (providersState.data ?? [])
-      .filter((provider) => provider.status === "active")
-      .map((provider) => provider.provider_id),
-  );
+  const activeProviders = (providersState.data ?? []).filter((provider) => provider.status === "active");
+  const activeProviderIds = new Set(activeProviders.map((provider) => provider.provider_id));
   const configuredProviderIds = new Set(
     (configsState.data?.items ?? [])
       .filter((config) => config.status === "active")
       .map((config) => config.provider_id),
   );
+  const activeCredentialCount = (configsState.data?.items ?? []).filter((config) => config.status === "active").length;
   const models = (modelsState.data?.items ?? []).map((rawModel) => {
     const model = mapModel(rawModel);
     const isReady = rawModel.status === "active"
@@ -74,7 +80,7 @@ export function AdminModelConfig() {
   });
 
   const stats = [
-    { label: "已配置模型", value: `${modelsState.data?.total ?? "-"}`, hint: "含供应商", icon: Bot, tone: "blue" as const },
+    { label: "模型目录", value: `${modelsState.data?.total ?? "-"}`, hint: `活动凭证 ${activeCredentialCount} 条`, icon: Bot, tone: "blue" as const },
     { label: "可用模型", value: `${models.filter((model) => model.status === "可用").length}`, hint: "凭证与供应商均正常", icon: PlugZap, tone: "emerald" as const },
     { label: "调用次数", value: `${modelCallsState.data?.reduce((sum, item) => sum + item.call_count, 0) ?? "-"}`, hint: "全平台累计", icon: ActivitySquare, tone: "purple" as const },
     { label: "平均响应时间", value: modelCallsState.data?.length ? `${Math.round(modelCallsState.data.reduce((sum, item) => sum + item.avg_latency_ms, 0) / modelCallsState.data.length)}ms` : "—", hint: "按模型平均", icon: Gauge, tone: "cyan" as const },
@@ -148,6 +154,57 @@ export function AdminModelConfig() {
     setOpen(true);
   };
 
+  const openCredentialEditor = () => {
+    const provider = activeProviders[0];
+    if (!provider) {
+      notify.warning("请先创建并启用模型供应商");
+      return;
+    }
+    setCredentialForm({
+      providerId: String(provider.provider_id),
+      configName: `${provider.provider_name} 主配置`,
+      apiKey: "",
+      quotaLimit: "0",
+    });
+    setCredentialOpen(true);
+  };
+
+  const closeCredentialEditor = () => {
+    if (savingCredential) return;
+    setCredentialOpen(false);
+    setCredentialForm((current) => ({ ...current, apiKey: "" }));
+  };
+
+  const saveCredential = async () => {
+    const providerId = Number(credentialForm.providerId);
+    const quotaLimit = Number(credentialForm.quotaLimit);
+    if (!providerId || !credentialForm.configName.trim() || !credentialForm.apiKey.trim()) {
+      notify.warning("请完整填写供应商、配置名称和 API Key");
+      return;
+    }
+    if (!Number.isFinite(quotaLimit) || quotaLimit < 0) {
+      notify.warning("额度上限不能小于 0");
+      return;
+    }
+    setSavingCredential(true);
+    try {
+      await modelsApi.createApiConfig({
+        provider_id: providerId,
+        config_name: credentialForm.configName.trim(),
+        api_key: credentialForm.apiKey.trim(),
+        quota_limit: quotaLimit,
+      });
+      setCredentialForm((current) => ({ ...current, apiKey: "" }));
+      setCredentialOpen(false);
+      await configsState.refetch();
+      notify.success("服务凭证已加密保存");
+    } catch (error) {
+      notify.error("凭证保存失败：" + String(error));
+    } finally {
+      setSavingCredential(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!editing || !form.displayName.trim()) {
       notify.warning("请填写模型显示名称");
@@ -187,7 +244,10 @@ export function AdminModelConfig() {
         title="模型配置"
         description="统一管理平台接入的大模型服务、API Key、模型能力和连接状态。"
         icon={Settings2}
-        action={<button onClick={handleHealthCheck} className={`${primaryButton} cursor-pointer`}>一键巡检</button>}
+        action={<div className="flex flex-col gap-3 sm:flex-row">
+          <button onClick={openCredentialEditor} className={`${secondaryButton} cursor-pointer`}><KeyRound className="h-4 w-4" />配置服务凭证</button>
+          <button onClick={handleHealthCheck} className={`${primaryButton} cursor-pointer`}>一键巡检</button>
+        </div>}
       />
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">{stats.map((stat) => <StatCard key={stat.label} {...stat} />)}</section>
       <section className="edu-card rounded-2xl p-4">
@@ -276,6 +336,66 @@ export function AdminModelConfig() {
         <div className="mt-5 flex justify-end gap-3">
           <button onClick={() => setOpen(false)} className={`${secondaryButton} cursor-pointer`}>取消</button>
           <button disabled={saving} onClick={handleSave} className={`${primaryButton} cursor-pointer disabled:cursor-not-allowed disabled:opacity-50`}><Save className="h-4 w-4" />{saving ? "保存中..." : "保存配置"}</button>
+        </div>
+      </ModalShell>
+      <ModalShell title="配置服务凭证" open={credentialOpen} onClose={closeCredentialEditor}>
+        <div className="space-y-4">
+          <label className="block text-sm font-bold text-slate-700">
+            模型供应商
+            <select
+              value={credentialForm.providerId}
+              onChange={(event) => {
+                const provider = activeProviders.find((item) => item.provider_id === Number(event.target.value));
+                setCredentialForm((current) => ({
+                  ...current,
+                  providerId: event.target.value,
+                  configName: provider ? `${provider.provider_name} 主配置` : current.configName,
+                }));
+              }}
+              className="edu-focus-ring mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
+            >
+              {activeProviders.map((provider) => (
+                <option key={provider.provider_id} value={provider.provider_id}>{provider.provider_name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm font-bold text-slate-700">
+            配置名称
+            <input
+              value={credentialForm.configName}
+              onChange={(event) => setCredentialForm((current) => ({ ...current, configName: event.target.value }))}
+              className="edu-focus-ring mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
+              maxLength={100}
+            />
+          </label>
+          <label className="block text-sm font-bold text-slate-700">
+            API Key
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={credentialForm.apiKey}
+              onChange={(event) => setCredentialForm((current) => ({ ...current, apiKey: event.target.value }))}
+              className="edu-focus-ring mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 font-mono text-sm"
+              placeholder="仅本次提交使用，保存后不回显"
+            />
+          </label>
+          <label className="block text-sm font-bold text-slate-700">
+            额度上限（元，0 表示不限制）
+            <input
+              type="number"
+              min="0"
+              step="100"
+              value={credentialForm.quotaLimit}
+              onChange={(event) => setCredentialForm((current) => ({ ...current, quotaLimit: event.target.value }))}
+              className="edu-focus-ring mt-2 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
+            />
+          </label>
+        </div>
+        <div className="mt-5 flex flex-col justify-end gap-3 sm:flex-row">
+          <button onClick={closeCredentialEditor} disabled={savingCredential} className={`${secondaryButton} cursor-pointer disabled:opacity-50`}>取消</button>
+          <button onClick={saveCredential} disabled={savingCredential} className={`${primaryButton} cursor-pointer disabled:opacity-50`}>
+            <Save className="h-4 w-4" />{savingCredential ? "保存中..." : "加密保存"}
+          </button>
         </div>
       </ModalShell>
     </div>
