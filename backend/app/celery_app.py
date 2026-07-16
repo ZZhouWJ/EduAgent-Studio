@@ -21,8 +21,6 @@ celery_app = Celery(
     backend=settings.redis_url or "redis://127.0.0.1:6379/0",
     include=[
         "app.tasks.embedding_tasks",
-        "app.tasks.resource_tasks",
-        "app.tasks.statistics_tasks",
     ]
 )
 
@@ -38,15 +36,3 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     task_acks_late=True,
 )
-
-# Beat schedule for periodic tasks
-celery_app.conf.beat_schedule = {
-    "daily-cost-summary": {
-        "task": "app.tasks.statistics_tasks.generate_daily_summary",
-        "schedule": 86400.0,  # every 24 hours
-    },
-    "cleanup-old-cache": {
-        "task": "app.tasks.statistics_tasks.cleanup_cache",
-        "schedule": 3600.0,  # every hour
-    },
-}
