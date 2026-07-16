@@ -29,5 +29,15 @@ VALUES
         ),
         '内容治理阈值、调用限制与敏感内容检测配置',
         NULL
+    ),
+    (
+        'cost.budget_alert',
+        JSON_OBJECT(
+            'monthly_budget', 10000.0,
+            'alert_threshold_percent', 80,
+            'enabled', TRUE
+        ),
+        '平台月度模型调用预算与提醒阈值',
+        NULL
     )
 ON DUPLICATE KEY UPDATE `setting_key` = VALUES(`setting_key`);

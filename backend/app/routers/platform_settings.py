@@ -17,6 +17,12 @@ class UpdateGovernanceSettingsRequest(BaseModel):
     sensitive_content_enabled: bool
 
 
+class UpdateBudgetAlertSettingsRequest(BaseModel):
+    monthly_budget: float = Field(..., gt=0, le=1_000_000_000)
+    alert_threshold_percent: int = Field(..., ge=1, le=100)
+    enabled: bool
+
+
 def _get_client_ip(request: Request) -> str:
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
@@ -47,3 +53,27 @@ async def update_governance_settings(
         user_agent=request.headers.get("User-Agent", ""),
     )
     return success_response(data=result, message="治理规则已更新")
+
+
+@router.get("/budget-alert")
+async def get_budget_alert_settings(
+    user: dict = Depends(require_role("admin")),
+) -> dict:
+    return success_response(data=PlatformSettingsService().get_budget_alert())
+
+
+@router.put("/budget-alert")
+async def update_budget_alert_settings(
+    body: UpdateBudgetAlertSettingsRequest,
+    request: Request,
+    user: dict = Depends(require_role("admin")),
+) -> dict:
+    result = PlatformSettingsService().update_budget_alert(
+        user=user,
+        monthly_budget=body.monthly_budget,
+        alert_threshold_percent=body.alert_threshold_percent,
+        enabled=body.enabled,
+        ip_address=_get_client_ip(request),
+        user_agent=request.headers.get("User-Agent", ""),
+    )
+    return success_response(data=result, message="预算提醒已更新")

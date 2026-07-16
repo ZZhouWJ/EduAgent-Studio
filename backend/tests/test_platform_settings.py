@@ -2,6 +2,9 @@ import unittest
 from unittest.mock import MagicMock, Mock, patch
 
 from app.services.platform_settings_service import (
+    BUDGET_ALERT_DESCRIPTION,
+    BUDGET_ALERT_SETTING_KEY,
+    DEFAULT_BUDGET_ALERT_SETTINGS,
     DEFAULT_GOVERNANCE_SETTINGS,
     GOVERNANCE_DESCRIPTION,
     GOVERNANCE_SETTING_KEY,
@@ -69,6 +72,48 @@ class PlatformSettingsServiceTests(unittest.TestCase):
             conn=conn,
         )
         self.assertEqual(insert_log.call_args.kwargs["action_type"], "governance:update")
+        self.assertEqual(insert_log.call_args.kwargs["conn"], conn)
+        self.assertEqual(result, expected)
+
+    def test_budget_alert_defaults_are_returned_when_setting_is_missing(self):
+        self.service._repo.get_setting.return_value = None
+
+        result = self.service.get_budget_alert()
+
+        for key, value in DEFAULT_BUDGET_ALERT_SETTINGS.items():
+            self.assertEqual(result[key], value)
+        self.assertIsNone(result["updated_at"])
+
+    @patch(
+        "app.services.platform_settings_service."
+        "user_repo.insert_operation_log_with_conn"
+    )
+    @patch("app.services.platform_settings_service.get_db_transaction")
+    def test_budget_alert_update_is_persisted_and_audited(
+        self, get_transaction, insert_log
+    ):
+        transaction = MagicMock()
+        conn = transaction.__enter__.return_value
+        get_transaction.return_value = transaction
+        user = {"user_id": 1, "roles": ["admin"]}
+        expected = {
+            "monthly_budget": 12000.0,
+            "alert_threshold_percent": 75,
+            "enabled": False,
+        }
+
+        result = self.service.update_budget_alert(user=user, **expected)
+
+        self.service._repo.upsert_setting.assert_called_once_with(
+            setting_key=BUDGET_ALERT_SETTING_KEY,
+            value=expected,
+            description=BUDGET_ALERT_DESCRIPTION,
+            updated_by=1,
+            conn=conn,
+        )
+        self.assertEqual(
+            insert_log.call_args.kwargs["action_type"], "cost_budget:update"
+        )
         self.assertEqual(insert_log.call_args.kwargs["conn"], conn)
         self.assertEqual(result, expected)
 

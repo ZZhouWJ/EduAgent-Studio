@@ -41,6 +41,8 @@ export {
   type ImageUnderstandResult,
   type GovernanceSettings,
   type GovernanceSettingsUpdate,
+  type BudgetAlertSettings,
+  type BudgetAlertSettingsUpdate,
   type UserInfo,
   type LoginResponse,
   type User,

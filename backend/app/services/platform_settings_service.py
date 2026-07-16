@@ -8,12 +8,20 @@ from app.repositories.platform_settings_repo import PlatformSettingsRepository
 
 GOVERNANCE_SETTING_KEY = "governance.rules"
 GOVERNANCE_DESCRIPTION = "内容治理阈值、调用限制与敏感内容检测配置"
+BUDGET_ALERT_SETTING_KEY = "cost.budget_alert"
+BUDGET_ALERT_DESCRIPTION = "平台月度模型调用预算与提醒阈值"
 
 DEFAULT_GOVERNANCE_SETTINGS: Dict[str, Any] = {
     "fact_consistency_threshold": 80,
     "citation_coverage_threshold": 75,
     "hourly_call_limit": 50,
     "sensitive_content_enabled": True,
+}
+
+DEFAULT_BUDGET_ALERT_SETTINGS: Dict[str, Any] = {
+    "monthly_budget": 10000.0,
+    "alert_threshold_percent": 80,
+    "enabled": True,
 }
 
 
@@ -81,6 +89,63 @@ class PlatformSettingsService:
             )
         return value
 
+    def get_budget_alert(self) -> Dict[str, Any]:
+        setting = self._repo.get_setting(BUDGET_ALERT_SETTING_KEY)
+        if setting is None:
+            return {
+                **DEFAULT_BUDGET_ALERT_SETTINGS,
+                "updated_by": None,
+                "updated_at": None,
+            }
+
+        value = self._normalize_budget_alert(setting.get("value"))
+        return {
+            **value,
+            "updated_by": setting.get("updated_by"),
+            "updated_at": setting.get("updated_at"),
+        }
+
+    def update_budget_alert(
+        self,
+        user: Dict[str, Any],
+        monthly_budget: float,
+        alert_threshold_percent: int,
+        enabled: bool,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        value = {
+            "monthly_budget": float(monthly_budget),
+            "alert_threshold_percent": alert_threshold_percent,
+            "enabled": enabled,
+        }
+        with get_db_transaction() as conn:
+            self._repo.upsert_setting(
+                setting_key=BUDGET_ALERT_SETTING_KEY,
+                value=value,
+                description=BUDGET_ALERT_DESCRIPTION,
+                updated_by=int(user["user_id"]),
+                conn=conn,
+            )
+            user_repo.insert_operation_log_with_conn(
+                user_id=int(user["user_id"]),
+                action_type="cost_budget:update",
+                action_desc=(
+                    "更新成本预算提醒: "
+                    f"月度预算 ¥{monthly_budget:.2f}, "
+                    f"阈值 {alert_threshold_percent}%, "
+                    f"提醒 {'启用' if enabled else '停用'}"
+                ),
+                target_type="platform_setting",
+                target_id=None,
+                project_id=None,
+                task_id=None,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                conn=conn,
+            )
+        return value
+
     @staticmethod
     def _normalize_governance(value: Any) -> Dict[str, Any]:
         if not isinstance(value, dict):
@@ -100,4 +165,30 @@ class PlatformSettingsService:
             normalized["hourly_call_limit"] = hourly_limit
         if isinstance(sensitive_enabled, bool):
             normalized["sensitive_content_enabled"] = sensitive_enabled
+        return normalized
+
+    @staticmethod
+    def _normalize_budget_alert(value: Any) -> Dict[str, Any]:
+        if not isinstance(value, dict):
+            return dict(DEFAULT_BUDGET_ALERT_SETTINGS)
+
+        normalized = dict(DEFAULT_BUDGET_ALERT_SETTINGS)
+        monthly_budget = value.get("monthly_budget")
+        alert_threshold = value.get("alert_threshold_percent")
+        enabled = value.get("enabled")
+
+        if (
+            isinstance(monthly_budget, (int, float))
+            and not isinstance(monthly_budget, bool)
+            and 0 < monthly_budget <= 1_000_000_000
+        ):
+            normalized["monthly_budget"] = float(monthly_budget)
+        if (
+            isinstance(alert_threshold, int)
+            and not isinstance(alert_threshold, bool)
+            and 1 <= alert_threshold <= 100
+        ):
+            normalized["alert_threshold_percent"] = alert_threshold
+        if isinstance(enabled, bool):
+            normalized["enabled"] = enabled
         return normalized

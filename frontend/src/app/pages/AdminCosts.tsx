@@ -2,10 +2,16 @@ import React from "react";
 import { BellRing, Coins, Download, LineChart as LineChartIcon, PieChart, WalletCards } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useApi } from "@/lib/useApi";
-import { learningApi, modelsApi, statisticsApi } from "@/lib/api";
+import { learningApi, modelsApi, platformSettingsApi, statisticsApi, type BudgetAlertSettingsUpdate } from "@/lib/api";
 import { ModalShell, PageHeader, PageShell, SegmentedControl, StatCard, primaryButton, secondaryButton, notify } from "../components/common/ProductUI";
 
 const COLORS = ["#2563EB", "#7C3AED", "#10B981", "#F59E0B", "#EF4444", "#06B6D4"];
+
+const DEFAULT_BUDGET_ALERT: BudgetAlertSettingsUpdate = {
+  monthly_budget: 10000,
+  alert_threshold_percent: 80,
+  enabled: true,
+};
 
 function downloadCsv(rows: Record<string, string | number>[], filename: string) {
   const headers = Object.keys(rows[0] ?? {});
@@ -25,12 +31,15 @@ export function AdminCosts() {
   const [courseFilter, setCourseFilter] = React.useState("全部课程");
   const [modelFilter, setModelFilter] = React.useState("全部模型");
   const [open, setOpen] = React.useState(false);
+  const [savingBudget, setSavingBudget] = React.useState(false);
+  const [budgetForm, setBudgetForm] = React.useState<BudgetAlertSettingsUpdate>(DEFAULT_BUDGET_ALERT);
 
   const costsState = useApi(() => statisticsApi.costs(), []);
   const distributionState = useApi(() => statisticsApi.costDistribution(), []);
   const costByModelState = useApi(() => statisticsApi.getCostByModel(), []);
   const coursesState = useApi(() => learningApi.listCourses(), []);
   const modelsState = useApi(() => modelsApi.getModels({ page_size: 50 }), []);
+  const budgetState = useApi(() => platformSettingsApi.getBudgetAlert(), []);
 
   const costs = costsState.data;
   const distribution = distributionState.data ?? [];
@@ -71,11 +80,48 @@ export function AdminCosts() {
     notify.success("成本报表已导出");
   };
 
+  const openBudgetEditor = () => {
+    if (!budgetState.data) {
+      notify.error(budgetState.error ? "预算配置加载失败" : "预算配置正在加载");
+      return;
+    }
+    setBudgetForm({
+      monthly_budget: budgetState.data.monthly_budget,
+      alert_threshold_percent: budgetState.data.alert_threshold_percent,
+      enabled: budgetState.data.enabled,
+    });
+    setOpen(true);
+  };
+
+  const saveBudgetAlert = async () => {
+    if (budgetForm.monthly_budget <= 0) {
+      notify.warning("月度预算必须大于 0");
+      return;
+    }
+    setSavingBudget(true);
+    try {
+      await platformSettingsApi.updateBudgetAlert(budgetForm);
+      await budgetState.refetch();
+      setOpen(false);
+      notify.success("预算提醒已保存");
+    } catch (error) {
+      notify.error("保存失败：" + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setSavingBudget(false);
+    }
+  };
+
   return (
     <PageShell>
       <PageHeader title="成本统计" description="按模型、智能体、课程和角色分析大模型调用成本。" icon={Coins}
         action={<div className="flex flex-col gap-3 sm:flex-row">
-          <button onClick={() => setOpen(true)} className={`${secondaryButton} cursor-pointer`}>设置预算提醒</button>
+          <button
+            onClick={openBudgetEditor}
+            disabled={budgetState.loading}
+            className={`${secondaryButton} cursor-pointer disabled:cursor-wait disabled:opacity-60`}
+          >
+            设置预算提醒
+          </button>
           <button onClick={handleExport} className={`${primaryButton} cursor-pointer`}><Download className="h-4 w-4" />导出报表</button>
         </div>}
       />
@@ -158,20 +204,75 @@ export function AdminCosts() {
           <div className="flex items-center justify-center py-16 text-sm text-slate-400">暂无成本数据</div>
         )}
       </section>
-      <ModalShell title="设置预算提醒" open={open} onClose={() => setOpen(false)}>
+      <ModalShell title="设置预算提醒" open={open} onClose={() => !savingBudget && setOpen(false)}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="text-sm font-bold text-slate-700">
             月度预算（元）
-            <input className="edu-focus-ring mt-2 h-10 w-full cursor-text rounded-xl border border-slate-200 bg-slate-50 px-3" defaultValue="¥10,000" />
+            <input
+              type="number"
+              min="0.01"
+              max="1000000000"
+              step="100"
+              value={budgetForm.monthly_budget}
+              onChange={(event) => setBudgetForm((current) => ({
+                ...current,
+                monthly_budget: Number(event.target.value),
+              }))}
+              className="edu-focus-ring mt-2 h-10 w-full cursor-text rounded-xl border border-slate-200 bg-slate-50 px-3 tabular-nums"
+            />
           </label>
           <label className="text-sm font-bold text-slate-700">
             提醒阈值（%）
-            <input className="edu-focus-ring mt-2 h-10 w-full cursor-text rounded-xl border border-slate-200 bg-slate-50 px-3" defaultValue="80%" />
+            <span className="float-right tabular-nums text-blue-700">{budgetForm.alert_threshold_percent}%</span>
+            <input
+              type="range"
+              min="1"
+              max="100"
+              value={budgetForm.alert_threshold_percent}
+              onChange={(event) => setBudgetForm((current) => ({
+                ...current,
+                alert_threshold_percent: Number(event.target.value),
+              }))}
+              className="mt-4 h-2 w-full cursor-pointer accent-blue-600"
+            />
           </label>
         </div>
+        <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+          <div>
+            <div className="text-sm font-black text-slate-900">启用预算提醒</div>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              成本达到阈值后生成治理提醒并进入审计范围。
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={budgetForm.enabled}
+            onClick={() => setBudgetForm((current) => ({ ...current, enabled: !current.enabled }))}
+            className={`relative h-7 w-12 shrink-0 cursor-pointer rounded-full transition ${
+              budgetForm.enabled ? "bg-blue-600" : "bg-slate-300"
+            }`}
+          >
+            <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition ${
+              budgetForm.enabled ? "left-6" : "left-1"
+            }`} />
+          </button>
+        </div>
         <div className="mt-5 flex flex-col justify-end gap-3 sm:flex-row">
-          <button onClick={() => setOpen(false)} className={`${secondaryButton} cursor-pointer`}>取消</button>
-          <button onClick={() => { setOpen(false); notify.success("预算提醒已保存（演示模式）"); }} className={`${primaryButton} cursor-pointer`}>保存提醒</button>
+          <button
+            onClick={() => setOpen(false)}
+            disabled={savingBudget}
+            className={`${secondaryButton} cursor-pointer disabled:cursor-not-allowed disabled:opacity-60`}
+          >
+            取消
+          </button>
+          <button
+            onClick={saveBudgetAlert}
+            disabled={savingBudget}
+            className={`${primaryButton} cursor-pointer disabled:cursor-wait disabled:opacity-60`}
+          >
+            {savingBudget ? "正在保存..." : "保存提醒"}
+          </button>
         </div>
       </ModalShell>
     </PageShell>

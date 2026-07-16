@@ -116,6 +116,8 @@ export {
   platformSettingsApi,
   type GovernanceSettings,
   type GovernanceSettingsUpdate,
+  type BudgetAlertSettings,
+  type BudgetAlertSettingsUpdate,
 } from './platform-settings'
 
 // Statistics
