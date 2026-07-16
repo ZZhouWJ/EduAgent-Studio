@@ -279,8 +279,8 @@ export function AdminPrompts() {
         icon={FileText}
         action={<button onClick={() => setModalMode("create")} className={`${primaryButton} cursor-pointer`}><Plus className="h-4 w-4" />新建模板</button>}
       />
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">{stats.map((stat) => <StatCard key={stat.label} {...stat} />)}</section>
-      <section className="grid grid-cols-[360px_1fr] gap-6">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">{stats.map((stat) => <StatCard key={stat.label} {...stat} />)}</section>
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_1fr]">
         <aside className="edu-card rounded-2xl p-5">
           <div className="mb-4 space-y-4">
             <SearchInput label="搜索模板" value={query} onChange={setQuery} />
