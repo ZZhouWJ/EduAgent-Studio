@@ -79,6 +79,7 @@ export function StudentTasks() {
   ];
 
   const recommendedResources = (resourcesData?.items ?? []).slice(0, 3).map((r) => ({
+    id: r.resource_id,
     title: r.resource_title,
     type: resourceTypeLabel(r.resource_type),
     icon: resourceIcon(r.resource_type),
@@ -113,7 +114,8 @@ export function StudentTasks() {
       const updated = await updateTaskStatus(selected.id, "in_progress");
       if (!updated) return;
     }
-    navigate("/student/resources");
+    const firstResourceId = recommendedResources[0]?.id;
+    navigate(firstResourceId ? `/student/resources?resource=${firstResourceId}` : "/student/resources");
   };
 
   return (
@@ -246,10 +248,14 @@ export function StudentTasks() {
                 </h3>
                 <div className="space-y-2 text-sm font-semibold text-blue-800">
                   {recommendedResources.map((r) => (
-                    <div key={r.title} className="flex items-center gap-2">
+                    <Link
+                      key={r.id}
+                      to={`/student/resources?resource=${r.id}`}
+                      className="flex min-h-10 items-center gap-2 rounded-lg px-2 transition hover:bg-blue-100"
+                    >
                       <r.icon className="h-4 w-4 cursor-pointer text-blue-600" />
-                      <span>{r.title}</span>
-                    </div>
+                      <span className="line-clamp-2">{r.title}</span>
+                    </Link>
                   ))}
                 </div>
               </div>

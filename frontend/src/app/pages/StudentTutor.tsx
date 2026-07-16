@@ -282,7 +282,7 @@ function ResourcesCard({ resources }: { resources?: RecommendedResource[] }) {
         {resources.map((res) => (
           <Link
             key={res.resource_id}
-            to="/student/resources"
+            to={`/student/resources?resource=${res.resource_id}`}
             className="flex items-center justify-between rounded-lg bg-white p-2 text-xs transition hover:bg-purple-50"
           >
             <span className="font-medium text-slate-700">{res.title}</span>
@@ -961,7 +961,7 @@ export function StudentTutor() {
                 {lastMessage.recommended_resources.map((res) => (
                   <Link
                     key={res.resource_id}
-                    to="/student/resources"
+                    to={`/student/resources?resource=${res.resource_id}`}
                     className="group block rounded-xl border border-slate-100 bg-white p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:shadow-md"
                   >
                     <div className="text-sm font-black text-slate-900 group-hover:text-blue-800">
