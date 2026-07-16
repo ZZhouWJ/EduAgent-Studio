@@ -101,6 +101,7 @@ def get_user_roles(user_id: int) -> List[str]:
         INNER JOIN user_roles ur ON r.role_id = ur.role_id
         WHERE ur.user_id = %s
           AND r.is_deleted = 0
+          AND r.status = 'active'
           AND ur.is_deleted = 0
     """
     with get_db_cursor() as cursor:

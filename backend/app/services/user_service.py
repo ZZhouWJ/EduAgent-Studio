@@ -7,7 +7,12 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.repositories import user_repo
-from app.utils.roles import PLATFORM_ROLE_CODES, filter_platform_roles
+from app.utils.roles import (
+    PLATFORM_ROLE_CODES,
+    filter_platform_roles,
+    list_platform_capabilities,
+    permissions_for_roles,
+)
 
 
 def get_user_detail(user_id: int) -> Optional[Dict[str, Any]]:
@@ -25,7 +30,7 @@ def get_user_detail(user_id: int) -> Optional[Dict[str, Any]]:
         return None
 
     roles = user_repo.get_user_roles(user_id)
-    permissions = user_repo.get_user_permissions(user_id)
+    permissions = permissions_for_roles(roles)
 
     return {
         "user_id": user["user_id"],
@@ -144,7 +149,11 @@ def update_user_roles_service(
         raise ValidationException(message="用户至少需要一个角色")
     for role_id in role_ids:
         role = roles_by_id.get(int(role_id))
-        if role is None or role["role_code"] not in PLATFORM_ROLE_CODES:
+        if (
+            role is None
+            or role.get("status", "active") != "active"
+            or role["role_code"] not in PLATFORM_ROLE_CODES
+        ):
             from app.utils.exceptions import ValidationException
             raise ValidationException(message="选择的角色不存在或不可分配")
 
@@ -168,7 +177,7 @@ def list_permissions_service() -> List[Dict[str, Any]]:
     Returns:
         权限列表
     """
-    return user_repo.list_permissions()
+    return list_platform_capabilities()
 
 
 def get_user_roles_service(user_id: int) -> List[str]:
@@ -177,8 +186,8 @@ def get_user_roles_service(user_id: int) -> List[str]:
 
 
 def get_user_permissions_service(user_id: int) -> List[str]:
-    """获取用户角色代码列表。"""
-    return user_repo.get_user_permissions(user_id)
+    """获取用户在当前教育平台中的能力代码列表。"""
+    return permissions_for_roles(user_repo.get_user_roles(user_id))
 
 
 def list_operation_logs_service(

@@ -115,6 +115,13 @@ def hash_password(pw: str) -> str:
 DEMO_PASSWORD = "Pass@1234"
 DEMO_PWHASH = hash_password(DEMO_PASSWORD)
 
+ROLE_METADATA = {
+    "student_member": ("学生", "使用个性化辅导、学习路径、任务、资源与学习反馈", "active"),
+    "teacher": ("教师", "管理本人课程、学生画像、学习任务、知识库与 AI 生成资源", "active"),
+    "admin": ("系统管理员", "负责平台用户、课程、模型、智能体、审计、成本与内容安全治理", "active"),
+    "project_leader": ("历史项目负责人", "旧协作模块兼容角色，当前教育平台不再分配", "disabled"),
+}
+
 
 # (username, real_name, email, student_no, phone, role_codes)
 DEMO_USERS: List[Tuple[str, str, str, Optional[str], str, List[str]]] = [
@@ -172,6 +179,17 @@ def assign_role(cur, user_id: int, role_code: str) -> None:
            VALUES (%s, %s, 0)""",
         (user_id, rid),
     )
+
+
+def align_platform_roles(cur) -> None:
+    """同步角色元数据，并停用不再分配的旧协作角色。"""
+    for role_code, (role_name, description, status) in ROLE_METADATA.items():
+        cur.execute(
+            """UPDATE roles
+               SET role_name=%s, description=%s, status=%s
+               WHERE role_code=%s AND is_deleted=0""",
+            (role_name, description, status, role_code),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -851,6 +869,7 @@ def main() -> int:
             log.info("  cleanup done")
 
             log.info("=== users & roles ===")
+            align_platform_roles(cur)
             for username, real_name, email, student_no, phone, roles in DEMO_USERS:
                 uid = upsert_user(cur, username, real_name, email, student_no, phone)
                 # Always reset password to the demo password so re-runs stay usable.

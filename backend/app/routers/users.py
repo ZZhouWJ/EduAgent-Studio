@@ -114,8 +114,8 @@ async def list_roles(
 
 @router.get("/permissions")
 async def list_permissions(
-    user: dict = Depends(get_current_user_dep),
+    user: dict = Depends(require_role("admin")),
 ) -> dict:
-    """获取权限列表。登录用户均可访问。"""
+    """获取当前教育平台能力清单。仅管理员可访问。"""
     permissions = user_service.list_permissions_service()
     return success_response(data=permissions)

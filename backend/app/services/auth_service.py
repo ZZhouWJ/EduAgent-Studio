@@ -15,6 +15,7 @@ from app.utils.roles import (
     PLATFORM_ROLE_CODES,
     PUBLIC_REGISTRATION_ROLE_CODES,
     filter_platform_roles,
+    permissions_for_roles,
 )
 from app.utils.token import create_access_token, decode_access_token
 
@@ -134,7 +135,7 @@ def get_current_user(token: str) -> Optional[Dict[str, Any]]:
         return None
 
     roles = user_repo.get_user_roles(user_id)
-    permissions = user_repo.get_user_permissions(user_id)
+    permissions = permissions_for_roles(roles)
 
     return {
         "user_id": user["user_id"],
@@ -354,6 +355,8 @@ def _validate_role_ids_for_user(
         role = roles_by_id.get(int(rid))
         if role is None:
             raise ValidationException(message="选择的角色不存在")
+        if role.get("status", "active") != "active":
+            raise ValidationException(message="选择的角色已停用")
         if role["role_code"] not in allowed_role_codes:
             raise ValidationException(message="无法分配该角色")
 

@@ -18,6 +18,7 @@ class RoleSecurityTests(unittest.TestCase):
     def test_public_role_list_only_contains_student(self, _list_roles):
         roles = auth_service.list_roles_public()
         self.assertEqual([role["role_code"] for role in roles], ["student_member"])
+        self.assertEqual(roles[0]["description"], "使用个性化辅导、学习路径、任务、资源与学习反馈。")
 
     @patch("app.services.auth_service.user_repo.list_roles", return_value=ROLES)
     def test_public_registration_cannot_select_teacher(self, _list_roles):
@@ -47,6 +48,23 @@ class RoleSecurityTests(unittest.TestCase):
         with self.assertRaises(ValidationException):
             user_service.update_user_roles_service(9, [2])
         update_roles.assert_not_called()
+
+    def test_capabilities_match_current_education_product(self):
+        capabilities = user_service.list_permissions_service()
+        codes = {item["permission_code"] for item in capabilities}
+        self.assertIn("tutor:chat", codes)
+        self.assertIn("resource:generate", codes)
+        self.assertIn("content:govern", codes)
+        self.assertFalse(any(code.startswith("project:") for code in codes))
+
+    @patch(
+        "app.services.user_service.user_repo.get_user_roles",
+        return_value=["teacher"],
+    )
+    def test_user_permissions_are_derived_from_platform_role(self, _get_roles):
+        permissions = user_service.get_user_permissions_service(7)
+        self.assertIn("resource:generate", permissions)
+        self.assertNotIn("user:manage", permissions)
 
 
 if __name__ == "__main__":

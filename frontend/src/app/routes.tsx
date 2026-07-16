@@ -51,6 +51,7 @@ export const router = createBrowserRouter(
 
         { path: "admin", lazy: async () => ({ Component: (await import("./pages/AdminDashboard")).AdminDashboard }) },
         { path: "admin/users", lazy: async () => ({ Component: (await import("./pages/AdminUsers")).AdminUsers }) },
+        { path: "admin/roles", lazy: async () => ({ Component: (await import("./pages/AdminRoles")).AdminRoles }) },
         { path: "admin/courses", lazy: async () => ({ Component: (await import("./pages/AdminCourses")).AdminCourses }) },
         { path: "admin/resources", lazy: async () => ({ Component: (await import("./pages/ResourceLibrary")).ResourceLibrary }) },
         { path: "admin/knowledge-base", lazy: async () => ({ Component: (await import("./pages/TeacherKnowledgeBase")).TeacherKnowledgeBase }) },

@@ -65,8 +65,8 @@ def require_permission(*permissions: str):
     权限校验依赖工厂。
 
     Usage:
-        @router.post("/api/projects")
-        async def create_project(user: dict = Depends(require_permission("project:create"))):
+        @router.post("/api/resources/generate")
+        async def generate_resource(user: dict = Depends(require_permission("resource:generate"))):
             ...
 
     可传多个权限，满足其一即可。
