@@ -13,7 +13,6 @@ import {
   BookOpen,
   Bot,
   CheckSquare,
-  ChevronDown,
   CircleDot,
   Database,
   History,
@@ -397,7 +396,7 @@ export function Layout() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button onClick={handleLogout} className="flex h-11 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm transition hover:border-blue-200">
+            <div className="flex h-11 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
               <div className="hidden text-right sm:block">
                 <div className="text-sm font-bold leading-4 text-slate-800">{realName}</div>
                 <div className="mt-0.5 text-[11px] font-semibold text-blue-700">{userMeta}</div>
@@ -405,7 +404,15 @@ export function Layout() {
               <div className="grid h-8 w-8 place-items-center rounded-xl bg-[linear-gradient(135deg,#EFF6FF,#F5F3FF)] text-sm font-black text-blue-700 ring-1 ring-blue-100">
                 {firstChar}
               </div>
-              <ChevronDown className="h-4 w-4 text-slate-400" />
+            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              aria-label="退出登录"
+              title="退出登录"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+            >
+              <LogOut className="h-[18px] w-[18px]" />
             </button>
           </div>
         </header>
