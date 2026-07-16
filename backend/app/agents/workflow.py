@@ -642,6 +642,7 @@ def stream_workflow(
             "thread_id": initial_state["run_id"],
         }
     }
+    total_start = time.time()
 
     for event in graph.stream(initial_state, config):
         node_name = next(iter(event.keys()))
@@ -669,8 +670,11 @@ def stream_workflow(
         result = final_state.values
         result["metadata"] = {
             **result.get("metadata", {}),
-            "total_duration_ms": result.get("metadata", {}).get("total_duration_ms", 0),
+            "total_duration_ms": int((time.time() - total_start) * 1000),
             "revision_count": result.get("revision_count", 0),
+            "quality_score": result.get("quality_score"),
+            "step_history": result.get("step_history", []),
+            "run_id": result.get("run_id"),
         }
         result["current_step"] = "completed"
         yield {
