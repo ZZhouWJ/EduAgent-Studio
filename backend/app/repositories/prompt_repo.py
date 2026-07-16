@@ -154,13 +154,16 @@ def list_templates(
     data_sql = f"""
         SELECT pt.template_id, pt.template_name, pt.task_type_id,
                pt.description, pt.current_version_id, pt.is_active,
-               pt.created_at, pt.created_by,
+               pt.created_at, pt.created_by, pt.updated_at,
                tt.type_name, tt.type_code,
-               u.username AS creator_username, u.real_name AS creator_real_name
+               u.username AS creator_username, u.real_name AS creator_real_name,
+               pv.version_no AS current_version_no
         FROM prompt_templates pt
         INNER JOIN task_types tt ON pt.task_type_id = tt.task_type_id
             AND tt.is_deleted = 0
         LEFT JOIN users u ON pt.created_by = u.user_id AND u.is_deleted = 0
+        LEFT JOIN prompt_versions pv ON pt.current_version_id = pv.prompt_version_id
+            AND pv.is_deleted = 0
         WHERE {where_clause}
         ORDER BY pt.created_at DESC
         LIMIT %s OFFSET %s
@@ -351,8 +354,11 @@ def list_template_versions(template_id: int) -> List[Dict[str, Any]]:
         SELECT pv.prompt_version_id, pv.template_id, pv.version_no,
                pv.prompt_content, pv.change_note,
                pv.created_at, pv.created_by,
+               (pt.current_version_id = pv.prompt_version_id) AS is_active,
                u.username AS creator_username, u.real_name AS creator_real_name
         FROM prompt_versions pv
+        INNER JOIN prompt_templates pt ON pv.template_id = pt.template_id
+            AND pt.is_deleted = 0
         LEFT JOIN users u ON pv.created_by = u.user_id AND u.is_deleted = 0
         WHERE pv.template_id = %s AND pv.is_deleted = 0
         ORDER BY pv.created_at DESC
@@ -368,8 +374,11 @@ def get_version_by_id(version_id: int) -> Optional[Dict[str, Any]]:
         SELECT pv.prompt_version_id, pv.template_id, pv.version_no,
                pv.prompt_content, pv.change_note,
                pv.created_at, pv.created_by, pv.updated_at,
+               (pt.current_version_id = pv.prompt_version_id) AS is_active,
                u.username AS creator_username, u.real_name AS creator_real_name
         FROM prompt_versions pv
+        INNER JOIN prompt_templates pt ON pv.template_id = pt.template_id
+            AND pt.is_deleted = 0
         LEFT JOIN users u ON pv.created_by = u.user_id AND u.is_deleted = 0
         WHERE pv.prompt_version_id = %s AND pv.is_deleted = 0
     """

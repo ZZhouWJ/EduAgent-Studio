@@ -15,16 +15,17 @@ export interface PromptTemplate {
   task_type_id: number
   type_name: string
   type_code: string
-  current_version_no: number
+  current_version_id?: number
+  current_version_no?: string
   is_active: boolean
   created_at: string
-  updated_at: string
+  updated_at?: string
 }
 
 export interface PromptVersion {
-  version_id: number
+  prompt_version_id: number
   template_id: number
-  version_no: number
+  version_no: string
   prompt_content: string
   change_note: string
   is_active: boolean

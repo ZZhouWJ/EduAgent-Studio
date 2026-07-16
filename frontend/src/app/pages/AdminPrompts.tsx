@@ -9,7 +9,7 @@ function mapTemplate(t: PromptTemplate) {
     id: String(t.template_id),
     name: t.template_name,
     agent: t.type_name,
-    version: `v${t.current_version_no}`,
+    version: t.current_version_no ? `v${t.current_version_no}` : "未发布",
     enabled: t.is_active,
     updatedAt: t.updated_at ? new Date(t.updated_at).toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" }) : "-",
     raw: t,
@@ -18,7 +18,7 @@ function mapTemplate(t: PromptTemplate) {
 
 function mapVersion(v: PromptVersion) {
   return {
-    id: String(v.version_id),
+    id: String(v.prompt_version_id),
     no: `v${v.version_no}`,
     note: v.change_note ?? "-",
     active: v.is_active,
@@ -32,7 +32,7 @@ export function AdminPrompts() {
   const [query, setQuery] = React.useState("");
   const [taskTypeFilter, setTaskTypeFilter] = React.useState("全部");
   const [selected, setSelected] = React.useState<ReturnType<typeof mapTemplate> | null>(null);
-  const [open, setOpen] = React.useState(false);
+  const [modalMode, setModalMode] = React.useState<"create" | "edit" | null>(null);
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const [promptContent, setPromptContent] = React.useState("");
   const [changeNote, setChangeNote] = React.useState("");
@@ -44,6 +44,17 @@ export function AdminPrompts() {
 
   const taskTypesState = useApi(() => promptsApi.getTaskTypes(), []);
   const templatesState = useApi(() => promptsApi.getTemplates({ page: 1, page_size: 100, keyword: query || undefined }), [query]);
+  const templates = React.useMemo(
+    () => (templatesState.data?.items ?? []).map(mapTemplate),
+    [templatesState.data]
+  );
+
+  React.useEffect(() => {
+    setSelected((current) => {
+      if (templates.length === 0) return null;
+      return templates.find((item) => item.id === current?.id) ?? templates[0];
+    });
+  }, [templates]);
 
   const versionsState = useApi(
     () => selected ? promptsApi.getVersions(Number(selected.id)) : Promise.resolve([] as PromptVersion[]),
@@ -56,7 +67,6 @@ export function AdminPrompts() {
     }
   }, [versionsState.data]);
 
-  const templates = (templatesState.data?.items ?? []).map(mapTemplate);
   const taskTypeOptions = ["全部", ...Array.from(new Set(templates.map((t) => t.agent)))];
   const filtered = templates.filter((item) => {
     const typeMatch = taskTypeFilter === "全部" || item.agent === taskTypeFilter;
@@ -93,7 +103,7 @@ export function AdminPrompts() {
       notify.success("版本已保存");
       versionsState.refetch();
       templatesState.refetch();
-      setOpen(false);
+      setModalMode(null);
       setChangeNote("");
     } catch (e) {
       notify.error("保存失败：" + String(e));
@@ -138,7 +148,7 @@ export function AdminPrompts() {
       templatesState.refetch();
       setNewTemplateName("");
       setNewTaskTypeId("");
-      setOpen(false);
+      setModalMode(null);
       const mapped = mapTemplate(created);
       setSelected(mapped);
     } catch (e) {
@@ -156,7 +166,7 @@ export function AdminPrompts() {
         title="提示词模板"
         description="管理资源生成、画像诊断、教师审核和防幻觉检查等场景的提示词模板。"
         icon={FileText}
-        action={<button onClick={() => setOpen(true)} className={`${primaryButton} cursor-pointer`}><Plus className="h-4 w-4" />新建模板</button>}
+        action={<button onClick={() => setModalMode("create")} className={`${primaryButton} cursor-pointer`}><Plus className="h-4 w-4" />新建模板</button>}
       />
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">{stats.map((stat) => <StatCard key={stat.label} {...stat} />)}</section>
       <section className="grid grid-cols-[360px_1fr] gap-6">
@@ -196,7 +206,7 @@ export function AdminPrompts() {
                 {(promptContent || activeVersion?.raw?.prompt_content) ?? "通过版本历史选择加载内容"}
               </div>
               <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <button onClick={() => setOpen(true)} className={`${primaryButton} cursor-pointer`}>编辑模板</button>
+                <button onClick={() => setModalMode("edit")} className={`${primaryButton} cursor-pointer`}>编辑模板</button>
                 <button onClick={handleCopyTemplate} className={`${secondaryButton} cursor-pointer`}><Copy className="h-4 w-4" />复制模板</button>
                 <button onClick={() => setHistoryOpen(true)} className={`${secondaryButton} cursor-pointer`}>版本历史</button>
                 <button onClick={() => notify.info("模拟渲染需要运行智能体工作流")} className={`${secondaryButton} cursor-pointer`}><Play className="h-4 w-4" />模拟渲染</button>
@@ -207,31 +217,34 @@ export function AdminPrompts() {
       </section>
 
       {/* Edit Modal */}
-      <ModalShell title="编辑提示词模板" open={open} onClose={() => setOpen(false)}>
+      <ModalShell title={modalMode === "create" ? "新建提示词模板" : "编辑提示词模板"} open={modalMode !== null} onClose={() => setModalMode(null)}>
         <div className="space-y-4">
-          <label className="block text-sm font-bold text-slate-700">
-            模板名称
-            <input
-              className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
-              value={newTemplateName}
-              onChange={(e) => setNewTemplateName(e.target.value)}
-              placeholder="输入模板名称"
-            />
-          </label>
-          <label className="block text-sm font-bold text-slate-700">
-            任务类型
-            <select
-              className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
-              value={newTaskTypeId}
-              onChange={(e) => setNewTaskTypeId(Number(e.target.value) || "")}
-            >
-              <option value="">请选择任务类型</option>
-              {taskTypes.map((tt) => (
-                <option key={tt.task_type_id} value={tt.task_type_id}>{tt.type_name}</option>
-              ))}
-            </select>
-          </label>
-          {selectedTemplate && (
+          {modalMode === "create" ? (
+            <>
+              <label className="block text-sm font-bold text-slate-700">
+                模板名称
+                <input
+                  className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
+                  value={newTemplateName}
+                  onChange={(e) => setNewTemplateName(e.target.value)}
+                  placeholder="输入模板名称"
+                />
+              </label>
+              <label className="block text-sm font-bold text-slate-700">
+                任务类型
+                <select
+                  className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
+                  value={newTaskTypeId}
+                  onChange={(e) => setNewTaskTypeId(Number(e.target.value) || "")}
+                >
+                  <option value="">请选择任务类型</option>
+                  {taskTypes.map((tt) => (
+                    <option key={tt.task_type_id} value={tt.task_type_id}>{tt.type_name}</option>
+                  ))}
+                </select>
+              </label>
+            </>
+          ) : selectedTemplate ? (
             <>
               <label className="block text-sm font-bold text-slate-700">
                 Prompt 内容
@@ -252,10 +265,10 @@ export function AdminPrompts() {
                 />
               </label>
             </>
-          )}
+          ) : null}
           <div className="flex justify-end gap-3">
-            <button onClick={() => setOpen(false)} className={`${secondaryButton} cursor-pointer`}>取消</button>
-            {selectedTemplate ? (
+            <button onClick={() => setModalMode(null)} className={`${secondaryButton} cursor-pointer`}>取消</button>
+            {modalMode === "edit" ? (
               <button onClick={handleSaveVersion} disabled={saving} className={`${primaryButton} cursor-pointer disabled:opacity-60`}>
                 {saving ? "保存中..." : "保存新版本"}
               </button>
