@@ -89,8 +89,8 @@ class MiniMaxProvider:
                 "latency_ms": int((time.time() - start_time) * 1000),
             }
         except httpx.HTTPStatusError as e:
-            logger.error(f"MiniMax API HTTP error: {e.response.status_code} - {e.response.text}")
+            logger.error("MiniMax API HTTP error: %s", e.response.status_code)
             raise
         except Exception as e:
-            logger.error(f"MiniMax API call failed: {e}")
+            logger.error("MiniMax API call failed (%s)", type(e).__name__)
             raise

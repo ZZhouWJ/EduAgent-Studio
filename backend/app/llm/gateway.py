@@ -95,7 +95,7 @@ class LLMGateway:
                 tool_calls=result.get("tool_calls"),
             )
         except Exception as e:
-            logger.error(f"LLM call failed: {e}")
+            logger.error("LLM call failed (%s)", type(e).__name__)
             return LLMCallResult(
                 content="", model=config.model_name, provider=config.provider,
                 input_tokens=0, output_tokens=0, total_tokens=0,

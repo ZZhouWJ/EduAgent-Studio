@@ -162,5 +162,5 @@ class IFlyTekProvider:
             )
             raise
         except Exception as e:
-            logger.error(f"[IFlyTek] API call failed: {e}")
+            logger.error("[IFlyTek] API call failed (%s)", type(e).__name__)
             raise

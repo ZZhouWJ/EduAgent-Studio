@@ -186,7 +186,7 @@ class TutorAgentCoordinator:
                 intent_data = json.loads(json_match.group())
                 return intent_data
         except Exception as e:
-            logger.warning(f"意图识别失败，使用默认策略: {e}")
+            logger.warning("意图识别失败，使用默认策略 (%s)", type(e).__name__)
 
         # Fallback：默认生成讲义 + 练习题
         return {
@@ -239,7 +239,7 @@ class TutorAgentCoordinator:
 
             return {"answer": text, "citations": citations}
         except Exception as e:
-            logger.error(f"主讲解生成失败: {e}")
+            logger.error("主讲解生成失败 (%s)", type(e).__name__)
             return {"answer": f"抱歉，无法回答该问题：{question}", "citations": []}
 
     async def _generate_resource_block(
@@ -287,7 +287,7 @@ class TutorAgentCoordinator:
                 "trustworthiness": result.get("trustworthiness", "medium"),
             }
         except Exception as e:
-            logger.error(f"资源生成失败 [{resource_type}]: {e}")
+            logger.error("资源生成失败 [%s] (%s)", resource_type, type(e).__name__)
             return {
                 "block_id": f"block_{resource_type}_error",
                 "block_type": resource_type,

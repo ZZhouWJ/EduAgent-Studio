@@ -51,7 +51,7 @@ async def retrieve_knowledge(
             "count": len(chunks),
         }
     except Exception as e:
-        logger.error(f"retrieve_knowledge failed: {e}")
+        logger.error("retrieve_knowledge failed (%s)", type(e).__name__)
         return {"chunks": [], "count": 0, "error": "知识检索失败"}
 
 
@@ -94,7 +94,7 @@ async def quiz_agent(
             "questions": _extract_questions(result.get("content", "")),
         }
     except Exception as e:
-        logger.error(f"quiz_agent failed: {e}")
+        logger.error("quiz_agent failed (%s)", type(e).__name__)
         return {"content": "题目生成失败，请稍后重试", "questions": [], "quality_score": 0}
 
 
@@ -131,7 +131,7 @@ async def code_case_agent(
             "trustworthiness": result.get("trustworthiness", "medium"),
         }
     except Exception as e:
-        logger.error(f"code_case_agent failed: {e}")
+        logger.error("code_case_agent failed (%s)", type(e).__name__)
         return {"content": "代码案例生成失败，请稍后重试", "language": language, "quality_score": 0}
 
 
@@ -166,7 +166,7 @@ async def mindmap_agent(
             "trustworthiness": result.get("trustworthiness", "medium"),
         }
     except Exception as e:
-        logger.error(f"mindmap_agent failed: {e}")
+        logger.error("mindmap_agent failed (%s)", type(e).__name__)
         return {"content": "思维导图生成失败，请稍后重试", "quality_score": 0}
 
 
@@ -216,7 +216,7 @@ async def planning_agent(
             "trustworthiness": "high",
         }
     except Exception as e:
-        logger.error(f"planning_agent failed: {e}")
+        logger.error("planning_agent failed (%s)", type(e).__name__)
         return {"content": "学习路径规划失败，请稍后重试", "quality_score": 0}
 
 
@@ -268,7 +268,7 @@ async def error_analysis_agent(
             "suggestions": ["查看讲解", "做变式题"],
         }
     except Exception as e:
-        logger.error(f"error_analysis_agent failed: {e}")
+        logger.error("error_analysis_agent failed (%s)", type(e).__name__)
         return {"content": "错因分析失败，请稍后重试", "error_type": "unknown", "suggestions": []}
 
 
@@ -317,7 +317,7 @@ async def explanation_skill(
         content = result.content if hasattr(result, "content") else str(result)
         return {"content": content, "quality_score": 0.8}
     except Exception as e:
-        logger.error(f"explanation_skill failed: {e}")
+        logger.error("explanation_skill failed (%s)", type(e).__name__)
         return {"content": "讲解生成失败，请稍后重试", "quality_score": 0}
 
 
@@ -356,7 +356,7 @@ async def tts_tool(
         data_url = f"data:audio/mpeg;base64,{audio_b64}"
         return {"audio_url": data_url, "text_length": len(text), "voice": voice}
     except Exception as e:
-        logger.error(f"tts_tool failed: {e}")
+        logger.error("tts_tool failed (%s)", type(e).__name__)
         return {"audio_url": "", "text_length": len(text), "error": "语音生成失败"}
 
 
@@ -418,7 +418,7 @@ async def ppt_agent(
             "quality_score": 0.8,
         }
     except Exception as e:
-        logger.error(f"ppt_agent failed: {e}")
+        logger.error("ppt_agent failed (%s)", type(e).__name__)
         return {"content": "PPT 生成失败，请稍后重试", "slide_count": 0, "topic": topic, "quality_score": 0}
 
 
@@ -466,7 +466,7 @@ async def image_agent(
             "style": style,
         }
     except Exception as e:
-        logger.error(f"image_agent failed: {e}")
+        logger.error("image_agent failed (%s)", type(e).__name__)
         return {"image_url": "", "prompt": prompt, "error": "图片生成失败"}
 
 

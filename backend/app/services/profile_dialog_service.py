@@ -129,7 +129,7 @@ class ProfileDialogService:
             }
 
         except Exception as e:
-            logger.exception("学生画像对话处理失败")
+            logger.error("学生画像对话处理失败 (%s)", type(e).__name__)
             return {
                 "code": 500,
                 "message": "对话处理失败，请稍后重试",
@@ -161,7 +161,7 @@ class ProfileDialogService:
                 },
             }
         except Exception as e:
-            logger.exception("获取学生画像对话历史失败")
+            logger.error("获取学生画像对话历史失败 (%s)", type(e).__name__)
             return {
                 "code": 500,
                 "message": "获取对话历史失败，请稍后重试",
@@ -199,7 +199,7 @@ class ProfileDialogService:
                 },
             }
         except Exception as e:
-            logger.exception("获取待应用画像抽取结果失败")
+            logger.error("获取待应用画像抽取结果失败 (%s)", type(e).__name__)
             return {
                 "code": 500,
                 "message": "获取待应用抽取结果失败，请稍后重试",
@@ -273,7 +273,7 @@ class ProfileDialogService:
             }
 
         except Exception as e:
-            logger.exception("应用画像抽取结果失败")
+            logger.error("应用画像抽取结果失败 (%s)", type(e).__name__)
             return {
                 "code": 500,
                 "message": "应用抽取结果失败，请稍后重试",
@@ -310,7 +310,7 @@ class ProfileDialogService:
             return self._get_default_extraction()
 
         except Exception as e:
-            logger.error(f"LLM extraction error: {e}")
+            logger.error("LLM extraction failed (%s)", type(e).__name__)
             return self._get_default_extraction()
 
     def _extract_json_from_response(self, content: str) -> Optional[str]:

@@ -174,8 +174,8 @@ class TutorService:
                 "data": result,
             }
 
-        except Exception:
-            logger.exception("Tutor 答疑失败")
+        except Exception as e:
+            logger.error("Tutor 答疑失败 (%s)", type(e).__name__)
             return {"code": 500, "message": "答疑失败，请稍后重试", "data": None}
 
     def submit_feedback(
@@ -218,8 +218,8 @@ class TutorService:
 
             return {"code": 0, "message": "反馈已提交", "data": {"session_id": session_id}}
 
-        except Exception:
-            logger.exception("Tutor 反馈提交失败")
+        except Exception as e:
+            logger.error("Tutor 反馈提交失败 (%s)", type(e).__name__)
             return {"code": 500, "message": "反馈提交失败，请稍后重试", "data": None}
 
     def get_sessions(
@@ -294,8 +294,8 @@ class TutorService:
                 },
             }
 
-        except Exception:
-            logger.exception("获取 Tutor 会话历史失败")
+        except Exception as e:
+            logger.error("获取 Tutor 会话历史失败 (%s)", type(e).__name__)
             return {"code": 500, "message": "获取会话历史失败，请稍后重试", "data": None}
 
     def _get_course_knowledge_points(self, course_id: int) -> List[Dict[str, Any]]:
@@ -323,7 +323,7 @@ class TutorService:
                 for row in rows
             ]
         except Exception as e:
-            logger.warning(f"Failed to get knowledge points: {e}")
+            logger.warning("Failed to get knowledge points (%s)", type(e).__name__)
             return []
 
     def _build_context(self, chunks: List[Dict[str, Any]]) -> str:
@@ -415,10 +415,14 @@ class TutorService:
             return answer_data
 
         except json.JSONDecodeError as e:
-            logger.error(f"JSON parse failed: {e}, content: {content[:200]}")
+            logger.error(
+                "LLM JSON parse failed (%s); content_length=%s",
+                type(e).__name__,
+                len(content),
+            )
             return self._fallback_answer(question, weak_points_str)
         except Exception as e:
-            logger.error(f"LLM generate failed: {e}")
+            logger.error("LLM generate failed (%s)", type(e).__name__)
             return self._fallback_answer(question, weak_points_str)
 
     def _generate_answer_multi_agent(
@@ -466,7 +470,7 @@ class TutorService:
             }
 
         except Exception as e:
-            logger.error(f"Supervisor run failed: {e}")
+            logger.error("Supervisor run failed (%s)", type(e).__name__)
             return self._generate_answer(
                 profile=profile,
                 knowledge_points=knowledge_points,
@@ -562,7 +566,7 @@ flowchart LR
                 )
                 return cursor.lastrowid
         except Exception as e:
-            logger.error(f"Failed to save session: {e}")
+            logger.error("Failed to save session (%s)", type(e).__name__)
             return 0
 
     def _apply_profile_updates(
@@ -606,7 +610,7 @@ flowchart LR
                 )
                 logger.info(f"[ProfileUpdate] kp={kp_name}(id={kp_id}) → mastery={mastery_level:.2f}")
             except Exception as e:
-                logger.error(f"[ProfileUpdate] failed for kp_id={kp_id}: {e}")
+                logger.error("[ProfileUpdate] failed for kp_id=%s (%s)", kp_id, type(e).__name__)
 
     def _adjust_explanation_level(self, session_id: int) -> None:
         """根据反馈调整解释难度"""
@@ -642,7 +646,7 @@ flowchart LR
             logger.info(f"Adjusted explanation level to: {new_level} for profile {row['profile_id']}")
 
         except Exception as e:
-            logger.error(f"Failed to adjust explanation level: {e}")
+            logger.error("Failed to adjust explanation level (%s)", type(e).__name__)
 
     def get_suggestions(
         self,
@@ -739,5 +743,5 @@ flowchart LR
             }
 
         except Exception as e:
-            logger.error(f"get_suggestions failed: {e}")
+            logger.error("get_suggestions failed (%s)", type(e).__name__)
             return {"code": 0, "data": {"suggestions": []}}

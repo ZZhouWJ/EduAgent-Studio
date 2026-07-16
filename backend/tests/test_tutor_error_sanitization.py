@@ -18,33 +18,39 @@ class TutorErrorSanitizationTests(unittest.TestCase):
         service._profile_repo = Mock()
         service._profile_repo.get_profile.side_effect = RuntimeError(SECRET)
 
-        result = service.chat(
-            22,
-            3,
-            "question",
-            {"user_id": 12, "roles": ["student_member"]},
-        )
+        with self.assertLogs("app.services.tutor_service", level="ERROR") as logs:
+            result = service.chat(
+                22,
+                3,
+                "question",
+                {"user_id": 12, "roles": ["student_member"]},
+            )
 
         self.assertEqual(result["code"], 500)
         self.assertNotIn(SECRET, result["message"])
+        self.assertNotIn(SECRET, "\n".join(logs.output))
 
     def test_profile_dialog_hides_repository_failure(self):
         service = ProfileDialogService()
         service._repo = Mock()
         service._repo.get_dialog_history.side_effect = RuntimeError(SECRET)
 
-        result = service.get_dialog_history(22)
+        with self.assertLogs("app.services.profile_dialog_service", level="ERROR") as logs:
+            result = service.get_dialog_history(22)
 
         self.assertEqual(result["code"], 500)
         self.assertNotIn(SECRET, result["message"])
+        self.assertNotIn(SECRET, "\n".join(logs.output))
 
     def test_tool_registry_hides_handler_failure(self):
         registry = ToolRegistry()
         registry._handlers = {"broken": Mock(side_effect=RuntimeError(SECRET))}
 
-        result = asyncio.run(registry.execute("broken", {}))
+        with self.assertLogs("app.services.tool_registry", level="ERROR") as logs:
+            result = asyncio.run(registry.execute("broken", {}))
 
         self.assertNotIn(SECRET, result["error"])
+        self.assertNotIn(SECRET, "\n".join(logs.output))
 
     def test_llm_gateway_hides_provider_failure(self):
         provider = Mock()
@@ -53,10 +59,12 @@ class TutorErrorSanitizationTests(unittest.TestCase):
         gateway.register_provider("test", provider)
         config = LLMConfig(model_id=1, model_name="test", provider="test")
 
-        result = gateway.generate([{"role": "user", "content": "hello"}], config)
+        with self.assertLogs("app.llm.gateway", level="ERROR") as logs:
+            result = gateway.generate([{"role": "user", "content": "hello"}], config)
 
         self.assertEqual(result.status, "failed")
         self.assertNotIn(SECRET, result.error)
+        self.assertNotIn(SECRET, "\n".join(logs.output))
 
 
 if __name__ == "__main__":
