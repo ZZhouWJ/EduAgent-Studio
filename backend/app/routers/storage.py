@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
 from app.services.storage_service import get_resource_content
-from app.services.auth_service import get_current_user_dependency as get_current_user
+from app.services.course_access_service import CourseAccessService
+from app.utils.dependencies import get_current_user_dep
 
 router = APIRouter(prefix="/storage", tags=["对象存储"])
 
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/storage", tags=["对象存储"])
 @router.get("/{file_id}")
 async def download_resource(
     file_id: str,
-    token: str = Depends(get_current_user),
+    user: dict = Depends(get_current_user_dep),
 ):
     """
     根据 file_id 下载学习资源 JSON 文件。
@@ -23,6 +24,11 @@ async def download_resource(
     entry = get_resource_content(file_id)
     if not entry:
         raise HTTPException(status_code=404, detail="文件不存在")
+
+    course_id = entry.get("course_id")
+    if course_id is None:
+        raise HTTPException(status_code=404, detail="文件不存在")
+    CourseAccessService().require_course_access(int(course_id), user)
 
     file_path = entry.get("file_path")
     if not file_path or not os.path.exists(file_path):
