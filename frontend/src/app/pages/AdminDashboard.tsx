@@ -108,18 +108,39 @@ export function AdminDashboard() {
 
   const platformOverview = useApi(() => statisticsApi.getPlatformOverview(), []);
   const modelCalls = useApi(() => statisticsApi.modelCalls(), []);
-  const reviewsStats = useApi(() => statisticsApi.reviews(), []);
+  const resourceStats = useApi(() => statisticsApi.getResourceStats(), []);
 
-  const loading = platformOverview.loading || modelCalls.loading || reviewsStats.loading;
+  const loading = platformOverview.loading || modelCalls.loading || resourceStats.loading;
 
-  // RISKS derived from reviews top_issue_tags
-  const riskItems = (reviewsStats.data?.top_issue_tags ?? []).slice(0, 4).map((t): [string, string, string] => [
-    `高频问题标签：${t.tag_name}`,
-    String(t.count),
-    t.severity === "high" ? "高风险" : t.severity === "medium" ? "中风险" : "低风险",
-  ]);
-  const risks: [string, string, string][] = riskItems.length > 0 ? riskItems : [
-    ["尚无问题标签", "0", "等待数据"],
+  const abnormalCallCount = (modelCalls.data ?? []).reduce(
+    (total, model) => total + Number(model.failed_count || 0) + Number(model.timeout_count || 0),
+    0,
+  );
+  const blockedCallCount = (modelCalls.data ?? []).reduce(
+    (total, model) => total + Number(model.blocked_count || 0),
+    0,
+  );
+  const risks = [
+    {
+      title: "待教师复核资源",
+      value: resourceStats.data?.pending ?? 0,
+      level: (resourceStats.data?.pending ?? 0) > 0 ? "待处理" : "正常",
+    },
+    {
+      title: "审核退回资源",
+      value: resourceStats.data?.rejected ?? 0,
+      level: (resourceStats.data?.rejected ?? 0) > 0 ? "需复查" : "正常",
+    },
+    {
+      title: "异常模型调用",
+      value: abnormalCallCount,
+      level: abnormalCallCount > 0 ? "需排查" : "正常",
+    },
+    {
+      title: "治理策略拦截",
+      value: blockedCallCount,
+      level: blockedCallCount > 0 ? "已拦截" : "正常",
+    },
   ];
 
   const stats = [
@@ -264,15 +285,15 @@ export function AdminDashboard() {
             内容安全与审核风险
           </h2>
           <div className="space-y-3">
-            {risks.map(([title, value, level]) => {
-              const isHigh = level === "高风险";
+            {risks.map((risk) => {
+              const isNormal = risk.level === "正常";
               return (
-                <div key={title} className="cursor-pointer rounded-2xl border border-slate-100 bg-white p-4 transition hover:border-red-200">
+                <div key={risk.title} className="rounded-2xl border border-slate-100 bg-white p-4">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm font-black text-slate-900">{title}</div>
-                    <div className={`text-xl font-black ${isHigh ? "text-red-600" : "text-orange-600"}`}>{value}</div>
+                    <div className="text-sm font-black text-slate-900">{risk.title}</div>
+                    <div className={`text-xl font-black ${isNormal ? "text-emerald-600" : "text-orange-600"}`}>{risk.value}</div>
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">{level}</div>
+                  <div className={`mt-1 text-xs ${isNormal ? "text-emerald-600" : "text-slate-500"}`}>{risk.level}</div>
                 </div>
               );
             })}
