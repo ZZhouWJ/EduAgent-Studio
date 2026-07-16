@@ -7,6 +7,7 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.repositories import user_repo
+from app.utils.roles import PLATFORM_ROLE_CODES, filter_platform_roles
 
 
 def get_user_detail(user_id: int) -> Optional[Dict[str, Any]]:
@@ -135,6 +136,18 @@ def update_user_roles_service(
         from app.utils.exceptions import NotFoundException
         raise NotFoundException(message="用户不存在")
 
+    roles_by_id = {
+        int(role["role_id"]): role for role in filter_platform_roles(user_repo.list_roles())
+    }
+    if not role_ids:
+        from app.utils.exceptions import ValidationException
+        raise ValidationException(message="用户至少需要一个角色")
+    for role_id in role_ids:
+        role = roles_by_id.get(int(role_id))
+        if role is None or role["role_code"] not in PLATFORM_ROLE_CODES:
+            from app.utils.exceptions import ValidationException
+            raise ValidationException(message="选择的角色不存在或不可分配")
+
     user_repo.update_user_roles(user_id, role_ids)
 
 
@@ -145,7 +158,7 @@ def list_roles_service() -> List[Dict[str, Any]]:
     Returns:
         角色列表
     """
-    return user_repo.list_roles()
+    return filter_platform_roles(user_repo.list_roles())
 
 
 def list_permissions_service() -> List[Dict[str, Any]]:
