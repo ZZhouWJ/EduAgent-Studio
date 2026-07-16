@@ -7,6 +7,7 @@
 import json
 import logging
 import os
+import tempfile
 import uuid
 from datetime import datetime
 from typing import Any, Optional
@@ -69,16 +70,30 @@ def _load_index() -> None:
 
 
 def _save_index() -> None:
-    """将索引保存到磁盘。"""
+    """通过同目录原子替换将索引保存到磁盘。"""
     _ensure_directories()
     index_path = _get_index_path()
+    temp_path: Optional[str] = None
 
     try:
-        with open(index_path, "w", encoding="utf-8") as f:
+        file_descriptor, temp_path = tempfile.mkstemp(
+            prefix=".storage_index-",
+            suffix=".tmp",
+            dir=os.path.dirname(index_path),
+            text=True,
+        )
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as f:
             json.dump(_storage_index, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_path, index_path)
+        temp_path = None
     except Exception as e:
         logger.error("保存存储索引失败 (%s)", type(e).__name__)
         raise
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)
 
 
 def _get_year_month() -> str:

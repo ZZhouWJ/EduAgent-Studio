@@ -115,6 +115,24 @@ class StorageContentTests(unittest.TestCase):
 
         self.assertIsNone(loaded)
 
+    def test_storage_index_is_replaced_atomically(self):
+        with tempfile.TemporaryDirectory() as data_dir, patch.object(
+            storage_service, "_get_data_dir", return_value=data_dir
+        ), patch.object(
+            storage_service.os, "replace", wraps=os.replace
+        ) as replace:
+            storage_service._storage_index = {str(FILE_ID): {"deleted": False}}
+
+            storage_service._save_index()
+
+            replace.assert_called_once()
+            index_path = os.path.join(data_dir, "storage_index.json")
+            with open(index_path, "r", encoding="utf-8") as file:
+                self.assertEqual(json.load(file), storage_service._storage_index)
+            self.assertFalse(
+                any(name.startswith(".storage_index-") for name in os.listdir(data_dir))
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
