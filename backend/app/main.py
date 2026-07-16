@@ -13,6 +13,7 @@ from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from redis import Redis
 
 from app.config import get_settings
 from app.database import test_connection
@@ -47,6 +48,26 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+def _check_redis_connection(redis_url: str) -> dict[str, Any]:
+    client = None
+    try:
+        client = Redis.from_url(
+            redis_url,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+        )
+        return {"connected": bool(client.ping())}
+    except Exception:
+        logger.warning("Redis 健康检查失败")
+        return {"connected": False}
+    finally:
+        if client is not None:
+            try:
+                client.close()
+            except Exception:
+                pass
 
 
 def create_app() -> FastAPI:
@@ -149,6 +170,20 @@ def create_app() -> FastAPI:
                     "database": "disconnected",
                 },
             )
+
+    @app.get(f"{settings.api_prefix}/health/redis")
+    async def health_check_redis() -> Any:
+        redis_result = _check_redis_connection(settings.redis_url)
+        if redis_result["connected"]:
+            return success_response(
+                data={"status": "ok", "redis": "connected"},
+                message="Redis 连接正常",
+            )
+        return error_response(
+            message="Redis 连接失败",
+            code=5003,
+            data={"status": "degraded", "redis": "disconnected"},
+        )
 
     logger.info(
         "FastAPI 应用初始化完成，API Prefix: %s, 环境: %s",

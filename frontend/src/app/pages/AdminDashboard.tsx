@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { ActivitySquare, ArrowRight, Bot, CircleAlert, Coins, Database, HardDrive, Library, LockKeyhole, Server, Settings2, ShieldAlert, TerminalSquare, Users } from "lucide-react";
+import { ActivitySquare, ArrowRight, Bot, CircleAlert, Coins, Database, Library, LockKeyhole, Server, Settings2, ShieldAlert, TerminalSquare, Users } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useApi } from "@/lib/useApi";
 import { statisticsApi } from "@/lib/api";
@@ -17,9 +17,7 @@ interface ServiceItem {
 const INITIAL_SERVICES: ServiceItem[] = [
   { name: "后端服务", status: "检测中", desc: "—", icon: Server, key: "api" },
   { name: "数据库", status: "检测中", desc: "—", icon: Database, key: "db" },
-  { name: "Redis", status: "未知", desc: "无独立健康端点", icon: ActivitySquare, key: "redis" },
-  { name: "MinIO", status: "未知", desc: "无独立健康端点", icon: HardDrive, key: "minio" },
-  { name: "模型服务", status: "—", desc: "—", icon: Bot, key: "llm" },
+  { name: "Redis", status: "检测中", desc: "—", icon: ActivitySquare, key: "redis" },
 ];
 
 const ENTRY = [
@@ -62,7 +60,7 @@ export function AdminDashboard() {
   React.useEffect(() => {
     const tick = async () => {
       setServices((prev) => prev.map((s) => {
-        if (s.key === "api") return { ...s, status: "检测中", desc: "—" };
+        if (["api", "db", "redis"].includes(s.key)) return { ...s, status: "检测中", desc: "—" };
         return s;
       }));
       try {
@@ -73,7 +71,9 @@ export function AdminDashboard() {
             ? { ...s, status: j1.code === 0 ? "正常" : "异常", desc: j1.data?.env ?? "—" }
             : s
         ));
-      } catch { /* keep previous */ }
+      } catch {
+        setServices((prev) => prev.map((s) => s.key === "api" ? { ...s, status: "异常", desc: "连接失败" } : s));
+      }
       try {
         const r2 = await fetch("/api/health/db");
         const j2 = await r2.json();
@@ -86,7 +86,20 @@ export function AdminDashboard() {
               }
             : s
         ));
-      } catch { /* keep previous */ }
+      } catch {
+        setServices((prev) => prev.map((s) => s.key === "db" ? { ...s, status: "异常", desc: "连接失败" } : s));
+      }
+      try {
+        const r3 = await fetch("/api/health/redis");
+        const j3 = await r3.json();
+        setServices((prev) => prev.map((s) =>
+          s.key === "redis"
+            ? { ...s, status: j3.code === 0 ? "正常" : "异常", desc: j3.code === 0 ? "连接可用" : "连接失败" }
+            : s
+        ));
+      } catch {
+        setServices((prev) => prev.map((s) => s.key === "redis" ? { ...s, status: "异常", desc: "连接失败" } : s));
+      }
     };
     tick();
     const h = setInterval(tick, 30000);
