@@ -31,7 +31,8 @@ export const useAuthStore = create<AuthState>()(
           set({ token: data.token, user: me, loading: false, initialized: true })
           return me
         } catch (e) {
-          set({ loading: false })
+          clearToken()
+          set({ token: null, user: null, loading: false })
           throw e
         }
       },
@@ -48,6 +49,7 @@ export const useAuthStore = create<AuthState>()(
           set({ user: me, initialized: true })
           return me
         } catch {
+          clearToken()
           set({ user: null, token: null, initialized: true })
           return null
         }

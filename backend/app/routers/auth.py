@@ -138,6 +138,7 @@ async def get_me(
         return error_response(
             message="Token 无效或已过期",
             code=4002,
+            status_code=401,
         )
 
     return success_response(data=user)

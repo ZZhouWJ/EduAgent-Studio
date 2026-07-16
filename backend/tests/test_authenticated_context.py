@@ -1,8 +1,10 @@
+import json
 import unittest
 from unittest.mock import Mock, patch
 
 from app.routers.learning import CreateLearningTaskRequest, create_learning_task
 from app.routers import feedbacks
+from app.routers.auth import get_me
 from app.services import auth_service
 
 
@@ -83,6 +85,14 @@ class ActiveSessionTests(unittest.TestCase):
 
 
 class AuthenticatedContextTests(unittest.IsolatedAsyncioTestCase):
+    @patch("app.routers.auth.auth_service.get_current_user", return_value=None)
+    async def test_invalid_session_returns_http_401(self, _get_current_user):
+        response = await get_me("Bearer revoked-token")
+        payload = json.loads(response.body)
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(payload["code"], 4002)
+
     async def test_learning_task_uses_authenticated_creator_id(self):
         service = Mock()
         service.create_task.return_value = {"code": 0, "data": {"task_id": 9}}
