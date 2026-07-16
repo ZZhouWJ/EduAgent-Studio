@@ -35,6 +35,7 @@ class Settings(BaseSettings):
         le=10080,
         alias="JWT_EXPIRE_MINUTES",
     )
+    api_key_secret: str = Field(default="", alias="API_KEY_SECRET")
     cors_origins: str = Field(
         default="http://127.0.0.1:5173,http://localhost:5173",
         alias="CORS_ORIGINS",
@@ -121,6 +122,8 @@ class Settings(BaseSettings):
             marker in self.jwt_secret_key.lower() for marker in weak_markers
         ):
             raise ValueError("生产环境 JWT_SECRET_KEY 必须是至少 32 字符的随机密钥")
+        if len(self.api_key_secret) < 32:
+            raise ValueError("生产环境 API_KEY_SECRET 必须是至少 32 字符的随机密钥")
         if not self.cors_origin_list or "*" in self.cors_origin_list:
             raise ValueError("生产环境 CORS_ORIGINS 必须配置明确的前端来源")
         if self.llm_provider == "mock":

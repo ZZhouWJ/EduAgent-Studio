@@ -64,6 +64,7 @@ class RedisHealthTests(unittest.TestCase):
         settings = Settings(
             APP_ENV="production",
             JWT_SECRET_KEY="a-secure-production-secret-key-with-32-chars",
+            API_KEY_SECRET="another-secure-production-key-32-chars",
             CORS_ORIGINS="https://eduagent.example.com",
             LLM_API_KEY="test-key",
             _env_file=None,

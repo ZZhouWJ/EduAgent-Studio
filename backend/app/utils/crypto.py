@@ -37,13 +37,12 @@ def _get_master_key() -> bytes:
             f"请在 .env 文件中设置 API_KEY_SECRET=<随机密钥>"
         )
     secret_bytes = secret.encode("utf-8")
-    if len(secret_bytes) < 16:
+    if len(secret_bytes) < 32:
         raise RuntimeError(
             f"环境变量 {_SECRET_ENV_VAR} 太短（至少需要 32 字符）。"
             f"请使用随机密钥，例如：openssl rand -hex 32"
         )
-    key = secret_bytes[:32] if len(secret_bytes) >= 32 else secret_bytes.ljust(32, b"\0")
-    return key
+    return secret_bytes[:32]
 
 
 def encrypt_api_key(plaintext: str) -> Tuple[str, str, str, int]:

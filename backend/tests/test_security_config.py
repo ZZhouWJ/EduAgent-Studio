@@ -1,9 +1,11 @@
+import os
 import unittest
 from unittest.mock import patch
 
 from pydantic import ValidationError
 
 from app.config import Settings
+from app.utils.crypto import decrypt_api_key, encrypt_api_key
 from app.utils.token import create_access_token, decode_access_token
 
 
@@ -67,9 +69,32 @@ class SecurityConfigTests(unittest.TestCase):
             CORS_ORIGINS="https://studio.example.com",
             LLM_PROVIDER="deepseek",
             LLM_API_KEY="configured-secret",
+            API_KEY_SECRET="c" * 32,
         )
 
         self.assertEqual(settings.llm_provider, "deepseek")
+
+    def test_rejects_weak_production_api_key_secret(self):
+        with self.assertRaises(ValidationError):
+            Settings(
+                _env_file=None,
+                APP_ENV="production",
+                JWT_SECRET_KEY="a" * 64,
+                API_KEY_SECRET="short-secret",
+                CORS_ORIGINS="https://studio.example.com",
+                LLM_PROVIDER="deepseek",
+                LLM_API_KEY="configured-secret",
+            )
+
+    def test_crypto_rejects_short_master_key(self):
+        with patch.dict(os.environ, {"API_KEY_SECRET": "a" * 16}):
+            with self.assertRaises(RuntimeError):
+                encrypt_api_key("provider-secret")
+
+    def test_crypto_round_trip_accepts_32_character_master_key(self):
+        with patch.dict(os.environ, {"API_KEY_SECRET": "b" * 32}):
+            encrypted, iv, tag, _ = encrypt_api_key("provider-secret")
+            self.assertEqual(decrypt_api_key(encrypted, iv, tag), "provider-secret")
 
     def test_token_round_trip_uses_managed_settings(self):
         settings = Settings(
