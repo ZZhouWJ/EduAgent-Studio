@@ -76,6 +76,7 @@ class StatisticsLearningRepository:
             cursor.execute(
                 f"SELECT COUNT(DISTINCT sp.student_id) AS cnt "
                 f"FROM student_profiles sp "
+                f"INNER JOIN users u ON u.user_id = sp.student_id AND u.is_deleted = 0 "
                 f"INNER JOIN courses c ON c.course_id = sp.course_id AND c.is_deleted = 0 "
                 f"WHERE sp.is_deleted = 0 AND {profile_filter}",
                 profile_params,
@@ -104,6 +105,7 @@ class StatisticsLearningRepository:
                 f"SELECT AVG(skm.mastery_level) AS avg_mastery "
                 f"FROM student_knowledge_mastery skm "
                 f"INNER JOIN student_profiles sp ON skm.profile_id = sp.profile_id AND sp.is_deleted = 0 "
+                f"INNER JOIN users u ON u.user_id = sp.student_id AND u.is_deleted = 0 "
                 f"INNER JOIN courses c ON c.course_id = sp.course_id AND c.is_deleted = 0 "
                 f"WHERE skm.is_deleted = 0 AND {profile_filter}",
                 profile_params,
@@ -114,6 +116,7 @@ class StatisticsLearningRepository:
             cursor.execute(
                 f"SELECT COUNT(*) AS cnt FROM learning_feedbacks lf "
                 f"INNER JOIN student_profiles sp ON sp.profile_id = lf.profile_id AND sp.is_deleted = 0 "
+                f"INNER JOIN users u ON u.user_id = sp.student_id AND u.is_deleted = 0 "
                 f"INNER JOIN courses c ON c.course_id = sp.course_id AND c.is_deleted = 0 "
                 f"WHERE lf.is_deleted = 0 AND {profile_filter}",
                 profile_params,
@@ -177,6 +180,7 @@ class StatisticsLearningRepository:
                 SELECT AVG(skm.mastery_level) AS avg_mastery
                 FROM student_knowledge_mastery skm
                 INNER JOIN student_profiles sp ON skm.profile_id = sp.profile_id AND sp.is_deleted = 0
+                INNER JOIN users u ON u.user_id = sp.student_id AND u.is_deleted = 0
                 INNER JOIN courses c ON c.course_id = sp.course_id AND c.is_deleted = 0
                 WHERE skm.is_deleted = 0 AND {profile_filter}
                 GROUP BY sp.profile_id
@@ -222,6 +226,7 @@ class StatisticsLearningRepository:
                     AVG(skm.mastery_level) AS avg_mastery
                 FROM student_knowledge_mastery skm
                 INNER JOIN student_profiles sp ON skm.profile_id = sp.profile_id AND sp.is_deleted = 0
+                INNER JOIN users u ON u.user_id = sp.student_id AND u.is_deleted = 0
                 INNER JOIN knowledge_points kp ON skm.kp_id = kp.kp_id AND kp.is_deleted = 0
                 INNER JOIN courses c ON kp.course_id = c.course_id AND c.is_deleted = 0
                 WHERE skm.is_deleted = 0 AND {profile_filter}

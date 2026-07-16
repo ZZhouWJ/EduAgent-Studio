@@ -831,8 +831,10 @@ def get_platform_stats() -> Dict[str, Any]:
         cursor.execute(
             """
             SELECT
-                (SELECT COUNT(DISTINCT student_id)
-                 FROM student_profiles WHERE is_deleted = 0) AS student_count,
+                (SELECT COUNT(DISTINCT sp.student_id)
+                 FROM student_profiles sp
+                 INNER JOIN users u ON u.user_id = sp.student_id AND u.is_deleted = 0
+                 WHERE sp.is_deleted = 0) AS student_count,
                 (SELECT COUNT(*) FROM courses WHERE is_deleted = 0) AS course_count
             """
         )

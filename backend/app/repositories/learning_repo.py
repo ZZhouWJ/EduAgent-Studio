@@ -144,9 +144,14 @@ class LearningRepository:
                 FROM knowledge_points WHERE is_deleted = 0 GROUP BY course_id
             ) kp_stats ON kp_stats.course_id = c.course_id
             LEFT JOIN (
-                SELECT course_id, COUNT(*) AS student_count,
-                       AVG(mastery_score) AS mastery_avg
-                FROM student_profiles WHERE is_deleted = 0 GROUP BY course_id
+                SELECT sp.course_id, COUNT(*) AS student_count,
+                       AVG(sp.mastery_score) AS mastery_avg
+                FROM student_profiles sp
+                INNER JOIN users profile_student
+                  ON profile_student.user_id = sp.student_id
+                 AND profile_student.is_deleted = 0
+                WHERE sp.is_deleted = 0
+                GROUP BY sp.course_id
             ) profile_stats ON profile_stats.course_id = c.course_id
             LEFT JOIN (
                 SELECT course_id, COUNT(*) AS task_count
@@ -174,10 +179,19 @@ class LearningRepository:
                 cursor.execute(
                     f"""
                     SELECT kp.course_id, kp.kp_id, kp.kp_name, kp.difficulty_level,
-                           COALESCE(AVG(mastery.mastery_level), 0) AS mastery_avg
+                           COALESCE(AVG(
+                               CASE WHEN mastery_student.user_id IS NOT NULL
+                                    THEN mastery.mastery_level END
+                           ), 0) AS mastery_avg
                     FROM knowledge_points kp
                     LEFT JOIN student_knowledge_mastery mastery
                       ON mastery.kp_id = kp.kp_id AND mastery.is_deleted = 0
+                    LEFT JOIN student_profiles mastery_profile
+                      ON mastery_profile.profile_id = mastery.profile_id
+                     AND mastery_profile.is_deleted = 0
+                    LEFT JOIN users mastery_student
+                      ON mastery_student.user_id = mastery_profile.student_id
+                     AND mastery_student.is_deleted = 0
                     WHERE kp.course_id IN ({placeholders}) AND kp.is_deleted = 0
                     GROUP BY kp.course_id, kp.kp_id, kp.kp_name, kp.difficulty_level
                     ORDER BY kp.course_id, kp.kp_id
@@ -277,7 +291,12 @@ class LearningRepository:
             kp_count = cursor.fetchone()["cnt"]
 
             cursor.execute(
-                "SELECT COUNT(*) AS cnt FROM student_profiles WHERE course_id = %s AND is_deleted = 0",
+                """
+                SELECT COUNT(*) AS cnt
+                FROM student_profiles sp
+                INNER JOIN users u ON u.user_id = sp.student_id AND u.is_deleted = 0
+                WHERE sp.course_id = %s AND sp.is_deleted = 0
+                """,
                 (course_id,),
             )
             student_count = cursor.fetchone()["cnt"]

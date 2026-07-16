@@ -22,6 +22,7 @@
 mysql -u root -p ai_collab_audit_system < database/09_create_a3_tables.sql
 mysql -u root -p ai_collab_audit_system < database/10_insert_a3_initial_data.sql
 mysql -u root -p ai_collab_audit_system < database/27_create_learning_task_progress.sql
+mysql -u root -p ai_collab_audit_system < database/28_cleanup_orphan_learning_profiles.sql
 
 # PostgreSQL（Phase 2/3 使用）
 # 方式一：仅创建 schema（推荐先试）

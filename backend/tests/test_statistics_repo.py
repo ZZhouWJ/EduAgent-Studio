@@ -135,6 +135,10 @@ class PlatformStatisticsTests(unittest.TestCase):
         self.assertNotIn("cost_records WHERE is_deleted", combined_queries)
         self.assertNotIn("FROM ai_invocations WHERE is_deleted", combined_queries)
         self.assertIn("SUM(status = 'success')", combined_queries)
+        self.assertIn(
+            "INNER JOIN users u ON u.user_id = sp.student_id AND u.is_deleted = 0",
+            combined_queries,
+        )
 
     def test_cost_by_model_does_not_soft_delete_audit_rows(self):
         cursor = FakeCursor([[
@@ -203,6 +207,9 @@ class PlatformStatisticsTests(unittest.TestCase):
         resource_queries = [query for query, _ in cursor.queries if "learning_resources lr" in query]
         self.assertEqual(len(resource_queries), 2)
         self.assertTrue(all("lr.status = 'approved'" in query for query in resource_queries))
+        profile_queries = [query for query, _ in cursor.queries if "student_profiles sp" in query]
+        self.assertTrue(profile_queries)
+        self.assertTrue(all("INNER JOIN users u" in query for query in profile_queries))
 
     def test_teacher_weak_points_are_scoped_to_owned_courses(self):
         cursor = FakeCursor([[]])
@@ -217,6 +224,7 @@ class PlatformStatisticsTests(unittest.TestCase):
 
         query, params = cursor.queries[0]
         self.assertIn("c.teacher_id = %s", query)
+        self.assertIn("INNER JOIN users u", query)
         self.assertEqual(params, (7, 5))
 
     @patch("app.services.statistics_service._require_auth")
