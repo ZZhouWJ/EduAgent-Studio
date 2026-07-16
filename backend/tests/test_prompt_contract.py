@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import patch
 
+from pydantic import ValidationError
+
 from app.services import prompt_service
 from app.routers import prompts as prompt_router
 from app.utils.exceptions import NotFoundException, ValidationException
@@ -281,6 +283,18 @@ class PromptRouterContractTests(unittest.IsolatedAsyncioTestCase):
             "headers": [],
             "client": ("127.0.0.1", 12345),
         })
+
+    def test_prompt_version_content_is_bounded(self):
+        with self.assertRaises(ValidationError):
+            prompt_router.CreateVersionRequest(prompt_content="x" * 200_001)
+
+    def test_render_variables_are_bounded(self):
+        with self.assertRaises(ValidationError):
+            prompt_router.RenderTemplateRequest(
+                variables={f"key_{index}": "value" for index in range(101)}
+            )
+        with self.assertRaises(ValidationError):
+            prompt_router.RenderTemplateRequest(variables={"key": "x" * 50_001})
 
     @patch("app.routers.prompts.prompt_service.create_template")
     async def test_create_template_routes_activation_to_template_service(

@@ -17,10 +17,10 @@ POST   /api/prompt-templates/{template_id}/versions
 POST   /api/prompt-templates/{template_id}/versions/{version_id}/activate
 """
 
-from typing import Dict, Optional
+from typing import Annotated, Dict, Optional
 
 from fastapi import APIRouter, Body, Header, Path, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from app.services import prompt_service
 from app.utils.exceptions import UnauthorizedException
@@ -68,14 +68,21 @@ class UpdateTemplateRequest(BaseModel):
 
 class CreateVersionRequest(BaseModel):
     version_no: Optional[str] = Field(None, max_length=20)
-    prompt_content: str = Field(..., min_length=1)
+    prompt_content: str = Field(..., min_length=1, max_length=200_000)
     change_note: Optional[str] = Field(None, max_length=500)
     activate: bool = Field(False)
 
 
+PromptVariableName = Annotated[str, StringConstraints(min_length=1, max_length=100)]
+PromptVariableValue = Annotated[str, StringConstraints(max_length=50_000)]
+
+
 class RenderTemplateRequest(BaseModel):
     version_id: Optional[int] = Field(None, gt=0)
-    variables: Dict[str, str] = Field(default_factory=dict)
+    variables: Dict[PromptVariableName, PromptVariableValue] = Field(
+        default_factory=dict,
+        max_length=100,
+    )
 
 
 # =============================================================================
