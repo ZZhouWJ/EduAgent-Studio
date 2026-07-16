@@ -58,6 +58,8 @@ class MockProvider:
             return self._mock_profile_extraction(input_text)
         if "诊断" in normalized_input or "薄弱" in normalized_input:
             return self._mock_diagnosis()
+        elif "教材原文依据" in input_text and "直接输出 Markdown" in input_text:
+            return self._mock_resource(input_text, model_name)
         elif "规划" in normalized_input or "路径" in normalized_input:
             return self._mock_planning()
         elif "评测" in normalized_input or "反馈" in normalized_input:
@@ -80,6 +82,56 @@ class MockProvider:
 
 ---
 *本资源由 {model_name} 生成 | EduAgent Studio*
+"""
+
+    def _mock_resource(self, prompt: str, model_name: str) -> str:
+        """Return representative Markdown for the explicit development provider."""
+        resource_match = re.search(r"资源类型[：:]\s*([^\n]+)", prompt)
+        resource_type = resource_match.group(1).strip() if resource_match else "学习资源"
+        topics = list(dict.fromkeys(
+            topic.strip()
+            for topic in re.findall(r"^\d+\.\s*\[([^\]]+)\]", prompt, re.MULTILINE)
+            if topic.strip()
+        ))
+        topic = "、".join(topics[:3]) or "课程重点"
+        chunk_ids = list(dict.fromkeys(re.findall(r"\[chunk_id:\s*(\d+)\]", prompt)))
+        citation = f" [引用:{chunk_ids[0]}]" if chunk_ids else " [草稿:缺乏充分教材依据]"
+
+        return f"""# {topic}专题{resource_type}
+
+## 学习目标
+
+- 理解 {topic} 的核心概念与适用场景
+- 能够结合示例完成基础分析与实践
+- 识别常见误区并完成自测
+
+## 核心概念
+
+{topic} 是本阶段学习路径中的重点内容。学习时应先建立概念边界，再通过实例验证理解。{citation}
+
+## 示例
+
+以课程中的典型问题为例，先明确输入条件，再分步骤写出推理过程，最后核对结果是否符合约束。对于不确定的结论，应回到教材原文进行复核。
+
+## 常见错误
+
+1. 只记忆结论，忽略结论成立的前提。
+2. 混淆相近概念，导致分析范围不准确。
+3. 完成操作后没有验证结果。
+
+## 练习与解析
+
+**练习 1：** 用自己的语言说明 {topic} 的关键作用。
+
+**参考解析：** 回答应包含定义、适用条件和一个课程内示例。
+
+**练习 2：** 列出一个常见错误，并说明如何验证和修正。
+
+**参考解析：** 先定位错误前提，再使用教材定义或可执行示例复核。
+
+---
+
+本资源由 {model_name} 开发模式生成，请由教师确认后发布。
 """
 
     def _mock_profile_extraction(self, prompt: str) -> str:

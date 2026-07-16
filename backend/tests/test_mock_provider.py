@@ -22,6 +22,24 @@ class MockProfileExtractionTests(unittest.TestCase):
         self.assertEqual(result["resource_preferences"], ["视频", "案例"])
         self.assertIn("SQL", result["knowledge_base"])
 
+    def test_resource_prompt_is_not_misclassified_as_planning_json(self):
+        prompt = """
+## 学习路径
+1. [事务隔离] 讲义 | 预计 30分钟
+## 资源类型：课程讲义
+## 教材原文依据（务必引用，chunk_id 格式为数字）
+（当前课程暂无教材依据）
+## 输出要求
+- 直接输出 Markdown 格式学习资源内容
+"""
+
+        result = MockProvider()._generate_response(prompt, "mock-model")
+
+        self.assertTrue(result.startswith("# 事务隔离专题课程讲义"))
+        self.assertIn("## 核心概念", result)
+        self.assertIn("[草稿:缺乏充分教材依据]", result)
+        self.assertNotIn('"learning_path"', result)
+
 
 if __name__ == "__main__":
     unittest.main()
