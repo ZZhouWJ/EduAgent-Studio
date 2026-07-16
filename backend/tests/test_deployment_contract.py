@@ -39,6 +39,12 @@ class DeploymentContractTests(unittest.TestCase):
         ):
             self.assertIn(directive, nginx)
 
+    def test_nginx_overwrites_untrusted_forwarded_ip_chain(self):
+        nginx = (ROOT / "frontend/nginx.conf").read_text(encoding="utf-8")
+
+        self.assertIn("proxy_set_header X-Forwarded-For $remote_addr;", nginx)
+        self.assertNotIn("$proxy_add_x_forwarded_for", nginx)
+
 
 if __name__ == "__main__":
     unittest.main()
