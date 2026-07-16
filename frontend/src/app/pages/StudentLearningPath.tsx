@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Network, Target } from "lucide-react";
+import { ArrowRight, Network, RefreshCw, Target } from "lucide-react";
 import { useApi } from "@/lib/useApi";
 import { learningApi } from "@/lib/api/learning";
 import { profilesApi } from "@/lib/api/profiles";
@@ -12,7 +12,7 @@ export function StudentLearningPath() {
   const profileId = profileData?.profile_id;
   const courseId = profileData?.course_id;
 
-  const { data: pathData, loading } = useApi(
+  const { data: pathData, loading, error, refetch } = useApi(
     () => (profileId && courseId ? learningApi.getLearningPath(courseId, profileId) : Promise.resolve(null)),
     [profileId, courseId]
   );
@@ -63,25 +63,8 @@ export function StudentLearningPath() {
     [knowledgePoints, navigate]
   );
 
-  const displayNodes: KpNode[] = knowledgePoints.length > 0 ? knowledgePoints : [
-    { kp_id: 1, kp_name: "关系模型", mastery: 0.9, description: "数据库基础概念" },
-    { kp_id: 2, kp_name: "SQL 查询", mastery: 0.85, description: "SELECT/INSERT/UPDATE/DELETE" },
-    { kp_id: 3, kp_name: "多表连接", mastery: 0.6, description: "INNER/LEFT/RIGHT JOIN" },
-    { kp_id: 4, kp_name: "子查询", mastery: 0.78, description: "嵌套查询语法" },
-    { kp_id: 5, kp_name: "事务", mastery: 0.35, description: "ACID特性与控制语句" },
-    { kp_id: 6, kp_name: "并发控制", mastery: 0.42, description: "锁机制与隔离级别" },
-    { kp_id: 7, kp_name: "事务隔离级别", mastery: 0.32, description: "读已提交/可重复读等" },
-    { kp_id: 8, kp_name: "索引优化", mastery: 0.65, description: "B树/Hash索引与优化" },
-    { kp_id: 9, kp_name: "Web数据库实践", mastery: 0.5, description: "FastAPI+PostgreSQL项目" },
-  ];
-
-  const displayTodayPath = todayPath.length > 0 ? todayPath : [
-    { kp_id: 7, kp_name: "事务隔离级别基础理解", mastery: 0.32, status_label: "当前学习点", difficulty: "advanced" },
-    { kp_id: 6, kp_name: "并发控制案例学习", mastery: 0.42, status_label: "薄弱", difficulty: "advanced" },
-    { kp_id: 5, kp_name: "事务", mastery: 0.35, status_label: "薄弱", difficulty: "intermediate" },
-    { kp_id: 3, kp_name: "多表连接补强", mastery: 0.6, status_label: "待学习", difficulty: "intermediate" },
-    { kp_id: 8, kp_name: "索引优化", mastery: 0.65, status_label: "待学习", difficulty: "advanced" },
-  ];
+  const displayNodes = knowledgePoints;
+  const displayTodayPath = todayPath;
 
   const displayCurrentKpId = currentRecommendKpId ?? displayTodayPath[0]?.kp_id;
 
@@ -109,6 +92,15 @@ export function StudentLearningPath() {
         </button>
       </div>
 
+      {error && (
+        <div role="alert" className="flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 sm:flex-row sm:items-center sm:justify-between">
+          <span>学习路径加载失败：{error.message}</span>
+          <button type="button" onClick={() => void refetch()} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-red-300 bg-white px-4 font-bold">
+            <RefreshCw className="h-4 w-4" /> 重试
+          </button>
+        </div>
+      )}
+
       {/* 知识图谱 */}
       <div className="edu-card p-4">
         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
@@ -134,7 +126,7 @@ export function StudentLearningPath() {
           今日学习顺序
         </h3>
         <div className="space-y-2">
-          {displayTodayPath.map((kp, i) => (
+          {displayTodayPath.length > 0 ? displayTodayPath.map((kp, i) => (
             <div
               key={kp.kp_id}
               className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/50 transition-colors cursor-pointer"
@@ -152,7 +144,9 @@ export function StudentLearningPath() {
                   : kp.status_label === "薄弱" ? "薄弱点" : "待学习"}
               </span>
             </div>
-          ))}
+          )) : !loading && (
+            <div className="py-10 text-center text-sm text-slate-400">暂无可安排的学习知识点</div>
+          )}
         </div>
       </div>
     </div>
