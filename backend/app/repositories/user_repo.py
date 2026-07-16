@@ -797,10 +797,15 @@ def list_operation_logs(
         SELECT o.log_id, o.user_id, o.project_id, o.task_id,
                o.target_type, o.target_id, o.action_type, o.action_desc,
                o.ip_address, o.user_agent, o.created_at,
-               u.username AS operator_username, u.real_name AS operator_real_name
+               u.username AS operator_username, u.real_name AS operator_real_name,
+               GROUP_CONCAT(DISTINCT r.role_code ORDER BY r.role_code SEPARATOR ',') AS role_codes
         FROM operation_logs o
         LEFT JOIN users u ON o.user_id = u.user_id AND u.is_deleted = 0
+        LEFT JOIN user_roles ur ON o.user_id = ur.user_id AND ur.is_deleted = 0
+        LEFT JOIN roles r ON ur.role_id = r.role_id
+            AND r.is_deleted = 0 AND r.status = 'active'
         WHERE {where_clause}
+        GROUP BY o.log_id
         ORDER BY o.log_id DESC
         LIMIT %s OFFSET %s
     """
@@ -864,10 +869,15 @@ def list_login_logs(
     data_sql = f"""
         SELECT l.login_id, l.user_id, l.username, l.login_status,
                l.failure_reason, l.ip_address, l.user_agent, l.login_time,
-               u.real_name AS real_name
+               u.real_name AS real_name,
+               GROUP_CONCAT(DISTINCT r.role_code ORDER BY r.role_code SEPARATOR ',') AS role_codes
         FROM login_logs l
         LEFT JOIN users u ON l.user_id = u.user_id AND u.is_deleted = 0
+        LEFT JOIN user_roles ur ON l.user_id = ur.user_id AND ur.is_deleted = 0
+        LEFT JOIN roles r ON ur.role_id = r.role_id
+            AND r.is_deleted = 0 AND r.status = 'active'
         WHERE {where_clause}
+        GROUP BY l.login_id
         ORDER BY l.login_id DESC
         LIMIT %s OFFSET %s
     """

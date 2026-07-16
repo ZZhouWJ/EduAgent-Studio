@@ -3,8 +3,9 @@ import client from './client'
 export interface OperationLog {
   log_id: number
   user_id: number
-  username: string
-  real_name: string
+  operator_username?: string
+  operator_real_name?: string
+  role_codes?: string
   action_type: string
   target_type: string
   target_id: number
@@ -20,6 +21,7 @@ export interface LoginLog {
   user_id: number
   username: string
   real_name: string
+  role_codes?: string
   login_status: 'success' | 'failed'
   failure_reason?: string
   ip_address?: string
