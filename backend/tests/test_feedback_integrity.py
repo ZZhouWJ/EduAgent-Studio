@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 
 from app.routers import feedbacks
 from app.routers.feedbacks import SubmitFeedbackRequest
-from app.utils.exceptions import ForbiddenException, ValidationException
+from app.utils.exceptions import ForbiddenException, NotFoundException, ValidationException
 
 
 class FeedbackIntegrityTests(unittest.IsolatedAsyncioTestCase):
@@ -61,6 +61,39 @@ class FeedbackIntegrityTests(unittest.IsolatedAsyncioTestCase):
                     SubmitFeedbackRequest(course_id=1, resource_id=9), user
                 )
 
+    async def test_feedback_rejects_unapproved_resource(self):
+        access = Mock()
+        access.require_resource_access.return_value = 1
+        resource = Mock()
+        resource.get_resource.return_value = {
+            "resource_id": 9,
+            "course_id": 1,
+            "status": "draft",
+        }
+        user = {"user_id": 12, "roles": ["student_member"]}
+
+        with patch("app.routers.feedbacks.CourseAccessService", return_value=access), patch.object(
+            feedbacks, "_resource_repo", resource
+        ):
+            with self.assertRaisesRegex(NotFoundException, "资源不存在"):
+                await feedbacks.submit_feedback(
+                    SubmitFeedbackRequest(resource_id=9, self_mastery=0.6), user
+                )
+
+    async def test_question_feedback_requires_content(self):
+        with self.assertRaisesRegex(ValidationException, "必须填写具体内容"):
+            await feedbacks.submit_feedback(
+                SubmitFeedbackRequest(feedback_type="question", content=" "),
+                {"user_id": 12, "roles": ["student_member"]},
+            )
+
+    async def test_quiz_feedback_requires_score(self):
+        with self.assertRaisesRegex(ValidationException, "必须包含测验得分"):
+            await feedbacks.submit_feedback(
+                SubmitFeedbackRequest(feedback_type="quiz_result"),
+                {"user_id": 12, "roles": ["student_member"]},
+            )
+
     async def test_self_mastery_is_normalized_and_uses_real_previous_value(self):
         access = Mock()
         access.list_accessible_course_ids.return_value = [1]
@@ -75,7 +108,7 @@ class FeedbackIntegrityTests(unittest.IsolatedAsyncioTestCase):
         }
         profile.get_profile.return_value = {"profile_id": 22}
         resource = Mock()
-        resource.get_resource.return_value = {"target_kp_ids": [4]}
+        resource.get_resource.return_value = {"target_kp_ids": [4], "status": "approved"}
         repo = Mock()
         repo.create_feedback.return_value = {"feedback_id": 5, "course_id": 1}
         learning = Mock()

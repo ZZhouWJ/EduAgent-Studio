@@ -1,5 +1,5 @@
 """学习反馈 API"""
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
@@ -23,11 +23,15 @@ _learning_service = LearningService()
 class SubmitFeedbackRequest(BaseModel):
     course_id: Optional[int] = Field(None, gt=0)
     resource_id: Optional[int] = Field(None, gt=0)
-    feedback_type: str = Field("self_report", min_length=1, max_length=50)
+    feedback_type: Literal[
+        "quiz_result", "self_report", "study_note", "question"
+    ] = "self_report"
     content: Optional[str] = Field(None, max_length=4000)
     quiz_score: Optional[float] = Field(None, ge=0, le=1)
     self_mastery: Optional[float] = Field(None, ge=0, le=1)
-    difficulty_rating: Optional[str] = Field(None, max_length=30)
+    difficulty_rating: Optional[
+        Literal["too_easy", "appropriate", "too_hard"]
+    ] = None
 
 
 @router.get("/feedbacks")
@@ -76,6 +80,11 @@ async def submit_feedback(
     """
     提交学习反馈，并自动更新知识点掌握度和学生画像。
     """
+    if data.feedback_type == "question" and not str(data.content or "").strip():
+        raise ValidationException("提交问题时必须填写具体内容")
+    if data.feedback_type == "quiz_result" and data.quiz_score is None:
+        raise ValidationException("测验反馈必须包含测验得分")
+
     user_id = int(user["user_id"])
     access = CourseAccessService()
     course_id = data.course_id
@@ -86,6 +95,8 @@ async def submit_feedback(
             raise ValidationException("反馈课程与学习资源课程不一致")
         course_id = resource_course_id
         resource = _resource_repo.get_resource(data.resource_id)
+        if resource is None or resource.get("status") != "approved":
+            raise NotFoundException("资源不存在")
 
     if course_id is None:
         accessible_course_ids = access.list_accessible_course_ids(user) or []
