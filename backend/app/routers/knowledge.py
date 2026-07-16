@@ -114,7 +114,7 @@ async def parse_material(
 @router.get("/search")
 async def search_knowledge(
     course_id: int = Query(..., description="课程 ID"),
-    query: str = Query(..., min_length=1, description="查询文本"),
+    query: str = Query(..., min_length=1, max_length=2000, description="查询文本"),
     kp_id: Optional[int] = Query(None, description="限定知识点 ID"),
     limit: int = Query(5, ge=1, le=20, description="返回数量"),
     user: dict = Depends(get_current_user_dep),
