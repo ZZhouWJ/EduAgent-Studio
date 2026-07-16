@@ -30,7 +30,7 @@ class UpdateRolesBody(BaseModel):
 
 class CreateUserBody(BaseModel):
     username: str = Field(..., min_length=1, max_length=50)
-    password: str = Field(..., min_length=6, max_length=100)
+    password: str = Field(..., min_length=8, max_length=72)
     real_name: str = Field(..., min_length=1, max_length=50)
     role_ids: list[int] = Field(..., min_length=1, max_length=5)
     student_no: Optional[str] = Field(None, max_length=20)

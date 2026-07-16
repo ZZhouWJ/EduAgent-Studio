@@ -128,8 +128,12 @@ export function AdminUsers() {
       notify.warning("请填写用户名和姓名");
       return;
     }
-    if (newPassword.length < 6) {
-      notify.warning("初始密码至少 6 位");
+    if (newPassword.length < 8) {
+      notify.warning("初始密码至少 8 位");
+      return;
+    }
+    if (new TextEncoder().encode(newPassword).length > 72) {
+      notify.warning("初始密码过长，请缩短后重试");
       return;
     }
     const roleId = newRoleId ?? rolesState.data?.[0]?.role_id;
@@ -244,7 +248,7 @@ export function AdminUsers() {
           </label>
           <label className="block text-sm font-bold text-slate-700">
             初始密码
-            <input type="password" autoComplete="new-password" className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="至少 6 位" />
+            <input type="password" autoComplete="new-password" minLength={8} maxLength={72} className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="至少 8 位" />
           </label>
           <label className="block text-sm font-bold text-slate-700">
             角色

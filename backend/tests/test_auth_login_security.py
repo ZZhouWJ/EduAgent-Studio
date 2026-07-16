@@ -5,6 +5,8 @@ from unittest.mock import Mock, patch
 
 from app.routers.auth import LoginRequest, login as login_route
 from app.services import auth_service
+from app.utils.exceptions import ValidationException
+from app.utils.password import MAX_PASSWORD_BYTES, get_password_policy_error, hash_password
 
 
 class LoginRateLimitTests(unittest.TestCase):
@@ -49,6 +51,55 @@ class LoginRateLimitTests(unittest.TestCase):
         self.assertEqual(response.status_code, 429)
         self.assertEqual(response.headers["Retry-After"], "900")
         self.assertEqual(payload["code"], 4290)
+
+
+class PasswordBoundaryTests(unittest.TestCase):
+    def test_new_password_requires_eight_characters(self):
+        self.assertEqual(
+            get_password_policy_error("Abc123!"),
+            "密码至少需要 8 个字符",
+        )
+
+    def test_new_password_enforces_bcrypt_utf8_byte_limit(self):
+        password = "学" * 25
+
+        self.assertGreater(len(password.encode("utf-8")), MAX_PASSWORD_BYTES)
+        self.assertIn("密码过长", get_password_policy_error(password) or "")
+        with self.assertRaises(ValueError):
+            hash_password(password)
+
+    @patch.object(auth_service.user_repo, "check_username_exists", return_value=False)
+    def test_registration_rejects_overlong_utf8_password(self, _username_exists):
+        password = "学" * 25
+
+        with self.assertRaisesRegex(ValidationException, "密码过长"):
+            auth_service.register(
+                username="new_student",
+                password=password,
+                confirm_password=password,
+                real_name="新学生",
+            )
+
+    @patch.object(auth_service.user_repo, "insert_login_log")
+    @patch.object(auth_service.user_repo, "get_user_by_username")
+    @patch.object(auth_service.user_repo, "count_recent_failed_login_attempts", return_value=0)
+    def test_login_treats_overlong_utf8_password_as_invalid(
+        self,
+        _count_failures,
+        get_user,
+        insert_log,
+    ):
+        get_user.return_value = {
+            "user_id": 7,
+            "username": "student",
+            "status": "active",
+            "password_hash": hash_password("Valid-Pass-123"),
+        }
+
+        result = auth_service.login("student", "学" * 25)
+
+        self.assertEqual(result, {"success": False, "reason": "用户名或密码错误"})
+        insert_log.assert_called_once()
 
 
 if __name__ == "__main__":

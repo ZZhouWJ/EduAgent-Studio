@@ -11,7 +11,7 @@ from fastapi import Header
 
 from app.repositories import user_repo
 from app.utils.exceptions import ConflictException, ForbiddenException, UnauthorizedException, ValidationException
-from app.utils.password import hash_password, verify_password
+from app.utils.password import get_password_policy_error, hash_password, verify_password
 from app.utils.roles import (
     PLATFORM_ROLE_CODES,
     PUBLIC_REGISTRATION_ROLE_CODES,
@@ -221,7 +221,7 @@ def register(
 
     流程：
     1. 校验两次密码一致
-    2. 校验参数（username 非空，password 至少 6 字符）
+    2. 校验参数（username 非空，password 符合统一安全策略）
     3. 检查用户名是否已存在
     4. 校验角色是否符合注册来源的授权范围
     5. bcrypt 哈希密码
@@ -230,7 +230,7 @@ def register(
 
     Args:
         username: 用户名
-        password: 明文密码（至少 6 字符）
+        password: 明文密码（至少 8 字符且不超过 bcrypt 字节上限）
         confirm_password: 确认密码（必须与 password 一致）
         real_name: 真实姓名
         student_no: 学号（可选）
@@ -249,8 +249,9 @@ def register(
     if not username or not username.strip():
         raise ValidationException(message="用户名不能为空")
 
-    if not password or len(password) < 6:
-        raise ValidationException(message="密码至少需要 6 个字符")
+    password_error = get_password_policy_error(password)
+    if password_error:
+        raise ValidationException(message=password_error)
 
     if not real_name or not real_name.strip():
         raise ValidationException(message="真实姓名不能为空")
@@ -322,13 +323,13 @@ def update_password(
     流程：
     1. 解析 token 获取当前用户
     2. 校验旧密码
-    3. 新密码至少 6 字符
+    3. 校验新密码安全策略
     4. 哈希新密码并更新
 
     Args:
         token: 当前用户的 JWT token
         old_password: 旧密码
-        new_password: 新密码（至少 6 字符）
+        new_password: 新密码（至少 8 字符且不超过 bcrypt 字节上限）
 
     Raises:
         UnauthorizedException: token 无效或过期
@@ -347,8 +348,9 @@ def update_password(
     if not verify_password(old_password, user_record["password_hash"]):
         raise ValidationException(message="旧密码错误")
 
-    if not new_password or len(new_password) < 6:
-        raise ValidationException(message="新密码至少需要 6 个字符")
+    password_error = get_password_policy_error(new_password)
+    if password_error:
+        raise ValidationException(message=password_error)
 
     new_hash = hash_password(new_password)
     user_repo.update_password(user_id, new_hash)

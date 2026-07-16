@@ -33,13 +33,13 @@ def _unexpected_auth_error(action: str, exc: Exception):
 
 class LoginRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=50)
-    password: str = Field(..., min_length=1, max_length=100)
+    password: str = Field(..., min_length=1, max_length=72)
 
 
 class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=50)
-    password: str = Field(..., min_length=6, max_length=100)
-    confirm_password: str = Field(..., min_length=6, max_length=100)
+    password: str = Field(..., min_length=8, max_length=72)
+    confirm_password: str = Field(..., min_length=8, max_length=72)
     real_name: str = Field(..., min_length=1, max_length=50)
     student_no: Optional[str] = Field(None, max_length=20)
     email: Optional[str] = Field(None, max_length=100)
@@ -62,8 +62,8 @@ class UpdateMyRolesRequest(BaseModel):
 
 
 class UpdatePasswordRequest(BaseModel):
-    old_password: str = Field(..., min_length=1)
-    new_password: str = Field(..., min_length=6, max_length=100)
+    old_password: str = Field(..., min_length=1, max_length=72)
+    new_password: str = Field(..., min_length=8, max_length=72)
 
 
 def _extract_token(authorization: Optional[str]) -> str:
