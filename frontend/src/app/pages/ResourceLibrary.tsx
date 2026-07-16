@@ -32,9 +32,10 @@ function resourceIcon(type: string) {
 
 const STATUS_LABELS: Record<string, string> = {
   approved: "已通过",
-  pending: "待审核",
+  pending_review: "待审核",
   rejected: "被退回",
   draft: "草稿",
+  archived: "已归档",
 };
 
 export function ResourceLibrary() {
@@ -71,6 +72,7 @@ export function ResourceLibrary() {
   const { data, loading } = useApi(
     () => resourcesApi.list({
       type: typeFilter || undefined,
+      status: statusFilter || undefined,
       course_id: Number(courseFilter) || undefined,
       page_size: 100,
     }),
@@ -135,7 +137,7 @@ export function ResourceLibrary() {
           >
             <option value="">全部状态</option>
             <option value="approved">已通过</option>
-            <option value="pending">待审核</option>
+            <option value="pending_review">待审核</option>
             <option value="rejected">被退回</option>
           </select>
         </div>
@@ -172,7 +174,7 @@ export function ResourceLibrary() {
             const Icon = res.icon;
             const statusColor =
               res.rawStatus === "approved" ? "text-emerald-600" :
-              res.rawStatus === "pending" ? "text-orange-600" : "text-red-600";
+              res.rawStatus === "pending_review" ? "text-orange-600" : "text-red-600";
             return (
               <div
                 key={res.id}
@@ -205,7 +207,7 @@ export function ResourceLibrary() {
                 <div className="flex items-center justify-between border-t border-slate-100 pt-3">
                   <div className="flex items-center gap-1.5">
                     {res.rawStatus === "approved" && <CheckCircle2 className="h-4 w-4 cursor-pointer text-emerald-500" />}
-                    {res.rawStatus === "pending" && <AlertCircle className="h-4 w-4 cursor-pointer text-orange-500" />}
+                    {res.rawStatus === "pending_review" && <AlertCircle className="h-4 w-4 cursor-pointer text-orange-500" />}
                     {res.rawStatus === "rejected" && <AlertCircle className="h-4 w-4 cursor-pointer text-red-500" />}
                     <span className={`text-xs font-bold ${statusColor}`}>{res.status}</span>
                   </div>

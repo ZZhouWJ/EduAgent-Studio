@@ -18,6 +18,7 @@ export const resourcesApi = {
     page_size?: number
     course_id?: number
     type?: string
+    status?: string
   }) {
     return client.get<{ items: LearningResource[]; total: number }>('/learning/resources', { params })
   },

@@ -24,6 +24,7 @@ class LearningResourceRepository:
         page_size: int = 20,
         course_id: Optional[int] = None,
         resource_type: Optional[str] = None,
+        status: Optional[str] = None,
         course_ids: Optional[List[int]] = None,
     ) -> Dict[str, Any]:
         """
@@ -50,6 +51,9 @@ class LearningResourceRepository:
         if resource_type:
             filters.append("lr.resource_type = %s")
             params.append(resource_type)
+        if status:
+            filters.append("lr.status = %s")
+            params.append(status)
 
         where_clause = " AND ".join(filters)
 
