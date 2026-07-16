@@ -1,12 +1,11 @@
 """智能体工作台 API — LangGraph 标准版"""
 import logging
-from typing import Annotated, Optional
+from typing import Annotated, List, Literal, Optional
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import AliasChoices, BaseModel, Field, StringConstraints
-from typing import List
 
 from app.services.agent_service import AgentService, extract_resource_references
 from app.services.course_access_service import CourseAccessService
@@ -15,6 +14,22 @@ from app.utils.dependencies import get_current_user_dep, require_role
 router = APIRouter(prefix="/agents", tags=["智能体工作台"])
 logger = logging.getLogger(__name__)
 
+ResourceType = Literal[
+    "lecture",
+    "mindmap",
+    "quiz",
+    "case",
+    "code_case",
+    "ppt",
+    "video_script",
+    "experiment_report",
+    "error_analysis",
+    "learning_card",
+    "review",
+    "test",
+    "other",
+]
+
 
 class GenerateRequest(BaseModel):
     student_id: int = Field(..., gt=0)
@@ -22,8 +37,8 @@ class GenerateRequest(BaseModel):
     knowledge_point_ids: List[Annotated[int, Field(gt=0)]] = Field(
         ..., min_length=1, max_length=50
     )
-    resource_type: str
-    difficulty: str
+    resource_type: ResourceType
+    difficulty: Literal["basic", "intermediate", "advanced"]
     generation_goal: Optional[str] = None
     enable_review: bool = True
 

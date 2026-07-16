@@ -2,6 +2,8 @@ import asyncio
 import unittest
 from unittest.mock import Mock, patch
 
+from pydantic import ValidationError
+
 from app.services.agent_service import (
     AgentService,
     _extract_save_payload,
@@ -65,6 +67,16 @@ class ExtractSavePayloadTests(unittest.TestCase):
 
 
 class AgentContextTests(unittest.TestCase):
+    def test_generation_request_rejects_unsupported_resource_type(self):
+        with self.assertRaises(ValidationError):
+            GenerateRequest(
+                student_id=12,
+                course_id=3,
+                knowledge_point_ids=[4],
+                resource_type="unsupported",
+                difficulty="intermediate",
+            )
+
     @patch("app.repositories.profile_repo.ProfileRepository")
     def test_profile_resolution_uses_student_and_course(self, repo_type):
         repo = Mock()

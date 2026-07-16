@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS learning_resources (
     resource_id SERIAL PRIMARY KEY,
     course_id INTEGER NOT NULL REFERENCES courses(course_id),
     resource_title VARCHAR(200) NOT NULL,
-    resource_type VARCHAR(20) NOT NULL CHECK (resource_type IN ('lecture', 'ppt', 'quiz', 'case', 'review', 'test', 'other')),
+    resource_type VARCHAR(32) NOT NULL CHECK (resource_type IN ('lecture', 'mindmap', 'quiz', 'case', 'code_case', 'ppt', 'video_script', 'experiment_report', 'error_analysis', 'learning_card', 'review', 'test', 'other')),
     difficulty VARCHAR(20) NOT NULL DEFAULT 'basic' CHECK (difficulty IN ('basic', 'intermediate', 'advanced')),
     content TEXT,
     target_kp_ids VARCHAR(500),
@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS learning_resources (
     updated_at TIMESTAMP
 );
 COMMENT ON TABLE learning_resources IS '学习资源表';
-COMMENT ON COLUMN learning_resources.resource_type IS '资源类型: lecture/ppt/quiz/case/review/test/other';
+COMMENT ON COLUMN learning_resources.resource_type IS '资源类型: lecture/mindmap/quiz/case/code_case/ppt/video_script/experiment_report/error_analysis/learning_card/review/test/other';
 COMMENT ON COLUMN learning_resources.status IS '审核状态: draft/pending_review/approved/rejected/archived';
 
 CREATE INDEX IF NOT EXISTS idx_resource_course ON learning_resources(course_id);
