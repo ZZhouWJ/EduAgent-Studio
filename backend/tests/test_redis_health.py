@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
 
+from app.config import Settings
 from app.main import _check_redis_connection, create_app
 
 
@@ -58,6 +59,22 @@ class RedisHealthTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["data"]["status"], "ok")
+
+    def test_root_hides_disabled_production_docs(self):
+        settings = Settings(
+            APP_ENV="production",
+            JWT_SECRET_KEY="a-secure-production-secret-key-with-32-chars",
+            CORS_ORIGINS="https://eduagent.example.com",
+            LLM_API_KEY="test-key",
+            _env_file=None,
+        )
+
+        with patch("app.main.get_settings", return_value=settings):
+            app = create_app()
+            response = TestClient(app).get("/")
+
+        self.assertIsNone(app.docs_url)
+        self.assertIsNone(response.json()["data"]["docs"])
 
 
 if __name__ == "__main__":

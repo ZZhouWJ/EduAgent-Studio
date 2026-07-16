@@ -115,12 +115,12 @@ def create_app() -> FastAPI:
 
     @app.get("/")
     async def root() -> dict:
-        """根路径，重定向到 /docs。"""
+        """返回服务元数据与当前可用的文档地址。"""
         return success_response(
             data={
                 "name": settings.app_name,
                 "env": settings.app_env,
-                "docs": "/docs",
+                "docs": app.docs_url,
             },
             message="服务正常运行",
         )
