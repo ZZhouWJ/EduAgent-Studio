@@ -64,7 +64,6 @@ export {
   type TaskOutput,
   type TaskBranch,
   type OutputComment,
-  type GenerationResult,
   type Project,
   type ProjectMember,
   type ProjectTask,

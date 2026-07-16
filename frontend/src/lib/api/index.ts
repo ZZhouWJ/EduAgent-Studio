@@ -52,7 +52,6 @@ export {
   type TaskOutput,
   type TaskBranch,
   type OutputComment,
-  type GenerationResult,
 } from './tasks'
 
 // Projects
