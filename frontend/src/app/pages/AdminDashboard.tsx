@@ -42,7 +42,7 @@ function OverviewCard({ label, value, hint, icon, tone }: {
 }) {
   const Icon = icon;
   return (
-    <div className="edu-card edu-card-hover cursor-pointer rounded-2xl p-4">
+    <div className="edu-card rounded-2xl p-4">
       <div className={`mb-4 grid h-10 w-10 place-items-center rounded-xl ring-1 ${toneClass[tone]}`}>
         <Icon className="h-5 w-5" />
       </div>
@@ -227,7 +227,7 @@ export function AdminDashboard() {
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="edu-card rounded-2xl p-6">
-          <h2 className="mb-5 flex cursor-pointer items-center gap-2 text-lg font-black text-slate-950">
+          <h2 className="mb-5 flex items-center gap-2 text-lg font-black text-slate-950">
             <Server className="h-5 w-5 text-emerald-600" />
             系统运行状态
           </h2>
@@ -237,7 +237,7 @@ export function AdminDashboard() {
               const warn = service.status !== "正常" && service.status !== "未知" && service.status !== "—" && service.status !== "检测中";
               const isPending = service.status === "检测中";
               return (
-                <div key={service.key} className="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 transition hover:border-slate-200">
+                <div key={service.key} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4">
                   <div className={`grid h-10 w-10 place-items-center rounded-xl ring-1 ${isPending ? "bg-slate-100 text-slate-400 ring-slate-200" : warn ? "bg-orange-50 text-orange-700 ring-orange-100" : "bg-emerald-50 text-emerald-700 ring-emerald-100"}`}>
                     <Icon className="h-5 w-5" />
                   </div>
@@ -255,7 +255,7 @@ export function AdminDashboard() {
         </div>
 
         <div className="edu-card rounded-2xl p-6">
-          <h2 className="mb-5 cursor-pointer text-lg font-black text-slate-950">模型调用统计</h2>
+          <h2 className="mb-5 text-lg font-black text-slate-950">模型调用统计</h2>
           {loading ? (
             <div className="flex h-[318px] items-center justify-center">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
@@ -280,7 +280,7 @@ export function AdminDashboard() {
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.25fr]">
         <div className="edu-card rounded-2xl p-6">
-          <h2 className="mb-5 flex cursor-pointer items-center gap-2 text-lg font-black text-slate-950">
+          <h2 className="mb-5 flex items-center gap-2 text-lg font-black text-slate-950">
             <CircleAlert className="h-5 w-5 text-red-600" />
             内容安全与审核风险
           </h2>
@@ -301,7 +301,7 @@ export function AdminDashboard() {
         </div>
 
         <div className="edu-card rounded-2xl p-6">
-          <h2 className="mb-5 cursor-pointer text-lg font-black text-slate-950">模型与智能体配置入口</h2>
+          <h2 className="mb-5 text-lg font-black text-slate-950">模型与智能体配置入口</h2>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             {ENTRY.map((entry) => {
               const Icon = entry.icon;

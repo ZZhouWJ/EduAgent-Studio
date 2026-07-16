@@ -263,7 +263,7 @@ export function AdminModelConfig() {
       ) : (
         <section className="grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-3">
           {filtered.map((model) => (
-            <article key={model.id} className="edu-card edu-card-hover cursor-pointer rounded-2xl p-5">
+            <article key={model.id} className="edu-card rounded-2xl p-5">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-black text-slate-950">{model.name}</h2>
