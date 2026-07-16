@@ -41,8 +41,8 @@ async def upload_material(
     """
     CourseAccessService().require_course_access(course_id, user)
 
-    # 读取文件内容
-    file_content = await file.read()
+    # Bounded read prevents direct API clients from forcing an unbounded allocation.
+    file_content = await file.read(knowledge_service.MAX_MATERIAL_SIZE + 1)
 
     # 获取文件类型
     filename = file.filename or "unknown"

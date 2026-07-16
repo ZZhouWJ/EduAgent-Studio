@@ -1,7 +1,9 @@
 import unittest
 from io import BytesIO
+from unittest.mock import AsyncMock, Mock, patch
 from zipfile import ZIP_DEFLATED, ZipFile
 
+from app.routers.knowledge import upload_material
 from app.services.knowledge_service import (
     MAX_MATERIAL_SIZE,
     validate_material_upload,
@@ -44,6 +46,29 @@ class KnowledgeUploadValidationTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "扩展名"):
             validate_material_upload(word, "lesson.pptx", "ppt")
+
+
+class KnowledgeUploadRouteTests(unittest.IsolatedAsyncioTestCase):
+    @patch("app.routers.knowledge.knowledge_service.KnowledgeService")
+    @patch("app.routers.knowledge.CourseAccessService")
+    async def test_route_uses_a_bounded_file_read(self, access_service, service_class):
+        upload = Mock(filename="lesson.txt")
+        upload.read = AsyncMock(return_value="课程内容".encode())
+        service_class.return_value.upload_material.return_value = {
+            "code": 0,
+            "message": "文件上传成功",
+            "data": {"material_id": 9},
+        }
+
+        result = await upload_material(
+            course_id=3,
+            file=upload,
+            user={"user_id": 7, "roles": ["teacher"]},
+        )
+
+        self.assertEqual(result["code"], 0)
+        upload.read.assert_awaited_once_with(MAX_MATERIAL_SIZE + 1)
+        access_service.return_value.require_course_access.assert_called_once()
 
 
 if __name__ == "__main__":
