@@ -130,6 +130,9 @@ def create_template(
     template_name: str,
     task_type_id: int,
     description: Optional[str] = None,
+    initial_prompt_content: Optional[str] = None,
+    change_note: Optional[str] = None,
+    activate: bool = False,
     ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -141,6 +144,12 @@ def create_template(
 
     if not template_name or not template_name.strip():
         raise ValidationException(message="模板名称不能为空")
+
+    normalized_prompt = (
+        initial_prompt_content.strip() if initial_prompt_content else None
+    )
+    if activate and not normalized_prompt:
+        raise ValidationException(message="启用模板前必须提供初始提示词")
 
     task_type = prompt_repo.get_task_type_by_id(task_type_id)
     if task_type is None:
@@ -154,13 +163,33 @@ def create_template(
             task_type_id=task_type_id,
             description=(description.strip() if description else None),
             created_by=user["user_id"],
+            is_active=activate,
             conn=conn,
         )
+
+        if normalized_prompt:
+            version_id = prompt_repo.create_version(
+                template_id=template_id,
+                version_no="1",
+                prompt_content=normalized_prompt,
+                change_note=(change_note.strip() if change_note else "初始版本"),
+                created_by=user["user_id"],
+                conn=conn,
+            )
+            prompt_repo.set_current_version(
+                template_id=template_id,
+                version_id=version_id,
+                conn=conn,
+            )
 
         user_repo.insert_operation_log_with_conn(
             user_id=user["user_id"],
             action_type="prompt_template:create",
-            action_desc=f"创建提示词模板: {template_name.strip()}",
+            action_desc=(
+                f"创建提示词模板及初始版本: {template_name.strip()}"
+                if normalized_prompt
+                else f"创建提示词模板草稿: {template_name.strip()}"
+            ),
             target_type="prompt_template",
             target_id=template_id,
             project_id=None,

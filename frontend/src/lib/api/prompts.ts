@@ -37,8 +37,10 @@ export interface PromptVersion {
 export interface CreateTemplateBody {
   template_name: string
   task_type_id: number
+  description?: string
   initial_prompt_content?: string
   change_note?: string
+  activate?: boolean
 }
 
 export interface UpdateTemplateBody {

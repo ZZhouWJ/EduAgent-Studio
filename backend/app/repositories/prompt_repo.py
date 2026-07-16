@@ -187,6 +187,7 @@ def create_template(
     task_type_id: int,
     description: Optional[str],
     created_by: int,
+    is_active: bool = False,
     conn: Optional[Connection] = None,
 ) -> int:
     """
@@ -202,18 +203,26 @@ def create_template(
              is_active, current_version_id,
              is_deleted, created_at, created_by)
         VALUES
-            (%s, %s, %s, 0, NULL, 0, %s, %s)
+            (%s, %s, %s, %s, NULL, 0, %s, %s)
     """
+    params = (
+        template_name,
+        task_type_id,
+        description,
+        1 if is_active else 0,
+        now,
+        created_by,
+    )
     if conn is not None:
         cursor = conn.cursor()
         try:
-            cursor.execute(sql, (template_name, task_type_id, description, now, created_by))
+            cursor.execute(sql, params)
             return cursor.lastrowid
         finally:
             cursor.close()
     else:
         with get_db_cursor() as cursor:
-            cursor.execute(sql, (template_name, task_type_id, description, now, created_by))
+            cursor.execute(sql, params)
             return cursor.lastrowid
 
 

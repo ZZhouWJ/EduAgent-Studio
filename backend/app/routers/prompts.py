@@ -54,6 +54,9 @@ class CreateTemplateRequest(BaseModel):
     template_name: str = Field(..., min_length=1, max_length=200)
     task_type_id: int = Field(..., gt=0)
     description: Optional[str] = Field(None, max_length=500)
+    initial_prompt_content: Optional[str] = Field(None, max_length=200_000)
+    change_note: Optional[str] = Field(None, max_length=500)
+    activate: bool = Field(False)
 
 
 class UpdateTemplateRequest(BaseModel):
@@ -136,6 +139,9 @@ async def create_template(
         template_name=body.template_name,
         task_type_id=body.task_type_id,
         description=body.description,
+        initial_prompt_content=body.initial_prompt_content,
+        change_note=body.change_note,
+        activate=body.activate,
         ip_address=ip,
         user_agent=ua,
     )

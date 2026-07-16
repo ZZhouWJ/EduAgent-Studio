@@ -40,6 +40,9 @@ export function AdminPrompts() {
 
   const [newTemplateName, setNewTemplateName] = React.useState("");
   const [newTaskTypeId, setNewTaskTypeId] = React.useState<number | "">("");
+  const [newDescription, setNewDescription] = React.useState("");
+  const [newPromptContent, setNewPromptContent] = React.useState("");
+  const [newTemplateActive, setNewTemplateActive] = React.useState(true);
   const [creatingTemplate, setCreatingTemplate] = React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [previewVersionId, setPreviewVersionId] = React.useState<number | null>(null);
@@ -143,8 +146,8 @@ export function AdminPrompts() {
   };
 
   const handleCreateTemplate = async () => {
-    if (!newTemplateName.trim() || !newTaskTypeId) {
-      notify.warning("请填写模板名称并选择任务类型");
+    if (!newTemplateName.trim() || !newTaskTypeId || !newPromptContent.trim()) {
+      notify.warning("请填写模板名称、任务类型和初始 Prompt");
       return;
     }
     setCreatingTemplate(true);
@@ -152,11 +155,18 @@ export function AdminPrompts() {
       const created = await promptsApi.createTemplate({
         template_name: newTemplateName.trim(),
         task_type_id: newTaskTypeId as number,
+        description: newDescription.trim() || undefined,
+        initial_prompt_content: newPromptContent.trim(),
+        change_note: "初始版本",
+        activate: newTemplateActive,
       });
       notify.success(`模板「${newTemplateName}」已创建`);
       templatesState.refetch();
       setNewTemplateName("");
       setNewTaskTypeId("");
+      setNewDescription("");
+      setNewPromptContent("");
+      setNewTemplateActive(true);
       setModalMode(null);
       const mapped = mapTemplate(created);
       setSelected(mapped);
@@ -298,6 +308,36 @@ export function AdminPrompts() {
                     <option key={tt.task_type_id} value={tt.task_type_id}>{tt.type_name}</option>
                   ))}
                 </select>
+              </label>
+              <label className="block text-sm font-bold text-slate-700">
+                使用说明
+                <input
+                  className="edu-focus-ring mt-2 h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"
+                  value={newDescription}
+                  onChange={(event) => setNewDescription(event.target.value)}
+                  placeholder="说明模板适用场景（选填）"
+                />
+              </label>
+              <label className="block text-sm font-bold text-slate-700">
+                初始 Prompt
+                <textarea
+                  className="edu-focus-ring mt-2 h-48 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 p-3 font-mono text-sm leading-6"
+                  value={newPromptContent}
+                  onChange={(event) => setNewPromptContent(event.target.value)}
+                  placeholder="输入首个可用版本，变量使用 {{variable_name}}"
+                />
+              </label>
+              <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <span>
+                  <span className="block text-sm font-bold text-slate-700">创建后启用</span>
+                  <span className="mt-1 block text-xs text-slate-500">启用后可被对应任务流程调用</span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={newTemplateActive}
+                  onChange={(event) => setNewTemplateActive(event.target.checked)}
+                  className="h-5 w-5 accent-blue-600"
+                />
               </label>
             </>
           ) : selectedTemplate ? (
