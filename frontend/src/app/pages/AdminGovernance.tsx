@@ -2,7 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Bot, CheckCircle2, ClipboardCheck, FileWarning, Gauge, LockKeyhole, ShieldAlert, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { useApi } from "@/lib/useApi";
-import { platformSettingsApi, reviewsApi, statisticsApi, type GovernanceSettingsUpdate } from "@/lib/api";
+import { platformSettingsApi, resourcesApi, statisticsApi, type GovernanceSettingsUpdate } from "@/lib/api";
 import { notify } from "@/lib/toast";
 import { ModalShell, primaryButton, secondaryButton } from "../components/common/ProductUI";
 
@@ -19,20 +19,18 @@ export function AdminGovernance() {
   const [saving, setSaving] = React.useState(false);
   const [form, setForm] = React.useState<GovernanceSettingsUpdate>(DEFAULT_FORM);
 
-  const reviewsState = useApi(() => statisticsApi.reviews(), []);
-  const pendingState = useApi(() => reviewsApi.getPending({ page_size: 100 }), []);
+  const pendingState = useApi(
+    () => resourcesApi.list({ status: "pending_review", page: 1, page_size: 100 }),
+    [],
+  );
   const modelCallsState = useApi(() => statisticsApi.modelCalls(), []);
-  const activitiesState = useApi(() => statisticsApi.recentActivities({ limit: 100 }), []);
   const resourcesState = useApi(() => statisticsApi.getResourceStats(), []);
   const settingsState = useApi(() => platformSettingsApi.getGovernance(), []);
 
-  const reviews = reviewsState.data;
   const pendingList = pendingState.data?.items ?? [];
   const modelCalls = modelCallsState.data ?? [];
   const governance = settingsState.data;
-  const highRiskIssueCount = (reviews?.top_issue_tags ?? [])
-    .filter((tag) => tag.severity === "high")
-    .reduce((total, tag) => total + Number(tag.count || 0), 0);
+  const rejectedResourceCount = resourcesState.data?.rejected ?? 0;
   const abnormalCallCount = modelCalls.reduce(
     (total, model) => total + Number(model.failed_count || 0) + Number(model.timeout_count || 0),
     0,
@@ -41,21 +39,19 @@ export function AdminGovernance() {
     (total, model) => total + Number(model.blocked_count || 0),
     0,
   );
-  const promptChangeCount = (activitiesState.data ?? []).filter(
-    (activity) => activity.action_type.toLowerCase().includes("prompt"),
-  ).length;
 
-  const riskQueue = pendingList.slice(0, 4).map((request) => ({
-    id: request.request_id,
-    title: request.output_title || "待审核资源",
-    level: highRiskIssueCount > 0 ? "中风险" : "待复核",
-    owner: request.submitter_real_name || request.submitter_username || "—",
-    reason: request.submit_note || "生成内容待人工复核",
+  const riskQueue = pendingList.slice(0, 4).map((resource) => ({
+    id: resource.resource_id,
+    courseId: resource.course_id,
+    title: resource.resource_title || "待审核资源",
+    level: "待复核",
+    course: resource.course_name || "未分配课程",
+    reason: "生成内容已提交人工复核，审核通过后才会向学生开放。",
   }));
 
   const stats = [
-    { label: "高风险问题", value: String(highRiskIssueCount), Icon: ShieldAlert, cls: "bg-red-50 text-red-700 ring-red-100" },
-    { label: "待复核资源", value: String(pendingState.data?.total ?? 0), Icon: ClipboardCheck, cls: "bg-orange-50 text-orange-700 ring-orange-100" },
+    { label: "已退回资源", value: String(rejectedResourceCount), Icon: ShieldAlert, cls: "bg-red-50 text-red-700 ring-red-100" },
+    { label: "待复核资源", value: String(resourcesState.data?.pending ?? 0), Icon: ClipboardCheck, cls: "bg-orange-50 text-orange-700 ring-orange-100" },
     { label: "异常调用", value: String(abnormalCallCount), Icon: Gauge, cls: "bg-slate-100 text-slate-700 ring-slate-200" },
     { label: "已拦截调用", value: String(blockedCallCount), Icon: ShieldCheck, cls: "bg-emerald-50 text-emerald-700 ring-emerald-100" },
   ];
@@ -68,9 +64,9 @@ export function AdminGovernance() {
   ];
 
   const governanceActions = [
-    ["待教师复核", `${pendingState.data?.total ?? 0} 条资源在课程审核队列`],
+    ["待教师复核", `${resourcesState.data?.pending ?? 0} 条资源在课程审核队列`],
     ["调用拦截记录", `${blockedCallCount} 次模型调用被治理策略拦截`],
-    ["Prompt 变更记录", `最近 100 条操作中有 ${promptChangeCount} 次 Prompt 变更`],
+    ["资源审核通过率", `${((resourcesState.data?.pass_rate ?? 0) * 100).toFixed(1)}% 的已审资源通过复核`],
     ["审核通过资源", `${resourcesState.data?.approved ?? 0} 条资源已通过人工审核`],
   ];
 
@@ -112,7 +108,7 @@ export function AdminGovernance() {
     }));
   };
 
-  const statsLoading = reviewsState.loading || pendingState.loading || modelCallsState.loading;
+  const statsLoading = resourcesState.loading || modelCallsState.loading;
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-6">
@@ -164,7 +160,7 @@ export function AdminGovernance() {
                   <div>
                     <h3 className="text-sm font-black text-slate-900">{risk.title}</h3>
                     <p className="mt-1 text-xs leading-5 text-slate-500">{risk.reason}</p>
-                    <p className="mt-2 text-xs font-bold text-slate-400">{risk.owner}</p>
+                    <p className="mt-2 text-xs font-bold text-slate-400">{risk.course}</p>
                   </div>
                   <div className="flex flex-col items-end gap-5">
                     <span className={`rounded-full px-2 py-1 text-[11px] font-black ${
@@ -173,7 +169,7 @@ export function AdminGovernance() {
                       {risk.level}
                     </span>
                     <button
-                      onClick={() => navigate(`/admin/audit?request=${risk.id}`)}
+                      onClick={() => navigate(`/admin/resources?course=${risk.courseId}&resource=${risk.id}`)}
                       className="cursor-pointer text-xs font-black text-blue-700 hover:text-blue-800"
                     >
                       查看详情
