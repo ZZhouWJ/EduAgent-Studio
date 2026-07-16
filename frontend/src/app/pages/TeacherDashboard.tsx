@@ -68,7 +68,7 @@ export function TeacherDashboard() {
         transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
         className="edu-card relative overflow-hidden rounded-2xl p-7"
       >
-        <div className="relative grid grid-cols-[1.25fr_0.75fr] items-center gap-6">
+        <div className="relative grid grid-cols-1 items-center gap-6 lg:grid-cols-[1.25fr_0.75fr]">
           <div>
             <div className="mb-4 flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
               教学工作台
@@ -123,7 +123,7 @@ export function TeacherDashboard() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-        className="grid grid-cols-6 gap-4"
+        className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6"
       >
         {stats.map((stat) => {
           const Icon = stat.icon;
@@ -145,14 +145,14 @@ export function TeacherDashboard() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-        className="grid grid-cols-[1fr_0.95fr] gap-6"
+        className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_0.95fr]"
       >
         <div className="edu-card rounded-2xl p-6">
           <h3 className="mb-5 flex items-center gap-2 text-lg font-semibold text-slate-900">
             <AlertTriangle className="h-5 w-5 text-orange-600" />
             待处理事项
           </h3>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {actionItems.map((item) => {
               const Icon = item.icon;
               return (
@@ -205,7 +205,7 @@ export function TeacherDashboard() {
           </h3>
           <Link to="/teacher/agent-workbench" className="text-sm font-semibold text-slate-700 hover:text-slate-900">进入智能体工坊</Link>
         </div>
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {taskSuggestions.map((item, index) => (
             <Link
               key={`${item.title}-${index}`}
