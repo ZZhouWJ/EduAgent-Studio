@@ -301,7 +301,8 @@ class ResourceGenerationAgent:
         return {
             "resource_id": f"res-{uuid.uuid4().hex[:8]}",
             "title": f"{kp_name}专题{RESOURCE_TYPE_TITLES.get(resource_type, '资源')}",
-            "type": RESOURCE_TYPE_TITLES.get(resource_type, "学习资源"),
+            "type": resource_type,
+            "type_label": RESOURCE_TYPE_TITLES.get(resource_type, "学习资源"),
             "target_kp_ids": kp_id_str,
             "knowledge_points": kp_ids,
             "difficulty": difficulty,
