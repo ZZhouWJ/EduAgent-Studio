@@ -174,16 +174,31 @@ def get_resource_content(file_id: str) -> Optional[dict[str, Any]]:
         return None
 
     file_path = entry.get("file_path")
-    if not file_path or not os.path.exists(file_path):
+    if not file_path:
+        return None
+
+    storage_root = os.path.realpath(_get_storage_dir())
+    resolved_path = os.path.realpath(file_path)
+    try:
+        inside_storage = os.path.commonpath([storage_root, resolved_path]) == storage_root
+    except ValueError:
+        inside_storage = False
+    if (
+        not inside_storage
+        or os.path.basename(resolved_path) != f"{file_id}.json"
+        or not os.path.isfile(resolved_path)
+    ):
+        logger.warning("拒绝读取无效的资源索引路径: file_id=%s", file_id)
         return None
 
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(resolved_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         return {
             "file_id": file_id,
             **data,
             "url": entry.get("url"),
+            "file_path": resolved_path,
         }
     except Exception as e:
         logger.error("读取资源文件失败 (%s)", type(e).__name__)
