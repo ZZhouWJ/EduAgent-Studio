@@ -76,6 +76,14 @@ def _parse_id_list(value: Optional[str]) -> List[int]:
     return [int(item.strip()) for item in value.split(",") if item.strip().isdigit()]
 
 
+def _serialize_due_date(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.isoformat(timespec="seconds")
+    return str(value)
+
+
 def _current_semester(reference: Optional[datetime] = None) -> str:
     current = reference or datetime.now()
     if current.month >= 9:
@@ -380,7 +388,7 @@ class LearningRepository:
                     "assignee_name": row["assignee_name"],
                     "target_kp_ids": _parse_id_list(row["target_kp_ids"]),
                     "priority": priority,
-                    "due_date": row["due_date"].strftime("%Y-%m-%d") if isinstance(due_date, datetime) else str(due_date),
+                    "due_date": _serialize_due_date(due_date),
                     "description": row["description"] or "",
                     "student_count": 0,
                     "completion_rate": 0.0,
@@ -439,7 +447,7 @@ class LearningRepository:
             "assignee_name": row["assignee_name"],
             "target_kp_ids": _parse_id_list(row["target_kp_ids"]),
             "priority": priority,
-            "due_date": row["due_date"].strftime("%Y-%m-%d") if isinstance(due_date, datetime) else str(due_date),
+            "due_date": _serialize_due_date(due_date),
             "description": row["description"] or "",
             "student_count": 0,
             "completion_rate": 0.0,

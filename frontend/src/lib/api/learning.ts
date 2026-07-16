@@ -36,7 +36,7 @@ export interface LearningTask {
   assignee_name: string | null
   target_kp_ids: number[]
   priority: string
-  due_date: string
+  due_date: string | null
   description: string
   student_count: number
   completion_rate: number

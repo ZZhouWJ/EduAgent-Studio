@@ -7,6 +7,7 @@ from app.repositories.learning_repo import (
     _current_semester,
     _estimate_resource_minutes,
     _parse_id_list,
+    _serialize_due_date,
 )
 
 
@@ -40,6 +41,13 @@ class LearningRepositoryTests(unittest.TestCase):
         self.assertEqual(_parse_id_list("1, 10,2"), [1, 10, 2])
         self.assertEqual(_parse_id_list("1,invalid, 3"), [1, 3])
         self.assertEqual(_parse_id_list(None), [])
+
+    def test_task_due_dates_preserve_time_and_nulls(self):
+        self.assertEqual(
+            _serialize_due_date(datetime(2026, 7, 30, 18, 5, 4)),
+            "2026-07-30T18:05:04",
+        )
+        self.assertIsNone(_serialize_due_date(None))
 
     @patch("app.repositories.learning_repo.get_db_cursor")
     def test_recommendations_use_approved_status_and_exact_kp_membership(self, get_cursor):
