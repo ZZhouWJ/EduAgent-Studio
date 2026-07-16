@@ -18,41 +18,12 @@ import {
   LockKeyhole,
   Network,
   Rocket,
-  ShieldCheck,
   Sparkles,
   Telescope,
   UserRound,
   Wand2,
   Zap,
 } from "lucide-react";
-
-/* ─── 角色快捷登录入口 ───────────────────────────────────── */
-const ROLE_ENTRIES = [
-  {
-    role: "管理员",
-    desc: "全平台管理、用户/角色、模型/智能体配置、调用审计与成本",
-    account: "admin",
-    password: "Pass@1234",
-    icon: ShieldCheck,
-    accent: "from-indigo-500 via-violet-500 to-purple-500",
-  },
-  {
-    role: "教师体验",
-    desc: "管理课程、生成资源、审核 AI 内容和查看教学分析",
-    account: "teacher_li",
-    password: "Pass@1234",
-    icon: BookOpenCheck,
-    accent: "from-blue-500 via-cyan-500 to-teal-400",
-  },
-  {
-    role: "学生体验",
-    desc: "查看个性化学习路径、推荐资源和学习反馈",
-    account: "student_zhang",
-    password: "Pass@1234",
-    icon: Bot,
-    accent: "from-emerald-500 via-teal-400 to-cyan-500",
-  },
-];
 
 /* ─── 满版左侧品牌：4 块面板 + 12 浮元素 + 8 上升粒子 ──── */
 function FloatingIcons() {
@@ -259,7 +230,7 @@ export function Login() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { login, loading } = useAuthStore();
-  const [username, setUsername] = useState("admin");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [focused, setFocused] = useState<"user" | "pass" | null>(null);
 
@@ -276,24 +247,6 @@ export function Login() {
         ? "/teacher"
         : (user.roles?.includes("student_member") ? "/student" : "/student");
       setTimeout(() => navigate(redirect || home, { replace: true }), 450);
-    } catch (err) {
-      notify.error(err instanceof Error ? err.message : "登录失败");
-    }
-  };
-
-  const quickLogin = async (acc: string, pwd: string) => {
-    setUsername(acc);
-    setPassword(pwd);
-    try {
-      const user = await login(acc, pwd);
-      notify.success(`欢迎回来，${user.real_name || user.username}`);
-      fireConfetti();
-      const home = user.roles?.includes("admin")
-        ? "/admin"
-        : user.roles?.includes("teacher")
-        ? "/teacher"
-        : (user.roles?.includes("student_member") ? "/student" : "/student");
-      setTimeout(() => navigate(home, { replace: true }), 450);
     } catch (err) {
       notify.error(err instanceof Error ? err.message : "登录失败");
     }
@@ -544,36 +497,6 @@ export function Login() {
               </button>
             </form>
 
-            <div className="mt-6 border-t border-slate-100 pt-5">
-              <p className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                <Sparkles className="h-3 w-3" />
-                角色体验入口
-              </p>
-              <div className="space-y-2">
-                {ROLE_ENTRIES.map((entry) => {
-                  const Icon = entry.icon;
-                  return (
-                    <button
-                      key={entry.role}
-                      type="button"
-                      onClick={() => quickLogin(entry.account, entry.password)}
-                      className="group flex w-full items-center gap-3 rounded-lg border border-slate-100 bg-gradient-to-r from-slate-50 to-white p-2.5 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/40"
-                    >
-                      <div
-                        className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br ${entry.accent} text-white shadow-sm`}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <span className="block text-sm font-bold text-slate-900">{entry.role}</span>
-                        <span className="block text-[11px] leading-snug text-slate-500">{entry.desc}</span>
-                      </div>
-                      <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition-colors group-hover:text-blue-500" />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
           </div>
 
           <p className="mt-6 text-center text-[11px] text-slate-400">
