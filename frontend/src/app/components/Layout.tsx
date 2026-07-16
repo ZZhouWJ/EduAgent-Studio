@@ -116,6 +116,7 @@ const ROLE_CONFIG: Record<RoleKey, RoleConfig> = {
           { path: "/teacher", label: "教学工作台", icon: LayoutDashboard },
           { path: "/teacher/courses", label: "我的课程", icon: BookOpen },
           { path: "/teacher/students", label: "学生画像", icon: Users },
+          { path: "/teacher/agent-workbench", label: "智能体工坊", icon: Sparkles },
           { path: "/teacher/resources", label: "学习资源库", icon: Library },
           { path: "/teacher/review", label: "审核中心", icon: CheckSquare },
           { path: "/teacher/tasks", label: "学习任务", icon: ListChecks },
