@@ -111,6 +111,13 @@ export { tutorApi, type TutorChatResponse, type Citation, type PracticeQuestion,
 // Multimodal
 export { multimodalApi, type ImageUnderstandResult } from './multimodal'
 
+// Platform settings
+export {
+  platformSettingsApi,
+  type GovernanceSettings,
+  type GovernanceSettingsUpdate,
+} from './platform-settings'
+
 // Statistics
 export {
   statisticsApi,
