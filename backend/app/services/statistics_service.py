@@ -33,6 +33,24 @@ def _is_admin(user: Dict[str, Any]) -> bool:
     return "admin" in user.get("roles", [])
 
 
+def _require_admin(token: str) -> Dict[str, Any]:
+    user = _require_auth(token)
+    if not _is_admin(user):
+        raise ForbiddenException(message="仅系统管理员可查看平台级统计")
+    return user
+
+
+def _learning_scope(user: Dict[str, Any]) -> tuple[str, int]:
+    roles = set(user.get("roles", []))
+    if "admin" in roles:
+        return "admin", user["user_id"]
+    if "teacher" in roles:
+        return "teacher", user["user_id"]
+    if "student_member" in roles:
+        return "student", user["user_id"]
+    raise ForbiddenException(message="当前角色无权查看学习统计")
+
+
 def get_overview(token: str) -> Dict[str, Any]:
     user = _require_auth(token)
     is_admin = _is_admin(user)
@@ -210,37 +228,47 @@ def _get_learning_repo():
 
 
 def get_learning_overview(user_token: str) -> dict:
-    _require_auth(user_token)
-    return _get_learning_repo().get_overview()
+    scope, user_id = _learning_scope(_require_auth(user_token))
+    return _get_learning_repo().get_overview(scope=scope, user_id=user_id)
 
 
 def get_mastery_distribution(user_token: str) -> list[dict]:
-    _require_auth(user_token)
-    return _get_learning_repo().get_mastery_distribution()
+    scope, user_id = _learning_scope(_require_auth(user_token))
+    return _get_learning_repo().get_mastery_distribution(scope=scope, user_id=user_id)
 
 
 def get_weak_knowledge_points(user_token: str, top_n: int = 10) -> list[dict]:
-    _require_auth(user_token)
-    return _get_learning_repo().get_weak_knowledge_points(top_n)
+    scope, user_id = _learning_scope(_require_auth(user_token))
+    return _get_learning_repo().get_weak_knowledge_points(
+        scope=scope,
+        user_id=user_id,
+        top_n=top_n,
+    )
 
 
 def get_resource_type_distribution(user_token: str) -> list[dict]:
-    _require_auth(user_token)
-    return _get_learning_repo().get_resource_type_distribution()
+    scope, user_id = _learning_scope(_require_auth(user_token))
+    return _get_learning_repo().get_resource_type_distribution(scope=scope, user_id=user_id)
 
 
 def get_invocation_trend(user_token: str, days: int = 14) -> list[dict]:
-    _require_auth(user_token)
-    return _get_learning_repo().get_invocation_trend(days)
+    scope, user_id = _learning_scope(_require_auth(user_token))
+    return _get_learning_repo().get_invocation_trend(
+        scope=scope,
+        user_id=user_id,
+        days=days,
+    )
 
 
 def get_review_rate_by_course(user_token: str) -> list[dict]:
-    _require_auth(user_token)
-    return _get_learning_repo().get_review_rate_by_course()
+    scope, user_id = _learning_scope(_require_auth(user_token))
+    if scope == "student":
+        raise ForbiddenException(message="学生无权查看课程审核统计")
+    return _get_learning_repo().get_review_rate_by_course(scope=scope, user_id=user_id)
 
 
 def get_cost_distribution(user_token: str) -> list[dict]:
-    _require_auth(user_token)
+    _require_admin(user_token)
     return _get_learning_repo().get_cost_distribution()
 
 
@@ -250,17 +278,17 @@ def get_cost_distribution(user_token: str) -> list[dict]:
 
 def get_platform_overview(token: str) -> Dict[str, Any]:
     """平台总览"""
-    _require_auth(token)
+    _require_admin(token)
     return statistics_repo.get_platform_stats()
 
 
 def get_cost_by_model_api(token: str) -> List[Dict[str, Any]]:
     """按模型成本 (Module 8)"""
-    _require_auth(token)
+    _require_admin(token)
     return statistics_repo.get_cost_by_model()
 
 
 def get_resource_stats_api(token: str) -> Dict[str, Any]:
     """资源统计 (Module 8)"""
-    _require_auth(token)
+    _require_admin(token)
     return statistics_repo.get_resource_stats()

@@ -230,8 +230,8 @@ async def get_recent_activities(
 async def get_learning_overview(
     authorization: Optional[str] = Header(None, alias="Authorization"),
 ) -> dict:
-    token = _extract_token(authorization) if authorization else None
-    result = statistics_service.get_learning_overview(token or "")
+    token = _extract_token(authorization)
+    result = statistics_service.get_learning_overview(token)
     return success_response(data=result)
 
 
@@ -239,8 +239,8 @@ async def get_learning_overview(
 async def get_mastery_distribution(
     authorization: Optional[str] = Header(None, alias="Authorization"),
 ) -> dict:
-    token = _extract_token(authorization) if authorization else None
-    result = statistics_service.get_mastery_distribution(token or "")
+    token = _extract_token(authorization)
+    result = statistics_service.get_mastery_distribution(token)
     return success_response(data=result)
 
 
@@ -249,8 +249,8 @@ async def get_weak_knowledge_points(
     authorization: Optional[str] = Header(None, alias="Authorization"),
     top_n: int = Query(10, ge=1, le=50),
 ) -> dict:
-    token = _extract_token(authorization) if authorization else None
-    result = statistics_service.get_weak_knowledge_points(token or "", top_n)
+    token = _extract_token(authorization)
+    result = statistics_service.get_weak_knowledge_points(token, top_n)
     return success_response(data=result)
 
 
@@ -258,8 +258,8 @@ async def get_weak_knowledge_points(
 async def get_resource_type_distribution(
     authorization: Optional[str] = Header(None, alias="Authorization"),
 ) -> dict:
-    token = _extract_token(authorization) if authorization else None
-    result = statistics_service.get_resource_type_distribution(token or "")
+    token = _extract_token(authorization)
+    result = statistics_service.get_resource_type_distribution(token)
     return success_response(data=result)
 
 
@@ -268,8 +268,8 @@ async def get_invocation_trend(
     authorization: Optional[str] = Header(None, alias="Authorization"),
     days: int = Query(14, ge=7, le=30),
 ) -> dict:
-    token = _extract_token(authorization) if authorization else None
-    result = statistics_service.get_invocation_trend(token or "", days)
+    token = _extract_token(authorization)
+    result = statistics_service.get_invocation_trend(token, days)
     return success_response(data=result)
 
 
@@ -277,8 +277,8 @@ async def get_invocation_trend(
 async def get_review_rate_by_course(
     authorization: Optional[str] = Header(None, alias="Authorization"),
 ) -> dict:
-    token = _extract_token(authorization) if authorization else None
-    result = statistics_service.get_review_rate_by_course(token or "")
+    token = _extract_token(authorization)
+    result = statistics_service.get_review_rate_by_course(token)
     return success_response(data=result)
 
 
@@ -286,8 +286,8 @@ async def get_review_rate_by_course(
 async def get_cost_distribution(
     authorization: Optional[str] = Header(None, alias="Authorization"),
 ) -> dict:
-    token = _extract_token(authorization) if authorization else None
-    result = statistics_service.get_cost_distribution(token or "")
+    token = _extract_token(authorization)
+    result = statistics_service.get_cost_distribution(token)
     return success_response(data=result)
 
 
@@ -307,8 +307,8 @@ async def get_platform_overview(
 
     返回平台全局运营指标：调用次数、Token消耗、成本、学生数、课程数等。
     """
-    token = _extract_token(authorization) if authorization else None
-    result = statistics_service.get_platform_overview(token or "")
+    token = _extract_token(authorization)
+    result = statistics_service.get_platform_overview(token)
     return success_response(data=result)
 
 
@@ -321,8 +321,8 @@ async def get_cost_by_model(
 
     返回各模型的调用次数、Token消耗和成本。
     """
-    token = _extract_token(authorization) if authorization else None
-    result = statistics_service.get_cost_by_model_api(token or "")
+    token = _extract_token(authorization)
+    result = statistics_service.get_cost_by_model_api(token)
     return success_response(data=result)
 
 
@@ -335,6 +335,6 @@ async def get_resource_stats(
 
     返回资源的审核状态分布和通过率。
     """
-    token = _extract_token(authorization) if authorization else None
-    result = statistics_service.get_resource_stats_api(token or "")
+    token = _extract_token(authorization)
+    result = statistics_service.get_resource_stats_api(token)
     return success_response(data=result)
