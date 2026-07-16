@@ -70,8 +70,8 @@ class ErrorSanitizationTests(unittest.TestCase):
         register_user.side_effect = RuntimeError(SECRET)
         body = RegisterRequest(
             username="tester",
-            password="Pass@1234",
-            confirm_password="Pass@1234",
+            password="Test-Only-Password-123!",
+            confirm_password="Test-Only-Password-123!",
             real_name="测试用户",
         )
         request = Mock()

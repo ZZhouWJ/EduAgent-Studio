@@ -3,8 +3,8 @@
 > 范围：TeacherDashboard 已落地（基线）。本文覆盖其余 **26 个 .tsx 页面**的硬编码 const[] → 真后端派生 + 死按钮（`showToast("...TODO...")`）→ 真实动作的精确改动清单。
 >
 > 生成时间：2026-06-15 14:46 UTC+8
-> 后端基线：`backend/database/seed_demo_data.py` 已跑通，登录用户名见下表。
-> 演示账号：所有账号密码统一 `Pass@1234`（bcrypt `$2b$12$`）
+> 后端基线：`database/seed_demo_data.py` 已跑通，登录用户名见下表。
+> 演示账号密码通过 `DEMO_PASSWORD` 环境变量设置，不写入代码或文档。
 
 ---
 
@@ -476,53 +476,12 @@ const barData = (weakKps ?? []).map((w) => ({
 
 ### 7.2 模板
 
-把 L23-L60 的 `ROLE_ENTRIES` 整块替换为：
-
-```tsx
-const ROLE_ENTRIES = [
-  {
-    role: "管理员",
-    desc: "全平台管理、用户/角色、模型/智能体配置、调用审计与成本",
-    account: "admin / Pass@1234",
-    path: () => loginAndGo("admin", "Pass@1234"),
-    icon: ShieldCheck,
-    cls: "bg-red-50 text-red-700 ring-red-100",
-  },
-  {
-    role: "教师体验",
-    desc: "管理课程、生成资源、审核 AI 内容和查看教学分析",
-    account: "teacher_li / Pass@1234",
-    path: () => loginAndGo("teacher_li", "Pass@1234"),
-    icon: Users,
-    cls: "bg-purple-50 text-purple-700 ring-purple-100",
-  },
-  {
-    role: "学生体验",
-    desc: "查看个性化学习路径、推荐资源和学习反馈",
-    account: "student_zhang / Pass@1234",
-    path: () => loginAndGo("student_zhang", "Pass@1234"),
-    icon: GraduationCap,
-    cls: "bg-blue-50 text-blue-700 ring-blue-100",
-  },
-];
-
-// 加 helper（在组件外）
-async function loginAndGo(username: string, password: string) {
-  try {
-    const user = await useAuthStore.getState().login(username, password);
-    const target = user.roles.includes("admin") ? "/admin"
-      : user.roles.includes("teacher") ? "/teacher"
-      : user.roles.includes("student_member") ? "/student" : "/";
-    window.location.href = target;
-  } catch (e) {
-    notify.error("登录失败：" + String(e));
-  }
-}
-```
+旧方案中的角色快捷登录会暴露开发凭据。产品版应删除 `ROLE_ENTRIES` 和
+`loginAndGo`，所有角色统一使用正常登录表单。
 
 ### 7.3 死按钮
 
-- "立即体验"按钮：调用上面的 `loginAndGo(...)`（已带 `await`）
+- 删除角色自动登录按钮；体验入口只跳转到标准登录页
 - L218 `href="#"` 的内联链接：换成 `<Link to="/docs">` 或 `<a href="/docs" target="_blank">`
 
 ---
@@ -879,6 +838,7 @@ cd frontend && npm run typecheck  # 不能有 TS 错误
 #!/bin/bash
 # scripts/e2e_smoke.sh
 set -e
+: "${DEMO_PASSWORD:?set DEMO_PASSWORD before running the smoke test}"
 
 # 1. 后端健康
 curl -fs http://127.0.0.1:8000/api/health/db >/dev/null || (echo "DB unhealthy"; exit 1)
@@ -887,7 +847,7 @@ curl -fs http://127.0.0.1:8000/api/health/db >/dev/null || (echo "DB unhealthy";
 for u in admin teacher_li teacher_wang student_zhang student_chen; do
   TOK=$(curl -sS -X POST http://127.0.0.1:8000/api/auth/login \
     -H "Content-Type: application/json" \
-    -d "{\"username\":\"$u\",\"password\":\"Pass@1234\"}" | jq -r .data.token)
+    -d "{\"username\":\"$u\",\"password\":\"$DEMO_PASSWORD\"}" | jq -r .data.token)
   [ "$TOK" != "null" ] && [ -n "$TOK" ] || (echo "$u login failed"; exit 1)
   echo "$u: OK"
 done

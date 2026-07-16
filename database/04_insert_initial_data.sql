@@ -137,8 +137,7 @@ CROSS JOIN `permissions` p
 WHERE r.role_code = 'admin';
 
 -- ============================================================
--- 4. 插入管理员用户
--- 演示密码: Pass@1234
+-- 4. 插入禁用的管理员占位账号；运行 seed_demo_data.py 后方可登录
 -- ============================================================
 
 INSERT INTO `users` (
@@ -146,46 +145,44 @@ INSERT INTO `users` (
     `email`, `phone`, `status`, `last_login_at`, `created_by`
 ) VALUES (
     'admin',
-    '$2b$12$Qcnez8qsfbryeJTPA/STAuHy64Rwz2IZOMXjYR4C5VgxkkvtBx4/y',
+    '!set-with-seed-script!',
     '系统管理员',
     NULL,
     'admin@example.com',
     '13800000000',
-    'active',
+    'disabled',
     NULL,
     NULL
 );
 
 -- ============================================================
--- 4b. 插入教师用户
--- 演示密码: Pass@1234
+-- 4b. 插入禁用的教师占位账号
 -- ============================================================
 INSERT INTO `users` (
     `username`, `password_hash`, `real_name`, `student_no`,
     `email`, `phone`, `status`, `last_login_at`, `created_by`
 ) VALUES (
     'teacher_li',
-    '$2b$12$Qcnez8qsfbryeJTPA/STAuHy64Rwz2IZOMXjYR4C5VgxkkvtBx4/y',
+    '!set-with-seed-script!',
     '李建国',
     NULL,
     'li.jianguo@eduagent.local',
     '13800000001',
-    'active',
+    'disabled',
     NULL,
     NULL
 );
 
 -- ============================================================
--- 4c. 插入学生用户
--- 演示密码: Pass@1234
+-- 4c. 插入禁用的学生占位账号
 -- ============================================================
 INSERT INTO `users` (
     `username`, `password_hash`, `real_name`, `student_no`,
     `email`, `phone`, `status`, `last_login_at`, `created_by`
 ) VALUES
-    ('student_zhang', '$2b$12$Qcnez8qsfbryeJTPA/STAuHy64Rwz2IZOMXjYR4C5VgxkkvtBx4/y', '张小明', '2024001001', 'zhang.xm@eduagent.local', '13800000201', 'active', NULL, NULL),
-    ('student_liu', '$2b$12$Qcnez8qsfbryeJTPA/STAuHy64Rwz2IZOMXjYR4C5VgxkkvtBx4/y', '刘洋', '2024001002', 'liu.yang@eduagent.local', '13800000202', 'active', NULL, NULL),
-    ('student_chen', '$2b$12$Qcnez8qsfbryeJTPA/STAuHy64Rwz2IZOMXjYR4C5VgxkkvtBx4/y', '陈雨欣', '2024001003', 'chen.yx@eduagent.local', '13800000203', 'active', NULL, NULL);
+    ('student_zhang', '!set-with-seed-script!', '张小明', '2024001001', 'zhang.xm@eduagent.local', '13800000201', 'disabled', NULL, NULL),
+    ('student_liu', '!set-with-seed-script!', '刘洋', '2024001002', 'liu.yang@eduagent.local', '13800000202', 'disabled', NULL, NULL),
+    ('student_chen', '!set-with-seed-script!', '陈雨欣', '2024001003', 'chen.yx@eduagent.local', '13800000203', 'disabled', NULL, NULL);
 
 -- ============================================================
 -- 5. 为管理员分配 admin 角色

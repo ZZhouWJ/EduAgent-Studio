@@ -13,7 +13,7 @@ class AdminUserTests(unittest.IsolatedAsyncioTestCase):
         response = await create_user(
             CreateUserBody(
                 username="new_user",
-                password="Pass@1234",
+                password="Test-Only-Password-123!",
                 real_name="新用户",
                 role_ids=[2],
             ),

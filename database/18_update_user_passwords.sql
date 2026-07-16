@@ -1,6 +1,8 @@
--- 统一演示账号初始密码为 Pass@1234。
--- 生产部署必须在首次登录后更换，并禁止保留本脚本中的演示密码。
+-- 清除旧版本中可公开推断的共享演示密码。
+-- 运行 database/seed_demo_data.py 并通过 DEMO_PASSWORD 提供独立密码后，
+-- 脚本会重新激活这些账号。
 
 UPDATE `users`
-SET `password_hash` = '$2b$12$Qcnez8qsfbryeJTPA/STAuHy64Rwz2IZOMXjYR4C5VgxkkvtBx4/y'
+SET `password_hash` = '!set-with-seed-script!',
+    `status` = 'disabled'
 WHERE `username` IN ('admin', 'teacher_li', 'student_zhang', 'student_liu', 'student_chen');

@@ -135,17 +135,24 @@ Docker Compose 会自动初始化。原生 MySQL 环境按以下顺序执行：
 
 其中 `01_create_database.sql` 会重建数据库，只能用于首次初始化或明确的数据重置。`07_test_queries.sql` 仅用于独立验收；`11_postgresql_migration.sql` 是历史迁移参考，不属于当前 MySQL 运行链路。
 
-## 演示账号
+## 开发种子账号
 
-初始化脚本提供以下账号：
+SQL 初始化只创建禁用的占位账号。开发环境需要显式设置独立密码，再运行种子脚本激活账号：
 
-| 角色 | 用户名 | 初始密码 |
-| --- | --- | --- |
-| 管理员 | `admin` | `Pass@1234` |
-| 教师 | `teacher_li` | `Pass@1234` |
-| 学生 | `student_zhang` | `Pass@1234` |
+```bash
+read -s DEMO_PASSWORD
+export DEMO_PASSWORD
+backend/.venv/bin/python database/seed_demo_data.py
+unset DEMO_PASSWORD
+```
 
-首次登录后应立即修改初始密码。生产部署不得使用演示账号与初始密码。
+| 角色 | 用户名 |
+| --- | --- |
+| 管理员 | `admin` |
+| 教师 | `teacher_li` |
+| 学生 | `student_zhang` |
+
+`DEMO_PASSWORD` 至少 12 个字符，不能使用示例占位值。生产部署不得创建这些开发种子账号。
 
 ## 验证
 

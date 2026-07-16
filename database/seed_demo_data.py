@@ -3,7 +3,7 @@ Seed demo data for EduAgent Studio.
 
 What it does
 ------------
-- Inserts 1 admin, 2 teachers, 6 students (with bcrypt-hashed `Pass@1234`).
+- Inserts 1 admin, 2 teachers, 6 students with a configured bcrypt password.
 - Ensures teacher / student roles are assigned.
 - Ensures 3 courses exist and are owned by the right teachers.
 - Seeds knowledge points, student profiles, learning mastery, projects,
@@ -16,12 +16,14 @@ What it does
 
 How to run
 ----------
-    cd backend
-    .venv/bin/python database/seed_demo_data.py
+    cd /path/to/EduAgent-Studio
+    read -s DEMO_PASSWORD && export DEMO_PASSWORD
+    backend/.venv/bin/python database/seed_demo_data.py
 
 Prereqs
 -------
 - .env configured (DB_HOST/DB_USER/DB_PASSWORD/DB_NAME point to MySQL).
+- DEMO_PASSWORD is set to a unique value of at least 12 characters.
 - MySQL is reachable, the 39 tables already exist (created by the app).
 - The bcrypt package is installed in the venv.
 """
@@ -63,7 +65,13 @@ def _load_env() -> Dict[str, str]:
                     continue
                 k, v = line.split("=", 1)
                 env[k.strip()] = v.strip()
-    env.update({key: value for key, value in os.environ.items() if key.startswith("DB_")})
+    env.update(
+        {
+            key: value
+            for key, value in os.environ.items()
+            if key.startswith("DB_") or key == "DEMO_PASSWORD"
+        }
+    )
     return env
 
 
@@ -112,8 +120,8 @@ def hash_password(pw: str) -> str:
 # People & roles
 # ---------------------------------------------------------------------------
 
-DEMO_PASSWORD = "Pass@1234"
-DEMO_PWHASH = hash_password(DEMO_PASSWORD)
+DEMO_PASSWORD = ENV.get("DEMO_PASSWORD", "")
+DEMO_PWHASH = ""
 
 ROLE_METADATA = {
     "student_member": ("学生", "使用个性化辅导、学习路径、任务、资源与学习反馈", "active"),
@@ -1169,6 +1177,14 @@ def get_course_id(cur, code: str) -> int:
 
 
 def main() -> int:
+    global DEMO_PWHASH
+    if len(DEMO_PASSWORD) < 12 or DEMO_PASSWORD.lower().startswith(
+        ("change_me", "replace_")
+    ):
+        log.error("Set DEMO_PASSWORD to a unique value of at least 12 characters.")
+        return 2
+    DEMO_PWHASH = hash_password(DEMO_PASSWORD)
+
     conn = connect()
     try:
         with conn.cursor() as cur:
@@ -1555,11 +1571,10 @@ def main() -> int:
         log.info("=" * 60)
         log.info("Seed complete.")
         log.info("Demo login: any of %s", [u[0] for u in DEMO_USERS])
-        log.info("Demo password: %s", DEMO_PASSWORD)
         log.info("=" * 60)
-    except Exception:
+    except Exception as exc:
         conn.rollback()
-        log.exception("Seed failed, transaction rolled back.")
+        log.error("Seed failed, transaction rolled back (%s).", type(exc).__name__)
         return 1
     finally:
         conn.close()
