@@ -27,6 +27,28 @@ DIFFICULTY_MAP = {
     "advanced": "高级",
 }
 
+RESOURCE_BASE_MINUTES = {
+    "lecture": 35,
+    "mindmap": 15,
+    "quiz": 30,
+    "case": 45,
+    "code_case": 60,
+    "ppt": 25,
+    "video_script": 20,
+    "experiment_report": 60,
+    "error_analysis": 25,
+    "learning_card": 10,
+    "review": 30,
+    "test": 45,
+    "other": 30,
+}
+
+RESOURCE_DIFFICULTY_MULTIPLIERS = {
+    "basic": 0.85,
+    "intermediate": 1.0,
+    "advanced": 1.25,
+}
+
 
 def _compute_cover_color(course_id: int) -> str:
     """根据 course_id 循环选择封面颜色。"""
@@ -38,6 +60,14 @@ def _map_difficulty(level: Optional[str]) -> str:
     if not level:
         return "基础"
     return DIFFICULTY_MAP.get(level.lower(), "基础")
+
+
+def _estimate_resource_minutes(resource_type: Optional[str], difficulty: Optional[str]) -> int:
+    base = RESOURCE_BASE_MINUTES.get((resource_type or "other").lower(), 30)
+    multiplier = RESOURCE_DIFFICULTY_MULTIPLIERS.get(
+        (difficulty or "intermediate").lower(), 1.0
+    )
+    return max(10, int(round(base * multiplier / 5) * 5))
 
 
 def _current_semester(reference: Optional[datetime] = None) -> str:
@@ -646,7 +676,7 @@ class LearningRepository:
 
             # 获取低 mastery 知识点（< 0.5）
             cursor.execute("""
-                SELECT kp.kp_id, kp.kp_name, kp.estimated_hours, skm.mastery_level
+                SELECT kp.kp_id, kp.kp_name, skm.mastery_level
                 FROM student_knowledge_mastery skm
                 INNER JOIN knowledge_points kp ON skm.kp_id = kp.kp_id AND kp.is_deleted = 0
                 WHERE skm.profile_id = %s
@@ -659,7 +689,7 @@ class LearningRepository:
             # 如果没有低 mastery 知识点，取所有知识点按 mastery 排序
             if not low_mastery_kps:
                 cursor.execute("""
-                    SELECT kp.kp_id, kp.kp_name, kp.estimated_hours,
+                    SELECT kp.kp_id, kp.kp_name,
                            COALESCE(skm.mastery_level, 0.5) AS mastery_level
                     FROM knowledge_points kp
                     LEFT JOIN student_knowledge_mastery skm
@@ -683,11 +713,6 @@ class LearningRepository:
             row["kp_id"]: float(row.get("mastery_level") or 0.5)
             for row in low_mastery_kps
         }
-        kp_hours_map = {
-            row["kp_id"]: float(row.get("estimated_hours") or 1)
-            for row in low_mastery_kps
-        }
-
         if not kp_ids:
             return []
 
@@ -761,9 +786,9 @@ class LearningRepository:
             if resource_prefs and row["resource_type"] in resource_prefs:
                 reason = f"推荐{row['resource_type']}类型资源，" + reason
 
-            # estimated_minutes: 从知识点 estimated_hours 计算（小时 * 60）
-            estimated_hours = kp_hours_map.get(min_mastery_kp_id, 1)
-            estimated_minutes = round(float(estimated_hours) * 60)
+            estimated_minutes = _estimate_resource_minutes(
+                row.get("resource_type"), row.get("difficulty")
+            )
 
             results.append({
                 "resource_id": row["resource_id"],

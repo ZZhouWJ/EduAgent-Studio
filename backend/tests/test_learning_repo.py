@@ -2,7 +2,11 @@ from datetime import datetime
 import unittest
 from unittest.mock import MagicMock, patch
 
-from app.repositories.learning_repo import LearningRepository, _current_semester
+from app.repositories.learning_repo import (
+    LearningRepository,
+    _current_semester,
+    _estimate_resource_minutes,
+)
 
 
 class LearningRepositoryTests(unittest.TestCase):
@@ -24,6 +28,12 @@ class LearningRepositoryTests(unittest.TestCase):
             _current_semester(datetime(2026, 10, 1)),
             "2026-2027学年秋季学期",
         )
+
+    def test_resource_duration_uses_type_and_difficulty(self):
+        self.assertEqual(_estimate_resource_minutes("quiz", "intermediate"), 30)
+        self.assertEqual(_estimate_resource_minutes("case", "advanced"), 55)
+        self.assertEqual(_estimate_resource_minutes("learning_card", "basic"), 10)
+        self.assertEqual(_estimate_resource_minutes("unknown", "unknown"), 30)
 
     @patch("app.repositories.learning_repo.get_db_cursor")
     def test_recommendations_use_approved_status_and_exact_kp_membership(self, get_cursor):
@@ -62,7 +72,7 @@ class LearningRepositoryTests(unittest.TestCase):
         self.assertIn("FIND_IN_SET", resource_sql)
         self.assertNotIn("review_status", resource_sql)
         self.assertEqual(items[0]["kp_name"], "事务隔离")
-        self.assertEqual(items[0]["estimated_minutes"], 90)
+        self.assertEqual(items[0]["estimated_minutes"], 30)
 
 
 if __name__ == "__main__":
