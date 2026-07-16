@@ -8,7 +8,9 @@ Tutor 工具处理器
 import logging
 from typing import Any, Dict, List, Optional
 
-from app.llm.gateway import LLMGateway, llm_gateway as _default_llm
+from app.config import get_settings
+from app.llm.gateway import LLMGateway
+from app.llm.runtime import get_runtime_llm_gateway
 from app.repositories.knowledge_repo import KnowledgeRepository
 from app.repositories.profile_repo import ProfileRepository
 
@@ -17,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 def _get_llm() -> Optional[LLMGateway]:
     try:
-        return _default_llm
+        return get_runtime_llm_gateway()
     except Exception:
         return None
 
@@ -252,9 +254,12 @@ async def error_analysis_agent(
 
 请用 Markdown 格式输出。
 """
+        config = get_settings().llm_config()
+        config.temperature = 0.7
+        config.max_tokens = 1000
         result = llm.generate(
             messages=[{"role": "user", "content": prompt}],
-            config={"temperature": 0.7, "max_tokens": 1000},
+            config=config,
         )
         content = result.content if hasattr(result, "content") else str(result)
         return {
@@ -302,9 +307,12 @@ async def explanation_skill(
 
 请用 Markdown 格式输出。
 """
+        config = get_settings().llm_config()
+        config.temperature = 0.7
+        config.max_tokens = 1500
         result = llm.generate(
             messages=[{"role": "user", "content": prompt}],
-            config={"temperature": 0.7, "max_tokens": 1500},
+            config=config,
         )
         content = result.content if hasattr(result, "content") else str(result)
         return {"content": content, "quality_score": 0.8}
@@ -360,11 +368,10 @@ async def ppt_agent(
 ) -> Dict[str, Any]:
     """PPT 生成 Agent — 生成结构化课件大纲（JSON 格式）"""
     try:
-        from app.config import get_settings
-        from app.llm.gateway import LLMGateway
-
         settings = get_settings()
-        llm = LLMGateway()
+        llm = _get_llm()
+        if llm is None:
+            raise RuntimeError("LLM gateway is unavailable")
 
         prompt = f"""你是一个专业的课件设计师。请为"{topic}"生成一份 PPT 大纲。
 

@@ -13,7 +13,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from app.config import get_settings
-from app.llm.gateway import LLMConfig, llm_gateway
+from app.llm.runtime import get_runtime_llm_gateway
 from app.repositories.profile_dialog_repo import ProfileDialogRepository
 from app.repositories.profile_repo import ProfileRepository
 
@@ -297,7 +297,7 @@ class ProfileDialogService:
                 {"role": "user", "content": EXTRACTION_PROMPT.format(user_message=user_message)}
             ]
 
-            result = llm_gateway.generate(messages, config)
+            result = get_runtime_llm_gateway().generate(messages, config)
 
             if result.status == "success" and result.content:
                 # 尝试解析 JSON

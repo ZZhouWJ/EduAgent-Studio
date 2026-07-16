@@ -14,7 +14,9 @@ import logging
 import re
 from typing import Any, Dict, List, Optional
 
+from app.config import get_settings
 from app.llm.gateway import LLMGateway
+from app.llm.runtime import get_runtime_llm_gateway
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +86,7 @@ class TutorAgentCoordinator:
     """Tutor 多智能体编排器"""
 
     def __init__(self, llm_gateway: Optional[LLMGateway] = None):
-        self._llm = llm_gateway
+        self._llm = llm_gateway or get_runtime_llm_gateway()
 
     async def orchestrate(
         self,
@@ -169,9 +171,12 @@ class TutorAgentCoordinator:
         )
 
         try:
+            config = get_settings().llm_config()
+            config.temperature = 0.3
+            config.max_tokens = 300
             result = self._llm.generate(
                 messages=[{"role": "user", "content": prompt}],
-                config={"temperature": 0.3, "max_tokens": 300},
+                config=config,
             )
             text = result.content.strip() if hasattr(result, "content") else str(result)
 
@@ -212,9 +217,12 @@ class TutorAgentCoordinator:
         )
 
         try:
+            config = get_settings().llm_config()
+            config.temperature = 0.7
+            config.max_tokens = 2000
             result = self._llm.generate(
                 messages=[{"role": "user", "content": prompt}],
-                config={"temperature": 0.7, "max_tokens": 2000},
+                config=config,
             )
             text = result.content if hasattr(result, "content") else str(result)
 

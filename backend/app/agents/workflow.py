@@ -27,8 +27,6 @@ from typing import Annotated, Any, Dict, List, Literal, Optional, TypedDict
 from langgraph.graph import StateGraph, END, START
 from langgraph.checkpoint.memory import InMemorySaver
 
-from app.config import get_settings
-
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -118,7 +116,6 @@ def _diagnosis_node(state: WorkflowState) -> Dict[str, Any]:
     from app.agents.diagnosis_agent import DiagnosisAgent
     import time
 
-    settings = get_settings()
     llm_gateway = _get_llm_gateway()
     agent = DiagnosisAgent(llm_gateway)
 
@@ -419,8 +416,9 @@ def _supervisor_router(state: WorkflowState) -> Literal[
 
 def _get_llm_gateway():
     """懒加载 LLM Gateway，延迟注入避免循环导入"""
-    from app.llm import llm_gateway as _gw
-    return _gw
+    from app.llm.runtime import get_runtime_llm_gateway
+
+    return get_runtime_llm_gateway()
 
 
 # ---------------------------------------------------------------------------

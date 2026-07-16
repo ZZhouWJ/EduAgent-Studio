@@ -15,7 +15,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
-from app.llm.gateway import LLMGateway, llm_gateway as _default_llm
+from app.llm.gateway import LLMGateway
+from app.llm.runtime import get_runtime_llm_gateway
 from app.config import get_settings
 
 settings = get_settings()
@@ -80,7 +81,7 @@ class TutorSupervisor:
         llm_gateway: Optional[LLMGateway] = None,
         max_steps: int = 8,
     ):
-        self._llm = llm_gateway or _default_llm
+        self._llm = llm_gateway or get_runtime_llm_gateway()
         self._max_steps = max_steps
         self._tool_registry = None  # 延迟导入避免循环
 

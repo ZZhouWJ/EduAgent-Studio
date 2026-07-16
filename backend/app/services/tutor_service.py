@@ -13,7 +13,8 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from app.config import get_settings
-from app.llm.gateway import LLMGateway, LLMConfig
+from app.llm.gateway import LLMGateway
+from app.llm.runtime import get_runtime_llm_gateway
 from app.repositories.knowledge_repo import KnowledgeRepository
 from app.repositories.profile_repo import ProfileRepository
 from app.services.course_access_service import CourseAccessService
@@ -87,7 +88,7 @@ class TutorService:
         self._knowledge_repo = KnowledgeRepository()
         self._profile_repo = ProfileRepository()
         self._access = CourseAccessService()
-        self._llm_gateway = llm_gateway
+        self._llm_gateway = llm_gateway or get_runtime_llm_gateway()
 
     def chat(
         self,
@@ -706,9 +707,12 @@ flowchart LR
                     },
                 }
 
+            config = get_settings().llm_config()
+            config.temperature = 0.8
+            config.max_tokens = 500
             result = self._llm_gateway.generate(
                 messages=[{"role": "user", "content": prompt}],
-                config={"temperature": 0.8, "max_tokens": 500},
+                config=config,
             )
 
             content = result.content.strip() if hasattr(result, "content") else "[]"
