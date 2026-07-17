@@ -514,6 +514,7 @@ class TutorSupervisor:
                 "course_id": course_id,
                 "knowledge_point_ids": knowledge_point_ids,
                 "question_count": _extract_question_count(question),
+                "question_type": _detect_question_type(question),
                 "difficulty": "intermediate",
                 "student_profile": profile,
             }
@@ -715,7 +716,7 @@ def _result_to_content_block(tool_id: str, result: Dict[str, Any]) -> Optional[D
     return {
         "block_id": f"block_{tool_id}_{uuid.uuid4().hex[:8]}",
         "block_type": block_type,
-        "title": title_map.get(tool_id, tool_id),
+        "title": result.get("title") or title_map.get(tool_id, tool_id),
         "content": result.get("content", ""),
         "metadata": {
             "quality_score": result.get("quality_score"),
@@ -760,6 +761,17 @@ def _extract_question_count(question: str) -> int:
     if match:
         return chinese_counts[match.group(1)]
     return 3
+
+
+def _detect_question_type(question: str) -> str:
+    """将自然语言题型约束转换为 Agent 的稳定枚举。"""
+    if "判断" in question or "对错" in question:
+        return "judgment"
+    if "选择" in question:
+        return "choice"
+    if "简答" in question or "问答" in question:
+        return "short_answer"
+    return "mixed"
 
 
 def _inject_embed_syntax(final_answer: str, content_blocks: List[Dict[str, Any]]) -> str:

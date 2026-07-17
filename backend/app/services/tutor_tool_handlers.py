@@ -66,6 +66,7 @@ async def quiz_agent(
     knowledge_point_ids: List[int],
     question_count: int = 3,
     difficulty: str = "intermediate",
+    question_type: str = "mixed",
     student_profile: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """自适应题库生成 Agent"""
@@ -75,10 +76,23 @@ async def quiz_agent(
         llm = _get_llm()
         agent = ResourceGenerationAgent(llm)
 
+        course_kps = {kp["kp_id"]: kp["name"] for kp in _get_course_kps(course_id)}
         learning_path = [
-            {"kp_id": kpid, "kp_name": f"kp#{kpid}", "mastery_level": 0.5}
+            {
+                "kp_id": kpid,
+                "kp_name": course_kps.get(kpid, "课程相关知识点"),
+                "mastery_level": 0.5,
+            }
             for kpid in knowledge_point_ids
         ]
+        type_labels = {
+            "judgment": "判断题",
+            "choice": "选择题",
+            "short_answer": "简答题",
+            "mixed": "综合题",
+        }
+        question_type = question_type if question_type in type_labels else "mixed"
+        question_count = max(1, min(int(question_count), 10))
 
         result = agent.run(
             learning_path=learning_path,
@@ -86,9 +100,15 @@ async def quiz_agent(
             difficulty=difficulty,
             student_profile=student_profile or {},
             course_id=course_id,
+            generation_requirements=(
+                f"题量：{question_count}道\n"
+                f"题型：{type_labels[question_type]}\n"
+                "必须严格遵守题量和题型，每题提供答案与简要解析。"
+            ),
         )
 
         return {
+            "title": result.get("title", "自适应练习题"),
             "content": result.get("content", ""),
             "quality_score": result.get("quality_score", 0.7),
             "trustworthiness": result.get("trustworthiness", "medium"),

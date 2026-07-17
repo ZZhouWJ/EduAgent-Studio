@@ -56,11 +56,15 @@ class ResourceGenerationContractTests(unittest.TestCase):
             difficulty="intermediate",
             student_profile={"student_name": "测试学生"},
             course_id=3,
+            generation_requirements="题量：2道\n题型：判断题",
         )
 
         self.assertEqual(result["type"], "lecture")
         self.assertEqual(result["type_label"], "知识点讲义")
         self.assertEqual(result["knowledge_points"], [7])
+        prompt = agent._call_llm.call_args.args[0][0]["content"]
+        self.assertIn("题量：2道", prompt)
+        self.assertIn("题型：判断题", prompt)
 
 
 if __name__ == "__main__":

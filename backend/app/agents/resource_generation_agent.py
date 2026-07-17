@@ -22,6 +22,9 @@ PROMPT_RESOURCE_GENERATION = """你是一个专业的教育资源生成智能体
 ## 难度：{difficulty}
 ## 学生信息：{student_info}
 
+## 本次生成约束
+{generation_requirements}
+
 ## 教材原文依据（务必引用，chunk_id 格式为数字）
 {evidence_context}
 
@@ -203,6 +206,7 @@ class ResourceGenerationAgent:
         difficulty: str,
         student_profile: Dict[str, Any],
         course_id: Optional[int] = None,
+        generation_requirements: str = "无额外约束",
     ) -> Dict[str, Any]:
         """
         生成学习资源（证据优先链路）。
@@ -269,6 +273,7 @@ class ResourceGenerationAgent:
                     resource_type=RESOURCE_TYPE_TITLES.get(resource_type, "学习资源"),
                     difficulty=difficulty,
                     student_info=student_info,
+                    generation_requirements=generation_requirements or "无额外约束",
                     evidence_context=evidence_context or "（当前课程暂无教材依据，请基于通用知识生成，并在关键结论处标注 [草稿:缺乏充分教材依据]）",
                     type_specific_instruction=type_instruction,
                 )

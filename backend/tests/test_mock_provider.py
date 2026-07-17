@@ -40,6 +40,28 @@ class MockProfileExtractionTests(unittest.TestCase):
         self.assertIn("[草稿:缺乏充分教材依据]", result)
         self.assertNotIn('"learning_path"', result)
 
+    def test_quiz_resource_honors_question_count_and_type(self):
+        prompt = """
+## 学习路径
+1. [事务与 ACID] 讲义 | 预计 30分钟
+## 资源类型：习题与答案
+## 本次生成约束
+题量：2道
+题型：判断题
+## 教材原文依据（务必引用，chunk_id 格式为数字）
+[chunk_id: 9]
+## 输出要求
+- 直接输出 Markdown 格式学习资源内容
+"""
+
+        result = MockProvider()._generate_response(prompt, "mock-model")
+
+        self.assertIn("共 2 道判断题", result)
+        self.assertEqual(result.count("### 判断题"), 2)
+        self.assertIn("**答案：正确**", result)
+        self.assertIn("**答案：错误**", result)
+        self.assertNotIn("kp#", result)
+
     def test_teacher_review_is_not_misclassified_by_embedded_resource(self):
         prompt = """你是一个专业的教学审核辅助智能体。请进行质量评估。
 

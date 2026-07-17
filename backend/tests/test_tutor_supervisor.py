@@ -64,6 +64,7 @@ class TutorSupervisorFallbackTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(":::quiz:", result.final_answer)
         self.assertEqual(self.registry.calls[1][1]["knowledge_point_ids"], [7])
         self.assertEqual(self.registry.calls[1][1]["question_count"], 2)
+        self.assertEqual(self.registry.calls[1][1]["question_type"], "judgment")
 
     async def test_stream_emits_tool_events_and_grounded_final(self):
         events = []

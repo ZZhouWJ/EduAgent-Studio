@@ -311,6 +311,11 @@ def _build_registry() -> ToolRegistry:
                 "course_id": {"type": "integer"},
                 "knowledge_point_ids": {"type": "array", "items": {"type": "integer"}},
                 "question_count": {"type": "integer", "default": 3},
+                "question_type": {
+                    "type": "string",
+                    "enum": ["judgment", "choice", "short_answer", "mixed"],
+                    "default": "mixed",
+                },
                 "difficulty": {"type": "string", "enum": ["basic", "intermediate", "advanced"]},
                 "student_profile": {"type": "object"},
             },

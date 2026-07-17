@@ -107,6 +107,9 @@ class MockProvider:
         chunk_ids = list(dict.fromkeys(re.findall(r"\[chunk_id:\s*(\d+)\]", prompt)))
         citation = f" [引用:{chunk_ids[0]}]" if chunk_ids else " [草稿:缺乏充分教材依据]"
 
+        if "习题" in resource_type or "练习" in resource_type:
+            return self._mock_quiz_resource(prompt, topic, resource_type, citation, model_name)
+
         return f"""# {topic}专题{resource_type}
 
 ## 学习目标
@@ -143,6 +146,74 @@ class MockProvider:
 
 本资源由 {model_name} 开发模式生成，请由教师确认后发布。
 """
+
+    def _mock_quiz_resource(
+        self,
+        prompt: str,
+        topic: str,
+        resource_type: str,
+        citation: str,
+        model_name: str,
+    ) -> str:
+        """按题量和题型约束生成可核对的开发模式练习。"""
+        count_match = re.search(r"题量[：:]\s*(\d+)\s*道", prompt)
+        question_count = max(1, min(int(count_match.group(1)), 10)) if count_match else 3
+        type_match = re.search(r"题型[：:]\s*([^\n]+)", prompt)
+        question_type = type_match.group(1).strip() if type_match else "综合题"
+
+        if question_type == "判断题" and "事务" in topic:
+            templates = [
+                (
+                    "银行转账中，扣款成功但入账失败时回滚扣款，体现了事务的原子性。",
+                    "正确",
+                    "原子性要求同一事务中的操作全部成功或全部回滚。",
+                ),
+                (
+                    "隔离性只关心单笔事务是否全部完成，与并发事务之间的可见性无关。",
+                    "错误",
+                    "隔离性正是用于约束并发事务之间的中间状态可见性。",
+                ),
+                (
+                    "其他事务不应读到转账过程中“已扣款、未入账”的中间状态。",
+                    "正确",
+                    "这体现了隔离性对并发读取中间状态的限制。",
+                ),
+                (
+                    "只要转账最终余额正确，就可以允许扣款步骤永久成功而入账步骤失败。",
+                    "错误",
+                    "这会破坏事务原子性，失败时应整体回滚。",
+                ),
+            ]
+        else:
+            templates = [
+                (
+                    f"学习 {topic} 时，应先明确概念成立的条件，再判断具体场景。",
+                    "正确",
+                    "概念边界和适用条件是判断结论的依据。",
+                ),
+                (
+                    f"只要记住 {topic} 的结论，就不需要验证应用场景和前提。",
+                    "错误",
+                    "忽略前提会造成概念误用，应结合课程证据验证。",
+                ),
+            ]
+
+        questions = []
+        for index in range(question_count):
+            statement, answer, explanation = templates[index % len(templates)]
+            questions.append(
+                f"### {question_type} {index + 1}\n\n"
+                f"{statement}\n\n"
+                f"**答案：{answer}**\n\n"
+                f"**解析：** {explanation}{citation}"
+            )
+
+        return (
+            f"# {topic}专题{resource_type}\n\n"
+            f"共 {question_count} 道{question_type}，请先独立作答，再核对解析。\n\n"
+            + "\n\n".join(questions)
+            + f"\n\n---\n\n本资源由 {model_name} 开发模式生成，请由教师确认后发布。"
+        )
 
     def _mock_profile_extraction(self, prompt: str) -> str:
         """为本地开发提供可确认、可落库的画像抽取结果。"""
