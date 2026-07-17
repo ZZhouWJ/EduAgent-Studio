@@ -57,8 +57,8 @@ mysql -h 127.0.0.1 -P 3306 -u root -p ai_collab_audit_system \
 | --- | --- |
 | `courses` | 课程空间与教师归属 |
 | `knowledge_points` | 课程知识结构 |
-| `course_materials` / `document_chunks` | 可检索的课程资料与分块 |
-| `chunk_knowledge_links` | 文档分块与知识点的人工确认证据关联 |
+| `course_materials` / `course_material_chunks` | 可检索的课程资料与分块 |
+| `kp_chunk_links` | 文档分块与知识点的人工确认证据关联 |
 | `student_profiles` / `student_knowledge_mastery` | 学生画像与知识点掌握度 |
 | `learning_tasks` / `learning_task_progress` | 教师任务与学生完成进度 |
 | `learning_resources` / `learning_resource_reviews` | AI 生成资源、审核与发布状态 |
