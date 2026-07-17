@@ -3,16 +3,16 @@ Seed demo data for EduAgent Studio.
 
 What it does
 ------------
-- Inserts 1 admin, 2 teachers, 6 students with a configured bcrypt password.
+- Inserts 1 admin, 1 teacher, 3 students with a configured bcrypt password.
 - Ensures teacher / student roles are assigned.
-- Ensures 3 courses exist and are owned by the right teachers.
+- Ensures 3 courses exist and are owned by the demo teacher.
 - Seeds knowledge points, student profiles, learning mastery, projects,
   project members, project tasks, task branches, task outputs,
   review requests, output reviews, learning resources, learning tasks,
   learning feedbacks, model providers, AI models, API configs,
   AI invocations, cost records, and a few operation/login logs.
-- Idempotent: re-runnable. Existing rows are updated, not duplicated,
-  so you can run it multiple times safely.
+- Idempotent: re-runnable. Stable dimensions are updated and the demo-owned
+  activity graph is rebuilt in one transaction without duplicate accumulation.
 
 How to run
 ----------
@@ -31,6 +31,8 @@ Prereqs
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
 import random
@@ -136,17 +138,28 @@ ROLE_METADATA = {
 DEMO_USERS: List[Tuple[str, str, str, Optional[str], str, List[str]]] = [
     # admin
     ("admin", "系统管理员", "admin@eduagent.local", None, "13800000001", ["admin"]),
-    # teachers
+    # teacher
     ("teacher_li", "李建国", "li.jianguo@eduagent.local", None, "13800000010", ["teacher"]),
-    ("teacher_wang", "王雪", "wang.xue@eduagent.local", None, "13800000011", ["teacher"]),
     # students
     ("student_zhang", "张小明", "zhang.xm@eduagent.local", "2024001001", "13800000201", ["student_member"]),
     ("student_liu", "刘洋", "liu.yang@eduagent.local", "2024001002", "13800000202", ["student_member"]),
     ("student_chen", "陈雨欣", "chen.yx@eduagent.local", "2024001003", "13800000203", ["student_member"]),
-    ("student_zhao", "赵伟", "zhao.wei@eduagent.local", "2024001004", "13800000204", ["student_member"]),
-    ("student_sun", "孙佳", "sun.jia@eduagent.local", "2024001005", "13800000205", ["student_member"]),
-    ("student_zhou", "周琪", "zhou.qi@eduagent.local", "2024001006", "13800000206", ["student_member"]),
 ]
+
+# Accounts introduced by old migrations, API smoke tests, and the previous
+# nine-account demo. They are disabled by this seed so dashboards and account
+# pickers show exactly the five supported contest identities.
+RETIRED_SAMPLE_USERS: Tuple[str, ...] = (
+    "teacher_wang",
+    "student_zhao",
+    "student_sun",
+    "student_zhou",
+    "student1",
+    "teacher1",
+    "apitest999",
+    "newuser99",
+    "testroleuser",
+)
 
 
 def upsert_user(cur, username: str, real_name: str, email: Optional[str],
@@ -156,7 +169,8 @@ def upsert_user(cur, username: str, real_name: str, email: Optional[str],
         uid = row["user_id"]
         cur.execute(
             """UPDATE users SET password_hash=%s, real_name=%s, email=%s, student_no=%s, phone=%s,
-                                 status='active', is_deleted=0
+                                 status='active', is_deleted=0,
+                                 deleted_at=NULL, deleted_by=NULL
                WHERE user_id=%s""",
             (DEMO_PWHASH, real_name, email, student_no, phone, uid),
         )
@@ -212,10 +226,10 @@ COURSES: List[Tuple[str, str, str, str]] = [
      "teacher_li"),
     ("CS201", "Python 程序设计",
      "Python 编程语言基础、函数、模块、面向对象、异常处理以及 Web 后端开发",
-     "teacher_wang"),
+     "teacher_li"),
     ("CS401", "软件工程实践",
      "软件工程方法论、需求分析、系统设计、项目管理、敏捷开发与持续集成",
-     "teacher_wang"),
+     "teacher_li"),
 ]
 
 
@@ -262,6 +276,34 @@ KNOWLEDGE_POINTS: Dict[str, List[Tuple[str, str, str, float]]] = {
         ("kp_se_agile", "敏捷与 Scrum", "intermediate", 3.0),
         ("kp_se_test", "测试与质量保障", "intermediate", 3.0),
     ],
+}
+
+MATERIAL_FILES = {
+    "CS301": "database_system_principles.md",
+    "CS201": "python_programming_guide.md",
+    "CS401": "software_engineering_practice.md",
+}
+
+MATERIAL_GUIDANCE: Dict[str, str] = {
+    "kp_db_intro": "数据库、数据库管理系统和应用共同构成数据管理环境。学习时需要区分模式、实例和视图，并说明 DBMS 对安全、并发和恢复的责任。",
+    "kp_relational_model": "关系模型用关系、元组和属性表达数据，候选键确定唯一性，外键维护引用完整性。设计时应同时写清业务语义与约束。",
+    "kp_sql_basic": "基础查询从输出列和数据来源开始，再依次处理筛选、分组、聚合和排序。WHERE 过滤行，HAVING 过滤分组后的结果。",
+    "kp_sql_join": "连接查询必须先确认表间基数和连接条件。左连接用于保留左表未匹配记录，子查询与连接方案应结合空值和重复行验证。",
+    "kp_index": "索引设计应由查询谓词、选择性、排序和执行计划共同驱动。复合索引字段顺序需要对应主要访问路径，并评估写入成本。",
+    "kp_transaction": "事务通过原子性、一致性、隔离性和持久性保护业务不变量。边界应覆盖完整业务动作，失败时必须整体回滚。",
+    "kp_concurrency": "并发控制需要识别脏读、不可重复读、幻读和丢失更新。隔离级别、锁顺序、超时重试必须结合具体数据库实现验证。",
+    "kp_norm": "范式用于减少插入、更新和删除异常。反范式只能在明确性能证据下采用，并同步设计一致性维护和校验机制。",
+    "kp_design": "数据库设计从需求和业务规则出发，经 E-R 模型转换为关系模式，再补充主外键、唯一约束、索引和审计字段。",
+    "kp_py_syntax": "Python 基础包括对象引用、容器、分支和循环。实现前应先约定输入类型、空值和边界，再选择可读的数据结构。",
+    "kp_py_func": "函数应有单一职责、清晰输入输出和稳定异常契约。模块用于组织相关能力，避免循环依赖和隐藏的全局状态。",
+    "kp_py_oop": "类封装状态与行为，组合适合表达可替换协作关系。设计时应避免把数据访问、HTTP 处理和业务规则堆在同一对象中。",
+    "kp_py_except": "异常处理只捕获可以处理的错误，并保留可诊断上下文。测试应覆盖成功、非法输入、资源不存在和依赖失败。",
+    "kp_py_web": "Web 服务需明确路由、业务服务和数据访问边界，统一鉴权、错误响应与日志。接口契约应包含状态码和幂等要求。",
+    "kp_se_process": "过程模型的选择取决于需求稳定性、风险和反馈周期。迭代开发需要目标、完成定义和可用增量，而不是无计划修改。",
+    "kp_se_req": "可验收需求需明确参与者、触发条件、主流程、异常和量化标准。非功能需求必须转换为可测量指标。",
+    "kp_se_design": "系统设计通过职责、接口、数据和部署视角降低耦合。关键决策要记录约束、替代方案、风险与演进方式。",
+    "kp_se_agile": "Scrum 以产品目标、Sprint 目标和完成定义形成透明反馈。评审检查价值，回顾改进协作和工程实践。",
+    "kp_se_test": "质量保障从需求阶段建立追溯关系，组合单元、接口和端到端测试。发布条件应包含自动化证据、监控和回滚方案。",
 }
 
 LEARNING_RESOURCE_CONTENTS: Dict[Tuple[str, str], str] = {
@@ -652,6 +694,169 @@ def upsert_kp(cur, course_id: int, code: str, name: str, difficulty: str, hours:
     return cur.lastrowid
 
 
+def upsert_course_material(
+    cur, course_id: int, course_code: str, created_by: int
+) -> int:
+    filename = MATERIAL_FILES[course_code]
+    total_chars = sum(
+        len(MATERIAL_GUIDANCE[kp_code])
+        for kp_code, *_ in KNOWLEDGE_POINTS[course_code]
+    )
+    row = fetchone(
+        cur,
+        "SELECT material_id FROM course_materials WHERE course_id=%s AND filename=%s",
+        course_id,
+        filename,
+    )
+    if row:
+        cur.execute(
+            """UPDATE course_materials
+               SET file_type='markdown', storage_path=%s, status='parsed',
+                   error_message=NULL, total_chunks=%s, created_by=%s,
+                   is_deleted=0, material_version=1, total_chars=%s,
+                   last_reparse_at=NOW()
+               WHERE material_id=%s""",
+            (
+                f"demo/course-materials/{filename}",
+                len(KNOWLEDGE_POINTS[course_code]),
+                created_by,
+                total_chars,
+                row["material_id"],
+            ),
+        )
+        return row["material_id"]
+    cur.execute(
+        """INSERT INTO course_materials
+               (course_id, filename, file_type, storage_path, status,
+                total_chunks, created_by, is_deleted, material_version,
+                total_chars, last_reparse_at)
+           VALUES (%s, %s, 'markdown', %s, 'parsed', %s, %s, 0, 1, %s, NOW())""",
+        (
+            course_id,
+            filename,
+            f"demo/course-materials/{filename}",
+            len(KNOWLEDGE_POINTS[course_code]),
+            created_by,
+            total_chars,
+        ),
+    )
+    return cur.lastrowid
+
+
+def upsert_material_chunk(
+    cur,
+    material_id: int,
+    course_id: int,
+    kp_id: int,
+    kp_code: str,
+    title: str,
+    chunk_index: int,
+) -> int:
+    content = MATERIAL_GUIDANCE[kp_code]
+    chunk_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    row = fetchone(
+        cur,
+        "SELECT chunk_id FROM course_material_chunks WHERE material_id=%s AND chunk_index=%s",
+        material_id,
+        chunk_index,
+    )
+    params = (
+        course_id,
+        kp_id,
+        title,
+        content,
+        chunk_index + 1,
+        chunk_index + 1,
+        f"{title},{kp_code}",
+        chunk_hash,
+    )
+    if row:
+        cur.execute(
+            """UPDATE course_material_chunks
+               SET course_id=%s, kp_id=%s, title=%s, content=%s,
+                   source_page=%s, source_paragraph=%s, bm25_terms=%s,
+                   chunk_hash=%s, material_version=1, is_deleted=0
+               WHERE chunk_id=%s""",
+            (*params, row["chunk_id"]),
+        )
+        return row["chunk_id"]
+    cur.execute(
+        """INSERT INTO course_material_chunks
+               (material_id, course_id, kp_id, title, content, source_page,
+                source_paragraph, bm25_terms, chunk_index, chunk_hash,
+                material_version, is_deleted)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 1, 0)""",
+        (
+            material_id,
+            course_id,
+            kp_id,
+            title,
+            content,
+            chunk_index + 1,
+            chunk_index + 1,
+            f"{title},{kp_code}",
+            chunk_index,
+            chunk_hash,
+        ),
+    )
+    return cur.lastrowid
+
+
+def prune_material_chunks(cur, material_id: int, expected_count: int) -> None:
+    stale_rows = fetchall(
+        cur,
+        """SELECT chunk_id FROM course_material_chunks
+           WHERE material_id=%s AND chunk_index >= %s""",
+        material_id,
+        expected_count,
+    )
+    stale_ids = [row["chunk_id"] for row in stale_rows]
+    if not stale_ids:
+        return
+    placeholders = ",".join(["%s"] * len(stale_ids))
+    cur.execute(
+        f"DELETE FROM resource_evidence_links WHERE chunk_id IN ({placeholders})",
+        stale_ids,
+    )
+    cur.execute(
+        f"DELETE FROM kp_chunk_links WHERE chunk_id IN ({placeholders})",
+        stale_ids,
+    )
+    cur.execute(
+        f"DELETE FROM course_material_chunks WHERE chunk_id IN ({placeholders})",
+        stale_ids,
+    )
+    log.info("  pruned %d stale chunks from material %s", len(stale_ids), material_id)
+
+
+def upsert_kp_chunk_link(
+    cur, chunk_id: int, kp_id: int, verified_by: int
+) -> None:
+    row = fetchone(
+        cur,
+        "SELECT link_id FROM kp_chunk_links WHERE chunk_id=%s AND kp_id=%s",
+        chunk_id,
+        kp_id,
+    )
+    if row:
+        cur.execute(
+            """UPDATE kp_chunk_links
+               SET match_method='manual', relevance_score=0.9800,
+                   status='confirmed', verified_by=%s, verified_at=NOW(),
+                   match_version=1
+               WHERE link_id=%s""",
+            (verified_by, row["link_id"]),
+        )
+        return
+    cur.execute(
+        """INSERT INTO kp_chunk_links
+               (chunk_id, kp_id, match_method, relevance_score, status,
+                verified_by, verified_at, match_version)
+           VALUES (%s, %s, 'manual', 0.9800, 'confirmed', %s, NOW(), 1)""",
+        (chunk_id, kp_id, verified_by),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Student profiles & mastery
 # ---------------------------------------------------------------------------
@@ -659,34 +864,53 @@ def upsert_kp(cur, course_id: int, code: str, name: str, difficulty: str, hours:
 STUDENT_PROFILES: List[Tuple[str, str, str, str, str, int, float]] = [
     # (username, course_code, learning_goal, current_level, interests, weekly_hours, mastery_score)
     ("student_zhang", "CS301",
-     "掌握数据库系统原理，能够独立完成数据库设计、SQL查询优化，能在两周内完成课程 Web 项目",
-     "已掌握 SQL 基本查询和数据定义 DDL，多表连接和事务管理薄弱",
-     "数据库实践,Web开发,项目实战", 8, 0.42),
-    ("student_liu", "CS301",
-     "深入理解数据库原理，能够进行性能调优和复杂业务数据库设计",
-     "SQL 查询基础扎实，理解索引概念，但缺乏实战经验",
-     "数据库优化,数据分析", 10, 0.68),
-    ("student_chen", "CS201",
-     "掌握 Python 程序设计基础，能独立编写 Web 后端接口",
-     "有 C 语言基础，Python 语法入门，函数和模块使用不熟练",
-     "Web开发,Python后端", 6, 0.35),
-    ("student_zhao", "CS201",
-     "能用 Python 完成数据处理与可视化任务",
-     "Python 基础扎实，正在学习数据科学方向",
-     "数据分析,可视化", 9, 0.72),
-    ("student_sun", "CS401",
-     "理解软件工程全流程，能在团队中担任前端或测试角色",
-     "熟悉基础开发，缺少工程化经验",
-     "前端开发,UI设计", 7, 0.50),
-    ("student_zhou", "CS401",
-     "成为全栈工程师，掌握需求→设计→实现→测试全链路",
-     "后端基础扎实，前端能力薄弱",
-     "后端开发,系统设计", 10, 0.61),
+     "掌握数据库系统原理，独立完成数据库设计、复杂 SQL 与事务分析",
+     "会写单表查询和 DDL，多表连接、事务隔离与索引设计薄弱",
+     "数据库实践,Web开发,校园选课系统", 6, 0.38),
+    ("student_liu", "CS201",
+     "掌握 Python 工程化开发，能够独立实现带测试的 FastAPI 服务",
+     "语法和函数基础扎实，异常边界、面向对象设计与自动化测试经验不足",
+     "Python后端,数据分析,自动化测试", 8, 0.63),
+    ("student_chen", "CS401",
+     "能够组织一次完整敏捷迭代，完成需求、设计、测试和发布闭环",
+     "有团队项目经验，擅长需求梳理，但系统设计与质量度量仍需加强",
+     "产品设计,敏捷协作,质量保障", 10, 0.76),
 ]
+
+PROFILE_TRAITS: Dict[str, Dict[str, str]] = {
+    "student_zhang": {
+        "knowledge_base": "完成数据库基础章节，能够使用 SELECT、WHERE、GROUP BY 与简单聚合。",
+        "cognitive_style": "先看业务案例，再通过关系图和可执行 SQL 归纳概念。",
+        "time_constraints": "工作日每天 45 分钟，周末可安排 2 小时集中练习。",
+        "practice_level": "每周完成 2 组 SQL 练习，复杂查询需要分步提示。",
+        "motivation": "希望在课程答辩中独立讲清选课系统的数据模型与事务设计。",
+        "error_prone_points": "遗漏连接条件、混淆 WHERE 与 HAVING、无法判断并发现象。",
+        "resource_preferences": "图解讲义,分步案例,即时测验",
+    },
+    "student_liu": {
+        "knowledge_base": "熟悉 Python 容器、函数和模块，能完成小型脚本与基础接口。",
+        "cognitive_style": "偏好先阅读接口契约，再通过代码重构和单元测试验证理解。",
+        "time_constraints": "工作日晚间 1 小时，周六可进行 3 小时项目实践。",
+        "practice_level": "能独立完成中等代码题，异常设计和测试覆盖需要反馈。",
+        "motivation": "希望完成一个结构清晰、可测试、可部署的学习进度服务。",
+        "error_prone_points": "可变默认参数、异常吞噬、业务逻辑与路由耦合。",
+        "resource_preferences": "代码案例,错误分析,项目任务",
+    },
+    "student_chen": {
+        "knowledge_base": "参与过两次课程团队项目，理解用户故事、迭代和基础测试流程。",
+        "cognitive_style": "擅长从场景和角色出发，偏好模板、对比表与评审反馈。",
+        "time_constraints": "每周可投入 10 小时，周三与周日适合团队协作。",
+        "practice_level": "能主持需求评审，正在提升架构权衡和质量指标设计能力。",
+        "motivation": "希望担任迭代负责人，形成可追溯、可验收的交付方案。",
+        "error_prone_points": "非功能需求不可测、模块职责过宽、风险缺少责任人。",
+        "resource_preferences": "项目案例,评审清单,可视化看板",
+    },
+}
 
 
 def upsert_student_profile(cur, student_id: int, course_id: int, goal: str, level: str,
-                            interests: str, weekly_hours: int, mastery: float) -> int:
+                            interests: str, weekly_hours: int, mastery: float,
+                            traits: Dict[str, str]) -> int:
     row = fetchone(
         cur,
         "SELECT profile_id FROM student_profiles WHERE student_id=%s AND course_id=%s",
@@ -695,28 +919,68 @@ def upsert_student_profile(cur, student_id: int, course_id: int, goal: str, leve
     if row:
         pid = row["profile_id"]
         cur.execute(
-            """UPDATE student_profiles SET learning_goal=%s, current_level=%s, interests=%s,
-                                           resource_preferences='案例讲解,图解说明,代码实操',
-                                           weekly_hours=%s, mastery_score=%s, is_deleted=0
+            """UPDATE student_profiles
+               SET learning_goal=%s, knowledge_base=%s, current_level=%s,
+                   cognitive_style=%s, time_constraints=%s, practice_level=%s,
+                   motivation=%s, error_prone_points=%s, interests=%s,
+                   resource_preferences=%s, weekly_hours=%s,
+                   mastery_score=%s, is_deleted=0, deleted_at=NULL
                WHERE profile_id=%s""",
-            (goal, level, interests, weekly_hours, mastery, pid),
+            (
+                goal,
+                traits["knowledge_base"],
+                level,
+                traits["cognitive_style"],
+                traits["time_constraints"],
+                traits["practice_level"],
+                traits["motivation"],
+                json.dumps(
+                    traits["error_prone_points"].split("、"), ensure_ascii=False
+                ),
+                interests,
+                traits["resource_preferences"],
+                weekly_hours,
+                mastery,
+                pid,
+            ),
         )
         return pid
     cur.execute(
         """INSERT INTO student_profiles
-               (student_id, course_id, learning_goal, current_level, interests,
+               (student_id, course_id, learning_goal, knowledge_base,
+                current_level, cognitive_style, time_constraints,
+                practice_level, motivation, error_prone_points, interests,
                 resource_preferences, weekly_hours, mastery_score, is_deleted)
-           VALUES (%s, %s, %s, %s, %s, '案例讲解,图解说明,代码实操', %s, %s, 0)""",
-        (student_id, course_id, goal, level, interests, weekly_hours, mastery),
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0)""",
+        (
+            student_id,
+            course_id,
+            goal,
+            traits["knowledge_base"],
+            level,
+            traits["cognitive_style"],
+            traits["time_constraints"],
+            traits["practice_level"],
+            traits["motivation"],
+            json.dumps(
+                traits["error_prone_points"].split("、"), ensure_ascii=False
+            ),
+            interests,
+            traits["resource_preferences"],
+            weekly_hours,
+            mastery,
+        ),
     )
     return cur.lastrowid
 
 
-def seed_mastery(cur, profile_id: int, kp_ids: List[int], base: float) -> None:
+def seed_mastery(
+    cur, profile_id: int, kp_ids: List[int], base: float, seed_key: str
+) -> None:
     """Fill per-KP mastery around `base` with noise; skips if row exists."""
-    random.seed(profile_id)
+    rng = random.Random(seed_key)
     for kp_id in kp_ids:
-        score = max(0.05, min(0.95, base + random.uniform(-0.20, 0.25)))
+        score = max(0.05, min(0.95, base + rng.uniform(-0.20, 0.25)))
         row = fetchone(
             cur,
             "SELECT mastery_id FROM student_knowledge_mastery WHERE profile_id=%s AND kp_id=%s",
@@ -727,8 +991,8 @@ def seed_mastery(cur, profile_id: int, kp_ids: List[int], base: float) -> None:
                 """UPDATE student_knowledge_mastery SET mastery_level=%s, last_test_score=%s,
                                                        last_test_date=%s, update_reason=%s
                    WHERE mastery_id=%s""",
-                (round(score, 3), round(score + random.uniform(-0.05, 0.1), 3),
-                 date.today() - timedelta(days=random.randint(1, 14)),
+                (round(score, 3), round(score + rng.uniform(-0.05, 0.1), 3),
+                 date.today() - timedelta(days=rng.randint(1, 14)),
                  "系统根据近期测验自动更新", row["mastery_id"]),
             )
         else:
@@ -738,8 +1002,125 @@ def seed_mastery(cur, profile_id: int, kp_ids: List[int], base: float) -> None:
                         last_test_date, update_reason, is_deleted)
                    VALUES (%s, %s, %s, %s, %s, '系统根据近期测验自动更新', 0)""",
                 (profile_id, kp_id, round(score, 3),
-                 round(score + random.uniform(-0.05, 0.1), 3),
-                 date.today() - timedelta(days=random.randint(1, 14))),
+                 round(score + rng.uniform(-0.05, 0.1), 3),
+                 date.today() - timedelta(days=rng.randint(1, 14))),
+            )
+
+
+def seed_profile_activity(
+    cur, profile_id: int, course_id: int, username: str, learning_goal: str
+) -> None:
+    traits = PROFILE_TRAITS[username]
+    dialog_rows = (
+        (
+            "student",
+            f"我的目标是{learning_goal}。每周学习安排是：{traits['time_constraints']}",
+            {"learning_goal": learning_goal, "time_constraints": traits["time_constraints"]},
+        ),
+        (
+            "assistant",
+            f"已记录目标。后续资源将优先采用{traits['resource_preferences']}，并重点关注{traits['error_prone_points']}。",
+            {
+                "resource_preferences": traits["resource_preferences"],
+                "error_prone_points": traits["error_prone_points"],
+            },
+        ),
+    )
+    for role, content, extracted in dialog_rows:
+        row = fetchone(
+            cur,
+            """SELECT message_id FROM profile_dialog_messages
+               WHERE profile_id=%s AND role=%s AND content=%s LIMIT 1""",
+            profile_id,
+            role,
+            content,
+        )
+        if row:
+            cur.execute(
+                """UPDATE profile_dialog_messages
+                   SET extracted_json=%s, is_applied=1, is_deleted=0
+                   WHERE message_id=%s""",
+                (json.dumps(extracted, ensure_ascii=False), row["message_id"]),
+            )
+        else:
+            cur.execute(
+                """INSERT INTO profile_dialog_messages
+                       (profile_id, role, content, extracted_json, is_applied, is_deleted)
+                   VALUES (%s, %s, %s, %s, 1, 0)""",
+                (
+                    profile_id,
+                    role,
+                    content,
+                    json.dumps(extracted, ensure_ascii=False),
+                ),
+            )
+
+    summary = "演示初始化：根据诊断对话补充目标、时间约束、偏好和易错点"
+    row = fetchone(
+        cur,
+        """SELECT history_id FROM profile_update_history
+           WHERE profile_id=%s AND change_summary=%s LIMIT 1""",
+        profile_id,
+        summary,
+    )
+    if not row:
+        cur.execute(
+            """INSERT INTO profile_update_history
+                   (profile_id, update_type, before_json, after_json, change_summary)
+               VALUES (%s, 'dialog', %s, %s, %s)""",
+            (
+                profile_id,
+                json.dumps({}, ensure_ascii=False),
+                json.dumps(
+                    {
+                        "course_id": course_id,
+                        "learning_goal": learning_goal,
+                        **traits,
+                    },
+                    ensure_ascii=False,
+                ),
+                summary,
+            ),
+        )
+
+    tutor_rows = (
+        (
+            f"我在本课程最容易出错的地方是什么？",
+            f"当前画像显示需要优先关注：{traits['error_prone_points']}。建议先完成一个诊断题，再按错误类型选择讲义和练习。",
+            "basic",
+            1,
+            "请给我一份 30 分钟的练习安排。",
+        ),
+        (
+            "如何判断我是否真正掌握了本周知识点？",
+            "同时检查三类证据：能否解释概念、能否独立完成新题、能否说明错误原因。系统会结合测验、任务进度和自评更新掌握度。",
+            "intermediate",
+            None,
+            None,
+        ),
+    )
+    for question, answer, level, helpful, follow_up in tutor_rows:
+        row = fetchone(
+            cur,
+            "SELECT session_id FROM tutor_sessions WHERE profile_id=%s AND question=%s LIMIT 1",
+            profile_id,
+            question,
+        )
+        if row:
+            cur.execute(
+                """UPDATE tutor_sessions
+                   SET course_id=%s, answer=%s, explanation_level=%s,
+                       helpful=%s, follow_up=%s, is_deleted=0
+                   WHERE session_id=%s""",
+                (course_id, answer, level, helpful, follow_up, row["session_id"]),
+            )
+        else:
+            cur.execute(
+                """INSERT INTO tutor_sessions
+                       (profile_id, course_id, question, answer, explanation_level,
+                        helpful, follow_up, is_deleted)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, 0)""",
+                (profile_id, course_id, question, answer, level, helpful, follow_up),
             )
 
 
@@ -829,6 +1210,36 @@ def upsert_learning_task(
     return cur.lastrowid
 
 
+def upsert_learning_task_progress(
+    cur, task_id: int, student_id: int, status: str
+) -> None:
+    started_at = datetime.now() - timedelta(days=2) if status != "assigned" else None
+    completed_at = datetime.now() - timedelta(hours=8) if status == "completed" else None
+    row = fetchone(
+        cur,
+        """SELECT progress_id FROM learning_task_progress
+           WHERE task_id=%s AND student_id=%s""",
+        task_id,
+        student_id,
+    )
+    if row:
+        cur.execute(
+            """UPDATE learning_task_progress
+               SET status=%s, started_at=%s, completed_at=%s,
+                   is_deleted=0, updated_at=NOW()
+               WHERE progress_id=%s""",
+            (status, started_at, completed_at, row["progress_id"]),
+        )
+        return
+    cur.execute(
+        """INSERT INTO learning_task_progress
+               (task_id, student_id, status, started_at, completed_at,
+                is_deleted, created_at, updated_at)
+           VALUES (%s, %s, %s, %s, %s, 0, NOW(), NOW())""",
+        (task_id, student_id, status, started_at, completed_at),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Model providers, AI models, API configs
 # ---------------------------------------------------------------------------
@@ -888,13 +1299,13 @@ PROJECTS: List[Tuple[str, str, str, str, List[str]]] = [
     ("Python Web 数据看板",
      "兴趣项目",
      "基于 Flask + ECharts 的数据可视化看板",
-     "teacher_wang",
-     ["student_chen", "student_zhao"]),
+     "teacher_li",
+     ["student_liu", "student_chen"]),
     ("软件工程 - 团队协作流程演练",
      "教学项目",
      "按 Scrum 流程完成一个小型 Web 应用的迭代开发",
-     "teacher_wang",
-     ["student_sun", "student_zhou"]),
+     "teacher_li",
+     ["student_zhang", "student_liu", "student_chen"]),
 ]
 
 
@@ -1086,9 +1497,11 @@ def upsert_learning_resource(cur, course_id: int, title: str, rtype: str,
         cur.execute(
             """UPDATE learning_resources SET resource_type=%s, difficulty=%s, content=%s,
                                             target_kp_ids=%s, generation_model=%s,
-                                            status=%s, is_deleted=0
+                                            generation_agent='multi_agent_workflow',
+                                            status=%s, created_by=%s, is_deleted=0,
+                                            deleted_at=NULL, updated_at=NOW()
                WHERE resource_id=%s""",
-            (rtype, difficulty, content, kp_ids_csv, model, status, rid),
+            (rtype, difficulty, content, kp_ids_csv, model, status, created_by, rid),
         )
         return rid
     cur.execute(
@@ -1099,6 +1512,114 @@ def upsert_learning_resource(cur, course_id: int, title: str, rtype: str,
         (course_id, title, rtype, difficulty, content, kp_ids_csv, model, status, created_by),
     )
     return cur.lastrowid
+
+
+def upsert_resource_review(
+    cur,
+    resource_id: int,
+    submitter_id: int,
+    reviewer_id: int,
+    status: str,
+) -> None:
+    row = fetchone(
+        cur,
+        """SELECT review_id FROM learning_resource_reviews
+           WHERE resource_id=%s AND submitter_id=%s ORDER BY review_id DESC LIMIT 1""",
+        resource_id,
+        submitter_id,
+    )
+    reviewed = status != "pending"
+    scores = {
+        "approved": (9.2, 8.8, 9.0, 8.7, 9.1),
+        "rejected": (6.2, 5.8, 6.5, 7.0, 5.9),
+        "pending": (None, None, None, None, None),
+    }[status]
+    comment = {
+        "approved": "事实准确，知识点覆盖完整，案例和练习可直接用于教学。",
+        "rejected": "需要补充来源证据、边界条件与可验证的答案解析后重新送审。",
+        "pending": "等待教师完成内容准确性、证据充分性和教学可用性审核。",
+    }[status]
+    params = (
+        reviewer_id,
+        status,
+        "多智能体生成完成，提交课程内容审核。",
+        *scores,
+        comment,
+        datetime.now() if reviewed else None,
+    )
+    if row:
+        cur.execute(
+            """UPDATE learning_resource_reviews
+               SET reviewer_id=%s, review_status=%s, submit_note=%s,
+                   accuracy_score=%s, completeness_score=%s, logic_score=%s,
+                   format_score=%s, usability_score=%s, review_comment=%s,
+                   reviewed_at=%s, is_deleted=0, updated_at=NOW()
+               WHERE review_id=%s""",
+            (*params, row["review_id"]),
+        )
+        return
+    cur.execute(
+        """INSERT INTO learning_resource_reviews
+               (resource_id, submitter_id, reviewer_id, review_status,
+                submit_note, accuracy_score, completeness_score, logic_score,
+                format_score, usability_score, review_comment, reviewed_at,
+                is_deleted)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0)""",
+        (resource_id, submitter_id, *params),
+    )
+
+
+def upsert_resource_evidence(
+    cur,
+    resource_id: int,
+    chunk_id: int,
+    kp_id: int,
+    quote_text: str,
+    resource_status: str,
+    verified_by: int,
+    source_page: int,
+) -> None:
+    verified_status = {
+        "approved": "verified",
+        "rejected": "rejected",
+    }.get(resource_status, "pending")
+    usage_type = "conceptual" if resource_status == "draft" else "paraphrase"
+    row = fetchone(
+        cur,
+        """SELECT link_id FROM resource_evidence_links
+           WHERE resource_id=%s AND chunk_id=%s AND kp_id=%s LIMIT 1""",
+        resource_id,
+        chunk_id,
+        kp_id,
+    )
+    params = (
+        quote_text,
+        0.9400,
+        usage_type,
+        verified_status,
+        verified_by if verified_status != "pending" else None,
+        datetime.now() if verified_status != "pending" else None,
+        source_page,
+        1,
+    )
+    if row:
+        cur.execute(
+            """UPDATE resource_evidence_links
+               SET quote_text=%s, relevance_score=%s, usage_type=%s,
+                   verified_status=%s, verified_by=%s, verified_at=%s,
+                   source_page=%s, source_paragraph=%s
+               WHERE link_id=%s""",
+            (*params, row["link_id"]),
+        )
+        return
+    cur.execute(
+        """INSERT INTO resource_evidence_links
+               (resource_id, chunk_id, kp_id, quote_text, relevance_score,
+                usage_type, verified_status, verified_by, verified_at,
+                source_page, source_paragraph)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+        (resource_id, chunk_id, kp_id, *params),
+    )
 
 
 def upsert_feedback(cur, profile_id: int, course_id: int, resource_id: Optional[int],
@@ -1185,13 +1706,15 @@ def main() -> int:
         log.error("Set DEMO_PASSWORD to a unique value of at least 12 characters.")
         return 2
     DEMO_PWHASH = hash_password(DEMO_PASSWORD)
+    random.seed(20260717)
 
     conn = connect()
     try:
         with conn.cursor() as cur:
             # 0) Rebuild project-workflow fixtures while preserving stable
             #    users, profiles, course resources, feedbacks, and learning tasks.
-            demo_usernames = [u[0] for u in DEMO_USERS]
+            active_demo_usernames = [u[0] for u in DEMO_USERS]
+            demo_usernames = active_demo_usernames + list(RETIRED_SAMPLE_USERS)
             log.info("=== cleanup previous demo rows (idempotent) ===")
             placeholders = ",".join(["%s"] * len(demo_usernames))
 
@@ -1208,6 +1731,95 @@ def main() -> int:
                 LEGACY_KP_CODES,
             )
 
+            # Remove the complete education-side graph belonging to known
+            # samples. Stable courses and materials are kept and updated below.
+            profile_children = (
+                "student_knowledge_mastery",
+                "learning_feedbacks",
+                "profile_dialog_messages",
+                "profile_update_history",
+                "tutor_sessions",
+            )
+            for table in profile_children:
+                cur.execute(
+                    f"DELETE {table} FROM {table} "
+                    f"INNER JOIN student_profiles sp ON {table}.profile_id=sp.profile_id "
+                    f"INNER JOIN users u ON sp.student_id=u.user_id "
+                    f"WHERE u.username IN ({placeholders})",
+                    demo_usernames,
+                )
+
+            # Old migrations left child rows attached to missing or soft-deleted
+            # profiles. They have no observable owner and distort analytics.
+            for table in profile_children:
+                cur.execute(
+                    f"DELETE {table} FROM {table} "
+                    f"LEFT JOIN student_profiles sp ON {table}.profile_id=sp.profile_id "
+                    f"WHERE sp.profile_id IS NULL OR sp.is_deleted=1"
+                )
+            cur.execute(
+                """DELETE sp FROM student_profiles sp
+                   LEFT JOIN users u ON sp.student_id=u.user_id
+                   WHERE sp.is_deleted=1 OR u.user_id IS NULL OR u.is_deleted=1"""
+            )
+
+            # Preserve historical system invocations while removing broken user
+            # references left by old hard-deleted sample accounts.
+            cur.execute(
+                """UPDATE ai_invocations ai
+                   LEFT JOIN users u ON ai.created_by=u.user_id
+                   SET ai.created_by=NULL
+                   WHERE ai.created_by IS NOT NULL AND u.user_id IS NULL"""
+            )
+
+            cur.execute(
+                f"DELETE ltp FROM learning_task_progress ltp "
+                f"INNER JOIN users u ON ltp.student_id=u.user_id "
+                f"WHERE u.username IN ({placeholders})",
+                demo_usernames,
+            )
+            cur.execute(
+                f"DELETE ltp FROM learning_task_progress ltp "
+                f"INNER JOIN learning_tasks lt ON ltp.task_id=lt.task_id "
+                f"INNER JOIN users u ON lt.creator_id=u.user_id "
+                f"WHERE u.username IN ({placeholders})",
+                demo_usernames,
+            )
+            cur.execute(
+                f"DELETE FROM learning_tasks WHERE creator_id IN "
+                f"(SELECT user_id FROM users WHERE username IN ({placeholders})) "
+                f"OR assignee_id IN "
+                f"(SELECT user_id FROM users WHERE username IN ({placeholders}))",
+                (*demo_usernames, *demo_usernames),
+            )
+
+            cur.execute(
+                f"DELETE rel FROM resource_evidence_links rel "
+                f"INNER JOIN learning_resources lr ON rel.resource_id=lr.resource_id "
+                f"INNER JOIN users u ON lr.created_by=u.user_id "
+                f"WHERE u.username IN ({placeholders})",
+                demo_usernames,
+            )
+            cur.execute(
+                f"DELETE lrr FROM learning_resource_reviews lrr "
+                f"INNER JOIN learning_resources lr ON lrr.resource_id=lr.resource_id "
+                f"INNER JOIN users u ON lr.created_by=u.user_id "
+                f"WHERE u.username IN ({placeholders})",
+                demo_usernames,
+            )
+            cur.execute(
+                f"DELETE lr FROM learning_resources lr "
+                f"INNER JOIN users u ON lr.created_by=u.user_id "
+                f"WHERE u.username IN ({placeholders})",
+                demo_usernames,
+            )
+            cur.execute(
+                f"DELETE sp FROM student_profiles sp "
+                f"INNER JOIN users u ON sp.student_id=u.user_id "
+                f"WHERE u.username IN ({placeholders})",
+                demo_usernames,
+            )
+
             # Tables where the user is referenced via a direct FK column.
             USER_COL = [
                 ("adopted_outputs", "adopted_by"),
@@ -1221,6 +1833,7 @@ def main() -> int:
                 ("project_tasks", "creator_id"),
                 ("project_members", "user_id"),
                 ("operation_logs", "user_id"),
+                ("auth_sessions", "user_id"),
                 ("user_roles", "user_id"),
             ]
             for tbl, col in USER_COL:
@@ -1276,6 +1889,16 @@ def main() -> int:
                     assign_role(cur, uid, rc)
                 log.info("  user %s (id=%s) -> roles %s", username, uid, roles)
 
+            admin_id = get_user_id(cur, "admin")
+            retired_placeholders = ",".join(["%s"] * len(RETIRED_SAMPLE_USERS))
+            cur.execute(
+                f"""UPDATE users
+                    SET status='disabled', is_deleted=1, deleted_at=NOW(),
+                        deleted_by=%s, updated_at=NOW()
+                    WHERE username IN ({retired_placeholders})""",
+                (admin_id, *RETIRED_SAMPLE_USERS),
+            )
+
             log.info("=== courses ===")
             course_ids: Dict[str, int] = {}
             for code, name, desc, owner_username in COURSES:
@@ -1286,14 +1909,44 @@ def main() -> int:
 
             log.info("=== knowledge points ===")
             kp_ids_by_course: Dict[int, List[int]] = {}
+            kp_id_by_code: Dict[str, int] = {}
             for code, kps in KNOWLEDGE_POINTS.items():
                 cid = course_ids[code]
                 ids = []
                 for kcode, kname, diff, hours in kps:
                     kid = upsert_kp(cur, cid, kcode, kname, diff, hours)
                     ids.append(kid)
+                    kp_id_by_code[kcode] = kid
                 kp_ids_by_course[cid] = ids
                 log.info("  %s: %d knowledge points", code, len(ids))
+
+            log.info("=== course materials + chunks + knowledge links ===")
+            teacher_li_id = get_user_id(cur, "teacher_li")
+            chunk_by_kp: Dict[int, Dict[str, Any]] = {}
+            for code, kps in KNOWLEDGE_POINTS.items():
+                cid = course_ids[code]
+                material_id = upsert_course_material(
+                    cur, cid, code, teacher_li_id
+                )
+                prune_material_chunks(cur, material_id, len(kps))
+                for index, (kp_code, kp_name, _difficulty, _hours) in enumerate(kps):
+                    kp_id = kp_id_by_code[kp_code]
+                    chunk_id = upsert_material_chunk(
+                        cur,
+                        material_id,
+                        cid,
+                        kp_id,
+                        kp_code,
+                        kp_name,
+                        index,
+                    )
+                    upsert_kp_chunk_link(cur, chunk_id, kp_id, teacher_li_id)
+                    chunk_by_kp[kp_id] = {
+                        "chunk_id": chunk_id,
+                        "content": MATERIAL_GUIDANCE[kp_code],
+                        "source_page": index + 1,
+                    }
+                log.info("  %s: material=%s, chunks=%d", code, material_id, len(kps))
 
             log.info("=== student profiles + mastery ===")
             profile_ids: Dict[Tuple[str, str], int] = {}
@@ -1301,10 +1954,18 @@ def main() -> int:
                 student_id = get_user_id(cur, username)
                 cid = course_ids[code]
                 pid = upsert_student_profile(cur, student_id, cid, goal, level,
-                                              interests, weekly, mastery)
+                                              interests, weekly, mastery,
+                                              PROFILE_TRAITS[username])
                 profile_ids[(username, code)] = pid
-                seed_mastery(cur, pid, kp_ids_by_course[cid], mastery)
+                seed_mastery(
+                    cur,
+                    pid,
+                    kp_ids_by_course[cid],
+                    mastery,
+                    f"{username}:{code}",
+                )
                 actual_mastery = refresh_profile_mastery_score(cur, pid)
+                seed_profile_activity(cur, pid, cid, username, goal)
                 log.info(
                     "  profile %s/%s (id=%s) mastery=%.3f",
                     username,
@@ -1329,27 +1990,45 @@ def main() -> int:
                     "SQL多表连接练习",
                     "完成教务系统多表查询练习，包括 INNER JOIN 和 LEFT JOIN",
                     [3],
-                    "student_liu",
+                    "student_zhang",
                     "assigned",
-                    11,
+                    -2,
                 ),
                 (
                     "CS201",
                     "Python函数与模块练习",
-                    "编写包含多个函数的 Python 模块，实现基本文本处理功能",
+                    "编写包含类型标注和单元测试的 Python 模块，实现学习记录统计",
                     [1],
-                    "student_chen",
+                    "student_liu",
+                    "completed",
+                    -3,
+                ),
+                (
+                    "CS201",
+                    "FastAPI异常处理与接口测试",
+                    "实现统一错误响应，并覆盖参数错误、资源不存在和依赖失败场景",
+                    [3, 4],
+                    "student_liu",
                     "assigned",
                     7,
                 ),
                 (
                     "CS401",
                     "UML建模实践",
-                    "为选定系统绘制完整的用例图和类图",
-                    [2],
-                    "student_sun",
-                    "draft",
-                    None,
+                    "为校园预约平台绘制用例图、领域模型和模块依赖图",
+                    [1, 2],
+                    "student_chen",
+                    "in_progress",
+                    5,
+                ),
+                (
+                    "CS401",
+                    "Sprint评审与质量复盘",
+                    "依据完成定义检查需求、测试、发布与回滚证据并形成复盘记录",
+                    [3, 4],
+                    "student_chen",
+                    "completed",
+                    -1,
                 ),
             ]
             for code, title, desc, kp_indexes, assignee_name, status, due_days in learning_task_specs:
@@ -1364,6 +2043,10 @@ def main() -> int:
                     get_user_id(cur, COURSES[[item[0] for item in COURSES].index(code)][3]),
                     status,
                     due_days,
+                )
+                assignee_id = get_user_id(cur, assignee_name)
+                upsert_learning_task_progress(
+                    cur, task_id, assignee_id, status
                 )
                 log.info("  task %s (id=%s)", title, task_id)
 
@@ -1409,7 +2092,6 @@ def main() -> int:
 
             admin_id = member_user_ids["admin"]
             teacher_li_id = member_user_ids["teacher_li"]
-            teacher_wang_id = member_user_ids["teacher_wang"]
 
             for proj_name, ptype, desc, owner_username, members in PROJECTS:
                 owner_id = member_user_ids[owner_username]
@@ -1437,19 +2119,19 @@ def main() -> int:
                     ]
                 elif "Python" in proj_name:
                     task_specs = [
-                        ("lecture", "Flask 路由与蓝图", "Flask 路由与蓝图的入门讲义", teacher_wang_id,
-                         member_user_ids["student_chen"], "approved", "normal", 4),
-                        ("quiz", "Python 函数练习", "10 道函数相关练习题", teacher_wang_id,
-                         member_user_ids["student_zhao"], "submitted", "normal", 6),
-                        ("case", "数据看板实战案例", "完整的数据看板案例", teacher_wang_id,
+                        ("lecture", "Flask 路由与蓝图", "Flask 路由与蓝图的入门讲义", teacher_li_id,
+                         member_user_ids["student_liu"], "approved", "normal", 4),
+                        ("quiz", "Python 函数练习", "10 道函数相关练习题", teacher_li_id,
+                         member_user_ids["student_liu"], "submitted", "normal", 6),
+                        ("case", "数据看板实战案例", "完整的数据看板案例", teacher_li_id,
                          member_user_ids["student_chen"], "running", "high", 8),
                     ]
                 else:  # 软件工程
                     task_specs = [
-                        ("summary", "Scrum 角色与流程总结", "Scrum 角色与流程的总结", teacher_wang_id,
-                         member_user_ids["student_sun"], "approved", "normal", 2),
-                        ("review", "团队迭代 1 评审", "对第一次迭代交付物进行评审", teacher_wang_id,
-                         member_user_ids["student_zhou"], "submitted", "high", 5),
+                        ("summary", "Scrum 角色与流程总结", "Scrum 角色与流程的总结", teacher_li_id,
+                         member_user_ids["student_chen"], "approved", "normal", 2),
+                        ("review", "团队迭代 1 评审", "对第一次迭代交付物进行评审", teacher_li_id,
+                         member_user_ids["student_zhang"], "submitted", "high", 5),
                     ]
 
                 for ttype_code, title, tdesc, creator_id, assignee_id, status, prio, days in task_specs:
@@ -1489,7 +2171,7 @@ def main() -> int:
                             is_final=(out_status == "approved"),
                         )
                         if status in ("submitted", "approved", "rejected"):
-                            reviewer = teacher_li_id if creator_id == teacher_li_id else teacher_wang_id
+                            reviewer = teacher_li_id
                             req_id = upsert_review_request(
                                 cur, out_id, tid, pid, creator_id, reviewer,
                                 "approved" if status == "approved" else
@@ -1517,6 +2199,11 @@ def main() -> int:
                                        f"任务 {title} 进入 {status}")
 
             log.info("=== learning resources ===")
+            resource_statuses = {
+                "CS301": ("approved", "pending_review", "rejected"),
+                "CS201": ("approved", "approved", "pending_review"),
+                "CS401": ("approved", "draft", "approved"),
+            }
             for code in ("CS301", "CS201", "CS401"):
                 cid = course_ids[code]
                 kps = kp_ids_by_course[cid]
@@ -1526,28 +2213,61 @@ def main() -> int:
                     ("case", f"{code} 综合案例分析", kps[2:5]),
                 ]):
                     kp_csv = ",".join(str(x) for x in kps_subset)
+                    resource_status = resource_statuses[code][idx]
                     rid = upsert_learning_resource(
                         cur, cid, title, rtype, "intermediate",
                         LEARNING_RESOURCE_CONTENTS[(code, rtype)],
-                        kp_csv, "deepseek-chat", "approved", teacher_li_id if code == "CS301" else teacher_wang_id,
+                        kp_csv, "deepseek-chat", resource_status, teacher_li_id,
+                    )
+                    if resource_status != "draft":
+                        review_status = {
+                            "approved": "approved",
+                            "pending_review": "pending",
+                            "rejected": "rejected",
+                        }[resource_status]
+                        upsert_resource_review(
+                            cur,
+                            rid,
+                            teacher_li_id,
+                            teacher_li_id,
+                            review_status,
+                        )
+                    for kp_id in kps_subset[:2]:
+                        evidence = chunk_by_kp[kp_id]
+                        upsert_resource_evidence(
+                            cur,
+                            rid,
+                            evidence["chunk_id"],
+                            kp_id,
+                            evidence["content"],
+                            resource_status,
+                            teacher_li_id,
+                            evidence["source_page"],
+                        )
+                    log.info(
+                        "  resource %s (id=%s, status=%s, evidence=%d)",
+                        title,
+                        rid,
+                        resource_status,
+                        min(2, len(kps_subset)),
                     )
 
             log.info("=== learning feedbacks ===")
             for (uname, code), pid in profile_ids.items():
                 student_id = member_user_ids[uname]
-                # 2-3 feedback rows
-                for i in range(2):
+                # Three complementary signals drive analytics and mastery updates.
+                for i in range(3):
                     rid = fetchone(cur, "SELECT resource_id FROM learning_resources WHERE course_id=%s LIMIT 1",
                                     course_ids[code])
                     resource_id = rid["resource_id"] if rid else None
-                    ftype = ["quiz_result", "self_report", "study_note"][i % 3]
+                    ftype = ["quiz_result", "self_report", "study_note"][i]
                     score = round(random.uniform(0.55, 0.95), 3) if ftype == "quiz_result" else None
                     sm = round(random.uniform(0.5, 0.9), 3) if ftype in ("self_report", "study_note") else None
                     diff = random.choice(["appropriate", "too_hard", "appropriate"])
                     content = {
                         "quiz_result": f"第 {i+1} 次测验正确率 {int((score or 0)*100)}%",
                         "self_report": "我觉得这一节讲得清楚，例题有帮助。",
-                        "study_note": "整理了关键概念的笔记。",
+                        "study_note": "整理了关键概念、错题原因和下一步练习计划。",
                     }[ftype]
                     upsert_feedback(cur, pid, course_ids[code], resource_id, ftype, content,
                                      score, sm, diff)
@@ -1575,7 +2295,9 @@ def main() -> int:
         log.info("=" * 60)
     except Exception as exc:
         conn.rollback()
-        log.error("Seed failed, transaction rolled back (%s).", type(exc).__name__)
+        log.exception(
+            "Seed failed, transaction rolled back (%s).", type(exc).__name__
+        )
         return 1
     finally:
         conn.close()

@@ -1,3 +1,4 @@
+import ast
 import os
 from pathlib import Path
 import subprocess
@@ -9,6 +10,25 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class DemoSeedContractTests(unittest.TestCase):
+    @staticmethod
+    def _seed_constants():
+        source = (ROOT / "database/seed_demo_data.py").read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        constants = {}
+        for node in tree.body:
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                continue
+            target = node.targets[0] if isinstance(node, ast.Assign) else node.target
+            value = node.value
+            if isinstance(target, ast.Name) and target.id in {
+                "DEMO_USERS",
+                "RETIRED_SAMPLE_USERS",
+                "COURSES",
+                "STUDENT_PROFILES",
+            }:
+                constants[target.id] = ast.literal_eval(value)
+        return constants
+
     def test_seed_requires_an_explicit_password(self):
         env = os.environ.copy()
         env["DEMO_PASSWORD"] = ""
@@ -29,10 +49,22 @@ class DemoSeedContractTests(unittest.TestCase):
         login = (ROOT / "frontend/src/app/pages/Login.tsx").read_text(encoding="utf-8")
         seed = (ROOT / "database/seed_demo_data.py").read_text(encoding="utf-8")
         env_example = (ROOT / "backend/.env.example").read_text(encoding="utf-8")
+        for username in (
+            "admin",
+            "teacher_li",
+            "student_zhang",
+            "student_liu",
+            "student_chen",
+        ):
+            self.assertIn(username, seed)
         for username in ("admin", "teacher_li", "student_zhang"):
             self.assertIn(username, readme)
-            self.assertIn(username, seed)
-        for username in ("teacher_li", "student_zhang"):
+        for username in (
+            "teacher_li",
+            "student_zhang",
+            "student_liu",
+            "student_chen",
+        ):
             self.assertNotIn(username, login)
         self.assertNotIn('setUsername("admin")', login)
         self.assertIn('DEMO_PASSWORD = ENV.get("DEMO_PASSWORD", "")', seed)
@@ -40,6 +72,51 @@ class DemoSeedContractTests(unittest.TestCase):
         self.assertNotIn("Demo password:", seed)
         self.assertIn('os.path.join(BASE_DIR, "backend", ".env")', seed)
         self.assertNotIn("DELETE FROM users WHERE username", seed)
+
+    def test_seed_defines_exactly_five_active_demo_accounts(self):
+        constants = self._seed_constants()
+        users = constants["DEMO_USERS"]
+        self.assertEqual(
+            [user[0] for user in users],
+            [
+                "admin",
+                "teacher_li",
+                "student_zhang",
+                "student_liu",
+                "student_chen",
+            ],
+        )
+        self.assertEqual([user[5] for user in users].count(["admin"]), 1)
+        self.assertEqual([user[5] for user in users].count(["teacher"]), 1)
+        self.assertEqual([user[5] for user in users].count(["student_member"]), 3)
+
+    def test_demo_courses_and_profiles_cover_three_learning_scenarios(self):
+        constants = self._seed_constants()
+        self.assertEqual(
+            {course[0] for course in constants["COURSES"]},
+            {"CS201", "CS301", "CS401"},
+        )
+        self.assertEqual({course[3] for course in constants["COURSES"]}, {"teacher_li"})
+        profiles = constants["STUDENT_PROFILES"]
+        self.assertEqual(
+            {profile[0] for profile in profiles},
+            {"student_zhang", "student_liu", "student_chen"},
+        )
+        self.assertEqual({profile[1] for profile in profiles}, {"CS201", "CS301", "CS401"})
+
+    def test_seed_populates_full_learning_evidence_chain(self):
+        seed = (ROOT / "database/seed_demo_data.py").read_text(encoding="utf-8")
+        for table in (
+            "course_material_chunks",
+            "kp_chunk_links",
+            "learning_task_progress",
+            "learning_resource_reviews",
+            "resource_evidence_links",
+            "profile_dialog_messages",
+            "profile_update_history",
+            "tutor_sessions",
+        ):
+            self.assertIn(table, seed)
 
     def test_course_ownership_uses_seeded_teacher(self):
         sql = (ROOT / "database/10_insert_a3_initial_data.sql").read_text(
