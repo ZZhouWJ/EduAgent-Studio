@@ -267,10 +267,10 @@ export function StudentProfile() {
       title: "时间约束",
       color: "text-cyan-700",
       bg: "bg-cyan-50",
-      items: [
+      items: uniqueStrings([
         profile.time_constraints,
         profile.weekly_hours ? `每周 ${profile.weekly_hours} 小时` : "",
-      ].filter(Boolean),
+      ]),
       source: "学习计划与可用时段",
     },
     {
