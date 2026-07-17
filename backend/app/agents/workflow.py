@@ -22,10 +22,11 @@ import time
 import uuid
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
 from typing import Annotated, Any, Dict, List, Literal, Optional, TypedDict
 
 from langgraph.graph import StateGraph, END, START
-from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 
 logger = logging.getLogger(__name__)
 
@@ -425,15 +426,30 @@ def _get_llm_gateway():
 # 5. LangGraph StateGraph 工厂
 # ---------------------------------------------------------------------------
 
-_checkpointer: Optional[InMemorySaver] = None
+_checkpointer: Optional[SqliteSaver] = None
+_checkpoint_connection: Optional[sqlite3.Connection] = None
 
 
-def _get_checkpointer() -> InMemorySaver:
-    """单例 Checkpointer — 内存持久化工作流状态"""
-    global _checkpointer
+def _get_checkpointer() -> SqliteSaver:
+    """创建持久化的 SQLite checkpointer，使工作流可跨进程重启恢复。"""
+    global _checkpointer, _checkpoint_connection
     if _checkpointer is None:
-        _checkpointer = InMemorySaver()
-        logger.info("Checkpointer initialized (InMemory)")
+        from app.config import get_settings
+
+        data_dir = Path(get_settings().app_data_dir)
+        data_dir.mkdir(parents=True, exist_ok=True)
+        checkpoint_path = data_dir / "agent_workflows.sqlite3"
+        _checkpoint_connection = sqlite3.connect(
+            checkpoint_path,
+            check_same_thread=False,
+        )
+        _checkpointer = SqliteSaver(_checkpoint_connection)
+        _checkpointer.setup()
+        try:
+            os.chmod(checkpoint_path, 0o600)
+        except OSError:
+            logger.warning("Unable to restrict checkpoint file permissions")
+        logger.info("Workflow checkpointer initialized (SQLite)")
     return _checkpointer
 
 
