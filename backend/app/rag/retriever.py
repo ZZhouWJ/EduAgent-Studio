@@ -22,15 +22,31 @@ logger = logging.getLogger(__name__)
 
 
 def _tokenize(text: str) -> List[str]:
-    """简单中文分词：正则提取词 + 过滤停用词。"""
+    """轻量中文分词：中文字符 n-gram + 英文/数字词元。"""
     STOP_WORDS = {
         "的", "了", "在", "是", "我", "有", "和", "就",
         "不", "人", "都", "一", "一个", "上", "也", "很",
         "到", "说", "要", "去", "你", "会", "着", "没有",
         "看", "好", "自己", "这", "那", "它", "什么",
     }
-    words = re.findall(r"[一-鿿]+|[a-zA-Z0-9]+", text.lower())
-    return [w for w in words if w not in STOP_WORDS and len(w) >= 2]
+    tokens: List[str] = []
+    segments = re.findall(r"[一-鿿]+|[a-zA-Z0-9]+", text.lower())
+    for segment in segments:
+        if re.fullmatch(r"[一-鿿]+", segment):
+            if len(segment) == 1:
+                if segment not in STOP_WORDS:
+                    tokens.append(segment)
+                continue
+
+            # 不依赖外部分词库，同时兼容“事务与 ACID”和“事务隔离”这类表述差异。
+            for size in range(2, min(4, len(segment)) + 1):
+                tokens.extend(
+                    segment[index:index + size]
+                    for index in range(len(segment) - size + 1)
+                )
+        elif len(segment) >= 2 and segment not in STOP_WORDS:
+            tokens.append(segment)
+    return tokens
 
 
 def _search_db_chunks(
