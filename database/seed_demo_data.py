@@ -24,7 +24,8 @@ Prereqs
 -------
 - .env configured (DB_HOST/DB_USER/DB_PASSWORD/DB_NAME point to MySQL).
 - DEMO_PASSWORD is set to a unique value of at least 12 characters.
-- MySQL is reachable, the 39 tables already exist (created by the app).
+- MySQL is reachable and all production SQL migrations listed in
+  ``database/README_A3.md`` have been applied.
 - The bcrypt package is installed in the venv.
 """
 
