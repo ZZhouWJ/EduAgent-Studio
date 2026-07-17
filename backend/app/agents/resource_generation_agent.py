@@ -351,10 +351,9 @@ class ResourceGenerationAgent:
 
         try:
             from app.repositories.evidence_repo import EvidenceRepository
-            from app.rag.retriever import CourseMaterialRetriever
+            from app.rag.retriever import search_knowledge
 
             evidence_repo = EvidenceRepository()
-            retriever = CourseMaterialRetriever()
 
             all_chunks = []
             coverage: Dict[int, int] = {}
@@ -372,7 +371,7 @@ class ResourceGenerationAgent:
                     # 兜底：BM25 检索
                     kp = evidence_repo.get_kp_by_id(kp_id)
                     if kp:
-                        bm25_results = retriever.search_knowledge(
+                        bm25_results = search_knowledge(
                             query=kp["kp_name"],
                             course_id=course_id,
                             top_k=5,
