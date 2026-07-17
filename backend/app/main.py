@@ -1,12 +1,4 @@
-"""
-FastAPI 应用入口。
-
-Stage-02 仅包含：
-- 全局异常处理注册
-- /api/health（不依赖数据库）
-- /api/health/db（依赖数据库）
-- 统一响应格式
-"""
+"""EduAgent Studio FastAPI 应用工厂与路由入口。"""
 
 import logging
 from typing import Any
