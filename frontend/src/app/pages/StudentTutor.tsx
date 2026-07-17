@@ -761,7 +761,7 @@ export function StudentTutor() {
       )}
 
       {/* 移动端 tab 切换 */}
-      <div className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1 lg:hidden">
+      <div className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1 xl:hidden">
         {(["context", "chat", "resources"] as const).map((key) => (
           <button
             key={key}
@@ -775,11 +775,11 @@ export function StudentTutor() {
         ))}
       </div>
 
-      <section className={`grid min-h-0 grid-cols-1 gap-4 lg:min-h-[720px] lg:grid-cols-[280px_1fr_320px] lg:gap-6 ${pendingAi || activeEvents.length > 0 ? "pb-20" : ""}`}>
+      <section className={`grid min-h-0 grid-cols-1 gap-4 xl:min-h-[720px] xl:grid-cols-[280px_minmax(0,1fr)_320px] xl:gap-6 ${pendingAi || activeEvents.length > 0 ? "pb-20" : ""}`}>
         {/* 左侧上下文面板 */}
         <aside
           className={`edu-card rounded-2xl p-5 ${
-            activePanel === "context" ? "block" : "hidden lg:block"
+            activePanel === "context" ? "block" : "hidden xl:block"
           }`}
         >
           <h2 className="mb-4 text-base font-black text-slate-950">学习上下文</h2>
@@ -866,7 +866,7 @@ export function StudentTutor() {
         {/* 中间对话区域 */}
         <main
           className={`edu-card min-w-0 flex-col rounded-2xl ${
-            activePanel === "chat" ? "flex" : "hidden lg:flex"
+            activePanel === "chat" ? "flex" : "hidden xl:flex"
           }`}
         >
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
@@ -993,7 +993,7 @@ export function StudentTutor() {
 
         {/* 右侧推荐资源面板 */}
         <aside
-          className={`flex-col gap-4 ${activePanel === "resources" ? "flex" : "hidden lg:flex"}`}
+          className={`flex-col gap-4 ${activePanel === "resources" ? "flex" : "hidden xl:flex"}`}
         >
           {/* 推荐资源 */}
           {lastMessage?.recommended_resources?.length ? (
