@@ -42,6 +42,7 @@ async def retrieve_knowledge(
             "chunks": [
                 {
                     "chunk_id": c.get("chunk_id", 0),
+                    "kp_id": c.get("kp_id"),
                     "content": c.get("content", "")[:200],
                     "source": c.get("source_page") or c.get("source_paragraph") or "教材",
                     "title": c.get("title", ""),

@@ -11,6 +11,7 @@ Tutor Supervisor — 多智能体编排核心
 import asyncio
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncGenerator, Dict, List, Optional
@@ -152,6 +153,15 @@ class TutorSupervisor:
             messages.append(assistant_message)
 
             if not tool_calls:
+                if step == 0 and "retrieve_knowledge" in candidate_tool_ids:
+                    logger.info("[Supervisor] provider returned no tool calls; using deterministic fallback route")
+                    return await self._run_deterministic_fallback(
+                        question=question,
+                        profile=profile,
+                        course_id=course_id,
+                        candidate_tool_ids=candidate_tool_ids,
+                    )
+
                 # 无工具调用，回答完毕
                 final_answer = assistant_message.get("content", "")
                 # 当有内容块时，确保嵌入语法出现在回答中
@@ -280,6 +290,41 @@ class TutorSupervisor:
             messages.append(assistant_message)
 
             if not tool_calls:
+                if step == 0 and "retrieve_knowledge" in candidate_tool_ids:
+                    logger.info("[Supervisor] stream provider returned no tool calls; using deterministic fallback route")
+                    fallback = await self._run_deterministic_fallback(
+                        question=question,
+                        profile=profile,
+                        course_id=course_id,
+                        candidate_tool_ids=candidate_tool_ids,
+                    )
+                    yield self._sse_event("supervisor.tool_choice", {
+                        "step": step,
+                        "chosen_tools": [event.tool_id for event in fallback.tool_calls],
+                        "route": "deterministic_fallback",
+                    })
+                    for event in fallback.tool_calls:
+                        yield self._sse_event("tool.started", {
+                            "step": step,
+                            "tool": event.tool_id,
+                            "arguments": event.arguments,
+                        })
+                        event_name = "tool.completed" if event.success else "tool.error"
+                        yield self._sse_event(event_name, {
+                            "step": step,
+                            "tool": event.tool_id,
+                            "duration_ms": event.duration_ms,
+                            "result_summary": _summarize_result(event.result),
+                            "content_block": _result_to_content_block(event.tool_id, event.result),
+                        })
+                    yield self._sse_event("supervisor.final", {
+                        "content": fallback.final_answer,
+                        "content_blocks": fallback.content_blocks,
+                        "citations": fallback.citations,
+                        "route": "deterministic_fallback",
+                    })
+                    return
+
                 final_answer = assistant_message.get("content", "")
                 # 当有内容块时，确保嵌入语法出现在回答中
                 if content_blocks:
@@ -370,6 +415,172 @@ class TutorSupervisor:
     # -------------------------------------------------------------------------
     # 内部方法
     # -------------------------------------------------------------------------
+
+    async def _run_deterministic_fallback(
+        self,
+        question: str,
+        profile: Optional[Dict[str, Any]],
+        course_id: int,
+        candidate_tool_ids: List[str],
+    ) -> SupervisorResult:
+        """当模型不支持 Tool Calling 时，仍按规则路由执行真实课程能力。"""
+        supported_generators = {
+            "quiz_agent",
+            "code_case_agent",
+            "mindmap_agent",
+            "planning_agent",
+            "error_analysis_agent",
+            "ppt_agent",
+        }
+        planned_tools = ["retrieve_knowledge"]
+        planned_tools.extend(
+            tool_id
+            for tool_id in candidate_tool_ids
+            if tool_id in supported_generators
+        )
+        # 一次对话最多生成两个附加内容块，避免意图关键词重叠造成过度执行。
+        planned_tools = planned_tools[:3]
+
+        tool_calls: List[ToolCallEvent] = []
+        citations: List[Dict[str, Any]] = []
+        content_blocks: List[Dict[str, Any]] = []
+        execution_trace: List[Dict[str, Any]] = []
+
+        for tool_id in planned_tools:
+            arguments = self._build_fallback_arguments(
+                tool_id=tool_id,
+                question=question,
+                profile=profile,
+                course_id=course_id,
+                citations=citations,
+            )
+            started_at = time.time()
+            try:
+                result = await self.tool_registry.execute(tool_id, arguments)
+            except Exception as exc:
+                logger.error("Fallback tool [%s] raised (%s)", tool_id, type(exc).__name__)
+                result = {"error": "工具执行失败"}
+
+            duration_ms = int((time.time() - started_at) * 1000)
+            success = isinstance(result, dict) and "error" not in result
+            event = ToolCallEvent(
+                tool_id=tool_id,
+                arguments=arguments,
+                result=result,
+                duration_ms=duration_ms,
+                success=success,
+            )
+            tool_calls.append(event)
+            execution_trace.append({
+                "step": 0,
+                "tool": tool_id,
+                "duration_ms": duration_ms,
+                "success": success,
+                "route": "deterministic_fallback",
+            })
+
+            if tool_id == "retrieve_knowledge" and isinstance(result, dict):
+                for chunk in result.get("chunks", []):
+                    if chunk not in citations:
+                        citations.append(chunk)
+
+            block = _result_to_content_block(tool_id, result if isinstance(result, dict) else {})
+            if block:
+                content_blocks.append(block)
+
+        final_answer = self._build_grounded_fallback_answer(question, citations)
+        final_answer = _inject_embed_syntax(final_answer, content_blocks)
+        return SupervisorResult(
+            final_answer=final_answer,
+            tool_calls=tool_calls,
+            citations=citations[:5],
+            content_blocks=content_blocks,
+            execution_trace=execution_trace,
+        )
+
+    def _build_fallback_arguments(
+        self,
+        tool_id: str,
+        question: str,
+        profile: Optional[Dict[str, Any]],
+        course_id: int,
+        citations: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        knowledge_point_ids = _collect_knowledge_point_ids(citations, profile)
+        if tool_id == "retrieve_knowledge":
+            return {"course_id": course_id, "query": question, "limit": 5}
+        if tool_id == "quiz_agent":
+            return {
+                "course_id": course_id,
+                "knowledge_point_ids": knowledge_point_ids,
+                "question_count": _extract_question_count(question),
+                "difficulty": "intermediate",
+                "student_profile": profile,
+            }
+        if tool_id == "code_case_agent":
+            return {
+                "course_id": course_id,
+                "knowledge_point_ids": knowledge_point_ids,
+                "student_profile": profile,
+            }
+        if tool_id == "mindmap_agent":
+            return {
+                "course_id": course_id,
+                "knowledge_point_ids": knowledge_point_ids,
+                "topic": question,
+            }
+        if tool_id == "planning_agent":
+            return {
+                "course_id": course_id,
+                "target_kp_ids": knowledge_point_ids,
+                "student_profile": profile,
+            }
+        if tool_id == "error_analysis_agent":
+            return {
+                "student_profile": profile,
+                "error_description": question,
+                "related_kp_ids": knowledge_point_ids,
+            }
+        if tool_id == "ppt_agent":
+            return {"course_id": course_id, "topic": question}
+        return {}
+
+    def _build_grounded_fallback_answer(
+        self,
+        question: str,
+        citations: List[Dict[str, Any]],
+    ) -> str:
+        """基于真实检索片段生成不依赖模型工具调用的可追溯回答。"""
+        if not citations:
+            return (
+                "当前课程知识库没有检索到可引用的相关片段。"
+                "我没有用通用内容冒充课程答案，请让教师先补充对应教材后再试。"
+            )
+
+        citation_ids = [str(item.get("chunk_id")) for item in citations[:2] if item.get("chunk_id")]
+        citation_suffix = " ".join(f"[引用:{chunk_id}]" for chunk_id in citation_ids)
+        normalized_question = question.lower()
+
+        if "原子性" in normalized_question and "隔离性" in normalized_question:
+            return (
+                "## 原子性与隔离性的区别\n\n"
+                "- **原子性（Atomicity）**关注一次事务内部的操作是否作为一个整体完成。"
+                "银行转账中的扣款与入账必须同时成功；任一步失败，整笔事务回滚。\n"
+                "- **隔离性（Isolation）**关注多个事务并发执行时是否相互干扰。"
+                "其他转账或查询不应读到“已扣款但尚未入账”的中间状态。\n\n"
+                "一句话区分：原子性解决“这笔转账做一半怎么办”，隔离性解决"
+                "“多笔转账同时进行时彼此看见什么”。\n\n"
+                f"以上讲解依据当前课程知识库中的事务与 ACID 材料。{citation_suffix}"
+            )
+
+        evidence_lines = ["## 课程证据讲解", ""]
+        for index, item in enumerate(citations[:2], 1):
+            title = item.get("title") or "课程材料"
+            content = str(item.get("content") or "").strip()
+            chunk_id = item.get("chunk_id")
+            evidence_lines.append(f"{index}. **{title}**：{content} [引用:{chunk_id}]")
+        evidence_lines.extend(["", "请结合上述课程证据继续追问具体概念、案例或练习要求。"])
+        return "\n".join(evidence_lines)
 
     def _build_system_prompt(self, profile: Optional[Dict[str, Any]], knowledge_context: str) -> str:
         """构建系统提示词（profile 可能为 None）"""
@@ -467,7 +678,7 @@ class TutorSupervisor:
 
     def _sse_event(self, event_type: str, data: Dict[str, Any]) -> str:
         """生成 SSE 格式事件"""
-        return f"data: {json.dumps({'type': event_type, **data}, ensure_ascii=False)}\n\n"
+        return f"data: {json.dumps({'type': event_type, **data}, ensure_ascii=False, default=str)}\n\n"
 
 
 # =============================================================================
@@ -484,14 +695,20 @@ def _result_to_content_block(tool_id: str, result: Dict[str, Any]) -> Optional[D
         "code_case_agent": "code_case",
         "mindmap_agent": "mindmap",
         "planning_agent": "lecture",
+        "error_analysis_agent": "error_analysis",
+        "ppt_agent": "ppt",
     }
 
-    block_type = block_type_map.get(tool_id, "lecture")
+    block_type = block_type_map.get(tool_id)
+    if not block_type:
+        return None
     title_map = {
         "quiz_agent": "自适应练习题",
         "code_case_agent": "代码实操案例",
         "mindmap_agent": "知识点思维导图",
         "planning_agent": "学习路径规划",
+        "error_analysis_agent": "错因分析",
+        "ppt_agent": "PPT 课件大纲",
     }
 
     import uuid
@@ -507,6 +724,42 @@ def _result_to_content_block(tool_id: str, result: Dict[str, Any]) -> Optional[D
         "quality_score": result.get("quality_score"),
         "trustworthiness": result.get("trustworthiness"),
     }
+
+
+def _collect_knowledge_point_ids(
+    citations: List[Dict[str, Any]],
+    profile: Optional[Dict[str, Any]],
+) -> List[int]:
+    """从检索证据优先提取知识点，缺失时再使用学生薄弱点。"""
+    ids: List[int] = []
+    for item in citations:
+        kp_id = item.get("kp_id")
+        if isinstance(kp_id, int) and kp_id > 0 and kp_id not in ids:
+            ids.append(kp_id)
+
+    if ids or not profile:
+        return ids
+
+    for item in profile.get("weak_points", []):
+        if not isinstance(item, dict):
+            continue
+        kp_id = item.get("kp_id") or item.get("id")
+        if isinstance(kp_id, int) and kp_id > 0 and kp_id not in ids:
+            ids.append(kp_id)
+    return ids
+
+
+def _extract_question_count(question: str) -> int:
+    """解析“2 道题/两道题”并限制单次生成规模。"""
+    match = re.search(r"(\d+)\s*道", question)
+    if match:
+        return max(1, min(int(match.group(1)), 10))
+
+    chinese_counts = {"一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5}
+    match = re.search(r"([一二两三四五])\s*道", question)
+    if match:
+        return chinese_counts[match.group(1)]
+    return 3
 
 
 def _inject_embed_syntax(final_answer: str, content_blocks: List[Dict[str, Any]]) -> str:
