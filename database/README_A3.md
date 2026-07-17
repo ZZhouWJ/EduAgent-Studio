@@ -1,58 +1,88 @@
-# 数据库 A3 改造说明
+# EduAgent Studio 数据库说明
 
-## 一、改造策略：两阶段方案
+> 当前运行基线：MySQL 8.4。PostgreSQL/pgvector 文件仅保留为历史方案参考，不属于当前初始化或部署链路。
 
-### Phase 1（当前）
-- 保留 MySQL 业务表（01-08 脚本）不变
-- 新增 A3 专用表（09-10 脚本）：courses、knowledge_points、student_profiles 等
-- 新增 PostgreSQL + pgvector 脚本用于向量检索（Phase 2 迁移用）
+## 运行模型
 
-### Phase 2（后续）
-- 将 MySQL 业务表逐步迁移到 PostgreSQL
-- 合并为统一的 PostgreSQL + pgvector 数据层
+- 业务数据、课程知识库、学生画像、学习路径、资源审核和调用审计统一存储在 MySQL。
+- 知识检索由 MySQL 文档分块与轻量 BM25/中文 n-gram 检索完成，无需 pgvector 才能运行。
+- Redis 承担应用缓存与 Celery 任务队列，不替代 MySQL 持久化。
+- LangGraph checkpoint 存储在后端持久化数据目录中的 SQLite 文件。
 
-### Phase 3（当前）
-- `database/11_postgresql_migration.sql` 完成 A3 业务表的 PostgreSQL schema 创建 + 种子数据迁移
-- 执行方式：`psql -U postgres -d eduagent_studio -f database/11_postgresql_migration.sql`
+## 初始化方式
 
-## 二、执行顺序
+### Docker Compose
+
+首次创建 MySQL 数据卷时，`docker-compose.yml` 会按文件名顺序挂载并执行生产初始化脚本。已存在数据卷时不会自动重放。
 
 ```bash
-# MySQL（Phase 1 当前）
-mysql -u root -p ai_collab_audit_system < database/09_create_a3_tables.sql
-mysql -u root -p ai_collab_audit_system < database/10_insert_a3_initial_data.sql
-mysql -u root -p ai_collab_audit_system < database/27_create_learning_task_progress.sql
-mysql -u root -p ai_collab_audit_system < database/28_cleanup_orphan_learning_profiles.sql
-mysql -u root -p ai_collab_audit_system < database/29_align_education_prompt_templates.sql
-mysql -u root -p ai_collab_audit_system < database/30_remove_demo_model_configs.sql
-mysql -u root -p ai_collab_audit_system < database/31_create_auth_sessions.sql
-mysql -u root -p ai_collab_audit_system < database/32_seed_course_knowledge_base.sql
-
-# PostgreSQL（Phase 2/3 使用）
-# 方式一：仅创建 schema（推荐先试）
-psql -U postgres -d eduagent_studio -f database/pgvector/01_enable_pgvector.sql
-psql -U postgres -d eduagent_studio -f database/pgvector/02_create_embeddings_table.sql
-psql -U postgres -d eduagent_studio -f database/11_postgresql_migration.sql
-
-# 方式二：完整迁移（需先从 MySQL 导出数据）
-# mysqldump -h 127.0.0.1 -P 3306 -u root -p \
-#   ai_collab_audit_system \
-#   courses knowledge_points learning_tasks \
-#   student_profiles student_knowledge_mastery learning_resources learning_feedbacks \
-#   --where="is_deleted=0" --no-create-info > a3_data.sql
-# sed -i 's/`//g' a3_data.sql
-# psql -U postgres -d eduagent_studio -f database/11_postgresql_migration.sql
-# psql -U postgres -d eduagent_studio -c "\i a3_data.sql"
+cp .env.example .env
+docker-compose up -d --build
+docker-compose ps
 ```
 
-## 三、表命名说明
+### 原生 MySQL
 
-| A3 表名 | 说明 | 可映射到 MySQL |
-|---------|------|---------------|
-| courses | 课程空间 | projects |
-| learning_tasks | 学习任务 | project_tasks |
-| learning_task_progress | 学生任务进度 | （新增）|
-| learning_resources | 学习资源 | task_outputs |
-| student_profiles | 学生画像 | （新增）|
-| knowledge_points | 知识点 | （新增）|
-| learning_feedbacks | 学习反馈 | （新增）|
+`01_create_database.sql` 会重建数据库，只能用于首次初始化或已确认的数据重置。完整初始化顺序为：
+
+```text
+01, 02, 03, 04, 05, 06,
+09, 10, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+27, 28, 29, 30, 31, 32
+```
+
+对已有数据库只顺序执行尚未应用的迁移脚本，不要重新执行 `01_create_database.sql`。例如：
+
+```bash
+mysql -h 127.0.0.1 -P 3306 -u root -p ai_collab_audit_system \
+  < database/32_seed_course_knowledge_base.sql
+```
+
+## 脚本分类
+
+| 范围 | 用途 |
+| --- | --- |
+| `01`-`06` | 基础库、业务表、索引、初始数据、视图和存储过程 |
+| `09`-`10` | A3 课程、知识点、任务、画像与学习资源基础数据 |
+| `13`-`17` | 课程资料、文档分块、画像对话、Tutor 会话和证据链 |
+| `18`-`26` | 账号、角色、平台设置、资源审核和产品化种子数据修正 |
+| `27`-`31` | 任务进度、数据清理、教育 Prompt、模型配置与认证会话 |
+| `32` | 导入 CS301《数据库系统原理》9 个课程章节，建立已确认的知识点证据关联 |
+
+`07_test_queries.sql` 会写入验证数据，仅用于独立测试，不参与自动初始化。`08_insert_prompt_templates.sql` 已被后续教育 Prompt 迁移取代。`11_postgresql_migration.sql` 与 `database/pgvector/` 是早期迁移探索，不得与当前 MySQL 链路混用。
+
+## 核心 A3 实体
+
+| 数据表 | 业务含义 |
+| --- | --- |
+| `courses` | 课程空间与教师归属 |
+| `knowledge_points` | 课程知识结构 |
+| `course_materials` / `document_chunks` | 可检索的课程资料与分块 |
+| `chunk_knowledge_links` | 文档分块与知识点的人工确认证据关联 |
+| `student_profiles` / `student_knowledge_mastery` | 学生画像与知识点掌握度 |
+| `learning_tasks` / `learning_task_progress` | 教师任务与学生完成进度 |
+| `learning_resources` / `learning_resource_reviews` | AI 生成资源、审核与发布状态 |
+| `resource_evidence_links` | 学习资源到原始分块的可追溯证据链 |
+| `learning_feedbacks` | 学习反馈和画像回写依据 |
+| `tutor_sessions` / `tutor_messages` | AI 学伴会话与消息历史 |
+
+## 课程证据种子
+
+`database/fixtures/database_system_principles.md` 是 CS301 的可追溯课程材料。`32_seed_course_knowledge_base.sql` 可重复执行，会：
+
+1. 确保课程材料记录存在并标记为已解析。
+2. 写入 9 个课程章节分块。
+3. 将每个分块与对应知识点建立 `confirmed` 关联。
+4. 为资源生成、Tutor 问答和引用追溯提供真实证据。
+
+## 验证
+
+```bash
+curl http://127.0.0.1:8000/api/health/db
+
+cd backend
+PYTHONPATH=. python -m unittest tests.test_database_migration_manifest -v
+PYTHONPATH=. python -m unittest tests.test_rag_retriever -v
+```
+
+全量后端测试命令见根目录 `README.md` 和 `docs/测试说明书.md`。
