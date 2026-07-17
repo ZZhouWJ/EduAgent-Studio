@@ -5,8 +5,9 @@
 供两级路由和 Supervisor 循环使用。
 """
 
+import inspect
 import logging
-from typing import Any, Callable, Dict, List, Optional, get_type_hints
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -224,10 +225,38 @@ class ToolRegistry:
 
         try:
             import asyncio
+            call_arguments = dict(arguments or {})
+            signature = inspect.signature(handler)
+            accepts_extra_arguments = any(
+                parameter.kind is inspect.Parameter.VAR_KEYWORD
+                for parameter in signature.parameters.values()
+            )
+            if not accepts_extra_arguments:
+                accepted_names = {
+                    name
+                    for name, parameter in signature.parameters.items()
+                    if parameter.kind
+                    in (
+                        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                        inspect.Parameter.KEYWORD_ONLY,
+                    )
+                }
+                ignored_names = sorted(set(call_arguments) - accepted_names)
+                if ignored_names:
+                    logger.warning(
+                        "Ignored unsupported tool arguments [%s]: %s",
+                        tool_id,
+                        ignored_names,
+                    )
+                call_arguments = {
+                    key: value
+                    for key, value in call_arguments.items()
+                    if key in accepted_names
+                }
             if asyncio.iscoroutinefunction(handler):
-                return await handler(**arguments)
+                return await handler(**call_arguments)
             else:
-                return handler(**arguments)
+                return handler(**call_arguments)
         except Exception as e:
             logger.error("Tool execution failed [%s] (%s)", tool_id, type(e).__name__)
             return {"error": "工具执行失败", "tool_id": tool_id}

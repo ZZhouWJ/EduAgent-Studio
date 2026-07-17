@@ -146,9 +146,15 @@ export const tutorApi = {
               }
 
               if (event.type === 'supervisor.final') {
+                const answer = typeof event.content === 'string' ? event.content.trim() : ''
+                const contentBlocks = event.content_blocks || []
+                if (!answer && contentBlocks.length === 0) {
+                  callbacks.onError('AI 未返回有效内容，请重试')
+                  return
+                }
                 callbacks.onFinal(
-                  event.content || '',
-                  event.content_blocks || [],
+                  answer,
+                  contentBlocks,
                   event.citations || [],
                   event.session_id
                 )
@@ -166,6 +172,8 @@ export const tutorApi = {
             }
           }
         }
+
+        callbacks.onError('回答流意外结束，请重试')
       })
       .catch((e) => {
         if (e.name !== 'AbortError') {

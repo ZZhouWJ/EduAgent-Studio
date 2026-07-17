@@ -11,6 +11,40 @@ class StaticGateway:
         return SimpleNamespace(content="通用模型回答", tool_calls=[])
 
 
+class ToolCallingThenFailureGateway:
+    def __init__(self):
+        self.calls = []
+
+    def generate(self, messages, config):
+        self.calls.append([dict(message) for message in messages])
+        if len(self.calls) == 1:
+            return SimpleNamespace(
+                content="",
+                status="success",
+                error=None,
+                tool_calls=[{
+                    "id": "call_retrieve_1",
+                    "type": "function",
+                    "function": {
+                        "name": "retrieve_knowledge",
+                        "arguments": json.dumps(
+                            {
+                                "query": "事务原子性与隔离性",
+                                "student_profile": {"profile_id": 999},
+                            },
+                            ensure_ascii=False,
+                        ),
+                    },
+                }],
+            )
+        return SimpleNamespace(
+            content="",
+            tool_calls=[],
+            status="failed",
+            error="模型调用失败",
+        )
+
+
 class FakeRegistry:
     def __init__(self):
         self.calls = []
@@ -86,6 +120,42 @@ class TutorSupervisorFallbackTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_plain_retrieval_is_not_mislabeled_as_learning_plan(self):
         self.assertIsNone(_result_to_content_block("retrieve_knowledge", {"chunks": []}))
+
+    async def test_tool_call_context_and_model_failure_produce_stream_answer(self):
+        gateway = ToolCallingThenFailureGateway()
+        supervisor = TutorSupervisor(llm_gateway=gateway)
+        supervisor._tool_registry = self.registry
+        events = []
+
+        async for raw_event in supervisor.run_stream(
+            question=self.question,
+            profile={"profile_id": 22, "weak_points": []},
+            course_id=3,
+        ):
+            events.append(json.loads(raw_event.removeprefix("data: ").strip()))
+
+        first_tool_arguments = self.registry.calls[0][1]
+        self.assertEqual(first_tool_arguments["course_id"], 3)
+        self.assertNotIn("student_profile", first_tool_arguments)
+        self.assertEqual(gateway.calls[1][-2]["role"], "assistant")
+        self.assertEqual(gateway.calls[1][-1]["role"], "tool")
+        self.assertEqual(events[-1]["type"], "supervisor.final")
+        self.assertEqual(events[-1]["reason"], "model_failure")
+        self.assertIn("[引用:41]", events[-1]["content"])
+
+    async def test_tool_call_context_and_model_failure_produce_blocking_answer(self):
+        gateway = ToolCallingThenFailureGateway()
+        supervisor = TutorSupervisor(llm_gateway=gateway)
+        supervisor._tool_registry = self.registry
+
+        result = await supervisor.run(
+            question=self.question,
+            profile={"profile_id": 22, "weak_points": []},
+            course_id=3,
+        )
+
+        self.assertIn("[引用:41]", result.final_answer)
+        self.assertTrue(result.final_answer.strip())
 
 
 if __name__ == "__main__":

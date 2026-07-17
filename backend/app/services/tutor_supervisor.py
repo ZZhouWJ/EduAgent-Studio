@@ -40,6 +40,22 @@ SSE_EVENT_TYPES = [
     "supervisor.max_steps",
 ]
 
+COURSE_SCOPED_TOOLS = {
+    "retrieve_knowledge",
+    "quiz_agent",
+    "code_case_agent",
+    "mindmap_agent",
+    "planning_agent",
+    "ppt_agent",
+}
+
+PROFILE_AWARE_TOOLS = {
+    "quiz_agent",
+    "code_case_agent",
+    "planning_agent",
+    "error_analysis_agent",
+}
+
 
 @dataclass
 class ToolCallEvent:
@@ -145,6 +161,18 @@ class TutorSupervisor:
             # 调用 LLM（带工具）
             response = self._call_llm_with_tools(messages, available_tools)
 
+            if response.get("failed"):
+                logger.warning(
+                    "[Supervisor] provider failed at step=%s; using deterministic fallback route",
+                    step,
+                )
+                return await self._run_deterministic_fallback(
+                    question=question,
+                    profile=profile,
+                    course_id=course_id,
+                    candidate_tool_ids=candidate_tool_ids,
+                )
+
             assistant_message = response.get("message", {})
             tool_calls = assistant_message.get("tool_calls", [])
 
@@ -152,7 +180,13 @@ class TutorSupervisor:
             messages.append(assistant_message)
 
             if not tool_calls:
-                if step == 0 and "retrieve_knowledge" in candidate_tool_ids:
+                if (
+                    "retrieve_knowledge" in candidate_tool_ids
+                    and (
+                        step == 0
+                        or not str(assistant_message.get("content") or "").strip()
+                    )
+                ):
                     logger.info("[Supervisor] provider returned no tool calls; using deterministic fallback route")
                     return await self._run_deterministic_fallback(
                         question=question,
@@ -181,11 +215,14 @@ class TutorSupervisor:
                 except json.JSONDecodeError:
                     arguments = {}
 
-                # 补充 course_id 和 profile（大多数工具需要）
-                if "course_id" not in arguments and tool_id != "retrieve_knowledge":
-                    arguments.setdefault("course_id", course_id)
-                if "student_profile" not in arguments:
-                    arguments.setdefault("student_profile", profile)
+                arguments = self._prepare_tool_arguments(
+                    tool_id=tool_id,
+                    arguments=arguments,
+                    question=question,
+                    profile=profile,
+                    course_id=course_id,
+                    citations=citations,
+                )
 
                 t0 = time.time()
                 try:
@@ -282,44 +319,45 @@ class TutorSupervisor:
 
         for step in range(self._max_steps):
             response = self._call_llm_with_tools(messages, available_tools)
+
+            if response.get("failed"):
+                logger.warning(
+                    "[Supervisor] stream provider failed at step=%s; using deterministic fallback route",
+                    step,
+                )
+                async for fallback_event in self._stream_deterministic_fallback(
+                    question=question,
+                    profile=profile,
+                    course_id=course_id,
+                    candidate_tool_ids=candidate_tool_ids,
+                    step=step,
+                    reason="model_failure",
+                ):
+                    yield fallback_event
+                return
+
             assistant_message = response.get("message", {})
             tool_calls = assistant_message.get("tool_calls", [])
             messages.append(assistant_message)
 
             if not tool_calls:
-                if step == 0 and "retrieve_knowledge" in candidate_tool_ids:
+                if (
+                    "retrieve_knowledge" in candidate_tool_ids
+                    and (
+                        step == 0
+                        or not str(assistant_message.get("content") or "").strip()
+                    )
+                ):
                     logger.info("[Supervisor] stream provider returned no tool calls; using deterministic fallback route")
-                    fallback = await self._run_deterministic_fallback(
+                    async for fallback_event in self._stream_deterministic_fallback(
                         question=question,
                         profile=profile,
                         course_id=course_id,
                         candidate_tool_ids=candidate_tool_ids,
-                    )
-                    yield self._sse_event("supervisor.tool_choice", {
-                        "step": step,
-                        "chosen_tools": [event.tool_id for event in fallback.tool_calls],
-                        "route": "deterministic_fallback",
-                    })
-                    for event in fallback.tool_calls:
-                        yield self._sse_event("tool.started", {
-                            "step": step,
-                            "tool": event.tool_id,
-                            "arguments": event.arguments,
-                        })
-                        event_name = "tool.completed" if event.success else "tool.error"
-                        yield self._sse_event(event_name, {
-                            "step": step,
-                            "tool": event.tool_id,
-                            "duration_ms": event.duration_ms,
-                            "result_summary": _summarize_result(event.result),
-                            "content_block": _result_to_content_block(event.tool_id, event.result),
-                        })
-                    yield self._sse_event("supervisor.final", {
-                        "content": fallback.final_answer,
-                        "content_blocks": fallback.content_blocks,
-                        "citations": fallback.citations,
-                        "route": "deterministic_fallback",
-                    })
+                        step=step,
+                        reason="provider_no_tool_calls",
+                    ):
+                        yield fallback_event
                     return
 
                 final_answer = assistant_message.get("content", "")
@@ -351,10 +389,14 @@ class TutorSupervisor:
                 except json.JSONDecodeError:
                     arguments = {}
 
-                if "course_id" not in arguments and tool_id != "retrieve_knowledge":
-                    arguments.setdefault("course_id", course_id)
-                if "student_profile" not in arguments:
-                    arguments.setdefault("student_profile", profile)
+                arguments = self._prepare_tool_arguments(
+                    tool_id=tool_id,
+                    arguments=arguments,
+                    question=question,
+                    profile=profile,
+                    course_id=course_id,
+                    citations=citations,
+                )
 
                 t0 = time.time()
                 yield self._sse_event("tool.started", {
@@ -412,6 +454,107 @@ class TutorSupervisor:
     # -------------------------------------------------------------------------
     # 内部方法
     # -------------------------------------------------------------------------
+
+    async def _stream_deterministic_fallback(
+        self,
+        question: str,
+        profile: Optional[Dict[str, Any]],
+        course_id: int,
+        candidate_tool_ids: List[str],
+        step: int,
+        reason: str,
+    ) -> AsyncGenerator[str, None]:
+        fallback = await self._run_deterministic_fallback(
+            question=question,
+            profile=profile,
+            course_id=course_id,
+            candidate_tool_ids=candidate_tool_ids,
+        )
+        yield self._sse_event("supervisor.tool_choice", {
+            "step": step,
+            "chosen_tools": [event.tool_id for event in fallback.tool_calls],
+            "route": "deterministic_fallback",
+            "reason": reason,
+        })
+        for event in fallback.tool_calls:
+            yield self._sse_event("tool.started", {
+                "step": step,
+                "tool": event.tool_id,
+                "arguments": event.arguments,
+            })
+            event_name = "tool.completed" if event.success else "tool.error"
+            yield self._sse_event(event_name, {
+                "step": step,
+                "tool": event.tool_id,
+                "duration_ms": event.duration_ms,
+                "result_summary": _summarize_result(event.result),
+                "content_block": _result_to_content_block(event.tool_id, event.result),
+            })
+        yield self._sse_event("supervisor.final", {
+            "content": fallback.final_answer,
+            "content_blocks": fallback.content_blocks,
+            "citations": fallback.citations,
+            "route": "deterministic_fallback",
+            "reason": reason,
+        })
+
+    def _prepare_tool_arguments(
+        self,
+        tool_id: str,
+        arguments: Any,
+        question: str,
+        profile: Optional[Dict[str, Any]],
+        course_id: int,
+        citations: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Combine model arguments with trusted request context."""
+        prepared = dict(arguments) if isinstance(arguments, dict) else {}
+
+        if tool_id in COURSE_SCOPED_TOOLS:
+            # Course scope is authorization context and must never be chosen by
+            # the model.
+            prepared["course_id"] = course_id
+        else:
+            prepared.pop("course_id", None)
+        if tool_id in PROFILE_AWARE_TOOLS:
+            prepared["student_profile"] = profile
+        else:
+            prepared.pop("student_profile", None)
+
+        knowledge_point_ids = _collect_knowledge_point_ids(citations, profile)
+        if tool_id == "retrieve_knowledge":
+            if not isinstance(prepared.get("query"), str) or not prepared["query"].strip():
+                prepared["query"] = question
+            prepared.setdefault("limit", 5)
+        elif tool_id in {"quiz_agent", "code_case_agent", "mindmap_agent"}:
+            prepared.setdefault("knowledge_point_ids", knowledge_point_ids)
+        elif tool_id == "planning_agent":
+            prepared.setdefault("target_kp_ids", knowledge_point_ids)
+        elif tool_id == "error_analysis_agent":
+            prepared.setdefault("error_description", question)
+            prepared.setdefault("related_kp_ids", knowledge_point_ids)
+        elif tool_id == "explanation_skill":
+            prepared.setdefault("concept", question)
+            prepared.setdefault(
+                "student_level",
+                str((profile or {}).get("current_level") or "intermediate"),
+            )
+            if citations:
+                prepared.setdefault(
+                    "context",
+                    "\n".join(
+                        str(item.get("content") or "")
+                        for item in citations[:3]
+                    ),
+                )
+        elif tool_id == "tts_tool":
+            prepared.setdefault("text", question)
+        elif tool_id == "image_agent":
+            prepared.setdefault("prompt", question)
+        elif tool_id == "ppt_agent":
+            prepared.setdefault("topic", question)
+
+        return prepared
 
     async def _run_deterministic_fallback(
         self,
@@ -654,9 +797,27 @@ class TutorSupervisor:
             config.tool_choice = "auto"
             result = self._llm.generate(messages=messages, config=config)
 
+            if getattr(result, "status", "success") != "success" or getattr(
+                result, "error", None
+            ):
+                return {
+                    "failed": True,
+                    "message": {
+                        "role": "assistant",
+                        "content": "",
+                        "tool_calls": [],
+                    },
+                }
+
             if hasattr(result, "tool_calls") and result.tool_calls:
                 # Provider 返回了 tool_calls（来自 OpenAI/讯飞等支持 function calling 的模型）
-                return {"message": {"content": result.content or "", "tool_calls": result.tool_calls}}
+                return {
+                    "message": {
+                        "role": "assistant",
+                        "content": result.content or "",
+                        "tool_calls": result.tool_calls,
+                    }
+                }
 
             if hasattr(result, "content"):
                 # 兜底：尝试解析 content 中的 tool_calls（某些 provider 可能放这里）
@@ -664,15 +825,37 @@ class TutorSupervisor:
                 try:
                     parsed = json.loads(content)
                     if isinstance(parsed, dict):
+                        parsed.setdefault("role", "assistant")
+                        parsed.setdefault("content", "")
+                        parsed.setdefault("tool_calls", [])
                         return {"message": parsed}
                 except (json.JSONDecodeError, TypeError):
                     pass
-                return {"message": {"content": content, "tool_calls": []}}
+                return {
+                    "message": {
+                        "role": "assistant",
+                        "content": content,
+                        "tool_calls": [],
+                    }
+                }
 
-            return {"message": {"content": str(result), "tool_calls": []}}
+            return {
+                "message": {
+                    "role": "assistant",
+                    "content": str(result),
+                    "tool_calls": [],
+                }
+            }
         except Exception as e:
             logger.error("LLM call failed (%s)", type(e).__name__)
-            return {"message": {"content": "模型调用失败，请稍后重试", "tool_calls": []}}
+            return {
+                "failed": True,
+                "message": {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [],
+                },
+            }
 
     def _sse_event(self, event_type: str, data: Dict[str, Any]) -> str:
         """生成 SSE 格式事件"""

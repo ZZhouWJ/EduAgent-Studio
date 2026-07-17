@@ -52,6 +52,30 @@ class TutorErrorSanitizationTests(unittest.TestCase):
         self.assertNotIn(SECRET, result["error"])
         self.assertNotIn(SECRET, "\n".join(logs.output))
 
+    def test_tool_registry_drops_model_generated_unknown_arguments(self):
+        async def retrieve(course_id, query, limit=5):
+            return {"course_id": course_id, "query": query, "limit": limit}
+
+        registry = ToolRegistry()
+        registry._handlers = {"retrieve": retrieve}
+
+        with self.assertLogs("app.services.tool_registry", level="WARNING"):
+            result = asyncio.run(
+                registry.execute(
+                    "retrieve",
+                    {
+                        "course_id": 3,
+                        "query": "事务",
+                        "student_profile": {"profile_id": 22},
+                    },
+                )
+            )
+
+        self.assertEqual(
+            result,
+            {"course_id": 3, "query": "事务", "limit": 5},
+        )
+
     def test_llm_gateway_hides_provider_failure(self):
         provider = Mock()
         provider.generate.side_effect = RuntimeError(SECRET)
