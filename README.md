@@ -131,10 +131,10 @@ Docker Compose 会自动初始化。原生 MySQL 环境按以下顺序执行：
 ```text
 01, 02, 03, 04, 05, 06,
 09, 10, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-27, 28, 29, 30, 31
+27, 28, 29, 30, 31, 32
 ```
 
-其中 `01_create_database.sql` 会重建数据库，只能用于首次初始化或明确的数据重置。`07_test_queries.sql` 仅用于独立验收；`08_insert_prompt_templates.sql` 已由后续教育提示词迁移取代；`11_postgresql_migration.sql` 是历史迁移参考，不属于当前 MySQL 运行链路。
+其中 `01_create_database.sql` 会重建数据库，只能用于首次初始化或明确的数据重置。`32_seed_course_knowledge_base.sql` 会导入 `database/fixtures/database_system_principles.md` 的 9 个课程章节并建立已确认的知识点证据关联。`07_test_queries.sql` 仅用于独立验收；`08_insert_prompt_templates.sql` 已由后续教育提示词迁移取代；`11_postgresql_migration.sql` 是历史迁移参考，不属于当前 MySQL 运行链路。
 
 ## 开发种子账号
 

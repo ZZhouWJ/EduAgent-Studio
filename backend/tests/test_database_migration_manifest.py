@@ -32,7 +32,7 @@ class DatabaseMigrationManifestTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        for migration_number in ("27", "28", "29", "30", "31"):
+        for migration_number in ("27", "28", "29", "30", "31", "32"):
             self.assertIn(migration_number, readme)
         for migration in (
             "27_create_learning_task_progress.sql",
@@ -40,8 +40,32 @@ class DatabaseMigrationManifestTests(unittest.TestCase):
             "29_align_education_prompt_templates.sql",
             "30_remove_demo_model_configs.sql",
             "31_create_auth_sessions.sql",
+            "32_seed_course_knowledge_base.sql",
         ):
             self.assertIn(migration, database_readme)
+
+    def test_seeded_course_knowledge_base_covers_every_cs301_topic(self):
+        migration = (ROOT / "database" / "32_seed_course_knowledge_base.sql").read_text(
+            encoding="utf-8"
+        )
+        fixture = (
+            ROOT / "database" / "fixtures" / "database_system_principles.md"
+        ).read_text(encoding="utf-8")
+
+        for code in (
+            "kp_db_intro",
+            "kp_relational_model",
+            "kp_sql_basic",
+            "kp_sql_join",
+            "kp_index",
+            "kp_transaction",
+            "kp_concurrency",
+            "kp_norm",
+            "kp_design",
+        ):
+            self.assertIn(code, migration)
+        self.assertEqual(fixture.count("\n## "), 9)
+        self.assertIn("status=VALUES(status)", migration)
 
 
 if __name__ == "__main__":

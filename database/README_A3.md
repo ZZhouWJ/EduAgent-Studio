@@ -26,6 +26,7 @@ mysql -u root -p ai_collab_audit_system < database/28_cleanup_orphan_learning_pr
 mysql -u root -p ai_collab_audit_system < database/29_align_education_prompt_templates.sql
 mysql -u root -p ai_collab_audit_system < database/30_remove_demo_model_configs.sql
 mysql -u root -p ai_collab_audit_system < database/31_create_auth_sessions.sql
+mysql -u root -p ai_collab_audit_system < database/32_seed_course_knowledge_base.sql
 
 # PostgreSQL（Phase 2/3 使用）
 # 方式一：仅创建 schema（推荐先试）
