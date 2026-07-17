@@ -20,6 +20,8 @@ from .document_loader import get_all_chunks, COURSE_MATERIALS
 
 logger = logging.getLogger(__name__)
 
+MIN_RELATIVE_RELEVANCE = 0.15
+
 
 def _tokenize(text: str) -> List[str]:
     """轻量中文分词：中文字符 n-gram + 英文/数字词元。"""
@@ -52,6 +54,21 @@ def _tokenize(text: str) -> List[str]:
 def tokenize_for_search(text: str) -> List[str]:
     """返回课程检索的统一词元，供 API 与 Agent 检索共用。"""
     return _tokenize(text)
+
+
+def filter_ranked_results(
+    scored: List[tuple[float, Dict[str, Any]]],
+    limit: int,
+    min_relative_score: float = MIN_RELATIVE_RELEVANCE,
+) -> List[Dict[str, Any]]:
+    """剔除与首条结果差距过大的 BM25 尾部噪声。"""
+    if not scored or limit <= 0:
+        return []
+
+    scored.sort(key=lambda item: item[0], reverse=True)
+    top_score = scored[0][0]
+    threshold = top_score * min_relative_score
+    return [result for score, result in scored if score >= threshold][:limit]
 
 
 def _search_db_chunks(
@@ -172,8 +189,7 @@ def _search_db_chunks(
             }
             scored.append((score, result))
 
-    scored.sort(key=lambda x: x[0], reverse=True)
-    return [item[1] for item in scored[:limit]]
+    return filter_ranked_results(scored, limit)
 
 
 def _search_static_chunks(
@@ -254,8 +270,7 @@ def _search_static_chunks(
             chunk["bm25_score"] = round(score, 4)
             scored.append((score, chunk))
 
-    scored.sort(key=lambda x: x[0], reverse=True)
-    return [item[1] for item in scored[:top_k]]
+    return filter_ranked_results(scored, top_k)
 
 
 def search_knowledge(

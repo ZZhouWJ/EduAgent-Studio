@@ -13,7 +13,7 @@ import math
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.database import get_db_cursor, get_db_transaction
-from app.rag.retriever import tokenize_for_search
+from app.rag.retriever import filter_ranked_results, tokenize_for_search
 
 
 class KnowledgeRepository:
@@ -373,9 +373,7 @@ class KnowledgeRepository:
                 }
                 scored.append((score, result))
 
-        # 排序并返回 top-k
-        scored.sort(key=lambda x: x[0], reverse=True)
-        return [item[1] for item in scored[:limit]]
+        return filter_ranked_results(scored, limit)
 
     def _tokenize(self, text: str) -> List[str]:
         """复用 Agent RAG 的中文 n-gram 分词，保证搜索入口一致。"""

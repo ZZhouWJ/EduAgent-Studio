@@ -2,10 +2,32 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from app.repositories.knowledge_repo import KnowledgeRepository
-from app.rag.retriever import _tokenize, search_knowledge
+from app.rag.retriever import _tokenize, filter_ranked_results, search_knowledge
 
 
 class RagRetrieverTests(unittest.TestCase):
+    def test_low_relevance_tail_is_removed_relative_to_top_result(self):
+        scored = [
+            (26.1, {"chunk_id": 9}),
+            (3.35, {"chunk_id": 5}),
+            (2.29, {"chunk_id": 6}),
+        ]
+
+        results = filter_ranked_results(scored, limit=5)
+
+        self.assertEqual([item["chunk_id"] for item in results], [9])
+
+    def test_comparable_multi_topic_results_are_preserved(self):
+        scored = [
+            (12.0, {"chunk_id": 1}),
+            (8.0, {"chunk_id": 2}),
+            (1.0, {"chunk_id": 3}),
+        ]
+
+        results = filter_ranked_results(scored, limit=5)
+
+        self.assertEqual([item["chunk_id"] for item in results], [1, 2])
+
     def test_chinese_phrases_share_semantic_ngrams(self):
         query_tokens = set(_tokenize("事务与 ACID"))
         document_tokens = set(_tokenize("事务与并发控制中的 ACID 特性"))
