@@ -429,6 +429,8 @@ export function TeacherKnowledgeBase() {
               onClick={handleSearch}
               disabled={searching || !query.trim() || !selectedCourseId}
               className={`${primaryButton} mt-auto disabled:opacity-50`}
+              aria-label={searching ? "正在检索知识库" : "执行知识库检索"}
+              title={searching ? "正在检索" : "执行检索"}
             >
               {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             </button>
