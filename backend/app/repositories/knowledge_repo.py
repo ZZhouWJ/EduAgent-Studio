@@ -10,10 +10,10 @@ Tables:
 """
 
 import math
-import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.database import get_db_cursor, get_db_transaction
+from app.rag.retriever import tokenize_for_search
 
 
 class KnowledgeRepository:
@@ -378,15 +378,8 @@ class KnowledgeRepository:
         return [item[1] for item in scored[:limit]]
 
     def _tokenize(self, text: str) -> List[str]:
-        """简单中文分词。"""
-        STOP_WORDS = {
-            "的", "了", "在", "是", "我", "有", "和", "就",
-            "不", "人", "都", "一", "一个", "上", "也", "很",
-            "到", "说", "要", "去", "你", "会", "着", "没有",
-            "看", "好", "自己", "这", "那", "它", "什么",
-        }
-        words = re.findall(r"[一-鿿]+|[a-zA-Z0-9]+", text.lower())
-        return [w for w in words if w not in STOP_WORDS and len(w) >= 2]
+        """复用 Agent RAG 的中文 n-gram 分词，保证搜索入口一致。"""
+        return tokenize_for_search(text)
 
     def _build_bm25_index(
         self,

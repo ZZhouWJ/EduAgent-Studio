@@ -49,6 +49,11 @@ def _tokenize(text: str) -> List[str]:
     return tokens
 
 
+def tokenize_for_search(text: str) -> List[str]:
+    """返回课程检索的统一词元，供 API 与 Agent 检索共用。"""
+    return _tokenize(text)
+
+
 def _search_db_chunks(
     course_id: int,
     query: str,
