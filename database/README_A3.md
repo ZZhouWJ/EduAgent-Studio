@@ -46,8 +46,12 @@ mysql -h 127.0.0.1 -P 3306 -u root -p ai_collab_audit_system \
 | `09`-`10` | A3 课程、知识点、任务、画像与学习资源基础数据 |
 | `13`-`17` | 课程资料、文档分块、画像对话、Tutor 会话和证据链 |
 | `18`-`26` | 账号、角色、平台设置、资源审核和产品化种子数据修正 |
-| `27`-`31` | 任务进度、数据清理、教育 Prompt、模型配置与认证会话 |
-| `32` | 导入 CS301《数据库系统原理》9 个课程章节，建立已确认的知识点证据关联 |
+| `27_create_learning_task_progress.sql` | 建立按学生隔离的任务进度 |
+| `28_cleanup_orphan_learning_profiles.sql` | 清理失去课程或学生归属的画像数据 |
+| `29_align_education_prompt_templates.sql` | 对齐当前教育智能体 Prompt 模板 |
+| `30_remove_demo_model_configs.sql` | 移除不应进入生产的演示模型配置 |
+| `31_create_auth_sessions.sql` | 建立可撤销认证会话 |
+| `32_seed_course_knowledge_base.sql` | 导入 CS301《数据库系统原理》9 个课程章节，建立已确认的知识点证据关联 |
 
 `07_test_queries.sql` 会写入验证数据，仅用于独立测试，不参与自动初始化。`08_insert_prompt_templates.sql` 已被后续教育 Prompt 迁移取代。`11_postgresql_migration.sql` 与 `database/pgvector/` 是早期迁移探索，不得与当前 MySQL 链路混用。
 
