@@ -129,10 +129,9 @@ class TutorSupervisor:
         )
 
         # 构建消息历史
+        # 注意：讯飞 Spark 要求首条消息不能是 system，故合并为单条 system 消息
         messages = [
-            {"role": "system", "content": system_prompt},
-            # 知识库上下文作为独立 system 消息注入，确保不被截断
-            {"role": "system", "content": f"## 知识库上下文\n{knowledge_context}"},
+            {"role": "system", "content": f"{system_prompt}\n\n## 知识库上下文\n{knowledge_context}"},
             {"role": "user", "content": question},
         ]
 
@@ -273,9 +272,7 @@ class TutorSupervisor:
         })
 
         messages = [
-            {"role": "system", "content": system_prompt},
-            # 知识库上下文作为独立 system 消息注入，确保不被截断
-            {"role": "system", "content": f"## 知识库上下文\n{knowledge_context}"},
+            {"role": "system", "content": f"{system_prompt}\n\n## 知识库上下文\n{knowledge_context}"},
             {"role": "user", "content": question},
         ]
 
