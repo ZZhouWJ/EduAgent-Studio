@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional
 from app.database import get_db_transaction
 from app.repositories import user_repo
 from app.repositories.platform_settings_repo import PlatformSettingsRepository
+from app.services.content_safety_service import content_safety_policy
 
 GOVERNANCE_SETTING_KEY = "governance.rules"
 GOVERNANCE_DESCRIPTION = "内容治理阈值、调用限制与敏感内容检测配置"
@@ -32,18 +33,22 @@ class PlatformSettingsService:
     def get_governance(self) -> Dict[str, Any]:
         setting = self._repo.get_setting(GOVERNANCE_SETTING_KEY)
         if setting is None:
-            return {
+            value = {
                 **DEFAULT_GOVERNANCE_SETTINGS,
                 "updated_by": None,
                 "updated_at": None,
             }
+            content_safety_policy.set_enabled(value["sensitive_content_enabled"])
+            return value
 
         value = self._normalize_governance(setting.get("value"))
-        return {
+        result = {
             **value,
             "updated_by": setting.get("updated_by"),
             "updated_at": setting.get("updated_at"),
         }
+        content_safety_policy.set_enabled(result["sensitive_content_enabled"])
+        return result
 
     def update_governance(
         self,
@@ -87,6 +92,7 @@ class PlatformSettingsService:
                 user_agent=user_agent,
                 conn=conn,
             )
+        content_safety_policy.set_enabled(sensitive_content_enabled)
         return value
 
     def get_budget_alert(self) -> Dict[str, Any]:

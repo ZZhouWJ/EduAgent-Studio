@@ -12,6 +12,8 @@ import logging
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 
+from app.services.content_safety_service import content_safety_policy
+
 logger = logging.getLogger(__name__)
 
 
@@ -69,6 +71,19 @@ class LLMGateway:
         """统一生成接口"""
         start_time = time.time()
 
+        input_finding = content_safety_policy.scan_messages(messages)
+        if input_finding:
+            logger.warning(
+                "LLM input blocked by content safety policy: %s",
+                input_finding.category,
+            )
+            return LLMCallResult(
+                content="", model=config.model_name, provider=config.provider,
+                input_tokens=0, output_tokens=0, total_tokens=0,
+                latency_ms=0, cost=0.0, status="failed",
+                error="请求触发内容安全策略",
+            )
+
         provider = self._providers.get(config.provider)
         if provider is None:
             logger.error("LLM provider is not registered: %s", config.provider)
@@ -82,8 +97,29 @@ class LLMGateway:
         try:
             result = provider.generate(messages, config, **kwargs)
             latency_ms = int((time.time() - start_time) * 1000)
+            content = str(result.get("content") or "")
+            tool_calls = result.get("tool_calls")
+            output_finding = content_safety_policy.scan_output(content, tool_calls)
+            if output_finding:
+                logger.warning(
+                    "LLM output blocked by content safety policy: %s",
+                    output_finding.category,
+                )
+                return LLMCallResult(
+                    content="", model=config.model_name, provider=config.provider,
+                    input_tokens=result.get("input_tokens", 0),
+                    output_tokens=result.get("output_tokens", 0),
+                    total_tokens=(
+                        result.get("input_tokens", 0)
+                        + result.get("output_tokens", 0)
+                    ),
+                    latency_ms=latency_ms,
+                    cost=result.get("cost", 0.0),
+                    status="failed",
+                    error="模型输出触发内容安全策略",
+                )
             return LLMCallResult(
-                content=result.get("content", ""),
+                content=content,
                 model=config.model_name,
                 provider=config.provider,
                 input_tokens=result.get("input_tokens", 0),
@@ -92,7 +128,7 @@ class LLMGateway:
                 latency_ms=latency_ms,
                 cost=result.get("cost", 0.0),
                 status="success",
-                tool_calls=result.get("tool_calls"),
+                tool_calls=tool_calls,
             )
         except Exception as e:
             logger.error("LLM call failed (%s)", type(e).__name__)

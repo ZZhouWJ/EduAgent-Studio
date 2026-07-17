@@ -10,10 +10,12 @@ from app.services.platform_settings_service import (
     GOVERNANCE_SETTING_KEY,
     PlatformSettingsService,
 )
+from app.services.content_safety_service import content_safety_policy
 
 
 class PlatformSettingsServiceTests(unittest.TestCase):
     def setUp(self):
+        content_safety_policy.set_enabled(True)
         self.service = PlatformSettingsService()
         self.service._repo = Mock()
 
@@ -74,6 +76,7 @@ class PlatformSettingsServiceTests(unittest.TestCase):
         self.assertEqual(insert_log.call_args.kwargs["action_type"], "governance:update")
         self.assertEqual(insert_log.call_args.kwargs["conn"], conn)
         self.assertEqual(result, expected)
+        self.assertFalse(content_safety_policy.enabled)
 
     def test_budget_alert_defaults_are_returned_when_setting_is_missing(self):
         self.service._repo.get_setting.return_value = None
