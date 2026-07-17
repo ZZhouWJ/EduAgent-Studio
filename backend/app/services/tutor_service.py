@@ -679,6 +679,12 @@ flowchart LR
             # 构建 prompt
             weak_str = "、".join(weak_points) if weak_points else "暂无薄弱点记录"
             kp_str = "、".join(kp_names) if kp_names else "暂无知识点数据"
+            fallback_suggestions = [
+                f"{kp_names[0] if kp_names else '课程'}的核心概念是什么？",
+                f"如何理解{kp_names[1] if len(kp_names) > 1 else '相关知识点'}？",
+                "有哪些典型应用场景？",
+                "常见错误和注意事项有哪些？",
+            ] if kp_names else []
 
             prompt = f"""你是一个学习助手。请根据以下信息，生成4条学生最可能问的学习问题。
 
@@ -700,15 +706,7 @@ flowchart LR
             if self._llm_gateway is None:
                 return {
                     "code": 0,
-                    "data": {
-                        "suggestions": [
-                            f"{kp_names[0] if kp_names else '课程内容'}的核心概念是什么？",
-                            f"如何理解{kp_names[1] if len(kp_names) > 1 else '相关知识点'}？",
-                            "有哪些典型应用场景？",
-                            "常见错误和注意事项有哪些？",
-                        ]
-                        if kp_names else []
-                    },
+                    "data": {"suggestions": fallback_suggestions},
                 }
 
             config = get_settings().llm_config()
@@ -724,22 +722,23 @@ flowchart LR
             import re
             m = re.search(r"\[[\s\S]*\]", content)
             if m:
-                import json
-                suggestions = json.loads(m.group())
-                if isinstance(suggestions, list):
-                    return {"code": 0, "data": {"suggestions": suggestions[:4]}}
+                try:
+                    suggestions = json.loads(m.group())
+                except json.JSONDecodeError:
+                    logger.warning("Suggestion response was not valid JSON; using fallback")
+                else:
+                    if isinstance(suggestions, list):
+                        normalized = [
+                            item.strip()
+                            for item in suggestions
+                            if isinstance(item, str) and item.strip()
+                        ][:4]
+                        if normalized:
+                            return {"code": 0, "data": {"suggestions": normalized}}
 
             return {
                 "code": 0,
-                "data": {
-                    "suggestions": [
-                        f"{kp_names[0] if kp_names else '课程'}的核心概念是什么？",
-                        "有哪些典型应用场景？",
-                        "常见错误和注意事项有哪些？",
-                        "如何系统地学习这部分内容？",
-                    ]
-                    if kp_names else []
-                },
+                "data": {"suggestions": fallback_suggestions},
             }
 
         except Exception as e:

@@ -43,6 +43,23 @@ class TutorAccessTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "denied"):
             self.service.get_suggestions(3, profile_id=22, user=self.user)
 
+    def test_suggestions_fall_back_when_model_returns_invalid_json(self):
+        self.service._get_course_knowledge_points = Mock(return_value=[
+            {"kp_id": 1, "name": "事务隔离"},
+            {"kp_id": 2, "name": "并发控制"},
+        ])
+        self.service._profile_repo.get_profile.return_value = {"weak_points": []}
+        self.service._llm_gateway = Mock()
+        self.service._llm_gateway.generate.return_value = Mock(
+            content="[事务隔离怎么学？, 并发控制怎么学？]",
+        )
+
+        result = self.service.get_suggestions(3, profile_id=22, user=self.user)
+
+        self.assertEqual(result["code"], 0)
+        self.assertEqual(len(result["data"]["suggestions"]), 4)
+        self.assertIn("事务隔离", result["data"]["suggestions"][0])
+
 
 class TutorRequestValidationTests(unittest.TestCase):
     def test_chat_normalizes_question_and_accepts_supported_content(self):
