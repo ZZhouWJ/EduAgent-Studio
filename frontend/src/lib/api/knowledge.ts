@@ -39,12 +39,26 @@ interface MaterialDetail {
 export interface SearchResult {
   chunk_id: number
   material_id: number
-  file_name: string
+  title: string | null
   page_num: number | null
   content: string
-  score: number
+  relative_score: number
   keywords: string[]
-  knowledge_point_name: string | null
+}
+
+interface SearchChunk extends MaterialChunk {
+  bm25_score: number
+}
+
+interface SearchResponse {
+  query: string
+  total: number
+  chunks: SearchChunk[]
+}
+
+function parseSearchTerms(value: string | null): string[] {
+  if (!value) return []
+  return value.split(/[,，\s]+/).map(term => term.trim()).filter(Boolean)
 }
 
 export interface KpChunkLink {
@@ -108,7 +122,21 @@ export const knowledgeApi = {
 
   // 检索
   search(query: string, courseId?: number, kpId?: number) {
-    return client.get<SearchResult[]>('/knowledge/search', { params: { query, course_id: courseId, kp_id: kpId } })
+    return client.get<SearchResponse>('/knowledge/search', { params: { query, course_id: courseId, kp_id: kpId } })
+      .then(response => {
+        const chunks = response.chunks ?? []
+        const maxScore = Math.max(...chunks.map(chunk => chunk.bm25_score), 0)
+
+        return chunks.map<SearchResult>(chunk => ({
+          chunk_id: chunk.chunk_id,
+          material_id: chunk.material_id,
+          title: chunk.title,
+          page_num: chunk.source_page,
+          content: chunk.content,
+          relative_score: maxScore > 0 ? chunk.bm25_score / maxScore : 0,
+          keywords: parseSearchTerms(chunk.bm25_terms),
+        }))
+      })
   },
 
   // === 证据链路 API ===

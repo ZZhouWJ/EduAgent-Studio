@@ -442,18 +442,20 @@ export function TeacherKnowledgeBase() {
                   <div className="mb-2 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-black text-blue-700">#{index + 1}</span>
-                      <h3 className="text-sm font-black text-slate-900 truncate max-w-[180px]">{result.file_name}</h3>
+                      <h3 className="text-sm font-black text-slate-900 truncate max-w-[180px]">
+                        {materialsData?.find(material => material.material_id === result.material_id)?.filename ?? `Chunk ${result.chunk_id}`}
+                      </h3>
                     </div>
-                    <span className="text-xs font-black text-blue-700">{Math.round(result.score * 100)}%</span>
+                    <span className="text-xs font-black text-blue-700">相对相关度 {Math.round(result.relative_score * 100)}%</span>
                   </div>
-                  {result.page_num !== null && (
-                    <p className="mb-2 text-[11px] text-slate-400">页码: {result.page_num}</p>
-                  )}
+                  <p className="mb-2 text-[11px] text-slate-400">
+                    Chunk {result.chunk_id}{result.page_num !== null && ` · 第 ${result.page_num} 页`}
+                  </p>
                   <p className="line-clamp-4 text-xs leading-5 text-slate-600">{result.content}</p>
-                  {result.knowledge_point_name && (
+                  {result.title && (
                     <div className="mt-2">
                       <span className="rounded bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700">
-                        知识点: {result.knowledge_point_name}
+                        知识点: {result.title}
                       </span>
                     </div>
                   )}
