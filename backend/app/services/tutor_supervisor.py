@@ -56,6 +56,19 @@ PROFILE_AWARE_TOOLS = {
     "error_analysis_agent",
 }
 
+TOOL_PROMPT_DESCRIPTIONS = {
+    "retrieve_knowledge": "检索当前课程的教材和讲义",
+    "quiz_agent": "生成自适应练习题",
+    "code_case_agent": "生成可执行的实操案例",
+    "mindmap_agent": "生成知识结构思维导图",
+    "planning_agent": "规划个性化学习路径",
+    "error_analysis_agent": "分析错题原因并给出订正建议",
+    "explanation_skill": "根据学生水平详细讲解概念",
+    "ppt_agent": "生成课件大纲",
+    "tts_tool": "将学习内容转为语音",
+    "image_agent": "生成教学图解",
+}
+
 
 @dataclass
 class ToolCallEvent:
@@ -132,12 +145,16 @@ class TutorSupervisor:
         Returns:
             SupervisorResult（含最终回答、工具调用记录、内容块）
         """
-        # 构建系统提示
-        system_prompt = self._build_system_prompt(profile, knowledge_context)
-
         # 两级路由：规则预筛选候选工具
         candidate_tool_ids = self.tool_registry.select_for_question(question)
         available_tools = self.tool_registry.get_openai_schemas(candidate_tool_ids)
+
+        # 提示词只描述本次真正开放的工具，避免模型伪造未生成内容。
+        system_prompt = self._build_system_prompt(
+            profile,
+            knowledge_context,
+            candidate_tool_ids,
+        )
 
         logger.info(
             f"[Supervisor] question={question[:50]}..., "
@@ -197,9 +214,7 @@ class TutorSupervisor:
 
                 # 无工具调用，回答完毕
                 final_answer = assistant_message.get("content", "")
-                # 当有内容块时，确保嵌入语法出现在回答中
-                if content_blocks:
-                    final_answer = _inject_embed_syntax(final_answer, content_blocks)
+                final_answer = _inject_embed_syntax(final_answer, content_blocks)
                 logger.info(f"[Supervisor] step={step} final_answer length={len(final_answer)}")
                 break
 
@@ -299,9 +314,13 @@ class TutorSupervisor:
         Yields:
             SSE 格式字符串，如 "data: {...}\n\n"
         """
-        system_prompt = self._build_system_prompt(profile, knowledge_context)
         candidate_tool_ids = self.tool_registry.select_for_question(question)
         available_tools = self.tool_registry.get_openai_schemas(candidate_tool_ids)
+        system_prompt = self._build_system_prompt(
+            profile,
+            knowledge_context,
+            candidate_tool_ids,
+        )
 
         yield self._sse_event("supervisor.started", {
             "candidates": candidate_tool_ids,
@@ -361,9 +380,7 @@ class TutorSupervisor:
                     return
 
                 final_answer = assistant_message.get("content", "")
-                # 当有内容块时，确保嵌入语法出现在回答中
-                if content_blocks:
-                    final_answer = _inject_embed_syntax(final_answer, content_blocks)
+                final_answer = _inject_embed_syntax(final_answer, content_blocks)
                 yield self._sse_event("supervisor.final", {
                     "content": final_answer,
                     "content_blocks": content_blocks,
@@ -723,7 +740,12 @@ class TutorSupervisor:
         evidence_lines.extend(["", "请结合上述课程证据继续追问具体概念、案例或练习要求。"])
         return "\n".join(evidence_lines)
 
-    def _build_system_prompt(self, profile: Optional[Dict[str, Any]], knowledge_context: str) -> str:
+    def _build_system_prompt(
+        self,
+        profile: Optional[Dict[str, Any]],
+        knowledge_context: str,
+        candidate_tool_ids: List[str],
+    ) -> str:
         """构建系统提示词（profile 可能为 None）"""
         if profile:
             weak_points = profile.get("weak_points", [])
@@ -740,6 +762,12 @@ class TutorSupervisor:
             student_name = "同学"
             current_level = "未知"
 
+        available_tool_lines = "\n".join(
+            f"- {tool_id}：{TOOL_PROMPT_DESCRIPTIONS[tool_id]}"
+            for tool_id in candidate_tool_ids
+            if tool_id in TOOL_PROMPT_DESCRIPTIONS
+        ) or "- 本次没有额外生成工具，直接回答学生问题"
+
         return f"""你是一个专业的 AI 学习辅导老师。你的职责是根据学生的问题，自主判断是否需要调用工具来生成更丰富的内容。
 
 ## 学生画像
@@ -748,40 +776,16 @@ class TutorSupervisor:
 - 薄弱知识点：{weak_str}
 - 资源偏好：{resource_prefs}
 
-## 可用工具（请根据问题选择合适的工具）
-- retrieve_knowledge：检索课程教材和讲义（几乎所有问题都需要先用这个）
-- quiz_agent：生成自适应练习题（当学生要求做题、出题、练习时）
-- code_case_agent：生成代码实操案例（当涉及编程语言、代码时）
-- mindmap_agent：生成思维导图（当需要梳理知识结构时）
-- planning_agent：规划学习路径（当学生问怎么学、学什么顺序时）
-- error_analysis_agent：分析错题原因（当学生描述错误或错题时）
-- explanation_skill：详细讲解概念（当学生问"什么是/为什么"时）
+## 本次可用工具
+{available_tool_lines}
 
 ## 执行规则
-1. 先用 retrieve_knowledge 检索相关教材内容
-2. 根据问题组合使用其他工具（不要一次调用太多，2-3个为宜）
-3. 整合工具返回结果，给出完整回答
-4. 重要：引用教材原文时使用 [引用:chunk_id] 格式
-
-## 内容块嵌入语法（重要）
-当需要展示以下类型内容时，必须在回复正文中用嵌入语法引用内容块，
-这样内容会以精美卡片形式内嵌在回答中，而不是单独堆叠在下方：
-
-| 类型 | 嵌入语法 | 说明 |
-|------|----------|------|
-| 练习题 | :::quiz:block_id::: | 自适应练习题 |
-| 代码案例 | :::code_case:block_id::: | 可运行代码示例 |
-| 思维导图 | :::mindmap:block_id::: | 知识结构图 |
-| 学习规划 | :::lecture:block_id::: | 学习路径 |
-| PPT大纲 | :::ppt:block_id::: | 课件大纲 |
-| 视频脚本 | :::video_script:block_id::: | 视频文案 |
-
-使用示例：
-- 「下面是一道练习题：:::quiz:block_abc123:::」
-- 「代码示例：:::code_case:block_def456:::」
-- 「用思维导图梳理：:::mindmap:block_ghi789:::」
-
-直接用 Markdown 格式组织回答，被引用内容块会自动以内嵌卡片渲染。
+1. 优先调用 retrieve_knowledge 检索相关教材内容。
+2. 只能调用上方列出且实际提供的工具，每轮最多组合 2-3 个。
+3. 只有在工具返回成功后，才能告诉学生已生成案例、测验、思维导图等内容。
+4. 不要编造或输出内容块 ID、占位符或内部协议；展示位置由系统自动处理。
+5. 整合工具返回结果，用 Markdown 给出完整、可直接学习的回答。
+6. 引用教材原文时使用 [引用:chunk_id] 格式。
 """
 
     def _call_llm_with_tools(
@@ -956,18 +960,55 @@ def _detect_question_type(question: str) -> str:
 
 def _inject_embed_syntax(final_answer: str, content_blocks: List[Dict[str, Any]]) -> str:
     """
-    当 LLM 回答文本中没有内嵌语法时，自动追加引用标记。
-    检查 final_answer 是否已包含每个 block 的 :::type:block_id::: 引用，
-    如有遗漏则追加。
-    """
-    if not content_blocks:
-        return final_answer
+    校验回答中的内容块引用，并追加尚未引用的真实内容块。
 
-    # 检查已有引用
+    模型无法预知后端生成的 block_id。若它仍输出了伪造标记，
+    优先按类型替换为未引用的真实内容块；没有匹配内容时直接清除，
+    避免将内部协议泄露到学生界面。
+    """
+    answer = final_answer or ""
+    embed_pattern = re.compile(r":::([a-z_]+):([^:\s]+):::", re.IGNORECASE)
+    blocks = [
+        block
+        for block in content_blocks
+        if block.get("block_id") and block.get("block_type")
+    ]
+    blocks_by_id = {str(block["block_id"]): block for block in blocks}
+
+    # 预留正文中已经正确引用的块，避免伪标记抢占后续真实引用。
+    reserved_ids = {
+        match.group(2)
+        for match in embed_pattern.finditer(answer)
+        if match.group(2) in blocks_by_id
+        and blocks_by_id[match.group(2)].get("block_type") == match.group(1)
+    }
     referenced_ids = set()
-    import re
-    for m in re.finditer(r":::(?:\w+):([\w_-]+):::", final_answer):
-        referenced_ids.add(m.group(1))
+
+    def replace_embed(match: re.Match[str]) -> str:
+        block_type, block_id = match.group(1), match.group(2)
+        block = blocks_by_id.get(block_id)
+        if block and block.get("block_type") == block_type:
+            referenced_ids.add(block_id)
+            return f":::{block_type}:{block_id}:::"
+
+        replacement = next(
+            (
+                candidate
+                for candidate in blocks
+                if candidate.get("block_type") == block_type
+                and candidate.get("block_id") not in reserved_ids
+                and candidate.get("block_id") not in referenced_ids
+            ),
+            None,
+        )
+        if replacement:
+            replacement_id = str(replacement["block_id"])
+            referenced_ids.add(replacement_id)
+            return f":::{block_type}:{replacement_id}:::"
+        return ""
+
+    answer = embed_pattern.sub(replace_embed, answer)
+    answer = re.sub(r"\n{3,}", "\n\n", answer).strip()
 
     label_map = {
         "quiz": "练习题",
@@ -983,13 +1024,13 @@ def _inject_embed_syntax(final_answer: str, content_blocks: List[Dict[str, Any]]
 
     missing = [
         f"{label_map.get(b.get('block_type', ''), b.get('title', '内容'))}：:::{b.get('block_type', '')}:{b.get('block_id', '')}:::"
-        for b in content_blocks
+        for b in blocks
         if b.get("block_id", "") not in referenced_ids
     ]
 
     if missing:
-        return final_answer + "\n\n" + " ".join(missing)
-    return final_answer
+        return (answer + "\n\n" + " ".join(missing)).strip()
+    return answer
 
 
 def _build_embed_answer(content_blocks: List[Dict[str, Any]]) -> str:

@@ -3,7 +3,11 @@ import unittest
 from datetime import datetime
 from types import SimpleNamespace
 
-from app.services.tutor_supervisor import TutorSupervisor, _result_to_content_block
+from app.services.tutor_supervisor import (
+    TutorSupervisor,
+    _inject_embed_syntax,
+    _result_to_content_block,
+)
 
 
 class StaticGateway:
@@ -120,6 +124,46 @@ class TutorSupervisorFallbackTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_plain_retrieval_is_not_mislabeled_as_learning_plan(self):
         self.assertIsNone(_result_to_content_block("retrieve_knowledge", {"chunks": []}))
+
+    def test_prompt_only_describes_tools_available_for_current_question(self):
+        prompt = self.supervisor._build_system_prompt(
+            profile={"weak_points": []},
+            knowledge_context="",
+            candidate_tool_ids=["retrieve_knowledge", "code_case_agent"],
+        )
+
+        self.assertIn("retrieve_knowledge", prompt)
+        self.assertIn("code_case_agent", prompt)
+        self.assertNotIn("quiz_agent", prompt)
+        self.assertNotIn(":::", prompt)
+        self.assertIn("不要编造或输出内容块 ID", prompt)
+
+    def test_embed_syntax_replaces_fake_ids_and_removes_unresolved_markers(self):
+        answer = (
+            "实操案例：:::code_case:block_case_001:::\n\n"
+            "即时小测：:::quiz:block_quiz_001:::"
+        )
+        blocks = [{
+            "block_id": "block_code_case_agent_a1b2c3d4",
+            "block_type": "code_case",
+            "title": "SQL 筛选案例",
+            "content": {},
+        }]
+
+        result = _inject_embed_syntax(answer, blocks)
+
+        self.assertIn(":::code_case:block_code_case_agent_a1b2c3d4:::", result)
+        self.assertNotIn("block_case_001", result)
+        self.assertNotIn("block_quiz_001", result)
+        self.assertNotIn(":::quiz:", result)
+
+    def test_embed_syntax_removes_fake_ids_when_no_blocks_exist(self):
+        result = _inject_embed_syntax(
+            "案例：:::code_case:block_case_001:::",
+            [],
+        )
+
+        self.assertEqual(result, "案例：")
 
     async def test_tool_call_context_and_model_failure_produce_stream_answer(self):
         gateway = ToolCallingThenFailureGateway()

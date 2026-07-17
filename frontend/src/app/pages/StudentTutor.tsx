@@ -299,6 +299,7 @@ function ResourcesCard({ resources }: { resources?: RecommendedResource[] }) {
 type ContentSegment =
   | { type: "text"; content: string }
   | { type: "embed"; blockType: string; blockId: string }
+  | { type: "missing"; blockType: string }
 
 const EMBED_REGEX = /:::(quiz|code_case|mindmap|lecture|ppt|video_script|error_analysis|learning_card):([^:]+):::/g
 
@@ -316,9 +317,11 @@ function parseInlineBlocks(content: string, blocks: ContentBlock[]): ContentSegm
     }
     // 嵌入标记：验证 block 是否存在
     const blockId = match[2]
-    const block = blocks.find((b) => b.block_id === blockId)
+    const block = blocks.find((b) => b.block_id === blockId && b.block_type === match![1])
     if (block) {
       segments.push({ type: "embed", blockType: match[1], blockId })
+    } else {
+      segments.push({ type: "missing", blockType: match[1] })
     }
     lastIndex = match.index + match[0].length
   }
@@ -327,6 +330,27 @@ function parseInlineBlocks(content: string, blocks: ContentBlock[]): ContentSegm
     segments.push({ type: "text", content: content.slice(lastIndex) })
   }
   return segments
+}
+
+const MISSING_BLOCK_LABELS: Record<string, string> = {
+  quiz: "练习题",
+  code_case: "实操案例",
+  mindmap: "思维导图",
+  lecture: "学习规划",
+  ppt: "PPT 大纲",
+  video_script: "视频脚本",
+  error_analysis: "错因分析",
+  learning_card: "知识卡片",
+}
+
+function MissingContentBlock({ blockType }: { blockType: string }) {
+  const label = MISSING_BLOCK_LABELS[blockType] || "学习内容"
+  return (
+    <div className="flex items-start gap-2 border-l-2 border-amber-400 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+      <CircleX className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+      <span>{label}未成功生成，请重新发送该项需求。</span>
+    </div>
+  )
 }
 
 /* ─── 消息气泡 ─────────────────────────────────────── */
@@ -342,7 +366,8 @@ function MessageBubble({ message, onFeedback, executionEvents }: {
   const segments = !isStudent && message.content && message.content_blocks
     ? parseInlineBlocks(message.content, message.content_blocks)
     : null
-  // 是否使用了内嵌语法
+  // 凡是出现内部嵌入标记都走分段渲染，避免伪造 ID 泄露到界面。
+  const hasInlineSyntax = segments && segments.some((s) => s.type !== "text")
   const hasInlineEmbeds = segments && segments.some((s) => s.type === "embed")
   // 未被引用的 content_blocks（作为兜底在末尾显示）
   const unusedBlocks = !isStudent && message.content_blocks
@@ -375,20 +400,24 @@ function MessageBubble({ message, onFeedback, executionEvents }: {
 
         {/* 消息内容：内嵌卡片模式优先 */}
         <div className="prose prose-sm max-w-none">
-          {hasInlineEmbeds && segments ? (
+          {hasInlineSyntax && segments ? (
             // 内嵌卡片模式：交替渲染文本片段和内容块卡片
             <div className="space-y-3">
-              {segments.map((seg, i) =>
-                seg.type === "text" ? (
-                  <ReactMarkdown key={i}>{seg.content}</ReactMarkdown>
-                ) : (
+              {segments.map((seg, i) => {
+                if (seg.type === "text") {
+                  return <ReactMarkdown key={i}>{seg.content}</ReactMarkdown>
+                }
+                if (seg.type === "missing") {
+                  return <MissingContentBlock key={i} blockType={seg.blockType} />
+                }
+                return (
                   <ContentBlockRenderer
                     key={i}
                     block={message.content_blocks!.find((b) => b.block_id === seg.blockId)!}
                     embedded
                   />
                 )
-              )}
+              })}
             </div>
           ) : message.content && message.content.trim() ? (
             // 有 markdown 内容，正常渲染
