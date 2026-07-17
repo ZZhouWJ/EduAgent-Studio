@@ -93,7 +93,7 @@ Tutor 将学生画像和课程检索结果注入系统上下文。支持模型�
 | Frontend | React 18、TypeScript、Vite 6、Tailwind CSS、Radix UI、Zustand、Recharts、ECharts |
 | Backend | FastAPI、Pydantic、PyMySQL、JWT、REST、SSE |
 | Agents | LangGraph、LangChain Core、统一 LLM Gateway、Tutor Supervisor、Tool Registry |
-| Data | MySQL、Redis、SQLite/In-memory Checkpoint、本地资源存储 |
+| Data | MySQL、Redis、SQLite Checkpoint、本地资源存储 |
 | Tasks | Celery Worker 与 Celery Beat |
 | Deployment | Docker Compose、Nginx SPA 托管与 API 反向代理 |
 
@@ -101,7 +101,7 @@ Tutor 将学生画像和课程检索结果注入系统上下文。支持模型�
 
 | 检查 | 结果 |
 | --- | --- |
-| 后端全量测试 | 260 项通过 |
+| 后端全量测试 | 262 项通过 |
 | 前端类型检查 | 通过 |
 | 前端生产构建 | 通过 |
 | npm 生产依赖审计 | 0 vulnerabilities |
