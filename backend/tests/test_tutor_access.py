@@ -31,6 +31,34 @@ class TutorAccessTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "denied"):
             self.service.submit_feedback(5, True, user=self.user)
 
+    def test_stream_session_checks_profile_course_before_saving(self):
+        self.service._access.require_profile_course.side_effect = RuntimeError("denied")
+        self.service._save_session = Mock()
+
+        with self.assertRaisesRegex(RuntimeError, "denied"):
+            self.service.save_stream_session(22, 3, "question", "answer", self.user)
+
+        self.service._save_session.assert_not_called()
+
+    def test_stream_session_persists_final_answer(self):
+        self.service._save_session = Mock(return_value=91)
+
+        session_id = self.service.save_stream_session(
+            22,
+            3,
+            "question",
+            "grounded answer",
+            self.user,
+        )
+
+        self.assertEqual(session_id, 91)
+        self.service._save_session.assert_called_once_with(
+            profile_id=22,
+            course_id=3,
+            question="question",
+            answer_data={"answer": "grounded answer", "explanation_level": "intermediate"},
+        )
+
     def test_session_history_checks_profile_access(self):
         self.service._access.require_profile_access.side_effect = RuntimeError("denied")
 

@@ -222,6 +222,29 @@ class TutorService:
             logger.error("Tutor 反馈提交失败 (%s)", type(e).__name__)
             return {"code": 500, "message": "反馈提交失败，请稍后重试", "data": None}
 
+    def save_stream_session(
+        self,
+        profile_id: int,
+        course_id: int,
+        question: str,
+        answer: str,
+        user: Dict[str, Any],
+        explanation_level: str = "intermediate",
+    ) -> int:
+        """保存流式答疑结果，并复用阻塞接口相同的访问控制。"""
+        self._access.require_profile_course(profile_id, course_id, user)
+        if not answer.strip():
+            return 0
+        return self._save_session(
+            profile_id=profile_id,
+            course_id=course_id,
+            question=question,
+            answer_data={
+                "answer": answer,
+                "explanation_level": explanation_level,
+            },
+        )
+
     def get_sessions(
         self,
         profile_id: int,
@@ -560,7 +583,7 @@ flowchart LR
                         profile_id,
                         course_id,
                         question,
-                        answer_data.get("answer", ""),
+                        answer_data.get("main_answer", answer_data.get("answer", "")),
                         answer_data.get("explanation_level", "intermediate"),
                     ),
                 )

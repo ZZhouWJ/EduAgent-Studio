@@ -599,6 +599,7 @@ export function StudentTutor() {
     setIsStreaming(true)
     setActiveEvents([])  // 重置轨迹
     setIsFirstThinking(true)
+    setLastSessionId(null)
 
     // 2. 后台分析图片（不阻塞 UI）
     let imageResult = ""
@@ -685,7 +686,7 @@ export function StudentTutor() {
           }
         },
 
-        onFinal: (answer: string, contentBlocks: ContentBlock[], citations: Citation[]) => {
+        onFinal: (answer: string, contentBlocks: ContentBlock[], citations: Citation[], sessionId?: number) => {
           // 更新助手消息
           setMessages((prev) =>
             prev.map((m) =>
@@ -698,6 +699,7 @@ export function StudentTutor() {
           setPendingAi(false)
           setActiveEvents([])
           setIsFirstThinking(false)
+          setLastSessionId(sessionId ?? null)
           showToast("已收到回复")
         },
 

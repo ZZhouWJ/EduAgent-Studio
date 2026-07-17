@@ -99,7 +99,7 @@ export const tutorApi = {
     data: { profile_id: number; course_id: number; question: string },
     callbacks: {
       onEvent: (event: SSEEvent) => void
-      onFinal: (answer: string, contentBlocks: ContentBlock[], citations: Citation[]) => void
+      onFinal: (answer: string, contentBlocks: ContentBlock[], citations: Citation[], sessionId?: number) => void
       onError: (error: string) => void
     }
   ): () => void {
@@ -149,13 +149,14 @@ export const tutorApi = {
                 callbacks.onFinal(
                   event.content || '',
                   event.content_blocks || [],
-                  event.citations || []
+                  event.citations || [],
+                  event.session_id
                 )
                 return
               }
 
               if (event.type === 'supervisor.max_steps') {
-                callbacks.onFinal(event.content || '（处理超时）', [], [])
+                callbacks.onFinal(event.content || '（处理超时）', [], [], event.session_id)
                 return
               }
 

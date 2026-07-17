@@ -73,6 +73,20 @@ def _get_tutor_service() -> TutorService:
     return TutorService()
 
 
+def _decode_sse_event(sse_line: str) -> Optional[dict]:
+    if not sse_line.startswith("data: "):
+        return None
+    try:
+        event = json.loads(sse_line[6:].strip())
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return event if isinstance(event, dict) else None
+
+
+def _encode_sse_event(event: dict) -> str:
+    return f"data: {json.dumps(event, ensure_ascii=False, default=str)}\n\n"
+
+
 @router.post("/chat")
 async def tutor_chat(
     data: ChatRequest,
@@ -140,6 +154,7 @@ async def tutor_chat_stream(
     CourseAccessService().require_profile_course(
         data.profile_id, data.course_id, user
     )
+    tutor_service = _get_tutor_service()
 
     async def event_stream():
         try:
@@ -167,7 +182,21 @@ async def tutor_chat_stream(
                 course_id=course_id,
                 knowledge_context=knowledge_context,
             ):
-                yield sse_line
+                event = _decode_sse_event(sse_line)
+                if event and event.get("type") in {"supervisor.final", "supervisor.max_steps"}:
+                    session_id = tutor_service.save_stream_session(
+                        profile_id=data.profile_id,
+                        course_id=course_id,
+                        question=data.question,
+                        answer=str(event.get("content") or ""),
+                        explanation_level=str(event.get("explanation_level") or "intermediate"),
+                        user=user,
+                    )
+                    if session_id:
+                        event["session_id"] = session_id
+                    yield _encode_sse_event(event)
+                else:
+                    yield sse_line
 
         except Exception as exc:
             logger.error("流式答疑失败 (%s)", type(exc).__name__)
