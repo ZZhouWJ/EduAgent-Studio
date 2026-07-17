@@ -1,5 +1,7 @@
 # EduAgent Studio — A3 Migration Changelog
 
+> 历史归档：本文只记录 2026-06-11 原型迁移方案，不是当前架构或待办清单。当前运行基线为 React + FastAPI + MySQL + Redis，课程检索使用 MySQL chunk、BM25 与中文 n-gram，不依赖 PostgreSQL、pgvector 或 MinIO。当前状态见 `docs/PROJECT_STATUS.md` 与 `docs/ARCHITECTURE.md`。
+
 ## [Phase 1] 2026-06-11
 
 ### 重大变更
